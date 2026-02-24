@@ -1,0 +1,593 @@
+{
+  "info": {
+    "_postman_id": "cdattg-web-golang-collection",
+    "name": "CDATTG Web - Golang API",
+    "description": "Colección de endpoints para el sistema CDATTG Web desarrollado en Go con Gin Framework",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "cdattg-web-golang"
+  },
+  "item": [
+    {
+      "name": "Autenticación",
+      "description": "Endpoints de autenticación",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"auth_token\", jsonData.token);",
+                  "    pm.environment.set(\"user_id\", jsonData.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"admin@example.com\",\n    \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Autentica un usuario y retorna un token JWT"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Usuario Actual",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"]},
+            "description": "Obtiene la información del usuario autenticado"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Personas",
+      "description": "Endpoints para gestión de personas",
+      "item": [
+        {
+          "name": "Listar Personas",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/personas?page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["personas"],
+              "query": [
+                {"key": "page", "value": "1", "description": "Número de página"},
+                {"key": "page_size", "value": "20", "description": "Tamaño de página"}
+              ]
+            },
+            "description": "Obtiene una lista paginada de personas"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Persona por ID",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/personas/:id", "host": ["{{base_url}}"], "path": ["personas", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Obtiene una persona específica por su ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Crear Persona",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tipo_documento\": 1,\n    \"numero_documento\": \"1234567890\",\n    \"primer_nombre\": \"Juan\",\n    \"segundo_nombre\": \"Carlos\",\n    \"primer_apellido\": \"Pérez\",\n    \"segundo_apellido\": \"García\",\n    \"fecha_nacimiento\": \"1990-01-15\",\n    \"genero\": 1,\n    \"telefono\": \"1234567\",\n    \"celular\": \"3001234567\",\n    \"email\": \"juan.perez@example.com\",\n    \"pais_id\": 1,\n    \"departamento_id\": 1,\n    \"municipio_id\": 1,\n    \"direccion\": \"Calle 123 #45-67\",\n    \"status\": true\n}"
+            },
+            "url": {"raw": "{{base_url}}/personas", "host": ["{{base_url}}"], "path": ["personas"]},
+            "description": "Crea una nueva persona"
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Persona",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tipo_documento\": 1,\n    \"numero_documento\": \"1234567890\",\n    \"primer_nombre\": \"Juan\",\n    \"segundo_nombre\": \"Carlos\",\n    \"primer_apellido\": \"Pérez\",\n    \"segundo_apellido\": \"García\",\n    \"telefono\": \"1234567\",\n    \"celular\": \"3001234567\",\n    \"email\": \"juan.perez.updated@example.com\",\n    \"direccion\": \"Calle 123 #45-67 Actualizada\"\n}"
+            },
+            "url": {"raw": "{{base_url}}/personas/:id", "host": ["{{base_url}}"], "path": ["personas", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Actualiza una persona existente"
+          },
+          "response": []
+        },
+        {
+          "name": "Resetear Contraseña (Persona)",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [],
+            "url": {"raw": "{{base_url}}/personas/:id/reset-password", "host": ["{{base_url}}"], "path": ["personas", ":id", "reset-password"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Restablece la contraseña del usuario asociado a la persona al número de documento"
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar Persona",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{base_url}}/personas/:id", "host": ["{{base_url}}"], "path": ["personas", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Elimina una persona"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Programas de Formación",
+      "description": "Endpoints para gestión de programas de formación",
+      "item": [
+        {
+          "name": "Listar Programas",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/programas-formacion?page=1&page_size=20", "host": ["{{base_url}}"], "path": ["programas-formacion"], "query": [{"key": "page", "value": "1"}, {"key": "page_size", "value": "20"}]},
+            "description": "Obtiene una lista paginada de programas de formación"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Programa por ID",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/programas-formacion/:id", "host": ["{{base_url}}"], "path": ["programas-formacion", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Obtiene un programa de formación por su ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Crear Programa",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"codigo\": \"228106\",\n    \"nombre\": \"Análisis y Desarrollo de Software\",\n    \"red_conocimiento_id\": 1,\n    \"nivel_formacion_id\": 1,\n    \"tipo_programa_id\": 1,\n    \"status\": true,\n    \"horas_totales\": 2436,\n    \"horas_etapa_lectiva\": 1800,\n    \"horas_etapa_productiva\": 636\n}"
+            },
+            "url": {"raw": "{{base_url}}/programas-formacion", "host": ["{{base_url}}"], "path": ["programas-formacion"]},
+            "description": "Crea un nuevo programa de formación"
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Programa",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"codigo\": \"228106\",\n    \"nombre\": \"Análisis y Desarrollo de Software (Actualizado)\",\n    \"status\": true,\n    \"horas_totales\": 2500\n}"
+            },
+            "url": {"raw": "{{base_url}}/programas-formacion/:id", "host": ["{{base_url}}"], "path": ["programas-formacion", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Actualiza un programa de formación existente"
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar Programa",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{base_url}}/programas-formacion/:id", "host": ["{{base_url}}"], "path": ["programas-formacion", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Elimina un programa de formación"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Catálogos (Fichas)",
+      "description": "Catálogos para fichas de caracterización (requiere permiso VER FICHAS)",
+      "item": [
+        {"name": "Sedes", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/sedes", "host": ["{{base_url}}"], "path": ["catalogos", "sedes"]}, "description": "Lista sedes"}, "response": []},
+        {"name": "Ambientes", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/ambientes", "host": ["{{base_url}}"], "path": ["catalogos", "ambientes"]}, "description": "Lista ambientes"}, "response": []},
+        {"name": "Modalidades Formación", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/modalidades-formacion", "host": ["{{base_url}}"], "path": ["catalogos", "modalidades-formacion"]}, "description": "Lista modalidades de formación"}, "response": []},
+        {"name": "Jornadas", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/jornadas", "host": ["{{base_url}}"], "path": ["catalogos", "jornadas"]}, "description": "Lista jornadas"}, "response": []},
+        {"name": "Días Formación", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/dias-formacion", "host": ["{{base_url}}"], "path": ["catalogos", "dias-formacion"]}, "description": "Lista días de formación"}, "response": []}
+      ]
+    },
+    {
+      "name": "Catálogos (Personas)",
+      "description": "Catálogos para personas (requiere permiso VER PERSONAS)",
+      "item": [
+        {"name": "Países", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/paises", "host": ["{{base_url}}"], "path": ["catalogos", "paises"]}, "description": "Lista países"}, "response": []},
+        {"name": "Departamentos", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/departamentos", "host": ["{{base_url}}"], "path": ["catalogos", "departamentos"]}, "description": "Lista departamentos"}, "response": []},
+        {"name": "Municipios", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/municipios", "host": ["{{base_url}}"], "path": ["catalogos", "municipios"]}, "description": "Lista municipios"}, "response": []},
+        {"name": "Tipos Documento", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/tipos-documento", "host": ["{{base_url}}"], "path": ["catalogos", "tipos-documento"]}, "description": "Lista tipos de documento"}, "response": []},
+        {"name": "Géneros", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/generos", "host": ["{{base_url}}"], "path": ["catalogos", "generos"]}, "description": "Lista géneros"}, "response": []},
+        {"name": "Persona Caracterización", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/persona-caracterizacion", "host": ["{{base_url}}"], "path": ["catalogos", "persona-caracterizacion"]}, "description": "Lista opciones de caracterización de persona"}, "response": []},
+        {"name": "Regionales", "request": {"auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]}, "method": "GET", "header": [], "url": {"raw": "{{base_url}}/catalogos/regionales", "host": ["{{base_url}}"], "path": ["catalogos", "regionales"]}, "description": "Lista regionales"}, "response": []}
+      ]
+    },
+    {
+      "name": "Fichas de Caracterización",
+      "description": "Endpoints para gestión de fichas de caracterización",
+      "item": [
+        {
+          "name": "Listar Fichas",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion?page=1&page_size=20", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion"], "query": [{"key": "page", "value": "1"}, {"key": "page_size", "value": "20"}]},
+            "description": "Obtiene una lista paginada de fichas de caracterización"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Ficha por ID",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion/:id", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Obtiene una ficha específica por su ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Ficha Detalle",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion/:id/detalle", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion", ":id", "detalle"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Obtiene una ficha con detalle completo (instructores, aprendices, etc.)"
+          },
+          "response": []
+        },
+        {
+          "name": "Crear Ficha",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"programa_formacion_id\": 1,\n    \"ficha\": \"123456\",\n    \"instructor_id\": 1,\n    \"fecha_inicio\": \"2024-01-15\",\n    \"fecha_fin\": \"2024-12-15\",\n    \"ambiente_id\": 1,\n    \"modalidad_formacion_id\": 1,\n    \"sede_id\": 1,\n    \"jornada_id\": 1,\n    \"total_horas\": 1200,\n    \"status\": true,\n    \"dias_formacion_ids\": [1, 2, 3]\n}"
+            },
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion"]},
+            "description": "Crea una nueva ficha de caracterización"
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Ficha",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"programa_formacion_id\": 1,\n    \"ficha\": \"123456\",\n    \"fecha_inicio\": \"2024-01-15\",\n    \"fecha_fin\": \"2024-12-15\",\n    \"total_horas\": 1300,\n    \"dias_formacion_ids\": [1, 2, 3, 4]\n}"
+            },
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion/:id", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Actualiza una ficha existente"
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar Ficha",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion/:id", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Elimina una ficha"
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Instructores de Ficha",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion/:id/instructores", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion", ":id", "instructores"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Lista los instructores asignados a una ficha"
+          },
+          "response": []
+        },
+        {
+          "name": "Asignar Instructores a Ficha",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"instructor_principal_id\": 1,\n    \"instructores\": [\n        {\n            \"instructor_id\": 1,\n            \"competencia_id\": null,\n            \"fecha_inicio\": \"2024-01-15\",\n            \"fecha_fin\": \"2024-12-15\",\n            \"total_horas_instructor\": 600\n        }\n    ]\n}"
+            },
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion/:id/instructores", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion", ":id", "instructores"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Asigna instructores a una ficha"
+          },
+          "response": []
+        },
+        {
+          "name": "Desasignar Instructor de Ficha",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion/:id/instructores/:instructorId", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion", ":id", "instructores", ":instructorId"], "variable": [{"key": "id", "value": "1"}, {"key": "instructorId", "value": "1"}]},
+            "description": "Desasigna un instructor de una ficha"
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Aprendices de Ficha",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion/:id/aprendices", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion", ":id", "aprendices"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Lista los aprendices asignados a una ficha"
+          },
+          "response": []
+        },
+        {
+          "name": "Asignar Aprendices a Ficha",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n    \"personas\": [1, 2, 3]\n}"},
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion/:id/aprendices", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion", ":id", "aprendices"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Asigna aprendices (por persona_id) a una ficha"
+          },
+          "response": []
+        },
+        {
+          "name": "Desasignar Aprendices de Ficha",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n    \"personas\": [1, 2]\n}"},
+            "url": {"raw": "{{base_url}}/fichas-caracterizacion/:id/aprendices/desasignar", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion", ":id", "aprendices", "desasignar"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Desasigna aprendices (por persona_id) de una ficha"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Instructores",
+      "description": "Endpoints para gestión de instructores",
+      "item": [
+        {
+          "name": "Listar Instructores",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/instructores", "host": ["{{base_url}}"], "path": ["instructores"]},
+            "description": "Obtiene todos los instructores (id, nombre) para selects"
+          },
+          "response": []
+        },
+        {
+          "name": "Crear Instructor desde Persona",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n    \"persona_id\": 1,\n    \"regional_id\": 1\n}"},
+            "url": {"raw": "{{base_url}}/instructores", "host": ["{{base_url}}"], "path": ["instructores"]},
+            "description": "Crea un instructor a partir de una persona existente"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Asistencias",
+      "description": "Endpoints para gestión de asistencias (sesiones e ingresos/salidas)",
+      "item": [
+        {
+          "name": "Crear Sesión de Asistencia",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"instructor_ficha_id\": 1,\n    \"fecha\": \"2024-02-20\",\n    \"hora_inicio\": \"2024-02-20T08:00:00Z\"\n}"
+            },
+            "url": {"raw": "{{base_url}}/asistencias", "host": ["{{base_url}}"], "path": ["asistencias"]},
+            "description": "Crea una nueva sesión de asistencia para un instructor-ficha y fecha"
+          },
+          "response": []
+        },
+        {
+          "name": "Listar por Instructor-Ficha",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/asistencias/instructor-ficha/:instructorFichaId", "host": ["{{base_url}}"], "path": ["asistencias", "instructor-ficha", ":instructorFichaId"], "variable": [{"key": "instructorFichaId", "value": "1"}]},
+            "description": "Lista sesiones de asistencia por ID de instructor-ficha"
+          },
+          "response": []
+        },
+        {
+          "name": "Listar por Ficha y Fechas",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/asistencias/ficha/:fichaId?fecha_inicio=2024-02-01&fecha_fin=2024-02-29",
+              "host": ["{{base_url}}"],
+              "path": ["asistencias", "ficha", ":fichaId"],
+              "query": [{"key": "fecha_inicio", "value": "2024-02-01", "description": "YYYY-MM-DD"}, {"key": "fecha_fin", "value": "2024-02-29", "description": "YYYY-MM-DD"}],
+              "variable": [{"key": "fichaId", "value": "1"}]
+            },
+            "description": "Lista sesiones de asistencia de una ficha en un rango de fechas"
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Ingreso",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n    \"asistencia_id\": 1,\n    \"aprendiz_id\": 1\n}"},
+            "url": {"raw": "{{base_url}}/asistencias/ingreso", "host": ["{{base_url}}"], "path": ["asistencias", "ingreso"]},
+            "description": "Registra el ingreso de un aprendiz a una sesión de asistencia"
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Salida",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [],
+            "url": {"raw": "{{base_url}}/asistencias/aprendiz/:asistenciaAprendizId/salida", "host": ["{{base_url}}"], "path": ["asistencias", "aprendiz", ":asistenciaAprendizId", "salida"], "variable": [{"key": "asistenciaAprendizId", "value": "1"}]},
+            "description": "Registra la salida de un aprendiz en una sesión"
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Aprendices en Sesión",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/asistencias/:id/aprendices", "host": ["{{base_url}}"], "path": ["asistencias", ":id", "aprendices"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Lista los aprendices registrados en una sesión de asistencia"
+          },
+          "response": []
+        },
+        {
+          "name": "Finalizar Sesión",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [],
+            "url": {"raw": "{{base_url}}/asistencias/:id/finalizar", "host": ["{{base_url}}"], "path": ["asistencias", ":id", "finalizar"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Finaliza una sesión de asistencia"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Sesión por ID",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/asistencias/:id", "host": ["{{base_url}}"], "path": ["asistencias", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Obtiene una sesión de asistencia por su ID"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Aprendices",
+      "description": "Endpoints para gestión de aprendices",
+      "item": [
+        {
+          "name": "Listar Aprendices",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/aprendices?page=1&page_size=20", "host": ["{{base_url}}"], "path": ["aprendices"], "query": [{"key": "page", "value": "1"}, {"key": "page_size", "value": "20"}]},
+            "description": "Obtiene una lista paginada de aprendices"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Aprendiz por ID",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/aprendices/:id", "host": ["{{base_url}}"], "path": ["aprendices", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Obtiene un aprendiz por su ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Crear Aprendiz",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n    \"persona_id\": 1,\n    \"ficha_caracterizacion_id\": 1,\n    \"estado\": true\n}"},
+            "url": {"raw": "{{base_url}}/aprendices", "host": ["{{base_url}}"], "path": ["aprendices"]},
+            "description": "Crea un aprendiz (asigna persona a ficha)"
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Aprendiz",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n    \"persona_id\": 1,\n    \"ficha_caracterizacion_id\": 1,\n    \"estado\": true\n}"},
+            "url": {"raw": "{{base_url}}/aprendices/:id", "host": ["{{base_url}}"], "path": ["aprendices", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Actualiza un aprendiz"
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar Aprendiz",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{auth_token}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{base_url}}/aprendices/:id", "host": ["{{base_url}}"], "path": ["aprendices", ":id"], "variable": [{"key": "id", "value": "1"}]},
+            "description": "Elimina un aprendiz"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [{"listen": "prerequest", "script": {"type": "text/javascript", "exec": [""]}}, {"listen": "test", "script": {"type": "text/javascript", "exec": [""]}}],
+  "variable": [{"key": "base_url", "value": "http://localhost:8080/api", "type": "string"}, {"key": "auth_token", "value": "", "type": "string"}]
+}

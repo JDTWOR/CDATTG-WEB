@@ -57,7 +57,6 @@ import type {
   ContratoConvenioResponse,
   UsuarioListItem,
   UsuarioPermisosResponse,
-  PermisoPair,
   DefinicionesPermisosResponse,
 } from '../types';
 

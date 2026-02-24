@@ -80,11 +80,16 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
     load();
   }, [load]);
 
-  const filterByQuery = <T extends { nombre?: string; persona_nombre?: string; full_name?: string }>(list: T[], query: string) => {
+  type WithDisplayName = { nombre?: string; persona_nombre?: string; full_name?: string; instructor_nombre?: string };
+  const filterByQuery = <T extends WithDisplayName>(list: T[], query: string): T[] => {
     const q = query.trim().toLowerCase();
     if (!q) return list;
     return list.filter((x) => {
-      const name = 'nombre' in x ? x.nombre : 'persona_nombre' in x ? x.persona_nombre : (x as PersonaResponse).full_name || '';
+      const name =
+        'nombre' in x && x.nombre ? x.nombre
+        : 'persona_nombre' in x && x.persona_nombre ? x.persona_nombre
+        : 'instructor_nombre' in x && x.instructor_nombre ? x.instructor_nombre
+        : (x as unknown as { full_name?: string }).full_name || '';
       return String(name).toLowerCase().includes(q);
     });
   };
@@ -96,8 +101,8 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
     ? (noAsignados as InstructorItem[])
     : (noAsignados as PersonaResponse[]).map((p) => ({ ...p, nombre: p.full_name }));
 
-  const asignadosF = filterByQuery(asignadosConNombre, filterAsignados) as (InstructorFichaResponse | AprendizResponse)[];
-  const noAsignadosF = filterByQuery(noAsignadosConNombre, filterNoAsignados) as (InstructorItem | PersonaResponse)[];
+  const asignadosF = filterByQuery(asignadosConNombre as WithDisplayName[], filterAsignados) as (InstructorFichaResponse | AprendizResponse)[];
+  const noAsignadosF = filterByQuery(noAsignadosConNombre as WithDisplayName[], filterNoAsignados) as (InstructorItem | PersonaResponse)[];
 
   const handleAssignInstructor = async (instructorId: number) => {
     const principal = instructorPrincipalId ?? (asignados as InstructorFichaResponse[])[0]?.instructor_id;
@@ -260,7 +265,7 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
                   {asignadosF.length === 0 ? (
                     <li className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">Arrastre aquí para asignar</li>
                   ) : (
-                    (asignadosF as (InstructorFichaResponse | AprendizResponse)[]).map((item) => {
+                    asignadosF.map((item) => {
                       const id = isInstructores ? (item as InstructorFichaResponse).instructor_id : (item as AprendizResponse).persona_id;
                       const label = isInstructores ? (item as InstructorFichaResponse).instructor_nombre : (item as AprendizResponse).persona_nombre;
                       return (
@@ -323,7 +328,7 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
                   {noAsignadosF.length === 0 ? (
                     <li className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">Ninguno disponible</li>
                   ) : (
-                    (noAsignadosF as (InstructorItem | PersonaResponse)[]).map((item) => {
+                    noAsignadosF.map((item) => {
                       const id = isInstructores ? (item as InstructorItem).id : (item as PersonaResponse).id;
                       const label = isInstructores ? (item as InstructorItem).nombre : (item as PersonaResponse).full_name || '';
                       return (

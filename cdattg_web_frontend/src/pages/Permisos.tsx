@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { ArrowLeftIcon, UserCircleIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
-import type { UsuarioListItem, UsuarioPermisosResponse, PermisoPair, DefinicionesPermisosResponse } from '../types';
+import type { UsuarioListItem, UsuarioPermisosResponse, DefinicionesPermisosResponse } from '../types';
 
 const PAGE_SIZE = 20;
 
 export function Permisos() {
   const { userId } = useParams<{ userId: string }>();
-  const navigate = useNavigate();
   const { user: currentUser, roles, hasPermission } = useAuth();
   const isSuperAdmin = roles.includes('SUPER ADMINISTRADOR');
 

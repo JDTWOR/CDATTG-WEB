@@ -423,7 +423,7 @@ export interface ProductoCreateRequest {
   fecha_vencimiento?: string;
 }
 
-export interface ProductoUpdateRequest extends ProductoCreateRequest {
+export interface ProductoUpdateRequest extends Omit<ProductoCreateRequest, 'cantidad' | 'proveedor_id'> {
   cantidad?: number;
   proveedor_id?: number;
 }

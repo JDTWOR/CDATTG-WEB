@@ -1,0 +1,33 @@
+# CDATTG - API (Go). Copiar a /etc/nginx/sites-available/apicdattg.dataguaviare.com.co
+# Luego: sudo ln -s /etc/nginx/sites-available/apicdattg.dataguaviare.com.co /etc/nginx/sites-enabled/
+# Certbot: sudo certbot --nginx -d apicdattg.dataguaviare.com.co
+
+server {
+    server_name apicdattg.dataguaviare.com.co;
+
+    access_log /var/log/nginx/apicdattg.access.log;
+    error_log  /var/log/nginx/apicdattg.error.log;
+
+    add_header X-Content-Type-Options nosniff;
+    add_header X-Frame-Options SAMEORIGIN;
+    add_header X-XSS-Protection "1; mode=block";
+
+    client_max_body_size 100M;
+    client_body_timeout 300s;
+    client_body_buffer_size 128k;
+
+    location / {
+        proxy_pass http://127.0.0.1:9081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 300s;
+    }
+
+    listen 80;
+    listen [::]:80;
+}

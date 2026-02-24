@@ -41,41 +41,27 @@ services:
       SERVER_HOST: "0.0.0.0"
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET obligatorio}
       JWT_EXPIRATION_HOURS: ${JWT_EXPIRATION_HOURS:-24}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://academica.jhonrojas.online}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://cdattg.dataguaviare.com.co}
       CORS_ALLOWED_METHODS: "GET,POST,PUT,DELETE,PATCH,OPTIONS"
       CORS_ALLOWED_HEADERS: "*"
       CORS_ALLOW_CREDENTIALS: "true"
       ENV: production
     volumes:
       - backend_storage:/app/storage
+    ports:
+      - "127.0.0.1:9081:8080"
 
   frontend:
     build:
       context: ./cdattg_web_frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://apiacademica.jhonrojas.online/api}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://apicdattg.dataguaviare.com.co/api}
     container_name: cdattg-frontend
     restart: unless-stopped
-
-  caddy:
-    image: caddy:2-alpine
-    container_name: cdattg-caddy
-    restart: unless-stopped
-    depends_on:
-      - backend
-      - frontend
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      - "127.0.0.1:9080:80"
 
 volumes:
   postgres_data:
   backend_storage:
-  caddy_data:
-  caddy_config:

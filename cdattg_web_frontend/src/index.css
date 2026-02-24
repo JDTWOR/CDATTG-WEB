@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Variables para React Select (light/dark) */
+:root {
+  --select-bg: #ffffff;
+  --select-border: #d1d5db;
+  --select-border-hover: #9ca3af;
+  --select-text: #111827;
+  --select-text-muted: #6b7280;
+  --select-menu-bg: #ffffff;
+  --select-option-focus: #e0f2fe;
+}
+.dark {
+  --select-bg: #374151;
+  --select-border: #4b5563;
+  --select-border-hover: #6b7280;
+  --select-text: #f3f4f6;
+  --select-text-muted: #9ca3af;
+  --select-menu-bg: #374151;
+  --select-option-focus: #1e3a5f;
+}
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-gray-200;
+  }
+  
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100;
+  }
+  
+  .card {
+    @apply bg-white rounded-lg shadow-md p-6 dark:bg-gray-800 dark:shadow-gray-900/50;
+  }
+}

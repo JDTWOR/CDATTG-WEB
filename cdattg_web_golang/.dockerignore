@@ -1,0 +1,9 @@
+.git
+.gitignore
+*.md
+.env
+.env.*
+storage/
+*.test
+*.out
+vendor/

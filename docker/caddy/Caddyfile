@@ -1,0 +1,9 @@
+# Frontend: academica.jhonrojas.online
+academica.jhonrojas.online {
+    reverse_proxy frontend:80
+}
+
+# API: apiacademica.jhonrojas.online
+apiacademica.jhonrojas.online {
+    reverse_proxy backend:8080
+}

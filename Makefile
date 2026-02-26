@@ -28,9 +28,9 @@ db-drop-recreate:
 	docker compose exec -T postgres psql -U $(DB_USER) -d postgres -c "DROP DATABASE IF EXISTS $(DB_NAME);"
 	docker compose exec -T postgres psql -U $(DB_USER) -d postgres -c "CREATE DATABASE $(DB_NAME);"
 
-# Ejecutar migraciones + seed (desde el host; requiere stack levantado y Go en cdattg_web_golang)
+# Ejecutar migraciones + seed dentro del contenedor backend (no requiere Go en el host)
 db-seed:
-	@cd $(BACKEND_DIR) && DB_HOST=127.0.0.1 go run ./cmd/seed
+	docker compose run --rm --entrypoint /app/seed backend
 
 # Borrar volumen, levantar de nuevo y ejecutar seed (reset completo)
 db-reset: docker-down docker-up
@@ -46,6 +46,6 @@ help:
 	@echo "  make docker-up         - Levantar stack (docker compose up -d --build)"
 	@echo "  make docker-down       - Parar y borrar volumen de Postgres"
 	@echo "  make db-drop-recreate  - Dropear y recrear la base (sin borrar volumen)"
-	@echo "  make db-seed           - Ejecutar migraciones y seeders (stack levantado)"
+	@echo "  make db-seed           - Ejecutar migraciones y seeders (dentro del contenedor)"
 	@echo "  make db-fresh          - Dropear DB + migraciones + seed (rápido)"
 	@echo "  make db-reset          - Borrar volumen, levantar y seed (reset completo)"

@@ -113,7 +113,7 @@ docker compose up -d --build
 | `make docker-up` | Levantar el stack. |
 | `make docker-down` | Parar y borrar el volumen de Postgres. |
 
-Requiere Go instalado en el host para `db-seed` / `db-fresh` / `db-reset` (el seed se ejecuta desde el host contra el Postgres del contenedor). Ver también `make help` en la raíz y `make help` en `cdattg_web_golang`.
+El seed se ejecuta dentro del contenedor del backend; no hace falta tener Go instalado en el servidor. Ver también `make help` en la raíz y `make help` en `cdattg_web_golang`.
 
 ## Notas HTTPS
 

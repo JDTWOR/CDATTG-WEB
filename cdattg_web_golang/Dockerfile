@@ -12,8 +12,9 @@ RUN go mod download
 
 COPY . .
 
-# Compilar binario estático
+# Compilar binarios estáticos (API y seed)
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/cdattg-api .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/seed ./cmd/seed
 
 # Stage final
 FROM alpine:3.21
@@ -23,8 +24,9 @@ ENV TZ=America/Bogota
 
 WORKDIR /app
 
-# Copiar binario, authz y entrypoint
+# Copiar binarios, authz y entrypoint
 COPY --from=builder /app/cdattg-api .
+COPY --from=builder /app/seed .
 COPY --from=builder /app/authz ./authz
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

@@ -105,7 +105,14 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
   const noAsignadosF = filterByQuery(noAsignadosConNombre as WithDisplayName[], filterNoAsignados) as (InstructorItem | PersonaResponse)[];
 
   const handleAssignInstructor = async (instructorId: number) => {
-    const principal = instructorPrincipalId ?? (asignados as InstructorFichaResponse[])[0]?.instructor_id;
+    const asignadosActuales = asignados as InstructorFichaResponse[];
+    let principal = instructorPrincipalId ?? asignadosActuales[0]?.instructor_id;
+
+    if (!principal) {
+      // Si no hay ninguno asignado todavía, el primero que se asigne será el principal
+      principal = instructorId;
+    }
+
     if (!principal) {
       setError('Seleccione un instructor principal primero (en la columna izquierda).');
       return;

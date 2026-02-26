@@ -245,6 +245,31 @@ export const FichasCaracterizacion = () => {
     }
   };
 
+  const handleDownloadIncidencias = () => {
+    if (!importResult?.incident_report_base64) return;
+    try {
+      const binary = atob(importResult.incident_report_base64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'reporte_incidencias_ficha.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // Silenciar errores de descarga en UI; el usuario puede reintentar la importación si es necesario.
+    }
+  };
+
   const totalPages = Math.ceil(total / pageSize);
 
   const filteredList =
@@ -749,9 +774,18 @@ export const FichasCaracterizacion = () => {
                 <p><strong>Resultado:</strong> {importResult.status}</p>
                 <p>Aprendices agregados a la ficha: {importResult.processed_count}</p>
                 <p>Personas creadas: {importResult.created_count} · Actualizadas: {importResult.updated_count}</p>
-                {importResult.duplicates_count > 0 && <p>Ya estaban en la ficha: {importResult.duplicates_count}</p>}
-                {importResult.error_count > 0 && <p>Errores: {importResult.error_count}</p>}
+                {importResult.duplicates_count > 0 && <p>Registros no agregados por estar ya inscritos: {importResult.duplicates_count}</p>}
+                {importResult.error_count > 0 && <p>Errores al crear/actualizar personas: {importResult.error_count}</p>}
                 {importResult.ficha_created && <p>Se creó la ficha en esta importación.</p>}
+                {importResult.incident_report_base64 && (
+                  <button
+                    type="button"
+                    onClick={handleDownloadIncidencias}
+                    className="mt-2 inline-flex items-center rounded-md bg-white/90 px-3 py-1.5 text-xs font-medium text-primary-700 shadow-sm ring-1 ring-inset ring-primary-200 hover:bg-white"
+                  >
+                    Descargar reporte de incidencias (Excel)
+                  </button>
+                )}
               </div>
             )}
             <div className="mb-4">

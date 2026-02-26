@@ -3,3 +3,7 @@
 .env.local
 *.log
 .cursor/
+
+# Excel temporales / datos locales
+*.xlsx
+*.xls

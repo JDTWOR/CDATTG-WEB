@@ -27,6 +27,8 @@ export const Asistencia = () => {
   const [sesionActual, setSesionActual] = useState<AsistenciaResponse | null>(null);
   const [aprendicesFicha, setAprendicesFicha] = useState<AprendizResponse[]>([]);
   const [aprendicesEnSesion, setAprendicesEnSesion] = useState<AsistenciaAprendizResponse[]>([]);
+  const [loadingAprendices, setLoadingAprendices] = useState(false);
+  const [errorAprendices, setErrorAprendices] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [instructorFichaSeleccionado, _setInstructorFichaSeleccionado] = useState<number | ''>('');
@@ -74,6 +76,9 @@ export const Asistencia = () => {
   const loadAprendicesYSesion = async (asistenciaId: number, fichaIdParam?: number) => {
     const fid = fichaIdParam ?? fichaId;
     if (!fid) return;
+    setErrorAprendices('');
+    setLoadingAprendices(true);
+    setAprendicesFicha([]);
     try {
       const [aprendices, enSesion] = await Promise.all([
         apiService.getFichaAprendices(fid),
@@ -81,17 +86,29 @@ export const Asistencia = () => {
       ]);
       setAprendicesFicha(aprendices.filter((a) => a.estado));
       setAprendicesEnSesion(enSesion);
-    } catch (_) {}
+    } catch (e: any) {
+      const msg = e.response?.data?.error || e.message || 'No se pudo cargar el listado de aprendices. Verifique permisos (VER ASISTENCIA) o que los aprendices estén asignados a la ficha.';
+      setErrorAprendices(msg);
+      setAprendicesFicha([]);
+      setAprendicesEnSesion([]);
+    } finally {
+      setLoadingAprendices(false);
+    }
   };
 
   useEffect(() => {
     if (sesionActual && fichaId) loadAprendicesYSesion(sesionActual.id, fichaId);
-    else setAprendicesEnSesion([]);
+    else {
+      setAprendicesEnSesion([]);
+      if (!sesionActual) setAprendicesFicha([]);
+    }
   }, [sesionActual?.id, fichaId]);
 
   const handleTomarAsistencia = async (id: number) => {
     setError('');
+    setErrorAprendices('');
     setLoading(true);
+    setAprendicesFicha([]);
     try {
       const sesion = await apiService.entrarTomarAsistencia(id);
       setFichaId(id);
@@ -327,6 +344,13 @@ export const Asistencia = () => {
             <h3 className="mb-1 text-lg font-semibold text-gray-900">Listado de aprendices</h3>
             <p className="mb-4 text-sm text-gray-600">Entradas y salidas por sesión</p>
 
+            {errorAprendices && (
+              <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+                <ExclamationTriangleIcon className="h-5 w-5 shrink-0 mt-0.5" />
+                <p className="text-sm">{errorAprendices}</p>
+              </div>
+            )}
+
             {/* Registro manual por documento */}
             <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
               <p className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase text-gray-700">
@@ -365,9 +389,13 @@ export const Asistencia = () => {
             </div>
 
             {/* Listado de aprendices: en móvil tarjetas, en desktop tabla */}
-            {aprendicesFicha.length === 0 ? (
+            {loadingAprendices ? (
               <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-8 text-center text-gray-500 text-sm">
-                No hay aprendices en esta ficha.
+                Cargando listado de aprendices...
+              </div>
+            ) : aprendicesFicha.length === 0 ? (
+              <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-8 text-center text-gray-500 text-sm">
+                No hay aprendices en esta ficha. Si debería haber aprendices, asígnelos desde Fichas de caracterización (pestaña Aprendices de la ficha).
               </div>
             ) : (
               <>

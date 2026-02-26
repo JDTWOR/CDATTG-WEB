@@ -20,11 +20,12 @@ export const Aprendices = () => {
   const [editFichaId, setEditFichaId] = useState<string>('');
   const [editEstado, setEditEstado] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [searchText, setSearchText] = useState('');
 
   const fetchAprendices = async () => {
     try {
       setLoading(true);
-      const res = await apiService.getAprendices(1, 100);
+      const res = await apiService.getAprendices(1, 100, undefined, searchText.trim() || undefined);
       setList(res.data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Error al cargar aprendices');
@@ -34,8 +35,9 @@ export const Aprendices = () => {
   };
 
   useEffect(() => {
-    fetchAprendices();
-  }, []);
+    const t = setTimeout(() => fetchAprendices(), 300);
+    return () => clearTimeout(t);
+  }, [searchText]);
 
   useEffect(() => {
     if (modalOpen || modalEdit) {
@@ -143,9 +145,11 @@ export const Aprendices = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-600 flex items-center gap-4">
           <input
-            type="text"
-            placeholder="Buscar por nombre, documento, ficha..."
+            type="search"
+            placeholder="Buscar por nombre, documento, ficha o programa..."
             className="input-field flex-1 max-w-md"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
           />
           <select className="input-field w-40">
             <option>Todos los estados</option>

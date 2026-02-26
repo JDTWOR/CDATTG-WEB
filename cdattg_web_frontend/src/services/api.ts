@@ -410,9 +410,9 @@ class ApiService {
   }
 
   // Aprendices (CRUD global)
-  async getAprendices(page = 1, pageSize = 20, fichaId?: number): Promise<PaginatedResponse<AprendizResponse>> {
+  async getAprendices(page = 1, pageSize = 20, fichaId?: number, search?: string): Promise<PaginatedResponse<AprendizResponse>> {
     const response = await this.api.get<PaginatedResponse<AprendizResponse>>('/aprendices', {
-      params: { page, page_size: pageSize, ficha_id: fichaId },
+      params: { page, page_size: pageSize, ficha_id: fichaId, search: search || undefined },
     });
     return response.data;
   }

@@ -1,4 +1,4 @@
-.PHONY: run build test clean deps migrate
+.PHONY: run build test clean deps migrate seed help
 
 # Variables
 BINARY_NAME=cdattg-web-golang
@@ -46,9 +46,13 @@ install-tools:
 lint:
 	golangci-lint run
 
-# Migraciones (si se implementan)
-migrate:
-	@echo "Migraciones no implementadas aún"
+# Migraciones + seed (GORM AutoMigrate se ejecuta dentro del seed)
+seed:
+	go run ./cmd/seed
+
+# Migraciones (en este proyecto se ejecutan dentro del seed)
+migrate: seed
+	@echo "Migraciones y seeders completados."
 
 # Ayuda
 help:
@@ -62,3 +66,5 @@ help:
 	@echo "  make fmt          - Formatear código"
 	@echo "  make vet          - Verificar código"
 	@echo "  make lint         - Ejecutar linter"
+	@echo "  make seed         - Ejecutar migraciones y seeders"
+	@echo "  make migrate      - Igual que seed (migrate incluido en seed)"

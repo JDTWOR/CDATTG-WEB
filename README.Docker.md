@@ -101,9 +101,19 @@ docker compose logs -f
 
 # Reconstruir y levantar
 docker compose up -d --build
-
-# Ejecutar seeders (datos iniciales): ver documentación en cdattg_web_golang (cmd/seed).
 ```
+
+### Base de datos (Make, desde la raíz del proyecto)
+
+| Comando | Descripción |
+|---------|-------------|
+| `make db-seed` | Ejecutar migraciones y seeders (stack ya levantado). |
+| `make db-fresh` | Dropear la base, recrearla y ejecutar migraciones + seed (rápido). |
+| `make db-reset` | Borrar volumen de Postgres, levantar de nuevo y ejecutar seed (reset completo). |
+| `make docker-up` | Levantar el stack. |
+| `make docker-down` | Parar y borrar el volumen de Postgres. |
+
+Requiere Go instalado en el host para `db-seed` / `db-fresh` / `db-reset` (el seed se ejecuta desde el host contra el Postgres del contenedor). Ver también `make help` en la raíz y `make help` en `cdattg_web_golang`.
 
 ## Notas HTTPS
 

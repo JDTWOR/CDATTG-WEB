@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -55,6 +56,7 @@ type FichaImportResult struct {
 	ErrorCount      int `json:"error_count"`
 	FichaCreated    bool `json:"ficha_created"`
 	Status          string `json:"status"`
+	IncidentReportBase64 string `json:"incident_report_base64,omitempty"`
 }
 
 func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) (*FichaImportResult, error) {
@@ -152,6 +154,35 @@ func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) 
 
 	var processed, updated, created, duplicates, errors int
 
+	// Mapa para detectar duplicados dentro del mismo archivo (solo nuevas personas creadas en esta importación)
+	seenEmailPersona := make(map[string]uint)
+	seenCelularPersona := make(map[string]uint)
+
+	// Libro para reporte de incidencias
+	incidentFile := excelize.NewFile()
+	incidentSheet := "Incidencias"
+	defaultSheet := incidentFile.GetSheetName(0)
+	if defaultSheet != "" {
+		_ = incidentFile.SetSheetName(defaultSheet, incidentSheet)
+	}
+	incidentHeaders := []string{"tipo_incidente", "numero_documento", "nombre", "apellidos", "correo_original", "celular_original", "ficha_origen", "ficha_destino", "detalle"}
+	for i, h := range incidentHeaders {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		_ = incidentFile.SetCellValue(incidentSheet, cell, h)
+	}
+	incidentRow := 2
+	hasIncidents := false
+
+	addIncident := func(tipo, numeroDoc, nombre, apellidos, correoOrig, celularOrig, fichaOrigen, fichaDestino, detalle string) {
+		hasIncidents = true
+		values := []string{tipo, numeroDoc, nombre, apellidos, correoOrig, celularOrig, fichaOrigen, fichaDestino, detalle}
+		for i, v := range values {
+			cell, _ := excelize.CoordinatesToCellName(i+1, incidentRow)
+			_ = incidentFile.SetCellValue(incidentSheet, cell, v)
+		}
+		incidentRow++
+	}
+
 	for i := dataStartRow; i < len(rows); i++ {
 		row := rows[i]
 		if len(row) <= fichaColNumDoc {
@@ -174,6 +205,9 @@ func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) 
 			correo = strings.TrimSpace(row[fichaColCorreo])
 		}
 
+		correoOriginal := correo
+		celularOriginal := celular
+
 		primerNombre, segundoNombre := splitNombre(nombreStr)
 		primerApellido, segundoApellido := splitNombre(apellidosStr)
 		if primerNombre == "" && primerApellido == "" {
@@ -182,6 +216,57 @@ func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) 
 		}
 
 		tipoID := tipoByCode[tipoDocStr]
+
+		// Reglas de duplicados de correo/celular:
+		// - Si el correo ya existe en BD o ya se usó en esta misma importación para otra persona nueva,
+		//   no se guarda el correo en esta persona y se registra incidencia.
+		// - Si el celular ya existe en BD o ya se usó en esta misma importación para otra persona nueva,
+		//   no se guarda el celular en esta persona y se registra incidencia.
+		// - Si el duplicado es dentro del mismo archivo (seen*), se limpia también el valor de la primera persona creada.
+
+		var firstPersonaEmailID uint
+		var emailSeen bool
+		if correo != "" {
+			firstPersonaEmailID, emailSeen = seenEmailPersona[strings.ToLower(correo)]
+		}
+		emailDuplicadoBD := correo != "" && s.personaRepo.ExistsByEmail(correo)
+		emailDuplicadoEnImport := correo != "" && emailSeen
+
+		if correo != "" && (emailDuplicadoBD || emailDuplicadoEnImport) {
+			detalle := "Correo ya registrado en otra persona"
+			addIncident("EMAIL_DUPLICADO", numeroDoc, nombreStr, apellidosStr, correoOriginal, celularOriginal, "", fichaCode, detalle)
+			// Si es duplicado dentro del mismo archivo y la primera persona fue creada en esta importación,
+			// se limpia también el correo de la primera persona.
+			if emailDuplicadoEnImport && firstPersonaEmailID != 0 {
+				if p, err := s.personaRepo.FindByID(firstPersonaEmailID); err == nil && p != nil && p.Email != "" {
+					p.Email = ""
+					_ = s.personaRepo.Update(p)
+				}
+			}
+			// No guardar correo para esta persona
+			correo = ""
+		}
+
+		var firstPersonaCelID uint
+		var celSeen bool
+		if celular != "" {
+			firstPersonaCelID, celSeen = seenCelularPersona[celular]
+		}
+		celDuplicadoBD := celular != "" && s.personaRepo.ExistsByCelular(celular)
+		celDuplicadoEnImport := celular != "" && celSeen
+
+		if celular != "" && (celDuplicadoBD || celDuplicadoEnImport) {
+			detalle := "Celular ya registrado en otra persona"
+			addIncident("CELULAR_DUPLICADO", numeroDoc, nombreStr, apellidosStr, correoOriginal, celularOriginal, "", fichaCode, detalle)
+			if celDuplicadoEnImport && firstPersonaCelID != 0 {
+				if p, err := s.personaRepo.FindByID(firstPersonaCelID); err == nil && p != nil && p.Celular != "" {
+					p.Celular = ""
+					_ = s.personaRepo.Update(p)
+				}
+			}
+			// No guardar celular para esta persona
+			celular = ""
+		}
 		req := dto.PersonaRequest{
 			NumeroDocumento: numeroDoc,
 			PrimerNombre:    primerNombre,
@@ -198,6 +283,7 @@ func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) 
 
 		persona, errFind := s.personaRepo.FindByNumeroDocumento(numeroDoc)
 		var personaID uint
+		isNewPersona := false
 		if errFind != nil || persona == nil {
 			createdResp, errCreate := s.personaSvc.Create(req)
 			if errCreate != nil {
@@ -205,6 +291,7 @@ func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) 
 				continue
 			}
 			personaID = createdResp.ID
+			isNewPersona = true
 			created++
 		} else {
 			personaID = persona.ID
@@ -216,8 +303,37 @@ func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) 
 			updated++
 		}
 
-		_, errAprendiz := s.aprendizRepo.FindByPersonaIDAndFichaID(personaID, ficha.ID)
-		if errAprendiz == nil {
+		// Registrar correos/celulares usados por personas nuevas creadas en esta importación
+		if isNewPersona && correoOriginal != "" {
+			seenEmailPersona[strings.ToLower(correoOriginal)] = personaID
+		}
+		if isNewPersona && celularOriginal != "" {
+			seenCelularPersona[celularOriginal] = personaID
+		}
+
+		// Reglas de inscripción en ficha:
+		// - Si ya está inscrito en esta ficha: contar como duplicado y no volver a inscribir.
+		// - Si ya está inscrito en otra ficha diferente: no inscribir en esta ficha y registrar incidencia.
+
+		if existingAprendiz, errAprendiz := s.aprendizRepo.FindByPersonaID(personaID); errAprendiz == nil && existingAprendiz != nil {
+			if existingAprendiz.FichaCaracterizacionID == ficha.ID {
+				duplicates++
+				continue
+			}
+
+			duplicates++
+
+			fichaOrigenCodigo := ""
+			if fichaOrigen, errFicha := s.fichaRepo.FindByID(existingAprendiz.FichaCaracterizacionID); errFicha == nil && fichaOrigen != nil {
+				fichaOrigenCodigo = fichaOrigen.Ficha
+			}
+
+			detalle := "Persona ya inscrita en otra ficha de formación"
+			addIncident("YA_EN_OTRA_FICHA", numeroDoc, nombreStr, apellidosStr, correoOriginal, celularOriginal, fichaOrigenCodigo, fichaCode, detalle)
+			continue
+		}
+
+		if _, errAprendiz := s.aprendizRepo.FindByPersonaIDAndFichaID(personaID, ficha.ID); errAprendiz == nil {
 			duplicates++
 			continue
 		}
@@ -233,6 +349,14 @@ func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) 
 		processed++
 	}
 
+	var incidentBase64 string
+	if hasIncidents {
+		var buf bytes.Buffer
+		if err := incidentFile.Write(&buf); err == nil {
+			incidentBase64 = base64.StdEncoding.EncodeToString(buf.Bytes())
+		}
+	}
+
 	return &FichaImportResult{
 		ProcessedCount:   processed,
 		UpdatedCount:    updated,
@@ -241,6 +365,7 @@ func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) 
 		ErrorCount:      errors,
 		FichaCreated:    fichaCreated,
 		Status:          "completado",
+		IncidentReportBase64: incidentBase64,
 	}, nil
 }
 

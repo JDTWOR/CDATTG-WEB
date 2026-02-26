@@ -10,7 +10,7 @@ import (
 )
 
 type AprendizService interface {
-	FindAll(page, pageSize int, fichaID *uint) ([]dto.AprendizResponse, int64, error)
+	FindAll(page, pageSize int, fichaID *uint, search string) ([]dto.AprendizResponse, int64, error)
 	FindByID(id uint) (*dto.AprendizResponse, error)
 	Create(req dto.AprendizRequest) (*dto.AprendizResponse, error)
 	Update(id uint, req dto.AprendizRequest) (*dto.AprendizResponse, error)
@@ -29,8 +29,8 @@ func NewAprendizService() AprendizService {
 	}
 }
 
-func (s *aprendizService) FindAll(page, pageSize int, fichaID *uint) ([]dto.AprendizResponse, int64, error) {
-	list, total, err := s.repo.FindAll(page, pageSize, fichaID)
+func (s *aprendizService) FindAll(page, pageSize int, fichaID *uint, search string) ([]dto.AprendizResponse, int64, error) {
+	list, total, err := s.repo.FindAll(page, pageSize, fichaID, search)
 	if err != nil {
 		return nil, 0, err
 	}

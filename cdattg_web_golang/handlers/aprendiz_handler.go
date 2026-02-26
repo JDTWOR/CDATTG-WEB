@@ -20,6 +20,7 @@ func NewAprendizHandler() *AprendizHandler {
 func (h *AprendizHandler) GetAll(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	search := c.Query("search")
 	var fichaID *uint
 	if fid := c.Query("ficha_id"); fid != "" {
 		if v, err := strconv.ParseUint(fid, 10, 32); err == nil {
@@ -27,7 +28,7 @@ func (h *AprendizHandler) GetAll(c *gin.Context) {
 			fichaID = &u
 		}
 	}
-	list, total, err := h.svc.FindAll(page, pageSize, fichaID)
+	list, total, err := h.svc.FindAll(page, pageSize, fichaID, search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

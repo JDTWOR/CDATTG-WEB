@@ -140,6 +140,7 @@ export interface FichaImportResult {
   error_count: number;
   ficha_created: boolean;
   status: string;
+  incident_report_base64?: string;
 }
 
 // Programas de formación

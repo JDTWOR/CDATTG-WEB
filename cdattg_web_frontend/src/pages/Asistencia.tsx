@@ -41,6 +41,11 @@ export const Asistencia = () => {
   const [registrandoManual, setRegistrandoManual] = useState(false);
   const [observacionesModal, setObservacionesModal] = useState<{ asistenciaId: number; aprendizId: number; nombre: string; observaciones: string } | null>(null);
   const [observacionesGuardando, setObservacionesGuardando] = useState(false);
+  const [estadoModal, setEstadoModal] = useState<{ asistenciaAprendizId: number; nombre: string; estado: string; motivo: string } | null>(null);
+  const [estadoGuardando, setEstadoGuardando] = useState(false);
+  const [pendientesRevision, setPendientesRevision] = useState<AsistenciaAprendizResponse[]>([]);
+  const [pendientesLoading, setPendientesLoading] = useState(false);
+  const [pendientesError, setPendientesError] = useState('');
 
   // Siempre pedir "mis fichas" (instructor asignado). Superadmin/otros reciben lista vacía.
   const fetchFichas = async () => {
@@ -57,6 +62,29 @@ export const Asistencia = () => {
 
   useEffect(() => {
     fetchFichas();
+  }, []);
+
+  // Cargar pendientes de revisión (para instructor actual) al entrar a la pantalla
+  useEffect(() => {
+    const loadPendientes = async () => {
+      setPendientesLoading(true);
+      setPendientesError('');
+      try {
+        const data = await apiService.getAsistenciaPendientesRevision();
+        setPendientesRevision(data);
+      } catch (e: any) {
+        const msg =
+          e.response?.data?.error ||
+          (e.response?.status === 403
+            ? 'Solo instructores con permiso de asistencia pueden ver pendientes de revisión.'
+            : 'No se pudo cargar la bandeja de pendientes de revisión.');
+        setPendientesError(msg);
+        setPendientesRevision([]);
+      } finally {
+        setPendientesLoading(false);
+      }
+    };
+    loadPendientes();
   }, []);
 
   useEffect(() => {
@@ -195,6 +223,32 @@ export const Asistencia = () => {
       alert(e.response?.data?.error || 'Error al guardar observaciones');
     } finally {
       setObservacionesGuardando(false);
+    }
+  };
+
+  const handleGuardarEstado = async () => {
+    if (!estadoModal) return;
+    setEstadoGuardando(true);
+    try {
+      await apiService.ajustarEstadoAsistencia(estadoModal.asistenciaAprendizId, {
+        estado: estadoModal.estado,
+        motivo: estadoModal.motivo || undefined,
+      });
+      setEstadoModal(null);
+      if (sesionActual) {
+        loadAprendicesYSesion(sesionActual.id);
+      }
+      // Refrescar bandeja de pendientes
+      try {
+        const data = await apiService.getAsistenciaPendientesRevision();
+        setPendientesRevision(data);
+      } catch {
+        // ignorar errores silenciosamente aquí
+      }
+    } catch (e: any) {
+      alert(e.response?.data?.error || 'Error al guardar estado');
+    } finally {
+      setEstadoGuardando(false);
     }
   };
 
@@ -452,6 +506,21 @@ export const Asistencia = () => {
                               <ArrowLeftOnRectangleIcon className="w-5 h-5 shrink-0" />
                               Salida
                             </button>
+                          ) : aa?.requiere_revision ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEstadoModal({
+                                  asistenciaAprendizId: aa.id,
+                                  nombre: aprendiz.persona_nombre ?? 'Aprendiz',
+                                  estado: aa.estado || 'ASISTENCIA_COMPLETA',
+                                  motivo: aa.motivo_ajuste || '',
+                                })
+                              }
+                              className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center rounded-lg border border-amber-400 bg-amber-50 text-amber-800 text-sm font-medium touch-manipulation"
+                            >
+                              Resolver estado
+                            </button>
                           ) : (
                             <span className="flex-1 min-h-[44px] flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
                               Registrado
@@ -535,6 +604,22 @@ export const Asistencia = () => {
                                 ) : (
                                   <span className="min-w-[52px] min-h-[52px] inline-block" aria-hidden />
                                 )}
+                                {aa?.requiere_revision && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setEstadoModal({
+                                        asistenciaAprendizId: aa.id,
+                                        nombre: aprendiz.persona_nombre ?? 'Aprendiz',
+                                        estado: aa.estado || 'ASISTENCIA_COMPLETA',
+                                        motivo: aa.motivo_ajuste || '',
+                                      })
+                                    }
+                                    className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200"
+                                  >
+                                    Resolver estado
+                                  </button>
+                                )}
                                 {sesionActual ? (
                                   <button
                                     type="button"
@@ -593,6 +678,63 @@ export const Asistencia = () => {
             </div>
           </div>
         )}
+
+        {/* Modal estado asistencia */}
+        {estadoModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-estado-title">
+            <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+              <h3 id="modal-estado-title" className="mb-3 text-lg font-semibold text-gray-900">
+                Estado de asistencia — {estadoModal.nombre}
+              </h3>
+              <p className="mb-2 text-sm text-gray-600">
+                Clasifique este registro cuando hubo entrada pero no quedó clara la salida (olvido del sistema o abandono de jornada).
+              </p>
+              <div className="mb-4 space-y-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                <select
+                  value={estadoModal.estado}
+                  onChange={(e) => setEstadoModal((prev) => (prev ? { ...prev, estado: e.target.value } : null))}
+                  className="input-field w-full"
+                  disabled={estadoGuardando}
+                >
+                  <option value="ASISTENCIA_COMPLETA">Asistencia completa (olvido registrar salida)</option>
+                  <option value="ASISTENCIA_PARCIAL">Asistencia parcial</option>
+                  <option value="ABANDONO_JORNADA">Abandono de jornada</option>
+                  <option value="REGISTRO_POR_CORREGIR">Dejar pendiente de revisión</option>
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Motivo / detalle (opcional)</label>
+                <textarea
+                  value={estadoModal.motivo}
+                  onChange={(e) => setEstadoModal((prev) => (prev ? { ...prev, motivo: e.target.value } : null))}
+                  rows={3}
+                  className="input-field w-full resize-y"
+                  disabled={estadoGuardando}
+                  placeholder="Ej: Olvido de salida, aprendiz se retiró en el descanso y no regresó, etc."
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEstadoModal(null)}
+                  className="btn-secondary"
+                  disabled={estadoGuardando}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGuardarEstado}
+                  disabled={estadoGuardando}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {estadoGuardando ? 'Guardando…' : 'Guardar estado'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -620,6 +762,97 @@ export const Asistencia = () => {
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">{error}</div>
       )}
+
+      {/* Bandeja de pendientes de revisión */}
+      <div className="card">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Pendientes de revisión de asistencia</h2>
+          {pendientesLoading && <span className="text-xs text-gray-500">Cargando…</span>}
+        </div>
+        {pendientesError && (
+          <p className="mb-3 text-sm text-amber-700 dark:text-amber-400">{pendientesError}</p>
+        )}
+        {!pendientesLoading && !pendientesError && pendientesRevision.length === 0 && (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No hay registros de asistencia pendientes de revisión para hoy.
+          </p>
+        )}
+        {!pendientesLoading && pendientesRevision.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-gray-100 dark:bg-gray-800 text-left">
+                  <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">
+                    Ficha
+                  </th>
+                  <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">
+                    Documento
+                  </th>
+                  <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">
+                    Aprendiz
+                  </th>
+                  <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">
+                    Ingreso
+                  </th>
+                  <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">
+                    Estado actual
+                  </th>
+                  <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">
+                    Acción
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendientesRevision.map((p) => (
+                  <tr
+                    key={p.id}
+                    className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                  >
+                    <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
+                      {p.ficha_numero || '–'}
+                    </td>
+                    <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
+                      {p.numero_documento || '–'}
+                    </td>
+                    <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
+                      {p.aprendiz_nombre || '–'}
+                    </td>
+                    <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
+                      {p.hora_ingreso
+                        ? new Date(p.hora_ingreso).toLocaleTimeString('es-CO', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : '–'}
+                    </td>
+                    <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
+                      <span className="inline-flex items-center rounded-full bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 text-xs font-medium">
+                        {p.estado || 'PENDIENTE'}
+                      </span>
+                    </td>
+                    <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEstadoModal({
+                            asistenciaAprendizId: p.id,
+                            nombre: p.aprendiz_nombre || 'Aprendiz',
+                            estado: p.estado || 'ASISTENCIA_COMPLETA',
+                            motivo: p.motivo_ajuste || '',
+                          })
+                        }
+                        className="btn-secondary text-xs"
+                      >
+                        Resolver estado
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {fichas.map((item) => (
@@ -664,6 +897,68 @@ export const Asistencia = () => {
           </div>
         ))}
       </div>
+
+      {/* Modal estado asistencia (también disponible en vista de fichas + pendientes) */}
+      {estadoModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-estado-title-root"
+        >
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+            <h3 id="modal-estado-title-root" className="mb-3 text-lg font-semibold text-gray-900">
+              Estado de asistencia — {estadoModal.nombre}
+            </h3>
+            <p className="mb-2 text-sm text-gray-600">
+              Clasifique este registro cuando hubo entrada pero no quedó clara la salida (olvido del sistema o abandono de jornada).
+            </p>
+            <div className="mb-4 space-y-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+              <select
+                value={estadoModal.estado}
+                onChange={(e) => setEstadoModal((prev) => (prev ? { ...prev, estado: e.target.value } : null))}
+                className="input-field w-full"
+                disabled={estadoGuardando}
+              >
+                <option value="ASISTENCIA_COMPLETA">Asistencia completa (olvido registrar salida)</option>
+                <option value="ASISTENCIA_PARCIAL">Asistencia parcial</option>
+                <option value="ABANDONO_JORNADA">Abandono de jornada</option>
+                <option value="REGISTRO_POR_CORREGIR">Dejar pendiente de revisión</option>
+              </select>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Motivo / detalle (opcional)</label>
+              <textarea
+                value={estadoModal.motivo}
+                onChange={(e) => setEstadoModal((prev) => (prev ? { ...prev, motivo: e.target.value } : null))}
+                rows={3}
+                className="input-field w-full resize-y"
+                disabled={estadoGuardando}
+                placeholder="Ej: Olvido de salida, aprendiz se retiró en el descanso y no regresó, etc."
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEstadoModal(null)}
+                className="btn-secondary"
+                disabled={estadoGuardando}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleGuardarEstado}
+                disabled={estadoGuardando}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                {estadoGuardando ? 'Guardando…' : 'Guardar estado'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -360,6 +360,14 @@ export interface AsistenciaAprendizResponse {
   hora_ingreso?: string;
   hora_salida?: string;
   observaciones?: string;
+   ficha_id?: number;
+   ficha_numero?: string;
+  /** Estado de la asistencia en la sesión (backend):
+   *  "" | "ASISTENCIA_COMPLETA" | "ASISTENCIA_PARCIAL" | "ABANDONO_JORNADA" | "REGISTRO_POR_CORREGIR"
+   */
+  estado?: string;
+  requiere_revision?: boolean;
+  motivo_ajuste?: string;
   /** Por documento/QR: "ingreso" | "salida" | "asistencia_completa" */
   tipo_registro?: string;
   mensaje?: string;

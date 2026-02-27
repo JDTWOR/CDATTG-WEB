@@ -483,6 +483,14 @@ class ApiService {
     return response.data;
   }
 
+  /** Registros de asistencia de aprendices pendientes de revisión para el instructor actual en una fecha (default hoy). */
+  async getAsistenciaPendientesRevision(fecha?: string): Promise<AsistenciaAprendizResponse[]> {
+    const response = await this.api.get<{ data: AsistenciaAprendizResponse[] }>('/asistencias/pendientes-revision', {
+      params: fecha ? { fecha } : undefined,
+    });
+    return response.data.data;
+  }
+
   async getAsistenciasByInstructorFicha(instructorFichaId: number): Promise<AsistenciaResponse[]> {
     const response = await this.api.get<{ data: AsistenciaResponse[] }>(`/asistencias/instructor-ficha/${instructorFichaId}`);
     return response.data.data;
@@ -520,6 +528,17 @@ class ApiService {
 
   async registrarSalidaAsistencia(asistenciaAprendizId: number): Promise<AsistenciaAprendizResponse> {
     const response = await this.api.put<AsistenciaAprendizResponse>(`/asistencias/aprendiz/${asistenciaAprendizId}/salida`);
+    return response.data;
+  }
+
+  async ajustarEstadoAsistencia(
+    asistenciaAprendizId: number,
+    data: { estado: string; motivo?: string }
+  ): Promise<AsistenciaAprendizResponse> {
+    const response = await this.api.put<AsistenciaAprendizResponse>(
+      `/asistencias/aprendiz/${asistenciaAprendizId}/estado`,
+      data
+    );
     return response.data;
   }
 

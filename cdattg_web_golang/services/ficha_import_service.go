@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/extrame/xls"
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
@@ -59,20 +60,61 @@ type FichaImportResult struct {
 	IncidentReportBase64 string `json:"incident_report_base64,omitempty"`
 }
 
-func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) (*FichaImportResult, error) {
+// readExcelRows devuelve todas las filas de la primera hoja. Soporta .xlsx (excelize) y .xls (extrame/xls).
+func (s *fichaImportService) readExcelRows(fileBytes []byte, filename string) ([][]string, error) {
+	lower := strings.ToLower(filename)
+	isXLS := strings.HasSuffix(lower, ".xls") && !strings.HasSuffix(lower, ".xlsx")
+
+	if isXLS {
+		return s.readXLSRows(fileBytes)
+	}
+	return s.readXLSXRows(fileBytes)
+}
+
+func (s *fichaImportService) readXLSRows(fileBytes []byte) ([][]string, error) {
+	reader := bytes.NewReader(fileBytes)
+	wb, err := xls.OpenReader(reader, "utf-8")
+	if err != nil {
+		return nil, fmt.Errorf("archivo XLS inválido: %w", err)
+	}
+	if wb.NumSheets() == 0 {
+		return nil, fmt.Errorf("el archivo no contiene hojas")
+	}
+	sheet := wb.GetSheet(0)
+	if sheet == nil {
+		return nil, fmt.Errorf("no se pudo leer la primera hoja")
+	}
+	maxRows := int(sheet.MaxRow) + 2
+	if maxRows <= 0 {
+		maxRows = 10000
+	}
+	rows := wb.ReadAllCells(maxRows)
+	return rows, nil
+}
+
+func (s *fichaImportService) readXLSXRows(fileBytes []byte) ([][]string, error) {
 	f, err := excelize.OpenReader(bytes.NewReader(fileBytes))
 	if err != nil {
 		return nil, fmt.Errorf("archivo Excel inválido: %w", err)
 	}
 	defer f.Close()
-
 	sheetName := f.GetSheetName(0)
 	if sheetName == "" {
 		return nil, fmt.Errorf("el archivo no contiene hojas")
 	}
-
 	rows, err := f.GetRows(sheetName)
-	if err != nil || len(rows) < 6 {
+	if err != nil {
+		return nil, fmt.Errorf("error leyendo la hoja: %w", err)
+	}
+	return rows, nil
+}
+
+func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) (*FichaImportResult, error) {
+	rows, err := s.readExcelRows(fileBytes, filename)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) < 6 {
 		return nil, fmt.Errorf("el archivo debe tener al menos cabecera y una fila de datos")
 	}
 

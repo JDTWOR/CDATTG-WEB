@@ -231,6 +231,11 @@ export const FichasCaracterizacion = () => {
       setImportError('Seleccione un archivo Excel.');
       return;
     }
+    const ext = importFile.name.toLowerCase().slice(-5);
+    if (!ext.includes('xlsx') && !ext.includes('xls')) {
+      setImportError('Solo se permiten archivos XLSX o XLS.');
+      return;
+    }
     setImportError('');
     setImportResult(null);
     setImportLoading(true);
@@ -762,7 +767,7 @@ export const FichasCaracterizacion = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-600">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Importar fichas desde Excel</h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Suba un archivo Excel con el reporte de aprendices (ficha de caracterización). Debe contener la línea con código y nombre del programa, y las columnas: Tipo de Documento, Número de Documento, Nombre, Apellidos, Celular, Correo.
+              Suba un archivo Excel (XLSX o XLS) con el reporte de aprendices (ficha de caracterización). Debe contener la línea con código y nombre del programa, y las columnas: Tipo de Documento, Número de Documento, Nombre, Apellidos, Celular, Correo.
             </p>
             {importError && (
               <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">

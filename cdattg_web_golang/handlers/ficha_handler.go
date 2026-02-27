@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sena/cdattg-web-golang/dto"
@@ -242,6 +243,11 @@ func (h *FichaHandler) ImportFichas(c *gin.Context) {
 	}
 	if file.Size > 20*1024*1024 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "El archivo no debe superar 20 MB"})
+		return
+	}
+	lower := strings.ToLower(file.Filename)
+	if !strings.HasSuffix(lower, ".xlsx") && !strings.HasSuffix(lower, ".xls") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Solo se permiten archivos Excel (.xlsx o .xls)"})
 		return
 	}
 	f, err := file.Open()

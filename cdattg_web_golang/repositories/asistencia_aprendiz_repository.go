@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"time"
+
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/models"
 	"gorm.io/gorm"
@@ -13,6 +15,7 @@ type AsistenciaAprendizRepository interface {
 	FindByAsistenciaIDAndAprendizID(asistenciaID, aprendizID uint) (*models.AsistenciaAprendiz, error)
 	FindEntryWithoutExitByAprendizIDAndAsistenciaIDs(aprendizID uint, asistenciaIDs []uint) (*models.AsistenciaAprendiz, error)
 	FindEntryWithExitByAprendizIDAndAsistenciaIDs(aprendizID uint, asistenciaIDs []uint) (*models.AsistenciaAprendiz, error)
+	FindPendientesRevisionByInstructorAndFecha(instructorID uint, fecha string) ([]models.AsistenciaAprendiz, error)
 	Update(a *models.AsistenciaAprendiz) error
 }
 
@@ -30,7 +33,11 @@ func (r *asistenciaAprendizRepository) Create(a *models.AsistenciaAprendiz) erro
 
 func (r *asistenciaAprendizRepository) FindByID(id uint) (*models.AsistenciaAprendiz, error) {
 	var m models.AsistenciaAprendiz
-	if err := r.db.Preload("Aprendiz").Preload("Aprendiz.Persona").Preload("Asistencia").First(&m, id).Error; err != nil {
+	if err := r.db.Preload("Aprendiz").Preload("Aprendiz.Persona").
+		Preload("Asistencia").
+		Preload("Asistencia.InstructorFicha").
+		Preload("Asistencia.InstructorFicha.Ficha").
+		First(&m, id).Error; err != nil {
 		return nil, err
 	}
 	return &m, nil
@@ -75,6 +82,37 @@ func (r *asistenciaAprendizRepository) FindEntryWithExitByAprendizIDAndAsistenci
 		return nil, err
 	}
 	return &m, nil
+}
+
+// FindPendientesRevisionByInstructorAndFecha devuelve registros con requiere_revision=true
+// para las sesiones del instructor. Si se pasa fecha (YYYY-MM-DD),
+// se filtra por ese día; si no, trae todos los pendientes.
+func (r *asistenciaAprendizRepository) FindPendientesRevisionByInstructorAndFecha(instructorID uint, fecha string) ([]models.AsistenciaAprendiz, error) {
+	var list []models.AsistenciaAprendiz
+	if instructorID == 0 {
+		return list, nil
+	}
+	db := r.db.Model(&models.AsistenciaAprendiz{}).
+		Joins("INNER JOIN asistencias a ON a.id = asistencia_aprendices.asistencia_id").
+		Joins("INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id").
+		Where("ifc.instructor_id = ? AND asistencia_aprendices.requiere_revision = ?", instructorID, true).
+		Preload("Aprendiz").Preload("Aprendiz.Persona").
+		Preload("Asistencia").
+		Preload("Asistencia.InstructorFicha").
+		Preload("Asistencia.InstructorFicha.Ficha")
+
+	// Si viene fecha, filtrar por rango del día para evitar problemas de tipos/hora
+	if fecha != "" {
+		if tInicio, err := time.Parse("2006-01-02", fecha); err == nil {
+			tFin := tInicio.AddDate(0, 0, 1)
+			db = db.Where("a.fecha >= ? AND a.fecha < ?", tInicio, tFin)
+		}
+	}
+
+	if err := db.Find(&list).Error; err != nil {
+		return nil, err
+	}
+	return list, nil
 }
 
 func (r *asistenciaAprendizRepository) Update(a *models.AsistenciaAprendiz) error {

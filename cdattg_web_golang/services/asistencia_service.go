@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/sena/cdattg-web-golang/dto"
@@ -24,6 +25,8 @@ type AsistenciaService interface {
 	CrearOActualizarObservaciones(asistenciaID, aprendizID uint, observaciones string) (*dto.AsistenciaAprendizResponse, error)
 	ListAprendicesEnSesion(asistenciaID uint) ([]dto.AsistenciaAprendizResponse, error)
 	GetDashboard(sedeID *uint, fecha string) (*dto.AsistenciaDashboardResponse, error)
+	AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string) (*dto.AsistenciaAprendizResponse, error)
+	ListPendientesRevision(instructorID uint, fecha string) ([]dto.AsistenciaAprendizResponse, error)
 }
 
 type asistenciaService struct {
@@ -166,6 +169,18 @@ func (s *asistenciaService) Finalizar(id uint) (*dto.AsistenciaResponse, error) 
 	if a.IsFinished {
 		return nil, errors.New("la sesión ya está finalizada")
 	}
+	// Marcar registros con ingreso y sin salida como "REGISTRO_POR_CORREGIR",
+	// para que el instructor pueda revisar si fue olvido de salida o abandono de jornada.
+	for i := range a.AsistenciaAprendices {
+		aa := &a.AsistenciaAprendices[i]
+		if aa.HoraIngreso != nil && aa.HoraSalida == nil && aa.Estado == "" && !aa.RequiereRevision {
+			aa.Estado = "REGISTRO_POR_CORREGIR"
+			aa.RequiereRevision = true
+			aa.MotivoAjuste = "Entrada registrada sin salida al finalizar la sesión"
+			// No se asigna hora de salida: deberá decidirse en la revisión.
+			_ = s.repoAA.Update(aa)
+		}
+	}
 	now := time.Now()
 	a.HoraFin = &now
 	a.IsFinished = true
@@ -303,6 +318,9 @@ func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint) (*dto.Asi
 	}
 	now := time.Now()
 	aa.HoraSalida = &now
+	// Salida normal registrada en la sesión → asistencia completa (sin requerir revisión)
+	aa.Estado = "ASISTENCIA_COMPLETA"
+	aa.RequiereRevision = false
 	if err := s.repoAA.Update(aa); err != nil {
 		return nil, err
 	}
@@ -410,16 +428,73 @@ func (s *asistenciaService) asistenciaToResponse(a *models.Asistencia) *dto.Asis
 
 func (s *asistenciaService) aaToResponse(aa *models.AsistenciaAprendiz) *dto.AsistenciaAprendizResponse {
 	r := &dto.AsistenciaAprendizResponse{
-		ID:             aa.ID,
-		AsistenciaID:   aa.AsistenciaID,
-		AprendizID:     aa.AprendizFichaID,
-		HoraIngreso:    aa.HoraIngreso,
-		HoraSalida:     aa.HoraSalida,
-		Observaciones:  aa.Observaciones,
+		ID:              aa.ID,
+		AsistenciaID:    aa.AsistenciaID,
+		AprendizID:      aa.AprendizFichaID,
+		HoraIngreso:     aa.HoraIngreso,
+		HoraSalida:      aa.HoraSalida,
+		Observaciones:   aa.Observaciones,
+		Estado:          aa.Estado,
+		RequiereRevision: aa.RequiereRevision,
+		MotivoAjuste:    aa.MotivoAjuste,
+	}
+	if aa.Asistencia != nil && aa.Asistencia.InstructorFicha != nil && aa.Asistencia.InstructorFicha.Ficha != nil {
+		r.FichaID = aa.Asistencia.InstructorFicha.FichaID
+		r.FichaNumero = aa.Asistencia.InstructorFicha.Ficha.Ficha
 	}
 	if aa.Aprendiz != nil && aa.Aprendiz.Persona != nil {
 		r.AprendizNombre  = aa.Aprendiz.Persona.GetFullName()
 		r.NumeroDocumento = aa.Aprendiz.Persona.NumeroDocumento
 	}
 	return r
+}
+
+// AjustarEstadoAprendiz permite clasificar un registro de asistencia de aprendiz
+// como asistencia completa, parcial, abandono de jornada o dejarlo pendiente de revisión.
+func (s *asistenciaService) AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string) (*dto.AsistenciaAprendizResponse, error) {
+	aa, err := s.repoAA.FindByID(asistenciaAprendizID)
+	if err != nil {
+		return nil, errors.New("registro de asistencia no encontrado")
+	}
+	if aa.HoraIngreso == nil {
+		return nil, errors.New("no se puede ajustar estado sin hora de ingreso")
+	}
+	normalized := strings.ToUpper(strings.TrimSpace(estado))
+	switch normalized {
+	case "ASISTENCIA_COMPLETA", "ASISTENCIA_PARCIAL", "ABANDONO_JORNADA", "REGISTRO_POR_CORREGIR":
+	default:
+		return nil, errors.New("estado de asistencia inválido")
+	}
+	aa.Estado = normalized
+	aa.MotivoAjuste = motivo
+	aa.RequiereRevision = normalized == "REGISTRO_POR_CORREGIR"
+
+	// Si el nuevo estado no es "por corregir" y aún no tiene salida,
+	// se asigna una hora de salida razonable (fin de sesión si existe, o ahora).
+	if normalized != "REGISTRO_POR_CORREGIR" && aa.HoraSalida == nil {
+		now := time.Now()
+		if aa.Asistencia != nil && aa.Asistencia.HoraFin != nil {
+			aa.HoraSalida = aa.Asistencia.HoraFin
+		} else {
+			aa.HoraSalida = &now
+		}
+	}
+	if err := s.repoAA.Update(aa); err != nil {
+		return nil, err
+	}
+	return s.aaToResponse(aa), nil
+}
+
+// ListPendientesRevision devuelve los registros de asistencia de aprendices
+// marcados como requiere_revision para el instructor y fecha dados.
+func (s *asistenciaService) ListPendientesRevision(instructorID uint, fecha string) ([]dto.AsistenciaAprendizResponse, error) {
+	list, err := s.repoAA.FindPendientesRevisionByInstructorAndFecha(instructorID, fecha)
+	if err != nil {
+		return nil, err
+	}
+	resp := make([]dto.AsistenciaAprendizResponse, len(list))
+	for i := range list {
+		resp[i] = *s.aaToResponse(&list[i])
+	}
+	return resp, nil
 }

@@ -131,10 +131,15 @@ func SetupRouter() *gin.Engine {
 			asistencias.POST("", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.CreateSesion)
 			asistencias.GET("/instructor-ficha/:instructorFichaId", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.ListByInstructorFicha)
 			asistencias.GET("/ficha/:fichaId", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.ListByFichaAndFechas)
+			// Pendientes de revisión:
+			// ya se valida dentro del handler que el usuario autenticado
+			// esté vinculado como instructor. No se requiere permiso Casbin adicional.
+			asistencias.GET("/pendientes-revision", asistenciaHandler.ListPendientesRevision)
 			asistencias.POST("/ingreso", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.RegistrarIngreso)
 			asistencias.POST("/ingreso-por-documento", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.RegistrarIngresoPorDocumento)
 			asistencias.PUT("/aprendiz/:asistenciaAprendizId/salida", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.RegistrarSalida)
 			asistencias.PUT("/aprendiz/:asistenciaAprendizId/observaciones", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.ActualizarObservaciones)
+			asistencias.PUT("/aprendiz/:asistenciaAprendizId/estado", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.AjustarEstadoAprendiz)
 			asistencias.GET("/:id/aprendices", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.ListAprendicesEnSesion)
 			asistencias.PUT("/:id/aprendiz/:aprendizId/observaciones", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.CrearOActualizarObservaciones)
 			asistencias.PUT("/:id/finalizar", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.Finalizar)

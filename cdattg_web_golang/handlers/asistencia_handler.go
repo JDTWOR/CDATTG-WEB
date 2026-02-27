@@ -226,6 +226,53 @@ func (h *AsistenciaHandler) ListAprendicesEnSesion(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": list})
 }
 
+// ListPendientesRevision devuelve los registros de asistencia de aprendices
+// marcados como requiere_revision para el instructor autenticado en una fecha.
+func (h *AsistenciaHandler) ListPendientesRevision(c *gin.Context) {
+	u, _ := c.Get("user")
+	user, _ := u.(*models.User)
+	if user == nil || user.PersonaID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Su cuenta no está vinculada a un instructor. Contacte al administrador."})
+		return
+	}
+	inst, err := h.instRepo.FindByPersonaID(*user.PersonaID)
+	if err != nil || inst == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Su cuenta no está vinculada a un instructor. Contacte al administrador."})
+		return
+	}
+	fecha := c.Query("fecha")
+	if fecha == "" {
+		fecha = time.Now().Format("2006-01-02")
+	}
+	list, err := h.svc.ListPendientesRevision(inst.ID, fecha)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": list})
+}
+
+// AjustarEstadoAprendiz permite clasificar un registro de asistencia de aprendiz
+// (asistencia completa, parcial, abandono de jornada o pendiente de revisión).
+func (h *AsistenciaHandler) AjustarEstadoAprendiz(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("asistenciaAprendizId"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+	var req dto.AsistenciaAprendizEstadoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		return
+	}
+	resp, err := h.svc.AjustarEstadoAprendiz(uint(id), req.Estado, req.Motivo)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 // GetDashboard devuelve el resumen para el dashboard de asistencia (solo superadmin). Query: sede_id (opcional), fecha (opcional, default hoy).
 func (h *AsistenciaHandler) GetDashboard(c *gin.Context) {
 	fecha := c.Query("fecha")

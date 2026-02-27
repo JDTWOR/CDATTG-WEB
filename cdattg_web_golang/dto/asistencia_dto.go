@@ -47,17 +47,35 @@ type AsistenciaAprendizObservacionesRequest struct {
 
 // AsistenciaAprendizResponse registro de asistencia de un aprendiz
 type AsistenciaAprendizResponse struct {
-	ID                uint       `json:"id"`
-	AsistenciaID      uint       `json:"asistencia_id"`
-	AprendizID        uint       `json:"aprendiz_id"`
-	AprendizNombre    string     `json:"aprendiz_nombre,omitempty"`
-	NumeroDocumento   string     `json:"numero_documento,omitempty"`
-	HoraIngreso       *time.Time `json:"hora_ingreso"`
-	HoraSalida        *time.Time `json:"hora_salida"`
-	Observaciones     string     `json:"observaciones"`
+	ID              uint       `json:"id"`
+	AsistenciaID    uint       `json:"asistencia_id"`
+	AprendizID      uint       `json:"aprendiz_id"`
+	AprendizNombre  string     `json:"aprendiz_nombre,omitempty"`
+	NumeroDocumento string     `json:"numero_documento,omitempty"`
+	HoraIngreso     *time.Time `json:"hora_ingreso"`
+	HoraSalida      *time.Time `json:"hora_salida"`
+	Observaciones   string     `json:"observaciones"`
+	// Información de ficha (cuando esté disponible)
+	FichaID     uint   `json:"ficha_id,omitempty"`
+	FichaNumero string `json:"ficha_numero,omitempty"`
+	// Estado de la asistencia en la sesión (backend):
+	// - "" (vacío): sin clasificar
+	// - "ASISTENCIA_COMPLETA"
+	// - "ASISTENCIA_PARCIAL"
+	// - "ABANDONO_JORNADA"
+	// - "REGISTRO_POR_CORREGIR"
+	Estado           string `json:"estado,omitempty"`
+	RequiereRevision bool   `json:"requiere_revision,omitempty"`
+	MotivoAjuste     string `json:"motivo_ajuste,omitempty"`
 	// TipoRegistro: "ingreso", "salida" o "asistencia_completa" (por documento/QR)
 	TipoRegistro string `json:"tipo_registro,omitempty"`
 	Mensaje      string `json:"mensaje,omitempty"`
+}
+
+// AsistenciaAprendizEstadoRequest para ajustar estado/motivo de un registro de asistencia de aprendiz
+type AsistenciaAprendizEstadoRequest struct {
+	Estado string `json:"estado" binding:"required"` // ASISTENCIA_COMPLETA, ASISTENCIA_PARCIAL, ABANDONO_JORNADA, REGISTRO_POR_CORREGIR
+	Motivo string `json:"motivo"`
 }
 
 // AsistenciaDashboardResponse resumen para el dashboard de asistencia (solo superadmin)

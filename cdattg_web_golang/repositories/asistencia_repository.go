@@ -103,8 +103,15 @@ func (r *asistenciaRepository) FindIDsByFichaIDAndFecha(fichaID uint, fecha stri
 	if len(ids) == 0 {
 		return nil, nil
 	}
+	tInicio, err := ParseDate(fecha)
+	if err != nil {
+		return nil, err
+	}
+	tFin := tInicio.AddDate(0, 0, 1)
 	var out []uint
-	if err := r.db.Model(&models.Asistencia{}).Where("instructor_ficha_id IN ? AND fecha = ?", ids, fecha).Pluck("id", &out).Error; err != nil {
+	if err := r.db.Model(&models.Asistencia{}).
+		Where("instructor_ficha_id IN ? AND fecha >= ? AND fecha < ?", ids, tInicio, tFin).
+		Pluck("id", &out).Error; err != nil {
 		return nil, err
 	}
 	return out, nil

@@ -47,6 +47,20 @@ export const Asistencia = () => {
   const [pendientesLoading, setPendientesLoading] = useState(false);
   const [pendientesError, setPendientesError] = useState('');
 
+  const upsertAsistenciaAprendizEnSesion = (actualizado: AsistenciaAprendizResponse) => {
+    if (!actualizado) return;
+    setAprendicesEnSesion((prev) => {
+      const byIdIndex = prev.findIndex((aa) => aa.id === actualizado.id);
+      if (byIdIndex !== -1) {
+        const copia = [...prev];
+        copia[byIdIndex] = actualizado;
+        return copia;
+      }
+      const sinDuplicados = prev.filter((aa) => aa.aprendiz_id !== actualizado.aprendiz_id);
+      return [...sinDuplicados, actualizado];
+    });
+  };
+
   // Siempre pedir "mis fichas" (instructor asignado). Superadmin/otros reciben lista vacía.
   const fetchFichas = async () => {
     setFichasLoading(true);
@@ -193,11 +207,11 @@ export const Asistencia = () => {
   const handleRegistrarIngreso = async (aprendizId: number) => {
     if (!sesionActual) return;
     try {
-      await apiService.registrarIngresoAsistencia({
+      const nuevo = await apiService.registrarIngresoAsistencia({
         asistencia_id: sesionActual.id,
         aprendiz_id: aprendizId,
       });
-      loadAprendicesYSesion(sesionActual.id);
+      upsertAsistenciaAprendizEnSesion(nuevo);
     } catch (e: any) {
       alert(e.response?.data?.error || 'Error al registrar ingreso');
     }
@@ -205,8 +219,8 @@ export const Asistencia = () => {
 
   const handleRegistrarSalida = async (asistenciaAprendizId: number) => {
     try {
-      await apiService.registrarSalidaAsistencia(asistenciaAprendizId);
-      if (sesionActual) loadAprendicesYSesion(sesionActual.id);
+      const actualizado = await apiService.registrarSalidaAsistencia(asistenciaAprendizId);
+      upsertAsistenciaAprendizEnSesion(actualizado);
     } catch (e: any) {
       alert(e.response?.data?.error || 'Error al registrar salida');
     }
@@ -216,9 +230,13 @@ export const Asistencia = () => {
     if (!observacionesModal || !sesionActual) return;
     setObservacionesGuardando(true);
     try {
-      await apiService.crearOActualizarObservacionesAsistencia(observacionesModal.asistenciaId, observacionesModal.aprendizId, observacionesModal.observaciones);
+      const actualizado = await apiService.crearOActualizarObservacionesAsistencia(
+        observacionesModal.asistenciaId,
+        observacionesModal.aprendizId,
+        observacionesModal.observaciones
+      );
       setObservacionesModal(null);
-      loadAprendicesYSesion(sesionActual.id);
+      upsertAsistenciaAprendizEnSesion(actualizado);
     } catch (e: any) {
       alert(e.response?.data?.error || 'Error al guardar observaciones');
     } finally {
@@ -230,14 +248,12 @@ export const Asistencia = () => {
     if (!estadoModal) return;
     setEstadoGuardando(true);
     try {
-      await apiService.ajustarEstadoAsistencia(estadoModal.asistenciaAprendizId, {
+      const actualizado = await apiService.ajustarEstadoAsistencia(estadoModal.asistenciaAprendizId, {
         estado: estadoModal.estado,
         motivo: estadoModal.motivo || undefined,
       });
       setEstadoModal(null);
-      if (sesionActual) {
-        loadAprendicesYSesion(sesionActual.id);
-      }
+      upsertAsistenciaAprendizEnSesion(actualizado);
       // Refrescar bandeja de pendientes
       try {
         const data = await apiService.getAsistenciaPendientesRevision();
@@ -260,8 +276,15 @@ export const Asistencia = () => {
     try {
       const data = await apiService.registrarIngresoAsistenciaPorDocumento(sesionActual.id, numeroDocumento.trim());
       setDocumentoManual('');
-      loadAprendicesYSesion(sesionActual.id);
-      setMensajeRegistroManual(data.mensaje || (data.tipo_registro === 'ingreso' ? 'Ingreso registrado' : data.tipo_registro === 'salida' ? 'Salida registrada' : 'Asistencia completa'));
+      upsertAsistenciaAprendizEnSesion(data);
+      setMensajeRegistroManual(
+        data.mensaje ||
+          (data.tipo_registro === 'ingreso'
+            ? 'Ingreso registrado'
+            : data.tipo_registro === 'salida'
+            ? 'Salida registrada'
+            : 'Asistencia completa')
+      );
     } catch (e: any) {
       const msg = e.response?.data?.error || 'Error al registrar asistencia';
       setErrorRegistroManual(msg);

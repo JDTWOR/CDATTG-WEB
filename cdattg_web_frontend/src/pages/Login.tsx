@@ -20,9 +20,10 @@ export const Login = () => {
 
     try {
       await login({ email: loginId.trim(), password });
-      navigate('/dashboard');
+      navigate('/perfil');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al iniciar sesión');
+      const msg = err.response?.data?.error ?? err.response?.data?.message ?? err.message;
+      setError(typeof msg === 'string' ? msg : 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }

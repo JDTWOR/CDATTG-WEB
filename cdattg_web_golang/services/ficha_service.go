@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/dto"
@@ -140,6 +141,15 @@ func (s *fichaService) Update(id uint, req dto.FichaCaracterizacionRequest) (*dt
 	if s.fichaRepo.ExistsByFichaExcludingID(req.Ficha, id) {
 		return nil, errors.New("ya existe otra ficha con ese número")
 	}
+	var reqJIDVal interface{}
+	if req.JornadaID != nil {
+		reqJIDVal = *req.JornadaID
+	}
+	var fJIDBefore interface{}
+	if f.JornadaID != nil {
+		fJIDBefore = *f.JornadaID
+	}
+	log.Printf("DEBUG FichaService.Update: id=%d req.JornadaID=%v (valor=%v) antes de asignar (f.JornadaID actual=%v valor=%v)", id, req.JornadaID, reqJIDVal, f.JornadaID, fJIDBefore)
 	f.ProgramaFormacionID = req.ProgramaFormacionID
 	f.Ficha = req.Ficha
 	f.InstructorID = req.InstructorID
@@ -149,6 +159,14 @@ func (s *fichaService) Update(id uint, req dto.FichaCaracterizacionRequest) (*dt
 	f.ModalidadFormacionID = req.ModalidadFormacionID
 	f.SedeID = req.SedeID
 	f.JornadaID = req.JornadaID
+	// Evitar que GORM reescriba jornada_id con la jornada pre-cargada (asociación antigua)
+	// Queremos que tome solo el nuevo JornadaID y luego se vuelva a precargar.
+	f.Jornada = nil
+	var fJIDAfter interface{}
+	if f.JornadaID != nil {
+		fJIDAfter = *f.JornadaID
+	}
+	log.Printf("DEBUG FichaService.Update: id=%d después de asignar JornadaID, f.JornadaID=%v valor=%v", id, f.JornadaID, fJIDAfter)
 	f.TotalHoras = req.TotalHoras
 	if req.Status != nil {
 		f.Status = *req.Status

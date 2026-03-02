@@ -27,6 +27,8 @@ var userSeeds = []UserSeed{
 	{"aprendiz1@dataguaviare.com", "Guaviare25!", 6, "APRENDIZ"},
 	{"aprendiz2@dataguaviare.com", "Guaviare25!", 7, "APRENDIZ"},
 	{"proveedor@dataguaviare.com", "Guaviare25.", 8, "PROVEEDOR"},
+	// Usuario para oficina de bienestar al aprendiz (solo lectura de dashboards)
+	{"bienestar@dataguaviare.com", "Guaviare25.", 9, "BIENESTAR AL APRENDIZ"},
 }
 
 // RunUsersSeeder crea usuarios de prueba y asigna roles (igual que cdattg_web UsersSeeder).

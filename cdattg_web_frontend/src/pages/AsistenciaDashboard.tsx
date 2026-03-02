@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeftIcon, UserGroupIcon, ChartBarIcon, SignalIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, UserGroupIcon, ChartBarIcon, SignalIcon, ExclamationTriangleIcon, DocumentMagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { getAsistenciaDashboardWsUrl } from '../config/api';
@@ -12,16 +12,21 @@ export const AsistenciaDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [wsConnected, setWsConnected] = useState(false);
+  const [casosBienestarCount, setCasosBienestarCount] = useState<number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isSuperAdmin = roles.includes('SUPER ADMINISTRADOR');
+  const canViewBienestar = roles.includes('SUPER ADMINISTRADOR') || roles.includes('BIENESTAR AL APRENDIZ');
 
   const fetchDashboard = async () => {
     try {
       setError('');
-      const res = await apiService.getAsistenciaDashboard();
+      const [res, casosRes] = await Promise.all([
+        apiService.getAsistenciaDashboard(),
+        apiService.getCasosBienestar({ dias: 30, min_fallas: 3 }).catch(() => ({ casos: [] })),
+      ]);
       setData(res);
+      setCasosBienestarCount(Array.isArray(casosRes?.casos) ? casosRes.casos.length : 0);
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { error?: string } } };
       if (err.response?.status === 403) {
@@ -35,9 +40,9 @@ export const AsistenciaDashboard = () => {
   };
 
   useEffect(() => {
-    if (!isSuperAdmin) {
+    if (!canViewBienestar) {
       setLoading(false);
-      setError('Solo el superadministrador puede acceder.');
+      setError('No tiene permiso para acceder al dashboard de asistencia.');
       return;
     }
     fetchDashboard();
@@ -45,7 +50,7 @@ export const AsistenciaDashboard = () => {
 
   // WebSocket para actualizaciones en tiempo real
   useEffect(() => {
-    if (!isSuperAdmin || !token) return;
+    if (!canViewBienestar || !token) return;
 
     const connect = () => {
       const url = getAsistenciaDashboardWsUrl(token);
@@ -81,10 +86,12 @@ export const AsistenciaDashboard = () => {
     };
   }, [isSuperAdmin, token]);
 
-  if (!isSuperAdmin) {
+  if (!canViewBienestar) {
     return (
       <div className="space-y-6">
-        <p className="text-red-600 dark:text-red-400">Solo el superadministrador puede acceder al dashboard de asistencia.</p>
+        <p className="text-red-600 dark:text-red-400">
+          No tiene permiso para acceder al dashboard de asistencia (requiere rol de Superadministrador o Bienestar al Aprendiz).
+        </p>
         <Link to="/asistencia" className="btn-secondary inline-flex items-center gap-2">
           <ArrowLeftIcon className="w-5 h-5" />
           Volver a Asistencia
@@ -137,7 +144,7 @@ export const AsistenciaDashboard = () => {
         <div className="card p-8 text-center text-gray-500 dark:text-gray-400">Cargando...</div>
       ) : data ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="card">
               <div className="flex items-center justify-between">
                 <div>
@@ -164,6 +171,50 @@ export const AsistenciaDashboard = () => {
                   <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{data.por_ficha.length}</p>
                 </div>
               </div>
+            </div>
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pendientes de revisión (hoy)</p>
+                  <p className="text-3xl font-bold text-amber-600 dark:text-amber-400 mt-1">
+                    {data.pendientes_revision ?? 0}
+                  </p>
+                </div>
+                <div className="w-14 h-14 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center">
+                  <DocumentMagnifyingGlassIcon className="w-7 h-7 text-amber-600 dark:text-amber-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Casos a tener en cuenta (Bienestar) */}
+          <div className="card border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+                  <ExclamationTriangleIcon className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Casos a tener en cuenta (Bienestar al Aprendiz)</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Aprendices con 3 o más inasistencias en los últimos 30 días para seguimiento y prevención de deserción.
+                  </p>
+                  {casosBienestarCount !== null && (
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-300 mt-2">
+                      {casosBienestarCount === 0
+                        ? 'Ningún caso detectado con el criterio actual.'
+                        : `${casosBienestarCount} caso${casosBienestarCount !== 1 ? 's' : ''} detectado${casosBienestarCount !== 1 ? 's' : ''}.`}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Link
+                to="/asistencia/dashboard/casos-bienestar"
+                className="btn-primary inline-flex items-center justify-center gap-2 shrink-0"
+              >
+                <ExclamationTriangleIcon className="w-5 h-5" />
+                Ver casos a tener en cuenta
+              </Link>
             </div>
           </div>
 

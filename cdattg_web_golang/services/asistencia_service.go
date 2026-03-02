@@ -42,6 +42,14 @@ type asistenciaService struct {
 	fichaRepo     repositories.FichaRepository
 }
 
+// esSesionDeHoy indica si la fecha de la sesión (interpretada en hora local) es el día de hoy.
+func esSesionDeHoy(fecha time.Time) bool {
+	now := time.Now()
+	loc := now.Location()
+	local := fecha.In(loc)
+	return local.Year() == now.Year() && local.Month() == now.Month() && local.Day() == now.Day()
+}
+
 func NewAsistenciaService() AsistenciaService {
 	return &asistenciaService{
 		repo:          repositories.NewAsistenciaRepository(),
@@ -56,7 +64,8 @@ func NewAsistenciaService() AsistenciaService {
 }
 
 func (s *asistenciaService) CreateSesion(req dto.AsistenciaRequest) (*dto.AsistenciaResponse, error) {
-	fecha, err := time.Parse("2006-01-02", req.Fecha)
+	// Parsear como medianoche en hora local para que el día de la sesión sea correcto en cualquier zona horaria.
+	fecha, err := time.ParseInLocation("2006-01-02", req.Fecha, time.Local)
 	if err != nil {
 		return nil, errors.New("fecha inválida, use YYYY-MM-DD")
 	}
@@ -113,17 +122,17 @@ func (s *asistenciaService) EntrarTomarAsistencia(instructorID uint, fichaID uin
 			return nil, errors.New("fuera del horario de la jornada de la ficha; solo se puede tomar asistencia en el horario configurado")
 		}
 	}
-	// 1) Sesión activa de este instructor para la ficha → usarla
+	// 1) Sesión activa de este instructor para la ficha → usarla solo si es de hoy (hora local)
 	activa, _ := s.repo.FindActivaByInstructorFichaID(ifc.ID)
-	if activa != nil {
+	if activa != nil && esSesionDeHoy(activa.Fecha) {
 		return s.asistenciaToResponse(activa), nil
 	}
-	// 2) Sesión activa de la ficha (creada por otro instructor) → permitir acceder a esa misma sesión
+	// 2) Sesión activa de la ficha (creada por otro instructor) → permitir acceder solo si es de hoy
 	activaFicha, _ := s.repo.FindActivaByFichaID(ifc.FichaID)
-	if activaFicha != nil {
+	if activaFicha != nil && esSesionDeHoy(activaFicha.Fecha) {
 		return s.asistenciaToResponse(activaFicha), nil
 	}
-	// 3) No hay sesión activa → crear una nueva
+	// 3) No hay sesión activa de hoy → crear una nueva
 	hoy := time.Now().Format("2006-01-02")
 	return s.CreateSesion(dto.AsistenciaRequest{
 		InstructorFichaID: ifc.ID,
@@ -214,7 +223,9 @@ func (s *asistenciaService) FinalizarSesionesVencidas() {
 			continue
 		}
 		j := a.InstructorFicha.Ficha.Jornada
-		sessionDate := time.Date(a.Fecha.Year(), a.Fecha.Month(), a.Fecha.Day(), 0, 0, 0, 0, now.Location())
+		// Usar el día de la sesión en hora local (evita que UTC midnight se interprete como día anterior en -05).
+		localFecha := a.Fecha.In(now.Location())
+		sessionDate := time.Date(localFecha.Year(), localFecha.Month(), localFecha.Day(), 0, 0, 0, 0, now.Location())
 		var endEffective time.Time
 		if j != nil {
 			endEffective = HoraFinEfectiva(j, sessionDate)

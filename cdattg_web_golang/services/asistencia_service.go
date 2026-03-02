@@ -25,8 +25,10 @@ type AsistenciaService interface {
 	CrearOActualizarObservaciones(asistenciaID, aprendizID uint, observaciones string) (*dto.AsistenciaAprendizResponse, error)
 	ListAprendicesEnSesion(asistenciaID uint) ([]dto.AsistenciaAprendizResponse, error)
 	GetDashboard(sedeID *uint, fecha string) (*dto.AsistenciaDashboardResponse, error)
+	GetCasosBienestar(sedeID *uint, dias, minFallas int) (*dto.CasosBienestarResponse, error)
 	AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string) (*dto.AsistenciaAprendizResponse, error)
 	ListPendientesRevision(instructorID uint, fecha string) ([]dto.AsistenciaAprendizResponse, error)
+	FinalizarSesionesVencidas()
 }
 
 type asistenciaService struct {
@@ -195,6 +197,34 @@ func (s *asistenciaService) Finalizar(id uint) (*dto.AsistenciaResponse, error) 
 		}
 	}
 	return s.GetByID(id)
+}
+
+// FinalizarSesionesVencidas finaliza sesiones no cerradas cuyo horario de jornada (hora_fin + extensión) ya pasó.
+// Se ejecuta de forma periódica (p. ej. cada 5 min). La finalización es automática; los instructores no pueden finalizar manualmente.
+func (s *asistenciaService) FinalizarSesionesVencidas() {
+	now := time.Now()
+	fechaDesde := now.AddDate(0, 0, -1).Format("2006-01-02")
+	list, err := s.repo.FindSesionesNoFinalizadasDesde(fechaDesde)
+	if err != nil || len(list) == 0 {
+		return
+	}
+	for i := range list {
+		a := &list[i]
+		if a.InstructorFicha == nil || a.InstructorFicha.Ficha == nil {
+			continue
+		}
+		j := a.InstructorFicha.Ficha.Jornada
+		sessionDate := time.Date(a.Fecha.Year(), a.Fecha.Month(), a.Fecha.Day(), 0, 0, 0, 0, now.Location())
+		var endEffective time.Time
+		if j != nil {
+			endEffective = HoraFinEfectiva(j, sessionDate)
+		} else {
+			endEffective = sessionDate.Add(24 * time.Hour)
+		}
+		if now.After(endEffective) {
+			_, _ = s.Finalizar(a.ID)
+		}
+	}
 }
 
 func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest) (*dto.AsistenciaAprendizResponse, error) {
@@ -384,9 +414,11 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 	if err != nil {
 		return nil, err
 	}
+	pendientes, _ := s.repo.CountPendientesRevisionByFecha(sedeID, fecha)
 	resp := &dto.AsistenciaDashboardResponse{
 		Fecha:                      fecha,
 		TotalAprendicesEnFormacion: total,
+		PendientesRevision:         pendientes,
 		PorFicha:                   make([]dto.AsistenciaDashboardPorFicha, len(porFicha)),
 	}
 	for i := range porFicha {
@@ -395,6 +427,42 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 			FichaNumero:      porFicha[i].FichaNumero,
 			SedeNombre:       porFicha[i].SedeNombre,
 			CantidadVinieron: porFicha[i].Cantidad,
+		}
+	}
+	return resp, nil
+}
+
+func (s *asistenciaService) GetCasosBienestar(sedeID *uint, dias, minFallas int) (*dto.CasosBienestarResponse, error) {
+	if dias <= 0 {
+		dias = 30
+	}
+	if minFallas <= 0 {
+		minFallas = 3
+	}
+	fechaFin := time.Now()
+	fechaInicio := fechaFin.AddDate(0, 0, -dias)
+	fechaInicioStr := fechaInicio.Format("2006-01-02")
+	fechaFinStr := fechaFin.Format("2006-01-02")
+
+	rows, err := s.repo.GetCasosBienestar(sedeID, fechaInicioStr, fechaFinStr, minFallas)
+	if err != nil {
+		return nil, err
+	}
+	resp := &dto.CasosBienestarResponse{
+		DiasAnalizados: dias,
+		MinFallas:      minFallas,
+		Casos:          make([]dto.CasoBienestarItem, len(rows)),
+	}
+	for i := range rows {
+		resp.Casos[i] = dto.CasoBienestarItem{
+			AprendizID:           rows[i].AprendizID,
+			PersonaNombre:        rows[i].PersonaNombre,
+			NumeroDocumento:       rows[i].NumeroDocumento,
+			FichaNumero:          rows[i].FichaNumero,
+			SedeNombre:           rows[i].SedeNombre,
+			TotalSesiones:        rows[i].TotalSesiones,
+			AsistenciasEfectivas: rows[i].AsistenciasEfectivas,
+			Inasistencias:        rows[i].Inasistencias,
 		}
 	}
 	return resp, nil

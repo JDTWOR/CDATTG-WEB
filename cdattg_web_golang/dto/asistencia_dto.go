@@ -82,6 +82,7 @@ type AsistenciaAprendizEstadoRequest struct {
 type AsistenciaDashboardResponse struct {
 	Fecha                       string                          `json:"fecha"` // YYYY-MM-DD
 	TotalAprendicesEnFormacion  int                             `json:"total_aprendices_en_formacion"`
+	PendientesRevision          int                             `json:"pendientes_revision"` // registros del día que requieren revisión
 	PorFicha                    []AsistenciaDashboardPorFicha   `json:"por_ficha"`
 }
 
@@ -91,4 +92,23 @@ type AsistenciaDashboardPorFicha struct {
 	FichaNumero          string `json:"ficha_numero"`
 	SedeNombre           string `json:"sede_nombre"`
 	CantidadVinieron     int    `json:"cantidad_vinieron"`
+}
+
+// CasosBienestarResponse lista de aprendices con indicadores de riesgo (para oficina de bienestar)
+type CasosBienestarResponse struct {
+	DiasAnalizados int                  `json:"dias_analizados"`
+	MinFallas      int                  `json:"min_fallas"`
+	Casos          []CasoBienestarItem  `json:"casos"`
+}
+
+// CasoBienestarItem un aprendiz con inasistencias >= umbral
+type CasoBienestarItem struct {
+	AprendizID         uint   `json:"aprendiz_id"`
+	PersonaNombre      string `json:"persona_nombre"`
+	NumeroDocumento    string `json:"numero_documento"`
+	FichaNumero        string `json:"ficha_numero"`
+	SedeNombre         string `json:"sede_nombre"`
+	TotalSesiones      int    `json:"total_sesiones"`
+	AsistenciasEfectivas int  `json:"asistencias_efectivas"`
+	Inasistencias      int    `json:"inasistencias"`
 }

@@ -377,7 +377,26 @@ export interface AsistenciaAprendizResponse {
 export interface AsistenciaDashboardResponse {
   fecha: string;
   total_aprendices_en_formacion: number;
+  pendientes_revision?: number;
   por_ficha: AsistenciaDashboardPorFicha[];
+}
+
+/** Casos de bienestar: aprendices con N+ inasistencias (riesgo deserción) */
+export interface CasosBienestarResponse {
+  dias_analizados: number;
+  min_fallas: number;
+  casos: CasoBienestarItem[];
+}
+
+export interface CasoBienestarItem {
+  aprendiz_id: number;
+  persona_nombre: string;
+  numero_documento: string;
+  ficha_numero: string;
+  sede_nombre: string;
+  total_sesiones: number;
+  asistencias_efectivas: number;
+  inasistencias: number;
 }
 
 export interface AsistenciaDashboardPorFicha {

@@ -25,6 +25,7 @@ func SetupRouter() *gin.Engine {
 		aprendizHandler := handlers.NewAprendizHandler()
 		instructorHandler := handlers.NewInstructorHandler()
 		asistenciaHandler := handlers.NewAsistenciaHandler()
+		handlers.StartAsistenciaAutoFinalize(asistenciaHandler)
 		adminHandler := handlers.NewAdminHandler()
 		permisosHandler := handlers.NewPermisosHandler()
 		_ = handlers.NewProductoHandler() // inventario desactivado
@@ -125,7 +126,9 @@ func SetupRouter() *gin.Engine {
 			instructores.DELETE("/:id", middleware.RequirePermission("instructor", "ELIMINAR INSTRUCTOR"), instructorHandler.Delete)
 
 			asistencias := protected.Group("/asistencias")
-			asistencias.GET("/dashboard", middleware.RequireSuperAdmin(), asistenciaHandler.GetDashboard)
+			// Dashboard de asistencia y Casos de Bienestar: accesible para SUPER ADMINISTRADOR y BIENESTAR AL APRENDIZ
+			asistencias.GET("/dashboard", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.GetDashboard)
+			asistencias.GET("/dashboard/casos-bienestar", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.GetCasosBienestar)
 			// Entrar a tomar asistencia: solo requiere estar autenticado; el servicio valida que el usuario sea instructor asignado a la ficha.
 			asistencias.POST("/entrar-tomar-asistencia", asistenciaHandler.EntrarTomarAsistencia)
 			asistencias.POST("", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.CreateSesion)
@@ -142,7 +145,6 @@ func SetupRouter() *gin.Engine {
 			asistencias.PUT("/aprendiz/:asistenciaAprendizId/estado", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.AjustarEstadoAprendiz)
 			asistencias.GET("/:id/aprendices", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.ListAprendicesEnSesion)
 			asistencias.PUT("/:id/aprendiz/:aprendizId/observaciones", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.CrearOActualizarObservaciones)
-			asistencias.PUT("/:id/finalizar", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.Finalizar)
 			asistencias.GET("/:id", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.GetByID)
 
 			admin := protected.Group("/admin")

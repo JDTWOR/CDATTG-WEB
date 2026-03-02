@@ -18,6 +18,21 @@ type AsistenciaRepository interface {
 	FindIDsByFichaIDAndFecha(fichaID uint, fecha string) ([]uint, error)
 	Update(a *models.Asistencia) error
 	GetDashboardResumen(sedeID *uint, fecha string) (totalAprendices int, porFicha []DashboardFichaRow, err error)
+	CountPendientesRevisionByFecha(sedeID *uint, fecha string) (int, error)
+	GetCasosBienestar(sedeID *uint, fechaInicio, fechaFin string, minFallas int) ([]CasosBienestarRow, error)
+	FindSesionesNoFinalizadasDesde(fechaDesde string) ([]models.Asistencia, error)
+}
+
+// CasosBienestarRow una fila para el reporte de casos de bienestar (aprendices con N+ inasistencias)
+type CasosBienestarRow struct {
+	AprendizID           uint
+	PersonaNombre        string
+	NumeroDocumento      string
+	FichaNumero          string
+	SedeNombre           string
+	TotalSesiones        int
+	AsistenciasEfectivas int
+	Inasistencias        int
 }
 
 // DashboardFichaRow una fila del resumen por ficha para el dashboard
@@ -194,6 +209,133 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 		}
 	}
 	return totalAprendices, porFicha, nil
+}
+
+// CountPendientesRevisionByFecha cuenta registros de asistencia del día con requiere_revision = true (opcional por sede).
+func (r *asistenciaRepository) CountPendientesRevisionByFecha(sedeID *uint, fecha string) (int, error) {
+	tInicio, err := time.Parse("2006-01-02", fecha)
+	if err != nil {
+		return 0, err
+	}
+	tFin := tInicio.AddDate(0, 0, 1)
+	q := r.db.Table("asistencia_aprendices aa").
+		Joins("INNER JOIN asistencias a ON a.id = aa.asistencia_id").
+		Joins("INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id").
+		Joins("INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id").
+		Where("aa.requiere_revision = ? AND a.fecha >= ? AND a.fecha < ?", true, tInicio, tFin)
+	if sedeID != nil && *sedeID > 0 {
+		q = q.Where("fc.sede_id = ?", *sedeID)
+	}
+	var count int64
+	if err := q.Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return int(count), nil
+}
+
+// GetCasosBienestar devuelve aprendices con inasistencias >= minFallas en el rango de fechas (para oficina de bienestar).
+// Considera "asistió" si tiene hora_ingreso y estado no es ABANDONO_JORNADA.
+func (r *asistenciaRepository) GetCasosBienestar(sedeID *uint, fechaInicio, fechaFin string, minFallas int) ([]CasosBienestarRow, error) {
+	tInicio, err := time.Parse("2006-01-02", fechaInicio)
+	if err != nil {
+		return nil, err
+	}
+	tFin, err := time.Parse("2006-01-02", fechaFin)
+	if err != nil {
+		return nil, err
+	}
+	tFin = tFin.AddDate(0, 0, 1) // exclusivo
+
+	type row struct {
+		AprendizID           uint   `gorm:"column:aprendiz_id"`
+		PersonaNombre        string `gorm:"column:persona_nombre"`
+		NumeroDocumento      string `gorm:"column:numero_documento"`
+		FichaNumero          string `gorm:"column:ficha_numero"`
+		SedeNombre           string `gorm:"column:sede_nombre"`
+		TotalSesiones        int    `gorm:"column:total_sesiones"`
+		AsistenciasEfectivas int    `gorm:"column:asistencias_efectivas"`
+		Inasistencias        int    `gorm:"column:inasistencias"`
+	}
+
+	raw := `
+WITH sesiones_rango AS (
+  SELECT a.id AS asistencia_id, fc.id AS ficha_id
+  FROM asistencias a
+  INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
+  INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id
+  WHERE a.fecha >= ? AND a.fecha < ?
+`
+	args := []interface{}{tInicio, tFin}
+	if sedeID != nil && *sedeID > 0 {
+		raw += " AND fc.sede_id = ?"
+		args = append(args, *sedeID)
+	}
+	raw += `
+),
+totales_por_ficha AS (
+  SELECT ficha_id, COUNT(*)::int AS total_sesiones
+  FROM sesiones_rango
+  GROUP BY ficha_id
+),
+asistencias_aprendiz AS (
+  SELECT aa.aprendiz_ficha_id, sr.ficha_id, COUNT(*)::int AS asistencias_efectivas
+  FROM asistencia_aprendices aa
+  INNER JOIN sesiones_rango sr ON sr.asistencia_id = aa.asistencia_id
+  WHERE aa.hora_ingreso IS NOT NULL
+  AND (aa.estado IS NULL OR aa.estado = '' OR aa.estado = 'ASISTENCIA_COMPLETA' OR aa.estado = 'ASISTENCIA_PARCIAL')
+  GROUP BY aa.aprendiz_ficha_id, sr.ficha_id
+)
+SELECT
+  ap.id AS aprendiz_id,
+  TRIM(COALESCE(p.primer_nombre,'') || ' ' || COALESCE(p.segundo_nombre,'') || ' ' || COALESCE(p.primer_apellido,'') || ' ' || COALESCE(p.segundo_apellido,'')) AS persona_nombre,
+  COALESCE(p.numero_documento,'') AS numero_documento,
+  fc.ficha AS ficha_numero,
+  COALESCE(s.nombre,'') AS sede_nombre,
+  COALESCE(tpf.total_sesiones, 0) AS total_sesiones,
+  COALESCE(aa.asistencias_efectivas, 0) AS asistencias_efectivas,
+  (COALESCE(tpf.total_sesiones, 0) - COALESCE(aa.asistencias_efectivas, 0)) AS inasistencias
+FROM aprendices ap
+INNER JOIN personas p ON p.id = ap.persona_id
+INNER JOIN fichas_caracterizacion fc ON fc.id = ap.ficha_caracterizacion_id
+LEFT JOIN sedes s ON s.id = fc.sede_id
+INNER JOIN totales_por_ficha tpf ON tpf.ficha_id = ap.ficha_caracterizacion_id
+LEFT JOIN asistencias_aprendiz aa ON aa.aprendiz_ficha_id = ap.id AND aa.ficha_id = ap.ficha_caracterizacion_id
+WHERE ap.estado = true
+AND (COALESCE(tpf.total_sesiones, 0) - COALESCE(aa.asistencias_efectivas, 0)) >= ?
+ORDER BY inasistencias DESC, ap.id
+`
+	args = append(args, minFallas)
+
+	var rows []row
+	if err := r.db.Raw(raw, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]CasosBienestarRow, len(rows))
+	for i := range rows {
+		out[i] = CasosBienestarRow{
+			AprendizID:           rows[i].AprendizID,
+			PersonaNombre:        rows[i].PersonaNombre,
+			NumeroDocumento:      rows[i].NumeroDocumento,
+			FichaNumero:          rows[i].FichaNumero,
+			SedeNombre:           rows[i].SedeNombre,
+			TotalSesiones:        rows[i].TotalSesiones,
+			AsistenciasEfectivas: rows[i].AsistenciasEfectivas,
+			Inasistencias:        rows[i].Inasistencias,
+		}
+	}
+	return out, nil
+}
+
+// FindSesionesNoFinalizadasDesde devuelve sesiones no finalizadas con fecha >= fechaDesde (YYYY-MM-DD),
+// con Ficha y Jornada cargados para evaluar si ya pasó el horario de cierre.
+func (r *asistenciaRepository) FindSesionesNoFinalizadasDesde(fechaDesde string) ([]models.Asistencia, error) {
+	var list []models.Asistencia
+	err := r.db.Where("is_finished = ? AND fecha >= ?", false, fechaDesde).
+		Preload("InstructorFicha").
+		Preload("InstructorFicha.Ficha").
+		Preload("InstructorFicha.Ficha.Jornada").
+		Find(&list).Error
+	return list, err
 }
 
 // ParseDate parses YYYY-MM-DD to time.Time

@@ -16,6 +16,8 @@ import { FichasCaracterizacion } from './pages/FichasCaracterizacion';
 import { FichaDetalle } from './pages/FichaDetalle';
 import { Asistencia } from './pages/Asistencia';
 import { AsistenciaDashboard } from './pages/AsistenciaDashboard';
+import { CasosBienestar } from './pages/CasosBienestar';
+import { CasosBienestarFichaDetalle } from './pages/CasosBienestarFichaDetalle';
 import { InventarioDashboard } from './pages/InventarioDashboard';
 import { InventarioProductos } from './pages/InventarioProductos';
 import { InventarioOrdenes } from './pages/InventarioOrdenes';
@@ -23,6 +25,7 @@ import { InventarioOrdenDetalle } from './pages/InventarioOrdenDetalle';
 import { InventarioPendientesAprobacion } from './pages/InventarioPendientesAprobacion';
 import { InventarioDevoluciones } from './pages/InventarioDevoluciones';
 import { Permisos } from './pages/Permisos';
+import { Perfil } from './pages/Perfil';
 
 function App() {
   return (
@@ -31,6 +34,16 @@ function App() {
         <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route
+            path="/perfil"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Perfil />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/dashboard"
             element={
@@ -152,6 +165,26 @@ function App() {
             }
           />
           <Route
+            path="/asistencia/dashboard/casos-bienestar"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <CasosBienestar />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/asistencia/dashboard/casos-bienestar/ficha/:fichaNumero"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <CasosBienestarFichaDetalle />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inventario/dashboard"
             element={
               <ProtectedRoute>
@@ -231,7 +264,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/perfil" replace />} />
         </Routes>
       </Router>
       </AuthProvider>

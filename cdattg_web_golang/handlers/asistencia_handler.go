@@ -113,19 +113,21 @@ func (h *AsistenciaHandler) ListByFichaAndFechas(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": list})
 }
 
-func (h *AsistenciaHandler) Finalizar(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
-		return
+// StartAsistenciaAutoFinalize inicia la goroutine que finaliza sesiones al terminar el horario de la jornada (más extensión).
+// Los instructores no pueden finalizar manualmente; la finalización es automática.
+func StartAsistenciaAutoFinalize(h *AsistenciaHandler) {
+	run := func() {
+		h.svc.FinalizarSesionesVencidas()
+		GetAsistenciaDashboardHub().BroadcastRefresh()
 	}
-	resp, err := h.svc.Finalizar(uint(id))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	GetAsistenciaDashboardHub().BroadcastRefresh()
-	c.JSON(http.StatusOK, resp)
+	run() // una vez al arranque
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			run()
+		}
+	}()
 }
 
 func (h *AsistenciaHandler) RegistrarIngreso(c *gin.Context) {
@@ -294,6 +296,35 @@ func (h *AsistenciaHandler) GetDashboard(c *gin.Context) {
 	}
 	if resp.Fecha == "" {
 		resp.Fecha = fecha
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetCasosBienestar devuelve aprendices con N+ inasistencias en el período (oficina de bienestar). Query: dias (default 30), min_fallas (default 3), sede_id (opcional).
+func (h *AsistenciaHandler) GetCasosBienestar(c *gin.Context) {
+	dias := 30
+	if s := c.Query("dias"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			dias = n
+		}
+	}
+	minFallas := 3
+	if s := c.Query("min_fallas"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n >= 0 {
+			minFallas = n
+		}
+	}
+	var sedeID *uint
+	if s := c.Query("sede_id"); s != "" {
+		if id, err := strconv.ParseUint(s, 10, 32); err == nil {
+			u := uint(id)
+			sedeID = &u
+		}
+	}
+	resp, err := h.svc.GetCasosBienestar(sedeID, dias, minFallas)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	c.JSON(http.StatusOK, resp)
 }

@@ -106,15 +106,15 @@ func DashboardWebSocket(c *gin.Context) {
 	}
 	sub := strconv.FormatUint(uint64(user.ID), 10)
 	roles, _ := authz.GetRolesForUser(e, sub)
-	isSuperAdmin := false
+	hasAccess := false
 	for _, r := range roles {
-		if r == "SUPER ADMINISTRADOR" {
-			isSuperAdmin = true
+		if r == "SUPER ADMINISTRADOR" || r == "BIENESTAR AL APRENDIZ" {
+			hasAccess = true
 			break
 		}
 	}
-	if !isSuperAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Solo el superadministrador puede acceder al dashboard en tiempo real"})
+	if !hasAccess {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Solo usuarios con rol SUPER ADMINISTRADOR o BIENESTAR AL APRENDIZ pueden acceder al dashboard en tiempo real"})
 		return
 	}
 	conn, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)

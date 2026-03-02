@@ -19,6 +19,7 @@ import {
   XMarkIcon,
   Bars3Icon,
   ShieldCheckIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -35,21 +36,48 @@ const navLinkClass = (isActive: boolean) =>
       : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
   }`;
 
-/** Permiso requerido: null = siempre visible. roleRequired: solo si el usuario tiene ese rol (ej. SUPER ADMINISTRADOR). */
-const SIDEBAR_ITEMS: { section: string; path: string; label: string; permission: string | null; roleRequired?: string }[] = [
-  { section: 'Inicio', path: '/dashboard', label: 'Dashboard', permission: null },
+/** Permiso requerido: null = siempre visible. rolesRequired: lista de roles que habilitan el ítem (si se define). */
+const SIDEBAR_ITEMS: {
+  section: string;
+  path: string;
+  label: string;
+  permission: string | null;
+  rolesRequired?: string[];
+}[] = [
+  { section: 'Inicio', path: '/perfil', label: 'Mi perfil', permission: null },
+  {
+    section: 'Inicio',
+    path: '/dashboard',
+    label: 'Dashboard',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
+  },
   { section: 'Gestión académica', path: '/programas', label: 'Programas', permission: 'VER PROGRAMAS' },
   { section: 'Gestión académica', path: '/fichas', label: 'Fichas', permission: 'VER FICHAS' },
   { section: 'Gestión de personal', path: '/instructores', label: 'Instructores', permission: 'VER FICHAS' },
   { section: 'Gestión de personal', path: '/aprendices', label: 'Aprendices', permission: 'VER APRENDICES' },
   { section: 'Gestión de personal', path: '/personas', label: 'Personas', permission: 'VER PERSONAS' },
   { section: 'Control y seguimiento', path: '/asistencia', label: 'Asistencia', permission: 'VER ASISTENCIA' },
-  { section: 'Control y seguimiento', path: '/asistencia/dashboard', label: 'Dashboard Asistencia', permission: null, roleRequired: 'SUPER ADMINISTRADOR' },
+  {
+    section: 'Control y seguimiento',
+    path: '/asistencia/dashboard',
+    label: 'Dashboard Asistencia',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
+  },
+  {
+    section: 'Control y seguimiento',
+    path: '/asistencia/dashboard/casos-bienestar',
+    label: 'Casos Bienestar',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
+  },
   // Inventario desactivado
   { section: 'Administración', path: '/permisos', label: 'Permisos y roles', permission: 'ASIGNAR PERMISOS' },
 ];
 
 const ICONS: Record<string, ReactNode> = {
+  perfil: <UsersIcon className="w-5 h-5" />,
   dashboard: <HomeIcon className="w-5 h-5" />,
   programas: <BookOpenIcon className="w-5 h-5" />,
   fichas: <DocumentTextIcon className="w-5 h-5" />,
@@ -58,6 +86,7 @@ const ICONS: Record<string, ReactNode> = {
   personas: <UsersIcon className="w-5 h-5" />,
   asistencia: <ClipboardDocumentListIcon className="w-5 h-5" />,
   'asistencia/dashboard': <ChartBarIcon className="w-5 h-5" />,
+  'asistencia/dashboard/casos-bienestar': <ExclamationTriangleIcon className="w-5 h-5" />,
   inventario: <CubeIcon className="w-5 h-5" />,
   'inventario/dashboard': <CubeIcon className="w-5 h-5" />,
   'inventario/productos': <CubeIcon className="w-5 h-5" />,
@@ -92,8 +121,8 @@ export const Layout = ({ children }: LayoutProps) => {
   }, [sidebarOpen]);
 
   const visibleItems = SIDEBAR_ITEMS.filter((item) => {
-    if (item.roleRequired) {
-      if (!roles.includes(item.roleRequired)) return false;
+    if (item.rolesRequired && item.rolesRequired.length > 0) {
+      if (!item.rolesRequired.some((r) => roles.includes(r))) return false;
     }
     return item.permission === null || hasPermission(item.permission);
   });
@@ -172,7 +201,7 @@ export const Layout = ({ children }: LayoutProps) => {
               >
                 <Bars3Icon className="w-6 h-6" />
               </button>
-              <Link to="/dashboard" className="flex items-center space-x-2" onClick={() => setSidebarOpen(false)}>
+              <Link to="/perfil" className="flex items-center space-x-2" onClick={() => setSidebarOpen(false)}>
                 <div className="w-9 h-9 sm:w-10 sm:h-10 bg-sena-green rounded-lg flex items-center justify-center shrink-0">
                   <span className="text-white font-bold text-lg sm:text-xl">S</span>
                 </div>

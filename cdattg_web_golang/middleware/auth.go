@@ -91,6 +91,20 @@ func RequirePermission(obj, act string) gin.HandlerFunc {
 			return
 		}
 
+		// Fallback para VER PERSONA en perfil: permitir ver solo su propia persona
+		if obj == authz.ObjPersona && act == "VER PERSONA" {
+			if u, ok := c.Get("user"); ok {
+				if user, _ := u.(*models.User); user != nil && user.PersonaID != nil {
+					if idStr := c.Param("id"); idStr != "" {
+						if id, errParse := strconv.ParseUint(idStr, 10, 32); errParse == nil && uint(id) == *user.PersonaID {
+							c.Next()
+							return
+						}
+					}
+				}
+			}
+		}
+
 		// Fallback especial para asistencia: permitir al instructor de la ficha ver la sesión (VER ASISTENCIA)
 		if obj == authz.ObjAsistencia && act == "VER ASISTENCIA" && c.Request.Method == http.MethodGet {
 			if asistenciaID, ok := getAsistenciaIDFromRequest(c); ok && asistenciaID > 0 {

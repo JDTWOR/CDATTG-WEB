@@ -32,6 +32,7 @@ import type {
   AsistenciaAprendizRequest,
   AsistenciaAprendizResponse,
   AsistenciaDashboardResponse,
+  CasosBienestarResponse,
   SedeItem,
   AmbienteItem,
   ModalidadFormacionItem,
@@ -88,9 +89,13 @@ class ApiService {
       (response) => response,
       (error: AxiosError) => {
         if (error.response?.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
+          // No redirigir si el 401 viene del intento de login (para mostrar error y mantener campos)
+          const isLoginRequest = error.config?.url?.includes('/auth/login');
+          if (!isLoginRequest) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(error);
       }
@@ -483,6 +488,12 @@ class ApiService {
     return response.data;
   }
 
+  /** Casos de bienestar: aprendices con N+ inasistencias (riesgo deserción). Params: dias (default 30), min_fallas (default 3), sede_id (opcional). */
+  async getCasosBienestar(params?: { dias?: number; min_fallas?: number; sede_id?: number }): Promise<CasosBienestarResponse> {
+    const response = await this.api.get<CasosBienestarResponse>('/asistencias/dashboard/casos-bienestar', { params });
+    return response.data;
+  }
+
   /** Registros de asistencia de aprendices pendientes de revisión para el instructor actual en una fecha (default hoy). */
   async getAsistenciaPendientesRevision(fecha?: string): Promise<AsistenciaAprendizResponse[]> {
     const response = await this.api.get<{ data: AsistenciaAprendizResponse[] }>('/asistencias/pendientes-revision', {
@@ -501,11 +512,6 @@ class ApiService {
       params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
     });
     return response.data.data;
-  }
-
-  async finalizarAsistencia(id: number): Promise<AsistenciaResponse> {
-    const response = await this.api.put<AsistenciaResponse>(`/asistencias/${id}/finalizar`);
-    return response.data;
   }
 
   async getAsistenciaAprendices(asistenciaId: number): Promise<AsistenciaAprendizResponse[]> {

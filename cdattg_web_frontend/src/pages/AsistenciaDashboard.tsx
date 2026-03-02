@@ -46,7 +46,7 @@ export const AsistenciaDashboard = () => {
       return;
     }
     fetchDashboard();
-  }, [isSuperAdmin]);
+  }, [canViewBienestar]);
 
   // WebSocket para actualizaciones en tiempo real
   useEffect(() => {
@@ -84,7 +84,7 @@ export const AsistenciaDashboard = () => {
       wsRef.current = null;
       setWsConnected(false);
     };
-  }, [isSuperAdmin, token]);
+  }, [canViewBienestar, token]);
 
   if (!canViewBienestar) {
     return (

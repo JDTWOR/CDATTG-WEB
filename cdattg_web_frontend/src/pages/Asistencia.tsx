@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { ExclamationTriangleIcon, ArrowLeftIcon, DocumentTextIcon, UserPlusIcon, CheckIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon, PencilSquareIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, ArrowLeftIcon, DocumentTextIcon, UserPlusIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon, PencilSquareIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { EscanerQR } from '../components/EscanerQR';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +11,250 @@ import type {
   AprendizResponse,
   AsistenciaAprendizResponse,
 } from '../types';
+
+function sameAsistenciaAprendiz(a: AsistenciaAprendizResponse | undefined, b: AsistenciaAprendizResponse | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.id === b.id &&
+    a.hora_ingreso === b.hora_ingreso &&
+    a.hora_salida === b.hora_salida &&
+    a.observaciones === b.observaciones &&
+    a.estado === b.estado &&
+    a.requiere_revision === b.requiere_revision &&
+    a.motivo_ajuste === b.motivo_ajuste
+  );
+}
+
+type TarjetaAprendizAsistenciaProps = {
+  aprendiz: AprendizResponse;
+  aa: AsistenciaAprendizResponse | undefined;
+  index: number;
+  asistenciaId: number | null;
+  onRegistrarIngreso: (aprendizId: number) => void;
+  onRegistrarSalida: (asistenciaAprendizId: number) => void;
+  onAbrirEstado: (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => void;
+  onAbrirObservaciones: (payload: { asistenciaId: number; aprendizId: number; nombre: string; observaciones: string }) => void;
+};
+
+const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
+  aprendiz,
+  aa,
+  index,
+  asistenciaId,
+  onRegistrarIngreso,
+  onRegistrarSalida,
+  onAbrirEstado,
+  onAbrirObservaciones,
+}: TarjetaAprendizAsistenciaProps) {
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-gray-900 dark:text-white truncate">
+            {aprendiz.persona_nombre ?? '–'}
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Doc: {aprendiz.persona_documento ?? '–'} · #{index}
+          </p>
+        </div>
+        <span className="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">
+          {aa?.hora_ingreso
+            ? new Date(aa.hora_ingreso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+            : '–'}
+          {aa?.hora_salida != null && (
+            <> → {new Date(aa.hora_salida).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</>
+          )}
+        </span>
+      </div>
+      {aa?.observaciones ? (
+        <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2" title={aa.observaciones}>
+          {aa.observaciones}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+        {!aa || !aa.hora_ingreso ? (
+          <button
+            type="button"
+            onClick={() => onRegistrarIngreso(aprendiz.id)}
+            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center gap-2 rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
+            aria-label="Registrar entrada"
+          >
+            <ArrowRightOnRectangleIcon className="w-5 h-5 shrink-0" />
+            Entrada
+          </button>
+        ) : !aa.hora_salida ? (
+          <button
+            type="button"
+            onClick={() => onRegistrarSalida(aa.id)}
+            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center gap-2 rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
+            aria-label="Registrar salida"
+          >
+            <ArrowLeftOnRectangleIcon className="w-5 h-5 shrink-0" />
+            Salida
+          </button>
+        ) : aa?.requiere_revision ? (
+          <button
+            type="button"
+            onClick={() =>
+              onAbrirEstado({
+                asistenciaAprendizId: aa.id,
+                nombre: aprendiz.persona_nombre ?? 'Aprendiz',
+                estado: aa.estado || 'ASISTENCIA_COMPLETA',
+                motivo: aa.motivo_ajuste || '',
+              })
+            }
+            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center rounded-lg border border-amber-400 bg-amber-50 text-amber-800 text-sm font-medium touch-manipulation"
+          >
+            Resolver estado
+          </button>
+        ) : (
+          <span className="flex-1 min-h-[44px] flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+            Registrado
+          </span>
+        )}
+        {asistenciaId != null ? (
+          <button
+            type="button"
+            onClick={() =>
+              onAbrirObservaciones({
+                asistenciaId,
+                aprendizId: aprendiz.id,
+                nombre: aprendiz.persona_nombre ?? 'Aprendiz',
+                observaciones: aa?.observaciones ?? '',
+              })
+            }
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 touch-manipulation"
+            aria-label="Observaciones"
+            title="Observaciones"
+          >
+            <PencilSquareIcon className="w-5 h-5" />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}, (prev, next) => {
+  return (
+    prev.aprendiz.id === next.aprendiz.id &&
+    prev.index === next.index &&
+    prev.asistenciaId === next.asistenciaId &&
+    sameAsistenciaAprendiz(prev.aa, next.aa) &&
+    prev.onRegistrarIngreso === next.onRegistrarIngreso &&
+    prev.onRegistrarSalida === next.onRegistrarSalida &&
+    prev.onAbrirEstado === next.onAbrirEstado &&
+    prev.onAbrirObservaciones === next.onAbrirObservaciones
+  );
+});
+
+type FilaAprendizAsistenciaProps = {
+  aprendiz: AprendizResponse;
+  aa: AsistenciaAprendizResponse | undefined;
+  index: number;
+  asistenciaId: number | null;
+  onRegistrarIngreso: (aprendizId: number) => void;
+  onRegistrarSalida: (asistenciaAprendizId: number) => void;
+  onAbrirEstado: (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => void;
+  onAbrirObservaciones: (payload: { asistenciaId: number; aprendizId: number; nombre: string; observaciones: string }) => void;
+};
+
+const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
+  aprendiz,
+  aa,
+  index,
+  asistenciaId,
+  onRegistrarIngreso,
+  onRegistrarSalida,
+  onAbrirEstado,
+  onAbrirObservaciones,
+}: FilaAprendizAsistenciaProps) {
+  return (
+    <tr className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-600 dark:text-gray-400">{index}</td>
+      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">{aprendiz.persona_documento ?? '-'}</td>
+      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-medium">{aprendiz.persona_nombre ?? '-'}</td>
+      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
+        {aa?.hora_ingreso ? new Date(aa.hora_ingreso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '–'}
+      </td>
+      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
+        {aa?.hora_salida ? new Date(aa.hora_salida).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '–'}
+      </td>
+      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-500 dark:text-gray-400">{aa?.observaciones || '–'}</td>
+      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
+        <div className="flex items-center gap-2">
+          {!aa || !aa.hora_ingreso ? (
+            <button
+              type="button"
+              onClick={() => onRegistrarIngreso(aprendiz.id)}
+              className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-500 dark:hover:text-green-400 dark:hover:bg-green-900/30 touch-manipulation transition-colors"
+              title="Registrar entrada"
+              aria-label="Registrar entrada"
+            >
+              <ArrowRightOnRectangleIcon className="h-7 w-7" />
+            </button>
+          ) : !aa.hora_salida ? (
+            <button
+              type="button"
+              onClick={() => onRegistrarSalida(aa.id)}
+              className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30 touch-manipulation transition-colors"
+              title="Registrar salida"
+              aria-label="Registrar salida"
+            >
+              <ArrowLeftOnRectangleIcon className="h-7 w-7" />
+            </button>
+          ) : (
+            <span className="min-w-[52px] min-h-[52px] inline-block" aria-hidden />
+          )}
+          {aa?.requiere_revision && (
+            <button
+              type="button"
+              onClick={() =>
+                onAbrirEstado({
+                  asistenciaAprendizId: aa.id,
+                  nombre: aprendiz.persona_nombre ?? 'Aprendiz',
+                  estado: aa.estado || 'ASISTENCIA_COMPLETA',
+                  motivo: aa.motivo_ajuste || '',
+                })
+              }
+              className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200"
+            >
+              Resolver estado
+            </button>
+          )}
+          {asistenciaId != null ? (
+            <button
+              type="button"
+              onClick={() =>
+                onAbrirObservaciones({
+                  asistenciaId,
+                  aprendizId: aprendiz.id,
+                  nombre: aprendiz.persona_nombre ?? 'Aprendiz',
+                  observaciones: aa?.observaciones ?? '',
+                })
+              }
+              className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 touch-manipulation transition-colors"
+              title="Observaciones"
+              aria-label="Registrar observaciones"
+            >
+              <PencilSquareIcon className="h-7 w-7" />
+            </button>
+          ) : null}
+        </div>
+      </td>
+    </tr>
+  );
+}, (prev, next) => {
+  return (
+    prev.aprendiz.id === next.aprendiz.id &&
+    prev.index === next.index &&
+    prev.asistenciaId === next.asistenciaId &&
+    sameAsistenciaAprendiz(prev.aa, next.aa) &&
+    prev.onRegistrarIngreso === next.onRegistrarIngreso &&
+    prev.onRegistrarSalida === next.onRegistrarSalida &&
+    prev.onAbrirEstado === next.onAbrirEstado &&
+    prev.onAbrirObservaciones === next.onAbrirObservaciones
+  );
+});
 
 export const Asistencia = () => {
   const { roles } = useAuth();
@@ -193,38 +437,44 @@ export const Asistencia = () => {
     }
   };
 
-  const handleFinalizar = async () => {
-    if (!sesionActual) return;
-    if (!confirm('¿Finalizar esta sesión de asistencia?')) return;
-    try {
-      await apiService.finalizarAsistencia(sesionActual.id);
-      setSesionActual(null);
-    } catch (e: any) {
-      alert(e.response?.data?.error || 'Error al finalizar');
-    }
-  };
+  const handleRegistrarIngreso = useCallback(
+    async (aprendizId: number) => {
+      if (!sesionActual) return;
+      try {
+        const nuevo = await apiService.registrarIngresoAsistencia({
+          asistencia_id: sesionActual.id,
+          aprendiz_id: aprendizId,
+        });
+        upsertAsistenciaAprendizEnSesion(nuevo);
+      } catch (e: any) {
+        alert(e.response?.data?.error || 'Error al registrar ingreso');
+      }
+    },
+    [sesionActual]
+  );
 
-  const handleRegistrarIngreso = async (aprendizId: number) => {
-    if (!sesionActual) return;
-    try {
-      const nuevo = await apiService.registrarIngresoAsistencia({
-        asistencia_id: sesionActual.id,
-        aprendiz_id: aprendizId,
-      });
-      upsertAsistenciaAprendizEnSesion(nuevo);
-    } catch (e: any) {
-      alert(e.response?.data?.error || 'Error al registrar ingreso');
-    }
-  };
-
-  const handleRegistrarSalida = async (asistenciaAprendizId: number) => {
+  const handleRegistrarSalida = useCallback(async (asistenciaAprendizId: number) => {
     try {
       const actualizado = await apiService.registrarSalidaAsistencia(asistenciaAprendizId);
       upsertAsistenciaAprendizEnSesion(actualizado);
     } catch (e: any) {
       alert(e.response?.data?.error || 'Error al registrar salida');
     }
-  };
+  }, []);
+
+  const onAbrirEstadoModal = useCallback(
+    (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => {
+      setEstadoModal(payload);
+    },
+    []
+  );
+
+  const onAbrirObservacionesModal = useCallback(
+    (payload: { asistenciaId: number; aprendizId: number; nombre: string; observaciones: string }) => {
+      setObservacionesModal(payload);
+    },
+    []
+  );
 
   const handleGuardarObservaciones = async () => {
     if (!observacionesModal || !sesionActual) return;
@@ -394,14 +644,9 @@ export const Asistencia = () => {
                   >
                     Volver a fichas
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleFinalizar}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-3 min-h-[44px] text-sm font-medium text-white hover:bg-primary-700 touch-manipulation"
-                  >
-                    <CheckIcon className="h-5 w-5" />
-                    Finalizar asistencia
-                  </button>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    La sesión se cierra automáticamente al terminar el horario de la jornada (más la extensión).
+                  </p>
                 </div>
               </div>
             </div>
@@ -476,101 +721,21 @@ export const Asistencia = () => {
               </div>
             ) : (
               <>
-                {/* Vista móvil: tarjetas por aprendiz */}
+                {/* Vista móvil: tarjetas por aprendiz (memoizadas para evitar salto de scroll) */}
                 <div className="md:hidden space-y-3">
-                  {aprendicesFicha.map((aprendiz, idx) => {
-                    const aa = registroPorAprendizId.get(aprendiz.id);
-                    return (
-                      <div
-                        key={aprendiz.id}
-                        className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 shadow-sm"
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-gray-900 dark:text-white truncate">
-                              {aprendiz.persona_nombre ?? '–'}
-                            </p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              Doc: {aprendiz.persona_documento ?? '–'} · #{idx + 1}
-                            </p>
-                          </div>
-                          <span className="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">
-                            {aa?.hora_ingreso
-                              ? new Date(aa.hora_ingreso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
-                              : '–'}
-                            {aa?.hora_salida != null && (
-                              <> → {new Date(aa.hora_salida).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</>
-                            )}
-                          </span>
-                        </div>
-                        {aa?.observaciones ? (
-                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2" title={aa.observaciones}>
-                            {aa.observaciones}
-                          </p>
-                        ) : null}
-                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                          {!aa || !aa.hora_ingreso ? (
-                            <button
-                              type="button"
-                              onClick={() => handleRegistrarIngreso(aprendiz.id)}
-                              className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center gap-2 rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
-                              aria-label="Registrar entrada"
-                            >
-                              <ArrowRightOnRectangleIcon className="w-5 h-5 shrink-0" />
-                              Entrada
-                            </button>
-                          ) : !aa.hora_salida ? (
-                            <button
-                              type="button"
-                              onClick={() => handleRegistrarSalida(aa.id)}
-                              className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center gap-2 rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
-                              aria-label="Registrar salida"
-                            >
-                              <ArrowLeftOnRectangleIcon className="w-5 h-5 shrink-0" />
-                              Salida
-                            </button>
-                          ) : aa?.requiere_revision ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setEstadoModal({
-                                  asistenciaAprendizId: aa.id,
-                                  nombre: aprendiz.persona_nombre ?? 'Aprendiz',
-                                  estado: aa.estado || 'ASISTENCIA_COMPLETA',
-                                  motivo: aa.motivo_ajuste || '',
-                                })
-                              }
-                              className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center rounded-lg border border-amber-400 bg-amber-50 text-amber-800 text-sm font-medium touch-manipulation"
-                            >
-                              Resolver estado
-                            </button>
-                          ) : (
-                            <span className="flex-1 min-h-[44px] flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-                              Registrado
-                            </span>
-                          )}
-                          {sesionActual ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setObservacionesModal({
-                                  asistenciaId: sesionActual.id,
-                                  aprendizId: aprendiz.id,
-                                  nombre: aprendiz.persona_nombre ?? 'Aprendiz',
-                                  observaciones: aa?.observaciones ?? '',
-                                })
-                              }
-                              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 touch-manipulation"
-                              aria-label="Observaciones"
-                              title="Observaciones"
-                            >
-                              <PencilSquareIcon className="w-5 h-5" />
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {aprendicesFicha.map((aprendiz, idx) => (
+                    <TarjetaAprendizAsistencia
+                      key={aprendiz.id}
+                      aprendiz={aprendiz}
+                      aa={registroPorAprendizId.get(aprendiz.id)}
+                      index={idx + 1}
+                      asistenciaId={sesionActual?.id ?? null}
+                      onRegistrarIngreso={handleRegistrarIngreso}
+                      onRegistrarSalida={handleRegistrarSalida}
+                      onAbrirEstado={onAbrirEstadoModal}
+                      onAbrirObservaciones={onAbrirObservacionesModal}
+                    />
+                  ))}
                 </div>
 
                 {/* Vista desktop: tabla */}
@@ -588,77 +753,19 @@ export const Asistencia = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {aprendicesFicha.map((aprendiz, idx) => {
-                        const aa = registroPorAprendizId.get(aprendiz.id);
-                        return (
-                          <tr key={aprendiz.id} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                            <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-600 dark:text-gray-400">{idx + 1}</td>
-                            <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">{aprendiz.persona_documento ?? '-'}</td>
-                            <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-medium">{aprendiz.persona_nombre ?? '-'}</td>
-                            <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-                              {aa?.hora_ingreso ? new Date(aa.hora_ingreso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '–'}
-                            </td>
-                            <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-                              {aa?.hora_salida ? new Date(aa.hora_salida).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '–'}
-                            </td>
-                            <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-500 dark:text-gray-400">{aa?.observaciones || '–'}</td>
-                            <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-                              <div className="flex items-center gap-2">
-                                {!aa || !aa.hora_ingreso ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRegistrarIngreso(aprendiz.id)}
-                                    className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-500 dark:hover:text-green-400 dark:hover:bg-green-900/30 touch-manipulation transition-colors"
-                                    title="Registrar entrada"
-                                    aria-label="Registrar entrada"
-                                  >
-                                    <ArrowRightOnRectangleIcon className="h-7 w-7" />
-                                  </button>
-                                ) : !aa.hora_salida ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRegistrarSalida(aa.id)}
-                                    className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30 touch-manipulation transition-colors"
-                                    title="Registrar salida"
-                                    aria-label="Registrar salida"
-                                  >
-                                    <ArrowLeftOnRectangleIcon className="h-7 w-7" />
-                                  </button>
-                                ) : (
-                                  <span className="min-w-[52px] min-h-[52px] inline-block" aria-hidden />
-                                )}
-                                {aa?.requiere_revision && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setEstadoModal({
-                                        asistenciaAprendizId: aa.id,
-                                        nombre: aprendiz.persona_nombre ?? 'Aprendiz',
-                                        estado: aa.estado || 'ASISTENCIA_COMPLETA',
-                                        motivo: aa.motivo_ajuste || '',
-                                      })
-                                    }
-                                    className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200"
-                                  >
-                                    Resolver estado
-                                  </button>
-                                )}
-                                {sesionActual ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setObservacionesModal({ asistenciaId: sesionActual.id, aprendizId: aprendiz.id, nombre: aprendiz.persona_nombre ?? 'Aprendiz', observaciones: aa?.observaciones ?? '' })}
-                                    className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 touch-manipulation transition-colors"
-                                    title="Observaciones"
-                                    aria-label="Registrar observaciones"
-                                  >
-                                    <PencilSquareIcon className="h-7 w-7" />
-                                  </button>
-                                ) : null}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {aprendicesFicha.map((aprendiz, idx) => (
+                        <FilaAprendizAsistencia
+                          key={aprendiz.id}
+                          aprendiz={aprendiz}
+                          aa={registroPorAprendizId.get(aprendiz.id)}
+                          index={idx + 1}
+                          asistenciaId={sesionActual?.id ?? null}
+                          onRegistrarIngreso={handleRegistrarIngreso}
+                          onRegistrarSalida={handleRegistrarSalida}
+                          onAbrirEstado={onAbrirEstadoModal}
+                          onAbrirObservaciones={onAbrirObservacionesModal}
+                        />
+                      ))}
                     </tbody>
                   </table>
                 </div>

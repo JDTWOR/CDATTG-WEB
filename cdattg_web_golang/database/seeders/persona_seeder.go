@@ -31,6 +31,8 @@ var personaSeeds = []PersonaSeed{
 	{6, "444444444", "APRENDIZ", "UNO", "CDATTG", "PRUEBAS", "3034444444", "aprendiz1@dataguaviare.com", "AVENIDA 5 #22-10", "2002-03-20"},
 	{7, "333333333", "APRENDIZ", "DOS", "CDATTG", "PRUEBAS", "3043333333", "aprendiz2@dataguaviare.com", "AVENIDA 6 #18-20", "2003-07-05"},
 	{8, "222222222", "PROVEEDOR", "DEMO", "CDATTG", "PRUEBAS", "3052222222", "proveedor@dataguaviare.com", "CALLE 7 #14-25", "1988-05-15"},
+	// Persona para rol "BIENESTAR AL APRENDIZ"
+	{9, "999999999", "BIENESTAR", "AL", "APRENDIZ", "", "3069999999", "bienestar@dataguaviare.com", "CALLE 9 #19-99", "1988-01-01"},
 }
 
 // RunPersonaSeeder crea las personas de prueba (IDs 1-8) igual que cdattg_web.

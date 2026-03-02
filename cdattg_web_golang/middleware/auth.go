@@ -101,7 +101,7 @@ func RequirePermission(obj, act string) gin.HandlerFunc {
 			}
 		}
 
-		// Fallback para TOMAR ASISTENCIA: instructor asignado a la ficha de la sesión puede registrar ingreso/salida/observaciones/finalizar
+		// Fallback para TOMAR ASISTENCIA: instructor asignado a la ficha de la sesión puede registrar ingreso/salida/observaciones (la finalización es automática)
 		if obj == authz.ObjAsistencia && act == "TOMAR ASISTENCIA" {
 			if asistenciaID, ok := getAsistenciaIDFromRequest(c); ok && asistenciaID > 0 {
 				if allowInstructorAsistenciaByID(c, asistenciaID) {
@@ -333,7 +333,7 @@ func RequirePermissionListAprendicesFicha() gin.HandlerFunc {
 	}
 }
 
-// RequireSuperAdmin exige que el usuario tenga el rol "SUPER ADMINISTRADOR" (solo para dashboard asistencia / WS).
+// RequireSuperAdmin exige que el usuario tenga el rol "SUPER ADMINISTRADOR".
 func RequireSuperAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userIDVal, exists := c.Get("userID")
@@ -368,6 +368,46 @@ func RequireSuperAdmin() gin.HandlerFunc {
 			}
 		}
 		c.JSON(http.StatusForbidden, gin.H{"error": "Solo el superadministrador puede acceder"})
+		c.Abort()
+	}
+}
+
+// RequireSuperAdminOrBienestar permite acceso a dashboard de asistencia y módulo de bienestar
+// a usuarios con rol "SUPER ADMINISTRADOR" o "BIENESTAR AL APRENDIZ".
+func RequireSuperAdminOrBienestar() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userIDVal, exists := c.Get("userID")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuario no autenticado"})
+			c.Abort()
+			return
+		}
+		userID, ok := userIDVal.(uint)
+		if !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Identidad de usuario inválida"})
+			c.Abort()
+			return
+		}
+		e, err := authz.GetEnforcer(database.GetDB())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error de autorización"})
+			c.Abort()
+			return
+		}
+		sub := strconv.FormatUint(uint64(userID), 10)
+		roles, err := authz.GetRolesForUser(e, sub)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error verificando rol"})
+			c.Abort()
+			return
+		}
+		for _, r := range roles {
+			if r == "SUPER ADMINISTRADOR" || r == "BIENESTAR AL APRENDIZ" {
+				c.Next()
+				return
+			}
+		}
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene rol suficiente para acceder a esta sección"})
 		c.Abort()
 	}
 }

@@ -47,16 +47,20 @@ func normalizeLogin(s string) string {
 func (s *authService) resolveUserFromLogin(login string) (*models.User, error) {
 	login = strings.TrimSpace(login)
 	if login == "" {
-		return nil, errors.New("credenciales inválidas")
+		return nil, errors.New("Usuario no encontrado")
 	}
 	// Si contiene @, tratar como correo
 	if strings.Contains(login, "@") {
-		return s.userRepo.FindActiveByEmail(login)
+		user, err := s.userRepo.FindActiveByEmail(login)
+		if err != nil || user == nil {
+			return nil, errors.New("Usuario no encontrado")
+		}
+		return user, nil
 	}
 	// Documento o celular: normalizar y buscar por Persona
 	normalized := normalizeLogin(login)
 	if normalized == "" {
-		return nil, errors.New("credenciales inválidas")
+		return nil, errors.New("Usuario no encontrado")
 	}
 	// Intentar por número de documento (normalizado y valor original)
 	for _, doc := range []string{normalized, login} {
@@ -84,18 +88,18 @@ func (s *authService) resolveUserFromLogin(login string) (*models.User, error) {
 			}
 		}
 	}
-	return nil, errors.New("credenciales inválidas")
+	return nil, errors.New("Usuario no encontrado")
 }
 
 func (s *authService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
 	// req.Email puede ser correo, documento o celular
 	user, err := s.resolveUserFromLogin(req.Email)
 	if err != nil {
-		return nil, errors.New("credenciales inválidas")
+		return nil, err
 	}
 
 	if !utils.CheckPasswordHash(req.Password, user.Password) {
-		return nil, errors.New("credenciales inválidas")
+		return nil, errors.New("Contraseña incorrecta")
 	}
 
 	token, err := utils.GenerateToken(user.ID, user.Email)

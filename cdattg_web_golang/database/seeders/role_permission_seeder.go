@@ -66,11 +66,13 @@ func RunRolePermissionSeeder(db *gorm.DB) error {
 	}
 	// Inventario desactivado: no addInventarioToRole
 
-	// INSTRUCTOR: solo asistencia
+	// INSTRUCTOR: asistencia + VER PERSONA (para que pueda ver su propio perfil)
 	_, _ = authz.RemoveFilteredPolicyForRole(e, "INSTRUCTOR", authz.ObjPersona)
 	for _, perm := range authz.PermisosAsistencia {
 		_, _ = authz.AddPermissionForRole(e, "INSTRUCTOR", authz.ObjAsistencia, perm)
 	}
+	// Permiso mínimo sobre persona para perfil
+	_, _ = authz.AddPermissionForRole(e, "INSTRUCTOR", authz.ObjPersona, "VER PERSONA")
 
 	// APRENDIZ, VISITANTE, ASPIRANTE, PROVEEDOR: solo VER PERSONA (perfil)
 	for _, roleName := range []string{"APRENDIZ", "VISITANTE", "ASPIRANTE", "PROVEEDOR"} {

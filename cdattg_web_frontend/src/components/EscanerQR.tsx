@@ -75,10 +75,8 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
                     resumeTimeout = window.setTimeout(() => {
                       if (cancelado) return;
                       try {
-                        const p = html5Qr.resume();
-                        if (p && typeof (p as any).catch === 'function') {
-                          (p as any).catch(() => {});
-                        }
+                        // html5Qr.resume() puede devolver void o una Promise; ignoramos el valor y cualquier error.
+                        (html5Qr.resume() as any)?.catch?.(() => {});
                       } catch {
                         // Ignorar errores de reanudación si la cámara ya fue detenida.
                       }

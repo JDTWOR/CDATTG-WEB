@@ -39,6 +39,8 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
     setPermisos(null);
 
     // Retrasar la creación del escáner hasta que el div esté en el DOM (evita pantalla en blanco tras permisos).
+    let cancelado = false;
+    let resumeTimeout: number | undefined;
     const t = setTimeout(() => {
       const container = document.getElementById(readerId);
       if (!container) {
@@ -68,8 +70,20 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
                 const doc = String(decodedText || '').trim();
                 if (doc) {
                   onEscaneadoRef.current(doc);
-                  html5Qr.pause();
-                  setTimeout(() => html5Qr.resume(), 1500);
+                  if (!cancelado) {
+                    html5Qr.pause();
+                    resumeTimeout = window.setTimeout(() => {
+                      if (cancelado) return;
+                      try {
+                        const p = html5Qr.resume();
+                        if (p && typeof (p as any).catch === 'function') {
+                          (p as any).catch(() => {});
+                        }
+                      } catch {
+                        // Ignorar errores de reanudación si la cámara ya fue detenida.
+                      }
+                    }, 1500);
+                  }
                 }
               },
               () => {}
@@ -85,7 +99,11 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
     }, 150);
 
     return () => {
+      cancelado = true;
       clearTimeout(t);
+      if (resumeTimeout !== undefined) {
+        clearTimeout(resumeTimeout);
+      }
       scannerRef.current?.stop().catch(() => {});
       scannerRef.current = null;
     };

@@ -254,6 +254,28 @@ func (h *AsistenciaHandler) ListPendientesRevision(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": list})
 }
 
+// ListPendientesRevisionAdmin permite a SUPER ADMINISTRADOR o BIENESTAR ver los pendientes de un instructor específico.
+// Query: instructor_id (obligatorio), fecha (opcional, YYYY-MM-DD; si se omite, trae todos los pendientes).
+func (h *AsistenciaHandler) ListPendientesRevisionAdmin(c *gin.Context) {
+	instructorIDStr := c.Query("instructor_id")
+	if instructorIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "instructor_id requerido"})
+		return
+	}
+	instructorID64, err := strconv.ParseUint(instructorIDStr, 10, 32)
+	if err != nil || instructorID64 == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "instructor_id inválido"})
+		return
+	}
+	fecha := c.Query("fecha")
+	list, err := h.svc.ListPendientesRevision(uint(instructorID64), fecha)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": list})
+}
+
 // AjustarEstadoAprendiz permite clasificar un registro de asistencia de aprendiz
 // (asistencia completa, parcial, abandono de jornada o pendiente de revisión).
 func (h *AsistenciaHandler) AjustarEstadoAprendiz(c *gin.Context) {
@@ -308,7 +330,7 @@ func (h *AsistenciaHandler) GetCasosBienestar(c *gin.Context) {
 			dias = n
 		}
 	}
-	minFallas := 3
+	minFallas := 1
 	if s := c.Query("min_fallas"); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n >= 0 {
 			minFallas = n

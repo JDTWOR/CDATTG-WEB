@@ -40,7 +40,6 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
 
     // Retrasar la creación del escáner hasta que el div esté en el DOM (evita pantalla en blanco tras permisos).
     let cancelado = false;
-    let resumeTimeout: number | undefined;
     const t = setTimeout(() => {
       const container = document.getElementById(readerId);
       if (!container) {
@@ -68,20 +67,18 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
               { fps: 8, qrbox: { width: 220, height: 220 } },
               (decodedText) => {
                 const doc = String(decodedText || '').trim();
-                if (doc) {
+                if (doc && !cancelado) {
                   onEscaneadoRef.current(doc);
-                  if (!cancelado) {
-                    html5Qr.pause();
-                    resumeTimeout = window.setTimeout(() => {
-                      if (cancelado) return;
-                      try {
-                        // html5Qr.resume() puede devolver void o una Promise; ignoramos el valor y cualquier error.
-                        (html5Qr.resume() as any)?.catch?.(() => {});
-                      } catch {
-                        // Ignorar errores de reanudación si la cámara ya fue detenida.
-                      }
-                    }, 1500);
-                  }
+                  // Tras un escaneo válido, detener la cámara para evitar estados inconsistentes en móviles.
+                  setCamaraActiva(false);
+                  html5Qr
+                    .stop()
+                    .catch(() => {
+                      // Ignorar errores al detener si ya fue detenida por el navegador.
+                    })
+                    .finally(() => {
+                      scannerRef.current = null;
+                    });
                 }
               },
               () => {}
@@ -99,9 +96,6 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
     return () => {
       cancelado = true;
       clearTimeout(t);
-      if (resumeTimeout !== undefined) {
-        clearTimeout(resumeTimeout);
-      }
       scannerRef.current?.stop().catch(() => {});
       scannerRef.current = null;
     };

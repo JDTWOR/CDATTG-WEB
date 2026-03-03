@@ -94,7 +94,8 @@ class ApiService {
           if (!isLoginRequest) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            window.location.href = '/login';
+            // Redirigir a la raíz; el enrutador protegerá y enviará a /login.
+            window.location.href = '/';
           }
         }
         return Promise.reject(error);

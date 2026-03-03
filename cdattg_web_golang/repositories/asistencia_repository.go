@@ -21,6 +21,7 @@ type AsistenciaRepository interface {
 	CountPendientesRevisionByFecha(sedeID *uint, fecha string) (int, error)
 	GetCasosBienestar(sedeID *uint, fechaInicio, fechaFin string, minFallas int) ([]CasosBienestarRow, error)
 	FindSesionesNoFinalizadasDesde(fechaDesde string) ([]models.Asistencia, error)
+	GetPendientesRevisionPorInstructor(sedeID *uint, fechaInicio, fechaFin string) ([]PendienteInstructorRow, error)
 }
 
 // CasosBienestarRow una fila para el reporte de casos de bienestar (aprendices con N+ inasistencias)
@@ -33,6 +34,14 @@ type CasosBienestarRow struct {
 	TotalSesiones        int
 	AsistenciasEfectivas int
 	Inasistencias        int
+}
+
+// PendienteInstructorRow una fila del resumen de pendientes de revisión por instructor
+type PendienteInstructorRow struct {
+	InstructorID                uint
+	InstructorNombre            string
+	NumeroDocumento             string
+	CantidadAprendicesSinSalida int
 }
 
 // DashboardFichaRow una fila del resumen por ficha para el dashboard
@@ -321,6 +330,82 @@ ORDER BY inasistencias DESC, ap.id
 			TotalSesiones:        rows[i].TotalSesiones,
 			AsistenciasEfectivas: rows[i].AsistenciasEfectivas,
 			Inasistencias:        rows[i].Inasistencias,
+		}
+	}
+	return out, nil
+}
+
+// GetPendientesRevisionPorInstructor devuelve, para el rango de fechas, la cantidad de aprendices
+// con registros de asistencia marcados como requiere_revision=true (por corregir) por instructor.
+// Opcionalmente se puede filtrar por sede.
+func (r *asistenciaRepository) GetPendientesRevisionPorInstructor(sedeID *uint, fechaInicio, fechaFin string) ([]PendienteInstructorRow, error) {
+	tInicio, err := time.Parse("2006-01-02", fechaInicio)
+	if err != nil {
+		return nil, err
+	}
+	tFin, err := time.Parse("2006-01-02", fechaFin)
+	if err != nil {
+		return nil, err
+	}
+	tFin = tFin.AddDate(0, 0, 1) // exclusivo
+
+	type row struct {
+		InstructorID                uint   `gorm:"column:instructor_id"`
+		InstructorNombre            string `gorm:"column:instructor_nombre"`
+		NumeroDocumento             string `gorm:"column:numero_documento"`
+		CantidadAprendicesSinSalida int    `gorm:"column:cantidad"`
+	}
+
+	raw := `
+WITH sesiones_rango AS (
+  SELECT a.id AS asistencia_id, ifc.instructor_id, fc.sede_id
+  FROM asistencias a
+  INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
+  INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id
+  WHERE a.fecha >= ? AND a.fecha < ?
+),
+pendientes AS (
+  SELECT sr.instructor_id, aa.aprendiz_ficha_id
+  FROM asistencia_aprendices aa
+  INNER JOIN sesiones_rango sr ON sr.asistencia_id = aa.asistencia_id
+  WHERE aa.requiere_revision = TRUE
+)
+SELECT
+  i.id AS instructor_id,
+  TRIM(COALESCE(p.primer_nombre,'') || ' ' || COALESCE(p.segundo_nombre,'') || ' ' ||
+       COALESCE(p.primer_apellido,'') || ' ' || COALESCE(p.segundo_apellido,'')) AS instructor_nombre,
+  COALESCE(p.numero_documento,'') AS numero_documento,
+  COUNT(DISTINCT pendientes.aprendiz_ficha_id)::int AS cantidad
+FROM pendientes
+INNER JOIN instructors i ON i.id = pendientes.instructor_id
+INNER JOIN personas p ON p.id = i.persona_id
+`
+	args := []interface{}{tInicio, tFin}
+	if sedeID != nil && *sedeID > 0 {
+		raw += `
+INNER JOIN instructor_fichas_caracterizacion ifc2 ON ifc2.instructor_id = i.id
+INNER JOIN fichas_caracterizacion fc2 ON fc2.id = ifc2.ficha_id
+WHERE fc2.sede_id = ?
+`
+		args = append(args, *sedeID)
+	}
+	raw += `
+GROUP BY i.id, instructor_nombre, p.numero_documento
+ORDER BY cantidad DESC, instructor_nombre
+`
+
+	var rows []row
+	if err := r.db.Raw(raw, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	out := make([]PendienteInstructorRow, len(rows))
+	for i := range rows {
+		out[i] = PendienteInstructorRow{
+			InstructorID:                rows[i].InstructorID,
+			InstructorNombre:            rows[i].InstructorNombre,
+			NumeroDocumento:             rows[i].NumeroDocumento,
+			CantidadAprendicesSinSalida: rows[i].CantidadAprendicesSinSalida,
 		}
 	}
 	return out, nil

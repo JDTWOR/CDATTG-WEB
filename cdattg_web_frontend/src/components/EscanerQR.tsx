@@ -18,12 +18,22 @@ interface EscanerQRProps {
 export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_READER_ID_DEFAULT }: EscanerQRProps) {
   const [error, setError] = useState<string | null>(null);
   const [permisos, setPermisos] = useState<boolean | null>(null);
+  const [camaraActiva, setCamaraActiva] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const onEscaneadoRef = useRef(onEscaneado);
   onEscaneadoRef.current = onEscaneado;
 
+  // Si el componente deja de estar activo (se cierra la sesión), apagar la cámara.
   useEffect(() => {
-    if (!activo) return;
+    if (!activo) {
+      setCamaraActiva(false);
+      setError(null);
+      setPermisos(null);
+    }
+  }, [activo]);
+
+  useEffect(() => {
+    if (!activo || !camaraActiva) return;
 
     setError(null);
     setPermisos(null);
@@ -45,7 +55,11 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
             return;
           }
           setPermisos(true);
-          const cameraId = cameras[0].id;
+          // Preferir cámara trasera (environment) cuando exista, ideal para uso en celular.
+          const cameraId =
+            cameras.find((cam) =>
+              /back|rear|environment|posterior|trasera/i.test(cam.label || '')
+            )?.id ?? cameras[0].id;
           return html5Qr
             .start(
               cameraId,
@@ -75,7 +89,7 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
       scannerRef.current?.stop().catch(() => {});
       scannerRef.current = null;
     };
-  }, [activo, readerId]);
+  }, [activo, camaraActiva, readerId]);
 
   if (!activo) return null;
 
@@ -86,16 +100,43 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
           <h3 className="font-semibold text-gray-900">Escanear QR</h3>
           <span className="rounded bg-primary-600 px-2 py-0.5 text-xs font-medium text-white">Registro en tiempo real</span>
         </div>
-        <p className="mb-3 text-sm text-gray-600">Posicione el código QR en el recuadro</p>
-        {error && (
-          <div className="mb-3 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>
+        {!camaraActiva ? (
+          <>
+            <p className="mb-3 text-sm text-gray-600">
+              La cámara se activará solo cuando presione el botón de abajo. Puede usar el registro manual si lo prefiere.
+            </p>
+            {error && (
+              <div className="mb-3 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>
+            )}
+            <button
+              type="button"
+              onClick={() => setCamaraActiva(true)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+            >
+              Activar cámara
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mb-3 text-sm text-gray-600">Posicione el código QR en el recuadro</p>
+            {error && (
+              <div className="mb-3 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>
+            )}
+            {permisos === false && !error && (
+              <div className="mb-3 rounded bg-amber-50 p-3 text-sm text-amber-800">
+                Permisos de cámara denegados. Use el registro manual por documento.
+              </div>
+            )}
+            <div id={readerId} className="min-h-[240px] w-full max-w-sm" />
+            <button
+              type="button"
+              onClick={() => setCamaraActiva(false)}
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Desactivar cámara
+            </button>
+          </>
         )}
-        {permisos === false && !error && (
-          <div className="mb-3 rounded bg-amber-50 p-3 text-sm text-amber-800">
-            Permisos de cámara denegados. Use el registro manual por documento.
-          </div>
-        )}
-        <div id={readerId} className="min-h-[240px] w-full max-w-sm" />
       </div>
     </div>
   );

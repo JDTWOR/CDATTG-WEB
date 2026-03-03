@@ -96,9 +96,10 @@ type AsistenciaDashboardPorFicha struct {
 
 // CasosBienestarResponse lista de aprendices con indicadores de riesgo (para oficina de bienestar)
 type CasosBienestarResponse struct {
-	DiasAnalizados int                  `json:"dias_analizados"`
-	MinFallas      int                  `json:"min_fallas"`
-	Casos          []CasoBienestarItem  `json:"casos"`
+	DiasAnalizados int                   `json:"dias_analizados"`
+	MinFallas      int                   `json:"min_fallas"`
+	Casos          []CasoBienestarItem   `json:"casos"`
+	Instructores   []InstructorPendienteItem `json:"instructores"`
 }
 
 // CasoBienestarItem un aprendiz con inasistencias >= umbral
@@ -111,4 +112,12 @@ type CasoBienestarItem struct {
 	TotalSesiones      int    `json:"total_sesiones"`
 	AsistenciasEfectivas int  `json:"asistencias_efectivas"`
 	Inasistencias      int    `json:"inasistencias"`
+}
+
+// InstructorPendienteItem resume cuántos aprendices tiene un instructor con registros "por corregir" (requiere_revision=true) en el período analizado.
+type InstructorPendienteItem struct {
+	InstructorID                uint   `json:"instructor_id"`
+	InstructorNombre            string `json:"instructor_nombre"`
+	NumeroDocumento             string `json:"numero_documento"`
+	CantidadAprendicesSinSalida int    `json:"cantidad_aprendices_sin_salida"`
 }

@@ -448,7 +448,7 @@ func (s *asistenciaService) GetCasosBienestar(sedeID *uint, dias, minFallas int)
 		dias = 30
 	}
 	if minFallas <= 0 {
-		minFallas = 3
+		minFallas = 1
 	}
 	fechaFin := time.Now()
 	fechaInicio := fechaFin.AddDate(0, 0, -dias)
@@ -474,6 +474,18 @@ func (s *asistenciaService) GetCasosBienestar(sedeID *uint, dias, minFallas int)
 			TotalSesiones:        rows[i].TotalSesiones,
 			AsistenciasEfectivas: rows[i].AsistenciasEfectivas,
 			Inasistencias:        rows[i].Inasistencias,
+		}
+	}
+	// Resumen por instructor: cantidad de aprendices con registros pendientes de revisión (sin salida, REGISTRO_POR_CORREGIR) en el mismo rango.
+	if instrRows, errInstr := s.repo.GetPendientesRevisionPorInstructor(sedeID, fechaInicioStr, fechaFinStr); errInstr == nil && len(instrRows) > 0 {
+		resp.Instructores = make([]dto.InstructorPendienteItem, len(instrRows))
+		for i := range instrRows {
+			resp.Instructores[i] = dto.InstructorPendienteItem{
+				InstructorID:                instrRows[i].InstructorID,
+				InstructorNombre:            instrRows[i].InstructorNombre,
+				NumeroDocumento:             instrRows[i].NumeroDocumento,
+				CantidadAprendicesSinSalida: instrRows[i].CantidadAprendicesSinSalida,
+			}
 		}
 	}
 	return resp, nil

@@ -21,13 +21,13 @@ import {
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { SelectSearch } from '../components/SelectSearch';
+import { InstructorSelectAsync } from '../components/InstructorSelectAsync';
 import { ModalAsignarFicha } from '../components/ModalAsignarFicha';
 import type {
   FichaCaracterizacionResponse,
   FichaCaracterizacionRequest,
   FichaImportResult,
   ProgramaFormacionResponse,
-  InstructorItem,
   SedeItem,
   AmbienteItem,
   ModalidadFormacionItem,
@@ -39,7 +39,6 @@ export const FichasCaracterizacion = () => {
   const { roles } = useAuth();
   const [list, setList] = useState<FichaCaracterizacionResponse[]>([]);
   const [programas, setProgramas] = useState<ProgramaFormacionResponse[]>([]);
-  const [instructores, setInstructores] = useState<InstructorItem[]>([]);
   const [sedes, setSedes] = useState<SedeItem[]>([]);
   const [ambientes, setAmbientes] = useState<AmbienteItem[]>([]);
   const [modalidades, setModalidades] = useState<ModalidadFormacionItem[]>([]);
@@ -117,16 +116,8 @@ export const FichasCaracterizacion = () => {
     }
   };
 
-  const fetchInstructores = async () => {
-    try {
-      const data = await apiService.getInstructores();
-      setInstructores(data);
-    } catch (_) {}
-  };
-
   useEffect(() => {
     fetchProgramas();
-    fetchInstructores();
     fetchCatalogos();
   }, []);
 
@@ -188,6 +179,12 @@ export const FichasCaracterizacion = () => {
       ...form,
       programa_formacion_id: form.programa_formacion_id || (programas[0]?.id as number),
       dias_formacion_ids: form.dias_formacion_ids?.length ? form.dias_formacion_ids : undefined,
+      // Incluir siempre para que el backend persista (undefined se omite en JSON; null sí se envía)
+      modalidad_formacion_id: form.modalidad_formacion_id ?? null,
+      ambiente_id: form.ambiente_id ?? null,
+      sede_id: form.sede_id ?? null,
+      instructor_id: form.instructor_id ?? null,
+      jornada_id: form.jornada_id ?? null,
     };
     try {
       if (editing) {
@@ -656,12 +653,12 @@ export const FichasCaracterizacion = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Instructor Líder *</label>
                 <div className="mt-1">
-                  <SelectSearch
-                    options={instructores.map((i) => ({ value: i.id, label: i.nombre }))}
-                    value={form.instructor_id}
+                  <InstructorSelectAsync
+                    value={form.instructor_id ?? undefined}
                     onChange={(v) => setForm((f) => ({ ...f, instructor_id: v }))}
-                    placeholder="Seleccione un instructor..."
+                    placeholder="Buscar por nombre o documento..."
                     isRequired
+                    defaultLabel={editing?.instructor_nombre}
                   />
                 </div>
                 {!editing && (

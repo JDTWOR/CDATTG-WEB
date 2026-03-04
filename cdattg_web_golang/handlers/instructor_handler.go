@@ -25,9 +25,19 @@ func NewInstructorHandler() *InstructorHandler {
 	}
 }
 
-// GetAll devuelve lista de instructores
+// GetAll devuelve lista de instructores (paginada; query: page, page_size, search)
 func (h *InstructorHandler) GetAll(c *gin.Context) {
-	list, err := h.repo.FindAll()
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	search := c.Query("search")
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+	list, total, err := h.repo.FindAllPaginated(offset, pageSize, search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -36,7 +46,7 @@ func (h *InstructorHandler) GetAll(c *gin.Context) {
 	for i := range list {
 		resp[i] = instructorToItem(list[i])
 	}
-	c.JSON(http.StatusOK, gin.H{"data": resp})
+	c.JSON(http.StatusOK, gin.H{"data": resp, "total": total, "page": page, "page_size": pageSize})
 }
 
 // GetByID devuelve un instructor por ID

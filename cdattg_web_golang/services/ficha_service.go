@@ -159,9 +159,12 @@ func (s *fichaService) Update(id uint, req dto.FichaCaracterizacionRequest) (*dt
 	f.ModalidadFormacionID = req.ModalidadFormacionID
 	f.SedeID = req.SedeID
 	f.JornadaID = req.JornadaID
-	// Evitar que GORM reescriba jornada_id con la jornada pre-cargada (asociación antigua)
-	// Queremos que tome solo el nuevo JornadaID y luego se vuelva a precargar.
+	// Evitar que GORM reescriba FKs con asociaciones pre-cargadas; usar solo los IDs asignados arriba.
 	f.Jornada = nil
+	f.Ambiente = nil
+	f.ModalidadFormacion = nil
+	f.Sede = nil
+	f.Instructor = nil
 	var fJIDAfter interface{}
 	if f.JornadaID != nil {
 		fJIDAfter = *f.JornadaID

@@ -19,9 +19,10 @@ const selectTheme: ThemeConfig = (theme) => ({
   ...theme,
   colors: {
     ...theme.colors,
-    primary: '#0284c7',
-    primary25: '#e0f2fe',
-    primary50: '#bae6fd',
+    primary: '#0ea5e9',
+    primary25: '#f0f9ff',
+    primary50: '#e0f2fe',
+    primary75: '#bae6fd',
     neutral0: 'var(--select-bg)',
     neutral5: 'var(--select-border)',
     neutral10: 'var(--select-border)',
@@ -34,40 +35,94 @@ const selectTheme: ThemeConfig = (theme) => ({
     neutral80: 'var(--select-text)',
     neutral90: 'var(--select-text)',
   },
+  spacing: {
+    ...theme.spacing,
+    controlHeight: 42,
+    baseUnit: 4,
+  },
 });
 
 const selectStyles: StylesConfig<SelectOption, false> = {
-  control: (base) => ({
+  control: (base, state) => ({
     ...base,
     minHeight: 42,
+    paddingLeft: 12,
+    paddingRight: 8,
     borderRadius: '0.5rem',
-    borderColor: 'var(--select-border)',
+    borderWidth: 1,
+    borderColor: state.isFocused ? '#0ea5e9' : 'var(--select-border)',
     backgroundColor: 'var(--select-bg)',
-    '&:hover': { borderColor: 'var(--select-border-hover)' },
+    boxShadow: state.isFocused ? '0 0 0 2px rgba(14, 165, 233, 0.25)' : 'none',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+    '&:hover': {
+      borderColor: state.isFocused ? '#0ea5e9' : 'var(--select-border-hover)',
+    },
   }),
-  singleValue: (base) => ({
+  valueContainer: (base) => ({
     ...base,
-    color: 'var(--select-text)',
+    padding: '6px 0',
   }),
   input: (base) => ({
     ...base,
     color: 'var(--select-text)',
+    margin: 0,
+    padding: 0,
+  }),
+  singleValue: (base) => ({
+    ...base,
+    color: 'var(--select-text)',
+    fontSize: '0.875rem',
   }),
   placeholder: (base) => ({
     ...base,
     color: 'var(--select-text-muted)',
+    fontSize: '0.875rem',
+  }),
+  indicatorSeparator: () => ({
+    display: 'none',
+  }),
+  dropdownIndicator: (base, state) => ({
+    ...base,
+    color: state.isFocused ? '#0ea5e9' : 'var(--select-text-muted)',
+    padding: 8,
+    '&:hover': {
+      color: 'var(--select-text)',
+    },
+  }),
+  clearIndicator: (base) => ({
+    ...base,
+    color: 'var(--select-text-muted)',
+    padding: 6,
+    '&:hover': {
+      color: 'var(--select-text)',
+    },
   }),
   menu: (base) => ({
     ...base,
-    backgroundColor: 'var(--select-menu-bg)',
+    marginTop: 4,
     borderRadius: '0.5rem',
     overflow: 'hidden',
+    backgroundColor: 'var(--select-menu-bg)',
+    border: '1px solid var(--select-border)',
+    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
   }),
-  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  menuList: (base) => ({
+    ...base,
+    padding: 4,
+    maxHeight: 280,
+  }),
   option: (base, state) => ({
     ...base,
+    fontSize: '0.875rem',
+    padding: '10px 12px',
+    borderRadius: '0.375rem',
     backgroundColor: state.isFocused ? 'var(--select-option-focus)' : 'transparent',
     color: 'var(--select-text)',
+    cursor: 'pointer',
+  }),
+  menuPortal: (base) => ({
+    ...base,
+    zIndex: 9999,
   }),
 };
 
@@ -84,7 +139,7 @@ export function SelectSearch({
     value !== undefined ? options.find((o) => o.value === value) || null : null;
 
   return (
-    <div className="react-select-wrapper">
+    <div className="react-select-wrapper w-full">
       <Select<SelectOption, false>
         options={options}
         value={selectedOption}
@@ -101,6 +156,9 @@ export function SelectSearch({
         menuPosition="fixed"
         required={isRequired}
         aria-label={ariaLabel}
+        classNames={{
+          control: () => 'w-full',
+        }}
       />
     </div>
   );

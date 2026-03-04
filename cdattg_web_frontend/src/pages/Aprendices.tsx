@@ -21,12 +21,16 @@ export const Aprendices = () => {
   const [editEstado, setEditEstado] = useState(true);
   const [saving, setSaving] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageSize] = useState(20);
 
   const fetchAprendices = async () => {
     try {
       setLoading(true);
-      const res = await apiService.getAprendices(1, 100, undefined, searchText.trim() || undefined);
+      const res = await apiService.getAprendices(page, pageSize, undefined, searchText.trim() || undefined);
       setList(res.data);
+      setTotal(res.total);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Error al cargar aprendices');
     } finally {
@@ -37,7 +41,7 @@ export const Aprendices = () => {
   useEffect(() => {
     const t = setTimeout(() => fetchAprendices(), 300);
     return () => clearTimeout(t);
-  }, [searchText]);
+  }, [page, searchText]);
 
   useEffect(() => {
     if (modalOpen || modalEdit) {
@@ -149,7 +153,10 @@ export const Aprendices = () => {
             placeholder="Buscar por nombre, documento, ficha o programa..."
             className="input-field flex-1 max-w-md"
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
+            onChange={(e) => {
+              setSearchText(e.target.value);
+              setPage(1);
+            }}
           />
           <select className="input-field w-40">
             <option>Todos los estados</option>
@@ -183,7 +190,7 @@ export const Aprendices = () => {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
               {list.map((item, idx) => (
                 <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{idx + 1}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{(page - 1) * pageSize + idx + 1}</td>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{item.persona_nombre}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.persona_documento ?? '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.ficha_numero ?? '-'}</td>
@@ -229,6 +236,31 @@ export const Aprendices = () => {
         )}
         {!loading && list.length === 0 && (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">No hay aprendices registrados.</div>
+        )}
+        {!loading && total > 0 && (
+          <div className="mt-4 flex items-center justify-between px-4 pb-4">
+            <div className="text-sm text-gray-700 dark:text-gray-300">
+              Mostrando {((page - 1) * pageSize) + 1} a {Math.min(page * pageSize, total)} de {total} resultados
+            </div>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="btn-secondary disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(Math.ceil(total / pageSize), p + 1))}
+                disabled={page >= Math.ceil(total / pageSize)}
+                className="btn-secondary disabled:opacity-50"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

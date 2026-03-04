@@ -89,13 +89,12 @@ class ApiService {
       (response) => response,
       (error: AxiosError) => {
         if (error.response?.status === 401) {
-          // No redirigir si el 401 viene del intento de login (para mostrar error y mantener campos)
           const isLoginRequest = error.config?.url?.includes('/auth/login');
           if (!isLoginRequest) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            // Redirigir a la raíz; el enrutador protegerá y enviará a /login.
-            window.location.href = '/';
+            // Avisar a la app para cerrar sesión sin recargar la página (evita pantalla en blanco en móvil/PC).
+            window.dispatchEvent(new CustomEvent('auth:session-expired'));
           }
         }
         return Promise.reject(error);

@@ -41,6 +41,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem(PERMISSIONS_KEY);
   };
 
+  // Cerrar sesión cuando el interceptor de API recibe 401 (sin recargar la página).
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      logout();
+    };
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
+  }, []);
+
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');

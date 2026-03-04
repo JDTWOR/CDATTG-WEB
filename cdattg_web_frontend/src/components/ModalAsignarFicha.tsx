@@ -9,6 +9,8 @@ import type {
   PersonaResponse,
 } from '../types';
 
+const DEBOUNCE_MS = 350;
+
 type Tipo = 'instructores' | 'aprendices';
 
 interface ModalAsignarFichaProps {
@@ -44,30 +46,21 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
     setError('');
     try {
       if (isInstructores) {
-        const [instFicha, todos] = await Promise.all([
-          apiService.getFichaInstructores(fichaId),
-          apiService.getInstructores(),
-        ]);
+        const instFicha = await apiService.getFichaInstructores(fichaId);
         setAsignados(instFicha);
-        const idsAsignados = new Set(instFicha.map((i) => i.instructor_id));
-        setNoAsignados(todos.filter((i) => !idsAsignados.has(i.id)));
         if (instFicha.length > 0) {
           setInstructorPrincipalId((prev) => {
-            if (prev === undefined || !idsAsignados.has(prev)) return instFicha[0].instructor_id;
+            const ids = new Set(instFicha.map((i) => i.instructor_id));
+            if (prev === undefined || !ids.has(prev)) return instFicha[0].instructor_id;
             return prev;
           });
         } else {
           setInstructorPrincipalId(undefined);
         }
       } else {
-        const [aprendices, resPersonas] = await Promise.all([
-          apiService.getFichaAprendices(fichaId),
-          apiService.getPersonas(1, 500),
-        ]);
+        const aprendices = await apiService.getFichaAprendices(fichaId);
         const activos = aprendices.filter((a) => a.estado);
         setAsignados(activos);
-        const idsAprendices = new Set(activos.map((a) => a.persona_id));
-        setNoAsignados(resPersonas.data.filter((p) => !idsAprendices.has(p.id)));
       }
     } catch (e: unknown) {
       setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al cargar');
@@ -79,6 +72,30 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
   useEffect(() => {
     load();
   }, [load]);
+
+  const [debouncedFilterNoAsignados, setDebouncedFilterNoAsignados] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedFilterNoAsignados(filterNoAsignados), DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [filterNoAsignados]);
+
+  useEffect(() => {
+    if (!asignados.length && loading) return;
+    const search = debouncedFilterNoAsignados.trim();
+    let cancelled = false;
+    if (isInstructores) {
+      const idsAsignados = new Set((asignados as InstructorFichaResponse[]).map((i) => i.instructor_id));
+      apiService.getInstructores(1, 200, search || undefined).then((res) => {
+        if (!cancelled) setNoAsignados(res.data.filter((i) => !idsAsignados.has(i.id)));
+      });
+    } else {
+      const idsAprendices = new Set((asignados as AprendizResponse[]).map((a) => a.persona_id));
+      apiService.getPersonas(1, 200, search).then((res) => {
+        if (!cancelled) setNoAsignados(res.data.filter((p) => !idsAprendices.has(p.id)));
+      });
+    }
+    return () => { cancelled = true; };
+  }, [asignados, debouncedFilterNoAsignados, isInstructores]);
 
   type WithDisplayName = { nombre?: string; persona_nombre?: string; full_name?: string; instructor_nombre?: string };
   const filterByQuery = <T extends WithDisplayName>(list: T[], query: string): T[] => {

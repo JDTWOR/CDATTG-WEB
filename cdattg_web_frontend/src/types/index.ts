@@ -220,13 +220,13 @@ export interface RegionalItem {
 export interface FichaCaracterizacionRequest {
   programa_formacion_id: number;
   ficha: string;
-  instructor_id?: number;
+  instructor_id?: number | null;
   fecha_inicio?: string;
   fecha_fin?: string;
-  ambiente_id?: number;
-  modalidad_formacion_id?: number;
-  sede_id?: number;
-  jornada_id?: number;
+  ambiente_id?: number | null;
+  modalidad_formacion_id?: number | null;
+  sede_id?: number | null;
+  jornada_id?: number | null;
   total_horas?: number;
   status?: boolean;
   dias_formacion_ids?: number[];

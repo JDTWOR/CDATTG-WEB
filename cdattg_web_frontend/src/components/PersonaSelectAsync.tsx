@@ -98,7 +98,7 @@ export function PersonaSelectAsync({
     <div className="react-select-wrapper">
       <AsyncSelect<SelectOption, false>
         loadOptions={loadOptions}
-        defaultOptions={true}
+        defaultOptions={false}
         value={selectedOption}
         onChange={(opt) => {
           setSelectedOption(opt ?? null);
@@ -109,7 +109,7 @@ export function PersonaSelectAsync({
         isClearable
         isSearchable
         noOptionsMessage={({ inputValue }) =>
-          inputValue ? 'Sin resultados. Busque por nombre o documento.' : 'Escriba para buscar...'
+          inputValue ? 'Sin resultados. Busque por nombre o documento.' : 'Escriba para buscar en todas las personas.'
         }
         loadingMessage={() => 'Buscando...'}
         theme={selectTheme}

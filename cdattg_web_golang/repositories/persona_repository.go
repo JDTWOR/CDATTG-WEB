@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"strings"
+
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/models"
 	"gorm.io/gorm"
@@ -55,31 +57,31 @@ func (r *personaRepository) FindByCelular(celular string) (*models.Persona, erro
 	return &persona, nil
 }
 
+// applyPersonaSearch aplica búsqueda por varias palabras: cada palabra debe coincidir en al menos un campo (AND de ORs).
+func applyPersonaSearch(q *gorm.DB, search string) *gorm.DB {
+	words := strings.Fields(strings.TrimSpace(search))
+	if len(words) == 0 {
+		return q
+	}
+	likeClause := "numero_documento ILIKE ? OR primer_nombre ILIKE ? OR segundo_nombre ILIKE ? OR primer_apellido ILIKE ? OR segundo_apellido ILIKE ?"
+	for _, word := range words {
+		term := "%" + word + "%"
+		q = q.Where("("+likeClause+")", term, term, term, term, term)
+	}
+	return q
+}
+
 func (r *personaRepository) FindAll(page, pageSize int, search string) ([]models.Persona, int64, error) {
 	var personas []models.Persona
 	var total int64
 	offset := (page - 1) * pageSize
 	base := r.db.Model(&models.Persona{})
-
-	if search != "" {
-		term := "%" + search + "%"
-		base = base.Where(
-			"numero_documento ILIKE ? OR primer_nombre ILIKE ? OR segundo_nombre ILIKE ? OR primer_apellido ILIKE ? OR segundo_apellido ILIKE ?",
-			term, term, term, term, term,
-		)
-	}
+	base = applyPersonaSearch(base, search)
 
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	q := r.db
-	if search != "" {
-		term := "%" + search + "%"
-		q = q.Where(
-			"numero_documento ILIKE ? OR primer_nombre ILIKE ? OR segundo_nombre ILIKE ? OR primer_apellido ILIKE ? OR segundo_apellido ILIKE ?",
-			term, term, term, term, term,
-		)
-	}
+	q := applyPersonaSearch(r.db, search)
 	if err := q.Offset(offset).Limit(pageSize).Find(&personas).Error; err != nil {
 		return nil, 0, err
 	}

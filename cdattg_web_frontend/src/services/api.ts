@@ -394,10 +394,12 @@ class ApiService {
     await this.api.post(`/fichas-caracterizacion/${fichaId}/aprendices/desasignar`, { personas });
   }
 
-  // Instructores
-  async getInstructores(): Promise<InstructorItem[]> {
-    const response = await this.api.get<{ data: InstructorItem[] }>('/instructores');
-    return response.data.data;
+  // Instructores (paginado; sin args devuelve página 1 con pageSize grande para compatibilidad)
+  async getInstructores(page = 1, pageSize = 10000, search?: string): Promise<PaginatedResponse<InstructorItem>> {
+    const response = await this.api.get<PaginatedResponse<InstructorItem>>('/instructores', {
+      params: { page, page_size: pageSize, search: search || undefined },
+    });
+    return response.data;
   }
 
   async getInstructorById(id: number): Promise<InstructorItem> {

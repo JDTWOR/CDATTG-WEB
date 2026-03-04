@@ -7,7 +7,7 @@ export interface SelectOption {
 
 interface SelectSearchProps {
   options: SelectOption[];
-  value: number | undefined;
+  value: number | null | undefined;
   onChange: (value: number | undefined) => void;
   placeholder?: string;
   isDisabled?: boolean;
@@ -136,7 +136,7 @@ export function SelectSearch({
   ariaLabel,
 }: SelectSearchProps) {
   const selectedOption =
-    value !== undefined ? options.find((o) => o.value === value) || null : null;
+    value !== undefined && value !== null ? options.find((o) => o.value === value) || null : null;
 
   return (
     <div className="react-select-wrapper w-full">

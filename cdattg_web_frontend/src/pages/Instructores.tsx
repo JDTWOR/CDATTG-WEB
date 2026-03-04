@@ -23,12 +23,16 @@ export const Instructores = () => {
   const [searchText, setSearchText] = useState('');
   const [filterEstado, setFilterEstado] = useState<'all' | 'activo' | 'inactivo'>('all');
   const [filterRegionalId, setFilterRegionalId] = useState<number | ''>('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageSize] = useState(20);
 
   const fetchInstructores = async () => {
     try {
       setLoading(true);
-      const res = await apiService.getInstructores();
-      setList(res);
+      const res = await apiService.getInstructores(page, pageSize, searchText.trim() || undefined);
+      setList(res.data);
+      setTotal(res.total);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Error al cargar instructores');
     } finally {
@@ -38,7 +42,7 @@ export const Instructores = () => {
 
   useEffect(() => {
     fetchInstructores();
-  }, []);
+  }, [page, searchText]);
 
   useEffect(() => {
     apiService.getCatalogosRegionales().then(setRegionales).catch(() => {});
@@ -112,12 +116,6 @@ export const Instructores = () => {
   };
 
   const filteredList = list.filter((item) => {
-    const q = searchText.trim().toLowerCase();
-    if (q) {
-      const matchNombre = item.nombre?.toLowerCase().includes(q);
-      const matchDoc = item.numero_documento?.toLowerCase().includes(q);
-      if (!matchNombre && !matchDoc) return false;
-    }
     if (filterEstado !== 'all') {
       const esActivo = item.estado !== false;
       if (filterEstado === 'activo' && !esActivo) return false;
@@ -159,7 +157,10 @@ export const Instructores = () => {
           <input
             type="text"
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
+            onChange={(e) => {
+              setSearchText(e.target.value);
+              setPage(1);
+            }}
             placeholder="Buscar por documento, nombre..."
             className="input-field flex-1 max-w-md"
           />
@@ -202,7 +203,7 @@ export const Instructores = () => {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
               {filteredList.map((item, idx) => (
                 <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{idx + 1}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{(page - 1) * pageSize + idx + 1}</td>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{item.nombre}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.numero_documento ?? '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.regional_nombre ?? '-'}</td>
@@ -249,6 +250,31 @@ export const Instructores = () => {
         )}
         {!loading && list.length > 0 && filteredList.length === 0 && (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">No hay resultados para la búsqueda o filtros aplicados.</div>
+        )}
+        {!loading && (total > 0 || list.length > 0) && (
+          <div className="mt-4 flex items-center justify-between px-4 pb-4 border-t border-gray-200 dark:border-gray-600 pt-4">
+            <div className="text-sm text-gray-700 dark:text-gray-300">
+              Mostrando {((page - 1) * pageSize) + 1} a {Math.min(page * pageSize, total || list.length)} de {total || list.length} resultados
+            </div>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="btn-secondary disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(Math.ceil((total || list.length) / pageSize), p + 1))}
+                disabled={page >= Math.ceil((total || list.length) / pageSize)}
+                className="btn-secondary disabled:opacity-50"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiService } from '../services/api';
-import { SelectSearch } from '../components/SelectSearch';
 import { InstructorSelectAsync } from '../components/InstructorSelectAsync';
 import type {
   FichaCaracterizacionResponse,

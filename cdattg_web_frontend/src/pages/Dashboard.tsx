@@ -32,10 +32,10 @@ export const Dashboard = () => {
           setTotalPersonas(personasRes.total);
         }
 
-        // Instructores: endpoint devuelve todos y no incluye total
+        // Instructores: paginado, usamos total
         if (hasPermission('VER FICHAS')) {
-          const instructoresRes = await apiService.getInstructores();
-          setTotalInstructores(instructoresRes.length);
+          const instructoresRes = await apiService.getInstructores(1, 1);
+          setTotalInstructores(instructoresRes.total);
         }
 
         // Aprendices: usar paginación para obtener el total

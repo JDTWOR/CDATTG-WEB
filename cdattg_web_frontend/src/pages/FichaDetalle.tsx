@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiService } from '../services/api';
 import { SelectSearch } from '../components/SelectSearch';
+import { InstructorSelectAsync } from '../components/InstructorSelectAsync';
 import type {
   FichaCaracterizacionResponse,
   InstructorFichaResponse,
@@ -67,8 +68,8 @@ export const FichaDetalle = () => {
 
   const loadInstructoresDisponibles = async () => {
     try {
-      const data = await apiService.getInstructores();
-      setInstructoresDisponibles(data);
+      const res = await apiService.getInstructores(1, 10000);
+      setInstructoresDisponibles(res.data);
     } catch (_) {}
   };
 
@@ -256,12 +257,12 @@ export const FichaDetalle = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Instructor principal</label>
                   <div className="mt-1">
-                    <SelectSearch
-                      options={instructoresDisponibles.map((i) => ({ value: i.id, label: i.nombre }))}
+                    <InstructorSelectAsync
                       value={instructorPrincipalId || undefined}
                       onChange={(v) => setInstructorPrincipalId(v ?? 0)}
-                      placeholder="Seleccione instructor principal..."
+                      placeholder="Buscar por nombre o documento..."
                       isRequired
+                      defaultLabel={instructores.find((i) => i.instructor_id === instructorPrincipalId)?.instructor_nombre ?? instructoresDisponibles.find((i) => i.id === instructorPrincipalId)?.nombre}
                     />
                   </div>
                 </div>

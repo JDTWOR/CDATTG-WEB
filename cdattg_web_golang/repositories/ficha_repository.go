@@ -70,12 +70,9 @@ func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instruct
 		q = q.Where("programa_formacion_id = ?", *programaID)
 	}
 	if instructorID != nil && *instructorID > 0 {
-		// Incluir fichas donde el instructor está asignado en el pivote
-		// o figura como instructor líder directamente en la ficha.
-		q = q.Where(
-			"(id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ?) OR instructor_id = ?)",
-			*instructorID, *instructorID,
-		)
+		// Solo fichas donde el instructor está en el pivote (asignado). Coincide con "tomar asistencia".
+		// No usar instructor_id de la ficha: si lo desasignan del pivote ya no debe ver la ficha.
+		q = q.Where("id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ? AND deleted_at IS NULL)", *instructorID)
 	}
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -85,10 +82,7 @@ func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instruct
 		findQ = findQ.Where("programa_formacion_id = ?", *programaID)
 	}
 	if instructorID != nil && *instructorID > 0 {
-		findQ = findQ.Where(
-			"(id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ?) OR instructor_id = ?)",
-			*instructorID, *instructorID,
-		)
+		findQ = findQ.Where("id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ? AND deleted_at IS NULL)", *instructorID)
 	}
 	if err := findQ.Offset(offset).Limit(pageSize).Find(&fichas).Error; err != nil {
 		return nil, 0, err

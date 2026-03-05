@@ -70,6 +70,11 @@ type AsistenciaAprendizResponse struct {
 	// TipoRegistro: "ingreso", "salida" o "asistencia_completa" (por documento/QR)
 	TipoRegistro string `json:"tipo_registro,omitempty"`
 	Mensaje      string `json:"mensaje,omitempty"`
+	// Quién registró ingreso/salida (auditoría)
+	InstructorFichaIDRegistroIngreso *uint  `json:"instructor_ficha_id_registro_ingreso,omitempty"`
+	InstructorFichaIDRegistroSalida  *uint  `json:"instructor_ficha_id_registro_salida,omitempty"`
+	InstructorRegistroIngresoNombre   string `json:"instructor_registro_ingreso_nombre,omitempty"`
+	InstructorRegistroSalidaNombre    string `json:"instructor_registro_salida_nombre,omitempty"`
 }
 
 // AsistenciaAprendizEstadoRequest para ajustar estado/motivo de un registro de asistencia de aprendiz

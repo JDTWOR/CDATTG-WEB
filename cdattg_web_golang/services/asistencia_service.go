@@ -18,15 +18,15 @@ type AsistenciaService interface {
 	ListByInstructorFichaID(instructorFichaID uint) ([]dto.AsistenciaResponse, error)
 	ListByFichaIDAndFechas(fichaID uint, fechaInicio, fechaFin string) ([]dto.AsistenciaResponse, error)
 	Finalizar(id uint) (*dto.AsistenciaResponse, error)
-	RegistrarIngreso(req dto.AsistenciaAprendizRequest) (*dto.AsistenciaAprendizResponse, error)
-	RegistrarIngresoPorDocumento(req dto.AsistenciaIngresoPorDocumentoRequest) (*dto.AsistenciaAprendizResponse, error)
-	RegistrarSalida(asistenciaAprendizID uint) (*dto.AsistenciaAprendizResponse, error)
+	RegistrarIngreso(req dto.AsistenciaAprendizRequest, instructorFichaIDRegistroIngreso *uint) (*dto.AsistenciaAprendizResponse, error)
+	RegistrarIngresoPorDocumento(req dto.AsistenciaIngresoPorDocumentoRequest, instructorFichaIDRegistroIngreso *uint) (*dto.AsistenciaAprendizResponse, error)
+	RegistrarSalida(asistenciaAprendizID uint, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error)
 	ActualizarObservaciones(asistenciaAprendizID uint, observaciones string) (*dto.AsistenciaAprendizResponse, error)
 	CrearOActualizarObservaciones(asistenciaID, aprendizID uint, observaciones string) (*dto.AsistenciaAprendizResponse, error)
 	ListAprendicesEnSesion(asistenciaID uint) ([]dto.AsistenciaAprendizResponse, error)
 	GetDashboard(sedeID *uint, fecha string) (*dto.AsistenciaDashboardResponse, error)
 	GetCasosBienestar(sedeID *uint, dias, minFallas int) (*dto.CasosBienestarResponse, error)
-	AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string) (*dto.AsistenciaAprendizResponse, error)
+	AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error)
 	ListPendientesRevision(instructorID uint, fecha string) ([]dto.AsistenciaAprendizResponse, error)
 	FinalizarSesionesVencidas()
 }
@@ -238,15 +238,15 @@ func (s *asistenciaService) FinalizarSesionesVencidas() {
 	}
 }
 
-func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest) (*dto.AsistenciaAprendizResponse, error) {
+func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest, instructorFichaIDRegistroIngreso *uint) (*dto.AsistenciaAprendizResponse, error) {
 	asist, err := s.repo.FindByID(req.AsistenciaID)
 	if err != nil {
-		return nil, errors.New("sesi?n de asistencia no encontrada")
+		return nil, errors.New("sesión de asistencia no encontrada")
 	}
 	if asist.IsFinished {
-		return nil, errors.New("la sesi?n ya est? finalizada")
+		return nil, errors.New("la sesión ya está finalizada")
 	}
-	// Regla: una sola entrada sin salida por d?a por aprendiz en la ficha
+	// Regla: una sola entrada sin salida por día por aprendiz en la ficha
 	var fichaID uint
 	if asist.InstructorFicha != nil {
 		fichaID = asist.InstructorFicha.FichaID
@@ -268,17 +268,19 @@ func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest) 
 	}
 	exist, _ := s.repoAA.FindByAsistenciaIDAndAprendizID(req.AsistenciaID, req.AprendizID)
 	if exist != nil && exist.HoraIngreso != nil {
-		return nil, errors.New("el aprendiz ya tiene registro de ingreso en esta sesi?n")
+		return nil, errors.New("el aprendiz ya tiene registro de ingreso en esta sesión")
 	}
 	now := time.Now()
 	aa := models.AsistenciaAprendiz{
-		AsistenciaID:      req.AsistenciaID,
-		InstructorFichaID: &asist.InstructorFichaID,
-		AprendizFichaID:   req.AprendizID,
-		HoraIngreso:       &now,
+		AsistenciaID:                      req.AsistenciaID,
+		InstructorFichaID:                 &asist.InstructorFichaID,
+		InstructorFichaIDRegistroIngreso:  instructorFichaIDRegistroIngreso,
+		AprendizFichaID:                   req.AprendizID,
+		HoraIngreso:                       &now,
 	}
 	if exist != nil {
 		exist.HoraIngreso = &now
+		exist.InstructorFichaIDRegistroIngreso = instructorFichaIDRegistroIngreso
 		if err := s.repoAA.Update(exist); err != nil {
 			return nil, err
 		}
@@ -290,21 +292,21 @@ func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest) 
 	return s.GetAsistenciaAprendizByID(aa.ID)
 }
 
-func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngresoPorDocumentoRequest) (*dto.AsistenciaAprendizResponse, error) {
+func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngresoPorDocumentoRequest, instructorFichaIDRegistroIngreso *uint) (*dto.AsistenciaAprendizResponse, error) {
 	asist, err := s.repo.FindByID(req.AsistenciaID)
 	if err != nil {
-		return nil, errors.New("sesi?n de asistencia no encontrada")
+		return nil, errors.New("sesión de asistencia no encontrada")
 	}
 	if asist.IsFinished {
-		return nil, errors.New("la sesi?n ya est? finalizada")
+		return nil, errors.New("la sesión ya está finalizada")
 	}
 	ifc, err := s.instFichaRepo.FindByID(asist.InstructorFichaID)
 	if err != nil || ifc == nil {
-		return nil, errors.New("no se pudo obtener la ficha de la sesi?n")
+		return nil, errors.New("no se pudo obtener la ficha de la sesión")
 	}
 	persona, err := s.personaRepo.FindByNumeroDocumento(req.NumeroDocumento)
 	if err != nil || persona == nil {
-		return nil, errors.New("no se encontr? ninguna persona con ese n?mero de documento")
+		return nil, errors.New("no se encontró ninguna persona con ese número de documento")
 	}
 	aprendiz, err := s.aprendizRepo.FindByPersonaIDAndFichaID(persona.ID, ifc.FichaID)
 	if err != nil || aprendiz == nil {
@@ -312,11 +314,11 @@ func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngre
 	}
 	hoy := time.Now().Format("2006-01-02")
 	sessionIDs, _ := s.repo.FindIDsByFichaIDAndFecha(ifc.FichaID, hoy)
-	// Si ya tiene entrada sin salida hoy ? registrar salida
+	// Si ya tiene entrada sin salida hoy → registrar salida
 	if len(sessionIDs) > 0 {
 		sinSalida, _ := s.repoAA.FindEntryWithoutExitByAprendizIDAndAsistenciaIDs(aprendiz.ID, sessionIDs)
 		if sinSalida != nil {
-			resp, err := s.RegistrarSalida(sinSalida.ID)
+			resp, err := s.RegistrarSalida(sinSalida.ID, instructorFichaIDRegistroIngreso)
 			if err != nil {
 				return nil, err
 			}
@@ -324,20 +326,20 @@ func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngre
 			resp.Mensaje = "Salida registrada"
 			return resp, nil
 		}
-		// Si ya tiene entrada y salida hoy ? asistencia completa
+		// Si ya tiene entrada y salida hoy → asistencia completa
 		conSalida, _ := s.repoAA.FindEntryWithExitByAprendizIDAndAsistenciaIDs(aprendiz.ID, sessionIDs)
 		if conSalida != nil {
 			r := s.aaToResponse(conSalida)
 			r.TipoRegistro = "asistencia_completa"
-			r.Mensaje = "Asistencia completa (ya registr? entrada y salida hoy)"
+			r.Mensaje = "Asistencia completa (ya registró entrada y salida hoy)"
 			return r, nil
 		}
 	}
-	// Primera vez hoy ? registrar ingreso
+	// Primera vez hoy → registrar ingreso
 	resp, err := s.RegistrarIngreso(dto.AsistenciaAprendizRequest{
 		AsistenciaID: req.AsistenciaID,
 		AprendizID:   aprendiz.ID,
-	})
+	}, instructorFichaIDRegistroIngreso)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +348,7 @@ func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngre
 	return resp, nil
 }
 
-func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint) (*dto.AsistenciaAprendizResponse, error) {
+func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error) {
 	aa, err := s.repoAA.FindByID(asistenciaAprendizID)
 	if err != nil {
 		return nil, errors.New("registro de asistencia no encontrado")
@@ -359,6 +361,7 @@ func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint) (*dto.Asi
 	}
 	now := time.Now()
 	aa.HoraSalida = &now
+	aa.InstructorFichaIDRegistroSalida = instructorFichaIDRegistroSalida
 	// Salida normal registrada en la sesión → asistencia completa (sin requerir revisión)
 	aa.Estado = "ASISTENCIA_COMPLETA"
 	aa.RequiereRevision = false
@@ -519,15 +522,17 @@ func (s *asistenciaService) asistenciaToResponse(a *models.Asistencia) *dto.Asis
 
 func (s *asistenciaService) aaToResponse(aa *models.AsistenciaAprendiz) *dto.AsistenciaAprendizResponse {
 	r := &dto.AsistenciaAprendizResponse{
-		ID:              aa.ID,
-		AsistenciaID:    aa.AsistenciaID,
-		AprendizID:      aa.AprendizFichaID,
-		HoraIngreso:     aa.HoraIngreso,
-		HoraSalida:      aa.HoraSalida,
-		Observaciones:   aa.Observaciones,
-		Estado:          aa.Estado,
-		RequiereRevision: aa.RequiereRevision,
-		MotivoAjuste:    aa.MotivoAjuste,
+		ID:                           aa.ID,
+		AsistenciaID:                 aa.AsistenciaID,
+		AprendizID:                   aa.AprendizFichaID,
+		HoraIngreso:                  aa.HoraIngreso,
+		HoraSalida:                   aa.HoraSalida,
+		Observaciones:                aa.Observaciones,
+		Estado:                       aa.Estado,
+		RequiereRevision:             aa.RequiereRevision,
+		MotivoAjuste:                 aa.MotivoAjuste,
+		InstructorFichaIDRegistroIngreso: aa.InstructorFichaIDRegistroIngreso,
+		InstructorFichaIDRegistroSalida:  aa.InstructorFichaIDRegistroSalida,
 	}
 	if aa.Asistencia != nil && aa.Asistencia.InstructorFicha != nil && aa.Asistencia.InstructorFicha.Ficha != nil {
 		r.FichaID = aa.Asistencia.InstructorFicha.FichaID
@@ -537,12 +542,18 @@ func (s *asistenciaService) aaToResponse(aa *models.AsistenciaAprendiz) *dto.Asi
 		r.AprendizNombre  = aa.Aprendiz.Persona.GetFullName()
 		r.NumeroDocumento = aa.Aprendiz.Persona.NumeroDocumento
 	}
+	if aa.InstructorRegistroIngreso != nil && aa.InstructorRegistroIngreso.Instructor != nil && aa.InstructorRegistroIngreso.Instructor.Persona != nil {
+		r.InstructorRegistroIngresoNombre = aa.InstructorRegistroIngreso.Instructor.Persona.GetFullName()
+	}
+	if aa.InstructorRegistroSalida != nil && aa.InstructorRegistroSalida.Instructor != nil && aa.InstructorRegistroSalida.Instructor.Persona != nil {
+		r.InstructorRegistroSalidaNombre = aa.InstructorRegistroSalida.Instructor.Persona.GetFullName()
+	}
 	return r
 }
 
 // AjustarEstadoAprendiz permite clasificar un registro de asistencia de aprendiz
 // como asistencia completa, parcial, abandono de jornada o dejarlo pendiente de revisión.
-func (s *asistenciaService) AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string) (*dto.AsistenciaAprendizResponse, error) {
+func (s *asistenciaService) AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error) {
 	aa, err := s.repoAA.FindByID(asistenciaAprendizID)
 	if err != nil {
 		return nil, errors.New("registro de asistencia no encontrado")
@@ -569,6 +580,7 @@ func (s *asistenciaService) AjustarEstadoAprendiz(asistenciaAprendizID uint, est
 		} else {
 			aa.HoraSalida = &now
 		}
+		aa.InstructorFichaIDRegistroSalida = instructorFichaIDRegistroSalida
 	}
 	if err := s.repoAA.Update(aa); err != nil {
 		return nil, err

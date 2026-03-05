@@ -13,21 +13,45 @@ import (
 )
 
 type AsistenciaHandler struct {
-	svc      services.AsistenciaService
-	instRepo repositories.InstructorRepository
+	svc           services.AsistenciaService
+	instRepo      repositories.InstructorRepository
+	instFichaRepo repositories.InstructorFichaRepository
+	asistenciaRepo repositories.AsistenciaRepository
+	repoAA        repositories.AsistenciaAprendizRepository
 }
 
 func NewAsistenciaHandler() *AsistenciaHandler {
 	return &AsistenciaHandler{
-		svc:      services.NewAsistenciaService(),
-		instRepo: repositories.NewInstructorRepository(),
+		svc:            services.NewAsistenciaService(),
+		instRepo:       repositories.NewInstructorRepository(),
+		instFichaRepo:  repositories.NewInstructorFichaRepository(),
+		asistenciaRepo: repositories.NewAsistenciaRepository(),
+		repoAA:         repositories.NewAsistenciaAprendizRepository(),
 	}
+}
+
+// getInstructorFichaIDForCurrentUser obtiene el InstructorFichaID del usuario autenticado para la ficha dada. Devuelve nil si no es instructor de esa ficha.
+func (h *AsistenciaHandler) getInstructorFichaIDForCurrentUser(c *gin.Context, fichaID uint) *uint {
+	u, _ := c.Get("user")
+	user, _ := u.(*models.User)
+	if user == nil || user.PersonaID == nil {
+		return nil
+	}
+	inst, err := h.instRepo.FindByPersonaID(*user.PersonaID)
+	if err != nil || inst == nil {
+		return nil
+	}
+	ifc, err := h.instFichaRepo.FindByFichaIDAndInstructorID(fichaID, inst.ID)
+	if err != nil || ifc == nil {
+		return nil
+	}
+	return &ifc.ID
 }
 
 func (h *AsistenciaHandler) CreateSesion(c *gin.Context) {
 	var req dto.AsistenciaRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inv?lidos", "details": err.Error()})
 		return
 	}
 	resp, err := h.svc.CreateSesion(req)
@@ -39,7 +63,7 @@ func (h *AsistenciaHandler) CreateSesion(c *gin.Context) {
 	c.JSON(http.StatusCreated, resp)
 }
 
-// EntrarTomarAsistencia obtiene o crea la sesión de asistencia del instructor actual para la ficha. Resuelve instructor por persona_id (igual que la lista de fichas).
+// EntrarTomarAsistencia obtiene o crea la sesi?n de asistencia del instructor actual para la ficha. Resuelve instructor por persona_id (igual que la lista de fichas).
 func (h *AsistenciaHandler) EntrarTomarAsistencia(c *gin.Context) {
 	var req dto.EntrarTomarAsistenciaRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -49,12 +73,12 @@ func (h *AsistenciaHandler) EntrarTomarAsistencia(c *gin.Context) {
 	u, _ := c.Get("user")
 	user, _ := u.(*models.User)
 	if user == nil || user.PersonaID == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Su cuenta no está vinculada a un instructor. Contacte al administrador."})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Su cuenta no est? vinculada a un instructor. Contacte al administrador."})
 		return
 	}
 	inst, err := h.instRepo.FindByPersonaID(*user.PersonaID)
 	if err != nil || inst == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Su cuenta no está vinculada a un instructor. Contacte al administrador."})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Su cuenta no est? vinculada a un instructor. Contacte al administrador."})
 		return
 	}
 	resp, err := h.svc.EntrarTomarAsistencia(inst.ID, req.FichaID)
@@ -68,7 +92,7 @@ func (h *AsistenciaHandler) EntrarTomarAsistencia(c *gin.Context) {
 func (h *AsistenciaHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inv?lido"})
 		return
 	}
 	resp, err := h.svc.GetByID(uint(id))
@@ -82,7 +106,7 @@ func (h *AsistenciaHandler) GetByID(c *gin.Context) {
 func (h *AsistenciaHandler) ListByInstructorFicha(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("instructorFichaId"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inv?lido"})
 		return
 	}
 	list, err := h.svc.ListByInstructorFichaID(uint(id))
@@ -96,7 +120,7 @@ func (h *AsistenciaHandler) ListByInstructorFicha(c *gin.Context) {
 func (h *AsistenciaHandler) ListByFichaAndFechas(c *gin.Context) {
 	fichaID, err := strconv.ParseUint(c.Param("fichaId"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ficha_id inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ficha_id inv?lido"})
 		return
 	}
 	fechaInicio := c.Query("fecha_inicio")
@@ -113,8 +137,8 @@ func (h *AsistenciaHandler) ListByFichaAndFechas(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": list})
 }
 
-// StartAsistenciaAutoFinalize inicia la goroutine que finaliza sesiones al terminar el horario de la jornada (más extensión).
-// Los instructores no pueden finalizar manualmente; la finalización es automática.
+// StartAsistenciaAutoFinalize inicia la goroutine que finaliza sesiones al terminar el horario de la jornada (m?s extensi?n).
+// Los instructores no pueden finalizar manualmente; la finalizaci?n es autom?tica.
 func StartAsistenciaAutoFinalize(h *AsistenciaHandler) {
 	run := func() {
 		h.svc.FinalizarSesionesVencidas()
@@ -133,10 +157,19 @@ func StartAsistenciaAutoFinalize(h *AsistenciaHandler) {
 func (h *AsistenciaHandler) RegistrarIngreso(c *gin.Context) {
 	var req dto.AsistenciaAprendizRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inv?lidos", "details": err.Error()})
 		return
 	}
-	resp, err := h.svc.RegistrarIngreso(req)
+	var fichaID uint
+	if asist, err := h.asistenciaRepo.FindByID(req.AsistenciaID); err == nil && asist != nil {
+		if asist.InstructorFicha != nil {
+			fichaID = asist.InstructorFicha.FichaID
+		} else if ifc, _ := h.instFichaRepo.FindByID(asist.InstructorFichaID); ifc != nil {
+			fichaID = ifc.FichaID
+		}
+	}
+	instructorFichaID := h.getInstructorFichaIDForCurrentUser(c, fichaID)
+	resp, err := h.svc.RegistrarIngreso(req, instructorFichaID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -148,10 +181,19 @@ func (h *AsistenciaHandler) RegistrarIngreso(c *gin.Context) {
 func (h *AsistenciaHandler) RegistrarIngresoPorDocumento(c *gin.Context) {
 	var req dto.AsistenciaIngresoPorDocumentoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inv?lidos", "details": err.Error()})
 		return
 	}
-	resp, err := h.svc.RegistrarIngresoPorDocumento(req)
+	var fichaID uint
+	if asist, err := h.asistenciaRepo.FindByID(req.AsistenciaID); err == nil && asist != nil {
+		if asist.InstructorFicha != nil {
+			fichaID = asist.InstructorFicha.FichaID
+		} else if ifc, _ := h.instFichaRepo.FindByID(asist.InstructorFichaID); ifc != nil {
+			fichaID = ifc.FichaID
+		}
+	}
+	instructorFichaID := h.getInstructorFichaIDForCurrentUser(c, fichaID)
+	resp, err := h.svc.RegistrarIngresoPorDocumento(req, instructorFichaID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -163,10 +205,19 @@ func (h *AsistenciaHandler) RegistrarIngresoPorDocumento(c *gin.Context) {
 func (h *AsistenciaHandler) RegistrarSalida(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("asistenciaAprendizId"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inv?lido"})
 		return
 	}
-	resp, err := h.svc.RegistrarSalida(uint(id))
+	var fichaID uint
+	if aa, errAA := h.repoAA.FindByID(uint(id)); errAA == nil && aa != nil && aa.Asistencia != nil {
+		if aa.Asistencia.InstructorFicha != nil {
+			fichaID = aa.Asistencia.InstructorFicha.FichaID
+		} else if ifc, _ := h.instFichaRepo.FindByID(aa.Asistencia.InstructorFichaID); ifc != nil {
+			fichaID = ifc.FichaID
+		}
+	}
+	instructorFichaID := h.getInstructorFichaIDForCurrentUser(c, fichaID)
+	resp, err := h.svc.RegistrarSalida(uint(id), instructorFichaID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -178,12 +229,12 @@ func (h *AsistenciaHandler) RegistrarSalida(c *gin.Context) {
 func (h *AsistenciaHandler) ActualizarObservaciones(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("asistenciaAprendizId"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inv?lido"})
 		return
 	}
 	var req dto.AsistenciaAprendizObservacionesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "observaciones inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "observaciones inv?lido"})
 		return
 	}
 	resp, err := h.svc.ActualizarObservaciones(uint(id), req.Observaciones)
@@ -198,12 +249,12 @@ func (h *AsistenciaHandler) CrearOActualizarObservaciones(c *gin.Context) {
 	asistenciaID, err1 := strconv.ParseUint(c.Param("id"), 10, 32)
 	aprendizID, err2 := strconv.ParseUint(c.Param("aprendizId"), 10, 32)
 	if err1 != nil || err2 != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de asistencia o aprendiz inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de asistencia o aprendiz inv?lido"})
 		return
 	}
 	var req dto.AsistenciaAprendizObservacionesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "observaciones inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "observaciones inv?lido"})
 		return
 	}
 	resp, err := h.svc.CrearOActualizarObservaciones(uint(asistenciaID), uint(aprendizID), req.Observaciones)
@@ -217,7 +268,7 @@ func (h *AsistenciaHandler) CrearOActualizarObservaciones(c *gin.Context) {
 func (h *AsistenciaHandler) ListAprendicesEnSesion(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inv?lido"})
 		return
 	}
 	list, err := h.svc.ListAprendicesEnSesion(uint(id))
@@ -234,12 +285,12 @@ func (h *AsistenciaHandler) ListPendientesRevision(c *gin.Context) {
 	u, _ := c.Get("user")
 	user, _ := u.(*models.User)
 	if user == nil || user.PersonaID == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Su cuenta no está vinculada a un instructor. Contacte al administrador."})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Su cuenta no est? vinculada a un instructor. Contacte al administrador."})
 		return
 	}
 	inst, err := h.instRepo.FindByPersonaID(*user.PersonaID)
 	if err != nil || inst == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Su cuenta no está vinculada a un instructor. Contacte al administrador."})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Su cuenta no est? vinculada a un instructor. Contacte al administrador."})
 		return
 	}
 	fecha := c.Query("fecha")
@@ -254,7 +305,7 @@ func (h *AsistenciaHandler) ListPendientesRevision(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": list})
 }
 
-// ListPendientesRevisionAdmin permite a SUPER ADMINISTRADOR o BIENESTAR ver los pendientes de un instructor específico.
+// ListPendientesRevisionAdmin permite a SUPER ADMINISTRADOR o BIENESTAR ver los pendientes de un instructor espec?fico.
 // Query: instructor_id (obligatorio), fecha (opcional, YYYY-MM-DD; si se omite, trae todos los pendientes).
 func (h *AsistenciaHandler) ListPendientesRevisionAdmin(c *gin.Context) {
 	instructorIDStr := c.Query("instructor_id")
@@ -264,7 +315,7 @@ func (h *AsistenciaHandler) ListPendientesRevisionAdmin(c *gin.Context) {
 	}
 	instructorID64, err := strconv.ParseUint(instructorIDStr, 10, 32)
 	if err != nil || instructorID64 == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "instructor_id inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "instructor_id inv?lido"})
 		return
 	}
 	fecha := c.Query("fecha")
@@ -277,19 +328,28 @@ func (h *AsistenciaHandler) ListPendientesRevisionAdmin(c *gin.Context) {
 }
 
 // AjustarEstadoAprendiz permite clasificar un registro de asistencia de aprendiz
-// (asistencia completa, parcial, abandono de jornada o pendiente de revisión).
+// (asistencia completa, parcial, abandono de jornada o pendiente de revisi?n).
 func (h *AsistenciaHandler) AjustarEstadoAprendiz(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("asistenciaAprendizId"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inv?lido"})
 		return
 	}
 	var req dto.AsistenciaAprendizEstadoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inv?lidos", "details": err.Error()})
 		return
 	}
-	resp, err := h.svc.AjustarEstadoAprendiz(uint(id), req.Estado, req.Motivo)
+	var fichaID uint
+	if aa, errAA := h.repoAA.FindByID(uint(id)); errAA == nil && aa != nil && aa.Asistencia != nil {
+		if aa.Asistencia.InstructorFicha != nil {
+			fichaID = aa.Asistencia.InstructorFicha.FichaID
+		} else if ifc, _ := h.instFichaRepo.FindByID(aa.Asistencia.InstructorFichaID); ifc != nil {
+			fichaID = ifc.FichaID
+		}
+	}
+	instructorFichaID := h.getInstructorFichaIDForCurrentUser(c, fichaID)
+	resp, err := h.svc.AjustarEstadoAprendiz(uint(id), req.Estado, req.Motivo, instructorFichaID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -322,7 +382,7 @@ func (h *AsistenciaHandler) GetDashboard(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetCasosBienestar devuelve aprendices con N+ inasistencias en el período (oficina de bienestar). Query: dias (default 30), min_fallas (default 3), sede_id (opcional).
+// GetCasosBienestar devuelve aprendices con N+ inasistencias en el per?odo (oficina de bienestar). Query: dias (default 30), min_fallas (default 3), sede_id (opcional).
 func (h *AsistenciaHandler) GetCasosBienestar(c *gin.Context) {
 	dias := 30
 	if s := c.Query("dias"); s != "" {

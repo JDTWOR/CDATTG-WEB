@@ -37,6 +37,8 @@ func (r *asistenciaAprendizRepository) FindByID(id uint) (*models.AsistenciaApre
 		Preload("Asistencia").
 		Preload("Asistencia.InstructorFicha").
 		Preload("Asistencia.InstructorFicha.Ficha").
+		Preload("InstructorRegistroIngreso").Preload("InstructorRegistroIngreso.Instructor").Preload("InstructorRegistroIngreso.Instructor.Persona").
+		Preload("InstructorRegistroSalida").Preload("InstructorRegistroSalida.Instructor").Preload("InstructorRegistroSalida.Instructor.Persona").
 		First(&m, id).Error; err != nil {
 		return nil, err
 	}
@@ -46,7 +48,10 @@ func (r *asistenciaAprendizRepository) FindByID(id uint) (*models.AsistenciaApre
 func (r *asistenciaAprendizRepository) FindByAsistenciaID(asistenciaID uint) ([]models.AsistenciaAprendiz, error) {
 	var list []models.AsistenciaAprendiz
 	if err := r.db.Where("asistencia_id = ?", asistenciaID).
-		Preload("Aprendiz").Preload("Aprendiz.Persona").Find(&list).Error; err != nil {
+		Preload("Aprendiz").Preload("Aprendiz.Persona").
+		Preload("InstructorRegistroIngreso").Preload("InstructorRegistroIngreso.Instructor").Preload("InstructorRegistroIngreso.Instructor.Persona").
+		Preload("InstructorRegistroSalida").Preload("InstructorRegistroSalida.Instructor").Preload("InstructorRegistroSalida.Instructor.Persona").
+		Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -99,7 +104,9 @@ func (r *asistenciaAprendizRepository) FindPendientesRevisionByInstructorAndFech
 		Preload("Aprendiz").Preload("Aprendiz.Persona").
 		Preload("Asistencia").
 		Preload("Asistencia.InstructorFicha").
-		Preload("Asistencia.InstructorFicha.Ficha")
+		Preload("Asistencia.InstructorFicha.Ficha").
+		Preload("InstructorRegistroIngreso").Preload("InstructorRegistroIngreso.Instructor").Preload("InstructorRegistroIngreso.Instructor.Persona").
+		Preload("InstructorRegistroSalida").Preload("InstructorRegistroSalida.Instructor").Preload("InstructorRegistroSalida.Instructor.Persona")
 
 	// Si viene fecha, filtrar por rango del día para evitar problemas de tipos/hora
 	if fecha != "" {

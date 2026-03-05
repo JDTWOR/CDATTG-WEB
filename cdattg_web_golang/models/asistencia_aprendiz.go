@@ -20,10 +20,16 @@ type AsistenciaAprendiz struct {
 	Estado           string `gorm:"column:estado;size:50;default:''" json:"estado"`
 	RequiereRevision bool   `gorm:"column:requiere_revision;default:false" json:"requiere_revision"`
 	MotivoAjuste     string `gorm:"column:motivo_ajuste;type:text" json:"motivo_ajuste"`
-	
+
+	// Quién registró ingreso/salida (auditoría). NULL en registros antiguos.
+	InstructorFichaIDRegistroIngreso *uint `gorm:"column:instructor_ficha_id_registro_ingreso" json:"instructor_ficha_id_registro_ingreso"`
+	InstructorFichaIDRegistroSalida  *uint `gorm:"column:instructor_ficha_id_registro_salida" json:"instructor_ficha_id_registro_salida"`
+
 	// Relaciones
-	Asistencia *Asistencia `gorm:"foreignKey:AsistenciaID" json:"asistencia,omitempty"`
-	Aprendiz   *Aprendiz   `gorm:"foreignKey:AprendizFichaID" json:"aprendiz,omitempty"`
+	Asistencia               *Asistencia                    `gorm:"foreignKey:AsistenciaID" json:"asistencia,omitempty"`
+	Aprendiz                 *Aprendiz                      `gorm:"foreignKey:AprendizFichaID" json:"aprendiz,omitempty"`
+	InstructorRegistroIngreso *InstructorFichaCaracterizacion `gorm:"foreignKey:InstructorFichaIDRegistroIngreso" json:"-"`
+	InstructorRegistroSalida  *InstructorFichaCaracterizacion `gorm:"foreignKey:InstructorFichaIDRegistroSalida" json:"-"`
 }
 
 // TableName especifica el nombre de la tabla

@@ -103,6 +103,7 @@ func SetupRouter() *gin.Engine {
 			{
 				fichas.GET("", middleware.RequirePermissionFichasOrMisFichas(), fichaHandler.GetAll)
 				fichas.GET("/:id/detalle", middleware.RequirePermission("ficha", "VER FICHA"), fichaHandler.GetByIDWithDetail)
+				fichas.GET("/:id/codigo", middleware.RequirePermissionVerFichaOrInstructorDeFicha(), fichaHandler.GetCodigo)
 				fichas.GET("/:id", middleware.RequirePermission("ficha", "VER FICHA"), fichaHandler.GetByID)
 				fichas.POST("/import", middleware.RequirePermission("ficha", "CREAR FICHA"), fichaHandler.ImportFichas)
 				fichas.POST("", middleware.RequirePermission("ficha", "CREAR FICHA"), fichaHandler.Create)
@@ -134,7 +135,7 @@ func SetupRouter() *gin.Engine {
 			asistencias.POST("/entrar-tomar-asistencia", asistenciaHandler.EntrarTomarAsistencia)
 			asistencias.POST("", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.CreateSesion)
 			asistencias.GET("/instructor-ficha/:instructorFichaId", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.ListByInstructorFicha)
-			asistencias.GET("/ficha/:fichaId", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.ListByFichaAndFechas)
+			asistencias.GET("/ficha/:fichaId", middleware.RequirePermissionListAsistenciasPorFicha(), asistenciaHandler.ListByFichaAndFechas)
 			// Pendientes de revisión:
 			// ya se valida dentro del handler que el usuario autenticado
 			// esté vinculado como instructor. No se requiere permiso Casbin adicional.

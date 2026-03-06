@@ -347,6 +347,115 @@ func RequirePermissionListAprendicesFicha() gin.HandlerFunc {
 	}
 }
 
+// RequirePermissionListAsistenciasPorFicha permite GET (listar sesiones por ficha y fechas) con VER ASISTENCIA (Casbin)
+// o si el usuario es instructor asignado a esa ficha. Así el instructor puede ver el historial de asistencias de sus fichas.
+func RequirePermissionListAsistenciasPorFicha() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method != http.MethodGet {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Método no permitido"})
+			c.Abort()
+			return
+		}
+		userIDVal, exists := c.Get("userID")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuario no autenticado"})
+			c.Abort()
+			return
+		}
+		userID, ok := userIDVal.(uint)
+		if !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Identidad de usuario inválida"})
+			c.Abort()
+			return
+		}
+		e, err := authz.GetEnforcer(database.GetDB())
+		if err == nil {
+			sub := strconv.FormatUint(uint64(userID), 10)
+			if allowed, errEnf := authz.Enforce(e, sub, authz.ObjAsistencia, "VER ASISTENCIA"); errEnf == nil && allowed {
+				c.Next()
+				return
+			}
+		}
+		// Fallback: instructor asignado a la ficha
+		fichaIdStr := c.Param("fichaId")
+		if fichaIdStr != "" {
+			if fichaID, errParse := strconv.ParseUint(fichaIdStr, 10, 32); errParse == nil {
+				if u, ok := c.Get("user"); ok {
+					if user, _ := u.(*models.User); user != nil && user.PersonaID != nil {
+						instRepo := repositories.NewInstructorRepository()
+						if inst, errInst := instRepo.FindByPersonaID(*user.PersonaID); errInst == nil && inst != nil {
+							instFichaRepo := repositories.NewInstructorFichaRepository()
+							if _, errIF := instFichaRepo.FindByFichaIDAndInstructorID(uint(fichaID), inst.ID); errIF == nil {
+								c.Next()
+								return
+							}
+						}
+					}
+				}
+			}
+		}
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "No tiene permiso para VER ASISTENCIA en asistencia",
+		})
+		c.Abort()
+	}
+}
+
+// RequirePermissionVerFichaOrInstructorDeFicha permite GET al código de una ficha si el usuario tiene
+// VER FICHA, o VER ASISTENCIA, o es instructor asignado a esa ficha (param "id").
+func RequirePermissionVerFichaOrInstructorDeFicha() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method != http.MethodGet {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Método no permitido"})
+			c.Abort()
+			return
+		}
+		userIDVal, exists := c.Get("userID")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuario no autenticado"})
+			c.Abort()
+			return
+		}
+		_, ok := userIDVal.(uint)
+		if !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Identidad de usuario inválida"})
+			c.Abort()
+			return
+		}
+		e, err := authz.GetEnforcer(database.GetDB())
+		if err == nil {
+			sub := strconv.FormatUint(uint64(userIDVal.(uint)), 10)
+			if allowed, errEnf := authz.Enforce(e, sub, authz.ObjFicha, "VER FICHA"); errEnf == nil && allowed {
+				c.Next()
+				return
+			}
+			if allowed, errEnf := authz.Enforce(e, sub, authz.ObjAsistencia, "VER ASISTENCIA"); errEnf == nil && allowed {
+				c.Next()
+				return
+			}
+		}
+		idStr := c.Param("id")
+		if idStr != "" {
+			if fichaID, errParse := strconv.ParseUint(idStr, 10, 32); errParse == nil {
+				if u, ok := c.Get("user"); ok {
+					if user, _ := u.(*models.User); user != nil && user.PersonaID != nil {
+						instRepo := repositories.NewInstructorRepository()
+						if inst, errInst := instRepo.FindByPersonaID(*user.PersonaID); errInst == nil && inst != nil {
+							instFichaRepo := repositories.NewInstructorFichaRepository()
+							if _, errIF := instFichaRepo.FindByFichaIDAndInstructorID(uint(fichaID), inst.ID); errIF == nil {
+								c.Next()
+								return
+							}
+						}
+					}
+				}
+			}
+		}
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene permiso para ver el código de esta ficha"})
+		c.Abort()
+	}
+}
+
 // RequireSuperAdmin exige que el usuario tenga el rol "SUPER ADMINISTRADOR".
 func RequireSuperAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {

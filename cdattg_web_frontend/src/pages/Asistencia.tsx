@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { ExclamationTriangleIcon, ArrowLeftIcon, DocumentTextIcon, UserPlusIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon, PencilSquareIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, ArrowLeftIcon, DocumentTextIcon, UserPlusIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon, PencilSquareIcon, ChartBarIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { EscanerQR } from '../components/EscanerQR';
 import { useAuth } from '../context/AuthContext';
@@ -878,15 +878,24 @@ export const Asistencia = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Asistencia</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">Tomar asistencia por ficha e instructor</p>
         </div>
-        {isSuperAdmin && (
+        <div className="flex items-center gap-2">
           <Link
-            to="/asistencia/dashboard"
+            to="/asistencia/historial"
             className="btn-secondary inline-flex items-center gap-2"
           >
-            <ChartBarIcon className="w-5 h-5" />
-            Dashboard en tiempo real
+            <CalendarDaysIcon className="w-5 h-5" />
+            Ver historial de asistencias
           </Link>
-        )}
+          {isSuperAdmin && (
+            <Link
+              to="/asistencia/dashboard"
+              className="btn-secondary inline-flex items-center gap-2"
+            >
+              <ChartBarIcon className="w-5 h-5" />
+              Dashboard en tiempo real
+            </Link>
+          )}
+        </div>
       </div>
 
       {error && (

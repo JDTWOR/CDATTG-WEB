@@ -15,6 +15,8 @@ import { ImportarProgramas } from './pages/ImportarProgramas';
 import { FichasCaracterizacion } from './pages/FichasCaracterizacion';
 import { FichaDetalle } from './pages/FichaDetalle';
 import { Asistencia } from './pages/Asistencia';
+import { AsistenciaHistorial } from './pages/AsistenciaHistorial';
+import { AsistenciaHistorialFicha } from './pages/AsistenciaHistorialFicha';
 import { AsistenciaDashboard } from './pages/AsistenciaDashboard';
 import { CasosBienestar } from './pages/CasosBienestar';
 import { CasosBienestarFichaDetalle } from './pages/CasosBienestarFichaDetalle';
@@ -150,6 +152,26 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Asistencia />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/asistencia/historial"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AsistenciaHistorial />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/asistencia/historial/ficha/:fichaId"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AsistenciaHistorialFicha />
                 </Layout>
               </ProtectedRoute>
             }

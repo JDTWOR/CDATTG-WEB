@@ -15,6 +15,7 @@ type FichaService interface {
 	FindAll(page, pageSize int, programaID *uint, instructorID *uint) ([]dto.FichaCaracterizacionResponse, int64, error)
 	FindByID(id uint) (*dto.FichaCaracterizacionResponse, error)
 	FindByIDWithDetail(id uint) (*dto.FichaCaracterizacionResponse, error)
+	GetCodigo(id uint) (string, error)
 	Create(req dto.FichaCaracterizacionRequest) (*dto.FichaCaracterizacionResponse, error)
 	Update(id uint, req dto.FichaCaracterizacionRequest) (*dto.FichaCaracterizacionResponse, error)
 	Delete(id uint) error
@@ -96,6 +97,14 @@ func (s *fichaService) FindByIDWithDetail(id uint) (*dto.FichaCaracterizacionRes
 	}
 	r := s.fichaToResponse(*f, len(f.Aprendices))
 	return &r, nil
+}
+
+func (s *fichaService) GetCodigo(id uint) (string, error) {
+	f, err := s.fichaRepo.FindByID(id)
+	if err != nil {
+		return "", errors.New("ficha no encontrada")
+	}
+	return f.Ficha, nil
 }
 
 func (s *fichaService) Create(req dto.FichaCaracterizacionRequest) (*dto.FichaCaracterizacionResponse, error) {

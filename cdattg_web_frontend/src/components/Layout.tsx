@@ -20,6 +20,7 @@ import {
   Bars3Icon,
   ShieldCheckIcon,
   ExclamationTriangleIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -58,6 +59,7 @@ const SIDEBAR_ITEMS: {
   { section: 'Gestión de personal', path: '/aprendices', label: 'Aprendices', permission: 'VER APRENDICES' },
   { section: 'Gestión de personal', path: '/personas', label: 'Personas', permission: 'VER PERSONAS' },
   { section: 'Control y seguimiento', path: '/asistencia', label: 'Asistencia', permission: 'VER ASISTENCIA' },
+  { section: 'Control y seguimiento', path: '/asistencia/historial', label: 'Historial asistencias', permission: 'VER ASISTENCIA' },
   {
     section: 'Control y seguimiento',
     path: '/asistencia/dashboard',
@@ -85,6 +87,7 @@ const ICONS: Record<string, ReactNode> = {
   aprendices: <UserGroupIcon className="w-5 h-5" />,
   personas: <UsersIcon className="w-5 h-5" />,
   asistencia: <ClipboardDocumentListIcon className="w-5 h-5" />,
+  'asistencia/historial': <CalendarDaysIcon className="w-5 h-5" />,
   'asistencia/dashboard': <ChartBarIcon className="w-5 h-5" />,
   'asistencia/dashboard/casos-bienestar': <ExclamationTriangleIcon className="w-5 h-5" />,
   inventario: <CubeIcon className="w-5 h-5" />,

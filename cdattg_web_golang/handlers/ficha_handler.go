@@ -88,6 +88,22 @@ func (h *FichaHandler) GetByIDWithDetail(c *gin.Context) {
 	c.JSON(http.StatusOK, f)
 }
 
+// GetCodigo devuelve solo el código de caracterización de la ficha (para nombres de archivo, etc.).
+// Accesible con VER FICHA o con VER ASISTENCIA / instructor de la ficha.
+func (h *FichaHandler) GetCodigo(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+	codigo, err := h.svc.GetCodigo(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ficha": codigo})
+}
+
 func (h *FichaHandler) Create(c *gin.Context) {
 	var req dto.FichaCaracterizacionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

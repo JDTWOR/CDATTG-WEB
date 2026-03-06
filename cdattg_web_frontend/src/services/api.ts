@@ -343,6 +343,12 @@ class ApiService {
     return response.data;
   }
 
+  /** Código de caracterización de la ficha (para nombres de archivo). Accesible para instructores de la ficha. */
+  async getFichaCodigo(id: number): Promise<string> {
+    const response = await this.api.get<{ ficha: string }>(`/fichas-caracterizacion/${id}/codigo`);
+    return response.data.ficha ?? '';
+  }
+
   async createFichaCaracterizacion(data: FichaCaracterizacionRequest): Promise<FichaCaracterizacionResponse> {
     const response = await this.api.post<FichaCaracterizacionResponse>('/fichas-caracterizacion', data);
     return response.data;

@@ -42,18 +42,7 @@ func ValidarAsignacionInstructor(
 		return errors.New("la ficha no está activa")
 	}
 
-	// 1. Límite de fichas activas (máximo 5)
-	count, err := instFichaRepo.CountActiveFichasByInstructorID(instructorID)
-	if err != nil {
-		return fmt.Errorf("error al contar fichas del instructor: %w", err)
-	}
-	// Si ya está asignado a esta ficha (actualización), no sumar una más
-	exist, _ := instFichaRepo.FindByFichaIDAndInstructorID(fichaID, instructorID)
-	if exist == nil && count >= cfg.MaxFichasActivas {
-		return fmt.Errorf("el instructor no puede tener más de %d fichas activas (tiene %d)", cfg.MaxFichasActivas, count)
-	}
-
-	// 2. Experiencia mínima (1 año configurable)
+	// Experiencia mínima (configurable)
 	if cfg.ExperienciaMinimaAnios > 0 {
 		anos := 0
 		if instructor.AnosExperiencia != nil {

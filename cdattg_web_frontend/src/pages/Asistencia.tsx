@@ -59,10 +59,10 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
           </p>
         </div>
         <span className="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">
-          {aa?.hora_ingreso
+          {aa?.hora_ingreso && !isNaN(new Date(aa.hora_ingreso).getTime())
             ? new Date(aa.hora_ingreso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
             : '–'}
-          {aa?.hora_salida != null && (
+          {aa?.hora_salida && !isNaN(new Date(aa.hora_salida).getTime()) && (
             <> → {new Date(aa.hora_salida).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</>
           )}
         </span>
@@ -174,10 +174,10 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">{aprendiz.persona_documento ?? '-'}</td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-medium">{aprendiz.persona_nombre ?? '-'}</td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-        {aa?.hora_ingreso ? new Date(aa.hora_ingreso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '–'}
+        {aa?.hora_ingreso && !isNaN(new Date(aa.hora_ingreso).getTime()) ? new Date(aa.hora_ingreso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '–'}
       </td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-        {aa?.hora_salida ? new Date(aa.hora_salida).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '–'}
+        {aa?.hora_salida && !isNaN(new Date(aa.hora_salida).getTime()) ? new Date(aa.hora_salida).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '–'}
       </td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-500 dark:text-gray-400">{aa?.observaciones || '–'}</td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
@@ -957,7 +957,7 @@ export const Asistencia = () => {
                       {p.aprendiz_nombre || '–'}
                     </td>
                     <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-                      {p.hora_ingreso
+                      {p.hora_ingreso && !isNaN(new Date(p.hora_ingreso).getTime())
                         ? new Date(p.hora_ingreso).toLocaleTimeString('es-CO', {
                             hour: '2-digit',
                             minute: '2-digit',

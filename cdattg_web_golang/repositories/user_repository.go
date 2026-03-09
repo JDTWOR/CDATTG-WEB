@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"strings"
+
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/models"
 	"gorm.io/gorm"
@@ -64,9 +66,10 @@ func (r *userRepository) List(offset, limit int, search string) ([]models.User, 
 	var list []models.User
 	q := r.db.Model(&models.User{}).Preload("Persona")
 	if search != "" {
-		like := "%" + search + "%"
+		// Reemplazar espacios por % para permitir búsqueda parcial
+		searchPattern := "%" + strings.ToLower(strings.Join(strings.Fields(search), "%")) + "%"
 		q = q.Joins("LEFT JOIN personas ON personas.id = users.persona_id").
-			Where("users.email ILIKE ? OR personas.nombres ILIKE ? OR personas.apellidos ILIKE ? OR personas.numero_documento ILIKE ?", like, like, like, like)
+			Where("LOWER(users.email) LIKE ? OR LOWER(COALESCE(personas.primer_nombre,'') || ' ' || COALESCE(personas.segundo_nombre,'') || ' ' || COALESCE(personas.primer_apellido,'') || ' ' || COALESCE(personas.segundo_apellido,'')) LIKE ? OR LOWER(personas.numero_documento) LIKE ?", searchPattern, searchPattern, searchPattern)
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {

@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"strings"
+
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/models"
 	"gorm.io/gorm"
@@ -75,8 +77,9 @@ func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instruct
 		q = q.Where("id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ? AND deleted_at IS NULL)", *instructorID)
 	}
 	if search != "" {
-		searchPattern := "%" + search + "%"
-		q = q.Where("ficha LIKE ? OR programa_formacion_id IN (SELECT id FROM programas_formacion WHERE nombre LIKE ? OR codigo LIKE ?)", searchPattern, searchPattern, searchPattern)
+		// Reemplazar espacios por % para permitir búsqueda parcial (ej. "analisis software" -> "%analisis%software%")
+		searchPattern := "%" + strings.Join(strings.Fields(search), "%") + "%"
+		q = q.Where("ficha ILIKE ? OR programa_formacion_id IN (SELECT id FROM programas_formacion WHERE nombre ILIKE ? OR codigo ILIKE ?)", searchPattern, searchPattern, searchPattern)
 	}
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -89,8 +92,8 @@ func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instruct
 		findQ = findQ.Where("id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ? AND deleted_at IS NULL)", *instructorID)
 	}
 	if search != "" {
-		searchPattern := "%" + search + "%"
-		findQ = findQ.Where("ficha LIKE ? OR programa_formacion_id IN (SELECT id FROM programas_formacion WHERE nombre LIKE ? OR codigo LIKE ?)", searchPattern, searchPattern, searchPattern)
+		searchPattern := "%" + strings.Join(strings.Fields(search), "%") + "%"
+		findQ = findQ.Where("ficha ILIKE ? OR programa_formacion_id IN (SELECT id FROM programas_formacion WHERE nombre ILIKE ? OR codigo ILIKE ?)", searchPattern, searchPattern, searchPattern)
 	}
 	if err := findQ.Offset(offset).Limit(pageSize).Find(&fichas).Error; err != nil {
 		return nil, 0, err

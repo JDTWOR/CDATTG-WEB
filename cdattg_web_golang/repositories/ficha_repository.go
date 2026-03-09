@@ -10,7 +10,7 @@ type FichaRepository interface {
 	FindByID(id uint) (*models.FichaCaracterizacion, error)
 	FindByIDWithInstructoresAndAprendices(id uint) (*models.FichaCaracterizacion, error)
 	FindByFicha(ficha string) (*models.FichaCaracterizacion, error)
-	FindAll(page, pageSize int, programaID *uint, instructorID *uint) ([]models.FichaCaracterizacion, int64, error)
+	FindAll(page, pageSize int, programaID *uint, instructorID *uint, search string) ([]models.FichaCaracterizacion, int64, error)
 	Search(query string) ([]models.FichaCaracterizacion, error)
 	Create(ficha *models.FichaCaracterizacion) error
 	Update(ficha *models.FichaCaracterizacion) error
@@ -61,7 +61,7 @@ func (r *fichaRepository) FindByFicha(ficha string) (*models.FichaCaracterizacio
 	return &fichaModel, nil
 }
 
-func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instructorID *uint) ([]models.FichaCaracterizacion, int64, error) {
+func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instructorID *uint, search string) ([]models.FichaCaracterizacion, int64, error) {
 	var fichas []models.FichaCaracterizacion
 	var total int64
 	offset := (page - 1) * pageSize
@@ -74,6 +74,10 @@ func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instruct
 		// No usar instructor_id de la ficha: si lo desasignan del pivote ya no debe ver la ficha.
 		q = q.Where("id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ? AND deleted_at IS NULL)", *instructorID)
 	}
+	if search != "" {
+		searchPattern := "%" + search + "%"
+		q = q.Where("ficha LIKE ? OR programa_formacion_id IN (SELECT id FROM programas_formacion WHERE nombre LIKE ? OR codigo LIKE ?)", searchPattern, searchPattern, searchPattern)
+	}
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -83,6 +87,10 @@ func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instruct
 	}
 	if instructorID != nil && *instructorID > 0 {
 		findQ = findQ.Where("id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ? AND deleted_at IS NULL)", *instructorID)
+	}
+	if search != "" {
+		searchPattern := "%" + search + "%"
+		findQ = findQ.Where("ficha LIKE ? OR programa_formacion_id IN (SELECT id FROM programas_formacion WHERE nombre LIKE ? OR codigo LIKE ?)", searchPattern, searchPattern, searchPattern)
 	}
 	if err := findQ.Offset(offset).Limit(pageSize).Find(&fichas).Error; err != nil {
 		return nil, 0, err

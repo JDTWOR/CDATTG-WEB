@@ -37,6 +37,7 @@ func (h *FichaHandler) GetAll(c *gin.Context) {
 			programaID = &u
 		}
 	}
+	search := c.Query("q")
 	var instructorID *uint
 	if c.Query("mis_fichas") == "1" {
 		if u, ok := c.Get("user"); ok {
@@ -52,7 +53,7 @@ func (h *FichaHandler) GetAll(c *gin.Context) {
 			return
 		}
 	}
-	list, total, err := h.svc.FindAll(page, pageSize, programaID, instructorID)
+	list, total, err := h.svc.FindAll(page, pageSize, programaID, instructorID, search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

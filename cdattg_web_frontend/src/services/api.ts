@@ -330,10 +330,11 @@ class ApiService {
     page = 1,
     pageSize = 20,
     programaId?: number,
-    misFichas?: boolean
+    misFichas?: boolean,
+    search?: string
   ): Promise<PaginatedResponse<FichaCaracterizacionResponse>> {
     const response = await this.api.get<PaginatedResponse<FichaCaracterizacionResponse>>('/fichas-caracterizacion', {
-      params: { page, page_size: pageSize, programa_id: programaId, mis_fichas: misFichas ? '1' : undefined },
+      params: { page, page_size: pageSize, programa_id: programaId, mis_fichas: misFichas ? '1' : undefined, q: search },
     });
     return response.data;
   }

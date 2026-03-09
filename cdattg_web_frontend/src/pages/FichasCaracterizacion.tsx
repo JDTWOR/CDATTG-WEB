@@ -106,7 +106,7 @@ export const FichasCaracterizacion = () => {
       setLoading(true);
       setError('');
       const id = programaId === '' ? undefined : programaId;
-      const response = await apiService.getFichasCaracterizacion(page, pageSize, id, esInstructor);
+      const response = await apiService.getFichasCaracterizacion(page, pageSize, id, esInstructor, searchQuery.trim() || undefined);
       setList(response.data);
       setTotal(response.total);
     } catch (err: unknown) {
@@ -122,8 +122,15 @@ export const FichasCaracterizacion = () => {
   }, []);
 
   useEffect(() => {
-    fetchList();
-  }, [page, programaId, esInstructor]);
+    // Si la búsqueda cambia, es buena idea volver a la página 1.
+    // Usaremos un timeout para el debounce si hay escritura, 
+    // pero de momento simplificamos llamando directamente o con un debounce simple.
+    // Para no romper la dependencia directa de useEffect:
+    const timer = setTimeout(() => {
+      fetchList();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [page, programaId, esInstructor, searchQuery]);
 
   const openCreate = () => {
     setEditing(null);
@@ -456,19 +463,42 @@ export const FichasCaracterizacion = () => {
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">{error}</div>
       )}
 
-      <div className="flex gap-4 items-center flex-wrap">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Programa:</label>
-        <div className="w-64 min-w-[200px]">
+      <div className="flex flex-col sm:flex-row gap-4 items-end sm:items-center bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600">
+        <div className="w-full sm:w-auto flex-1 min-w-[250px]">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Buscar ficha
+          </label>
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar por código de ficha o programa..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-shadow"
+            />
+          </div>
+        </div>
+        <div className="w-full sm:w-auto min-w-[250px]">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Filtrar por Programa
+          </label>
           <SelectSearch
             options={[
-              { value: 0, label: 'Todos' },
+              { value: 0, label: 'Todos los programas' },
               ...programas.map((p) => ({
                 value: p.id,
                 label: p.codigo ? `${p.codigo} - ${p.nombre}` : p.nombre,
               })),
             ]}
             value={programaId === '' ? 0 : programaId}
-            onChange={(v) => setProgramaId(v === 0 || v === undefined ? '' : v)}
+            onChange={(v) => {
+              setProgramaId(v === 0 || v === undefined ? '' : v);
+              setPage(1);
+            }}
             placeholder="Todos los programas"
           />
         </div>

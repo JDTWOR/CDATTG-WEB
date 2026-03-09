@@ -12,7 +12,7 @@ import (
 )
 
 type FichaService interface {
-	FindAll(page, pageSize int, programaID *uint, instructorID *uint) ([]dto.FichaCaracterizacionResponse, int64, error)
+	FindAll(page, pageSize int, programaID *uint, instructorID *uint, search string) ([]dto.FichaCaracterizacionResponse, int64, error)
 	FindByID(id uint) (*dto.FichaCaracterizacionResponse, error)
 	FindByIDWithDetail(id uint) (*dto.FichaCaracterizacionResponse, error)
 	GetCodigo(id uint) (string, error)
@@ -45,8 +45,8 @@ func NewFichaService() FichaService {
 	}
 }
 
-func (s *fichaService) FindAll(page, pageSize int, programaID *uint, instructorID *uint) ([]dto.FichaCaracterizacionResponse, int64, error) {
-	list, total, err := s.fichaRepo.FindAll(page, pageSize, programaID, instructorID)
+func (s *fichaService) FindAll(page, pageSize int, programaID *uint, instructorID *uint, search string) ([]dto.FichaCaracterizacionResponse, int64, error) {
+	list, total, err := s.fichaRepo.FindAll(page, pageSize, programaID, instructorID, search)
 	if err != nil {
 		return nil, 0, err
 	}

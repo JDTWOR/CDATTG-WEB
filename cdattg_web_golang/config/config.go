@@ -15,7 +15,25 @@ type Config struct {
 	CORS       CORSConfig
 	Negocio    NegocioConfig
 	Inventario InventarioConfig
+	SMTP       SMTPConfig
+	Alertas    AlertasConfig
 	Env        string
+}
+
+// SMTPConfig para envío de correos (alertas al coordinador).
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	From     string
+	Enabled  bool
+}
+
+// AlertasConfig reglas para alertas de asistencia (fichas que no han iniciado toma de asistencia).
+type AlertasConfig struct {
+	MinutosDespuesInicioJornada int  // Alertar si pasaron estos minutos desde hora_inicio y no hay sesión (ej. 90 = 1h30)
+	Enabled                    bool // Si las alertas por correo están activas
 }
 
 // InventarioConfig según documentacion_inventario.md (umbrales, notificaciones)
@@ -104,6 +122,18 @@ func LoadConfig() {
 			UmbralMinimo:       getEnvAsInt("INVENTARIO_UMBRAL_MINIMO", 10),
 			UmbralCritico:      getEnvAsInt("INVENTARIO_UMBRAL_CRITICO", 5),
 			NotificarStockBajo: getEnvAsBool("INVENTARIO_NOTIFICAR_STOCK_BAJO", true),
+		},
+		SMTP: SMTPConfig{
+			Host:     getEnv("SMTP_HOST", ""),
+			Port:     getEnvAsInt("SMTP_PORT", 587),
+			User:     getEnv("SMTP_USER", ""),
+			Password: getEnv("SMTP_PASSWORD", ""),
+			From:     getEnv("SMTP_FROM", "noreply@sena.local"),
+			Enabled:  getEnvAsBool("SMTP_ENABLED", false),
+		},
+		Alertas: AlertasConfig{
+			MinutosDespuesInicioJornada: getEnvAsInt("ALERTAS_MINUTOS_DESPUES_INICIO_JORNADA", 90),
+			Enabled:                     getEnvAsBool("ALERTAS_ASISTENCIA_ENABLED", true),
 		},
 		Env: getEnv("ENV", "development"),
 	}

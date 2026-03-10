@@ -114,6 +114,7 @@ func Migrate() error {
 		&models.Asistencia{},
 		&models.AsistenciaAprendiz{},
 		&models.Evidencia{},
+		&models.AlertaAsistenciaLog{},
 		
 		// Entrada/Salida
 		&models.EntradaSalida{},

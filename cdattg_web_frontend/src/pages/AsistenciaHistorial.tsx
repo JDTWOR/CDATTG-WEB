@@ -1,20 +1,25 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
+import { ClipboardDocumentListIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import type { FichaCaracterizacionResponse } from '../types';
 
 export const AsistenciaHistorial = () => {
+  const { roles } = useAuth();
   const [fichas, setFichas] = useState<FichaCaracterizacionResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const isSuperAdmin = roles.includes('SUPER ADMINISTRADOR');
 
   useEffect(() => {
     const fetchFichas = async () => {
       setLoading(true);
       setError('');
       try {
-        const res = await apiService.getFichasCaracterizacion(1, 200, undefined, true);
+        // Superadmin ve todas las fichas; instructores solo las asignadas
+        const res = await apiService.getFichasCaracterizacion(1, 500, undefined, isSuperAdmin ? undefined : true);
         setFichas(res.data);
       } catch {
         setFichas([]);
@@ -24,7 +29,7 @@ export const AsistenciaHistorial = () => {
       }
     };
     fetchFichas();
-  }, []);
+  }, [isSuperAdmin]);
 
   return (
     <div className="space-y-6">
@@ -32,7 +37,9 @@ export const AsistenciaHistorial = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Historial de asistencias</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Consulte por fecha qué aprendices asistieron o no a cada ficha. Todos los instructores asignados pueden ver el historial.
+            {isSuperAdmin
+              ? 'Consulte el historial de asistencia de cualquier ficha. Seleccione una ficha para ver detalle por fecha.'
+              : 'Consulte por fecha qué aprendices asistieron o no a cada ficha. Solo puede ver el historial de las fichas en las que está asignado.'}
           </p>
         </div>
         <Link
@@ -55,13 +62,76 @@ export const AsistenciaHistorial = () => {
       ) : fichas.length === 0 ? (
         <div className="card text-center py-12">
           <p className="text-gray-600 dark:text-gray-400">
-            No tiene fichas asignadas como instructor. Solo puede ver el historial de las fichas en las que está asignado.
+            {isSuperAdmin
+              ? 'No hay fichas de caracterización registradas en el sistema.'
+              : 'No tiene fichas asignadas como instructor. Solo puede ver el historial de las fichas en las que está asignado.'}
           </p>
           <Link to="/asistencia" className="btn-primary mt-4 inline-flex">
             Ir a tomar asistencia
           </Link>
         </div>
+      ) : isSuperAdmin ? (
+        /* Vista superadmin: tabla con todas las fichas y botón Ver historial */
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+              <thead className="bg-gray-50 dark:bg-gray-700/50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                    Ficha
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                    Programa de formación
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                    Instructor líder
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                    Sede / Ambiente
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                    Aprendices
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider w-40">
+                    Acción
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                {fichas.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                      {item.ficha}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                      {item.programa_formacion_nombre || '–'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                      {item.instructor_nombre || '–'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                      {[item.sede_nombre, item.ambiente_nombre].filter(Boolean).join(' / ') || '–'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                      {item.cantidad_aprendices}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        to={`/asistencia/historial/ficha/${item.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
+                      >
+                        <CalendarDaysIcon className="w-4 h-4" />
+                        Ver historial
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
+        /* Vista instructor: tarjetas con sus fichas asignadas */
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {fichas.map((item) => (
             <div

@@ -46,8 +46,9 @@ type PendienteInstructorRow struct {
 
 // DashboardFichaRow una fila del resumen por ficha para el dashboard
 type DashboardFichaRow struct {
-	FichaID     uint
-	FichaNumero string
+	FichaID         uint
+	FichaNumero     string
+	ProgramaNombre  string
 	SedeNombre  string
 	Cantidad    int
 }
@@ -181,20 +182,22 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 	}
 	totalAprendices = int(total)
 
-	// Por ficha: ficha_id, ficha_numero, sede_nombre, count(aa.id)
+	// Por ficha: ficha_id, ficha_numero, programa_nombre, sede_nombre, count(aa.id)
 	type row struct {
-		FichaID     uint   `gorm:"column:ficha_id"`
-		FichaNumero string `gorm:"column:ficha_numero"`
-		SedeNombre  string `gorm:"column:sede_nombre"`
-		Cantidad    int    `gorm:"column:cantidad"`
+		FichaID        uint   `gorm:"column:ficha_id"`
+		FichaNumero    string `gorm:"column:ficha_numero"`
+		ProgramaNombre string `gorm:"column:programa_nombre"`
+		SedeNombre     string `gorm:"column:sede_nombre"`
+		Cantidad       int    `gorm:"column:cantidad"`
 	}
 	var rows []row
 	raw := `
-		SELECT fc.id AS ficha_id, fc.ficha AS ficha_numero, COALESCE(s.nombre, '') AS sede_nombre,
+		SELECT fc.id AS ficha_id, fc.ficha AS ficha_numero, COALESCE(pf.nombre, '') AS programa_nombre, COALESCE(s.nombre, '') AS sede_nombre,
 		       COUNT(aa.id)::int AS cantidad
 		FROM asistencias a
 		INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
 		INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id
+		LEFT JOIN programas_formacion pf ON fc.programa_formacion_id = pf.id
 		LEFT JOIN sedes s ON fc.sede_id = s.id
 		LEFT JOIN asistencia_aprendices aa ON aa.asistencia_id = a.id AND aa.hora_ingreso IS NOT NULL AND aa.hora_salida IS NULL
 		WHERE a.fecha >= ? AND a.fecha < ?
@@ -204,17 +207,18 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 		raw += " AND fc.sede_id = ?"
 		args = append(args, *sedeID)
 	}
-	raw += " GROUP BY fc.id, fc.ficha, s.nombre ORDER BY fc.ficha"
+	raw += " GROUP BY fc.id, fc.ficha, pf.nombre, s.nombre ORDER BY fc.ficha"
 	if err := r.db.Raw(raw, args...).Scan(&rows).Error; err != nil {
 		return totalAprendices, nil, err
 	}
 	porFicha = make([]DashboardFichaRow, len(rows))
 	for i := range rows {
 		porFicha[i] = DashboardFichaRow{
-			FichaID:     rows[i].FichaID,
-			FichaNumero: rows[i].FichaNumero,
-			SedeNombre:  rows[i].SedeNombre,
-			Cantidad:    rows[i].Cantidad,
+			FichaID:        rows[i].FichaID,
+			FichaNumero:    rows[i].FichaNumero,
+			ProgramaNombre: rows[i].ProgramaNombre,
+			SedeNombre:     rows[i].SedeNombre,
+			Cantidad:       rows[i].Cantidad,
 		}
 	}
 	return totalAprendices, porFicha, nil

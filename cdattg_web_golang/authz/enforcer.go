@@ -83,6 +83,21 @@ func GetRolesForUser(e *casbin.Enforcer, userID string) ([]string, error) {
 	return e.GetRolesForUser(userID)
 }
 
+// GetUserIDsWithRole devuelve los IDs de usuario (como string) que tienen el rol indicado.
+// Útil para notificar a todos los coordinadores, etc.
+func GetUserIDsWithRole(e *casbin.Enforcer, roleName string) []string {
+	rules, _ := e.GetFilteredGroupingPolicy(1, roleName)
+	ids := make([]string, 0, len(rules))
+	seen := make(map[string]bool)
+	for _, r := range rules {
+		if len(r) >= 1 && !seen[r[0]] {
+			seen[r[0]] = true
+			ids = append(ids, r[0])
+		}
+	}
+	return ids
+}
+
 const policyDirect = "p2"
 
 // AddPermissionForUser asigna permiso directo al usuario (p2). Para que el admin dé permisos sin rol.

@@ -402,6 +402,7 @@ export interface CasoBienestarItem {
 export interface AsistenciaDashboardPorFicha {
   ficha_id: number;
   ficha_numero: string;
+  programa_nombre: string;
   sede_nombre: string;
   cantidad_vinieron: number;
 }

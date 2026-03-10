@@ -97,6 +97,29 @@ func parseHora(s string) (t time.Time, err error) {
 	return time.Parse("15:04", s)
 }
 
+// HoraInicioMasMinutos devuelve el instante (en la zona de dia) de hora_inicio del día dado más los minutos indicados.
+// Sirve para saber a partir de qué momento alertar si no se ha iniciado la toma de asistencia.
+func HoraInicioMasMinutos(j *models.Jornada, dia time.Time, minutosDespues int) time.Time {
+	if j == nil || minutosDespues < 0 {
+		return dia
+	}
+	inicio := j.HoraInicio
+	if inicio == "" {
+		if def, ok := defaultHorarios[j.Nombre]; ok {
+			inicio = def.inicio
+		} else {
+			return dia
+		}
+	}
+	tInicio, err := parseHora(inicio)
+	if err != nil {
+		return dia
+	}
+	base := time.Date(dia.Year(), dia.Month(), dia.Day(), 0, 0, 0, 0, dia.Location())
+	start := base.Add(time.Duration(tInicio.Hour())*time.Hour + time.Duration(tInicio.Minute())*time.Minute)
+	return start.Add(time.Duration(minutosDespues) * time.Minute)
+}
+
 // HoraFinEfectiva devuelve el instante (en la zona de dia) en que termina la ventana válida de la jornada
 // (hora_fin + minutos extensión) para el día dado. Sirve para auto-finalizar sesiones.
 func HoraFinEfectiva(j *models.Jornada, dia time.Time) time.Time {

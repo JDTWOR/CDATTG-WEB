@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"strings"
+	"time"
 
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/models"
@@ -13,6 +14,7 @@ type FichaRepository interface {
 	FindByIDWithInstructoresAndAprendices(id uint) (*models.FichaCaracterizacion, error)
 	FindByFicha(ficha string) (*models.FichaCaracterizacion, error)
 	FindAll(page, pageSize int, programaID *uint, instructorID *uint, search string) ([]models.FichaCaracterizacion, int64, error)
+	FindActivasParaHoyConJornada(hoy time.Time) ([]models.FichaCaracterizacion, error)
 	Search(query string) ([]models.FichaCaracterizacion, error)
 	Create(ficha *models.FichaCaracterizacion) error
 	Update(ficha *models.FichaCaracterizacion) error
@@ -61,6 +63,23 @@ func (r *fichaRepository) FindByFicha(ficha string) (*models.FichaCaracterizacio
 		return nil, err
 	}
 	return &fichaModel, nil
+}
+
+// FindActivasParaHoyConJornada devuelve fichas activas (status=true, fecha_fin >= hoy) que tienen formación el día de la semana de hoy, con Jornada y FichaDiasFormacion cargados.
+func (r *fichaRepository) FindActivasParaHoyConJornada(hoy time.Time) ([]models.FichaCaracterizacion, error) {
+	weekday := int(hoy.Weekday()) // 0=Sunday, 1=Monday, ...
+	diaFormacionID := weekday
+	if diaFormacionID == 0 {
+		diaFormacionID = 7
+	}
+	hoyStr := hoy.Format("2006-01-02")
+	var list []models.FichaCaracterizacion
+	err := r.db.Where("status = ?", true).
+		Where("(fecha_fin IS NULL OR fecha_fin >= ?)", hoyStr).
+		Where("id IN (SELECT ficha_id FROM ficha_dias_formacion WHERE dia_formacion_id = ? AND deleted_at IS NULL)", diaFormacionID).
+		Preload("Jornada").Preload("FichaDiasFormacion").
+		Find(&list).Error
+	return list, err
 }
 
 func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instructorID *uint, search string) ([]models.FichaCaracterizacion, int64, error) {

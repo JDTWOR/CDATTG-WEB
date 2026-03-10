@@ -228,6 +228,7 @@ export const AsistenciaDashboard = () => {
                   <thead className="bg-gray-50 dark:bg-gray-700/50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ficha</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nombre</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sede</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vinieron hoy</th>
                     </tr>
@@ -236,6 +237,7 @@ export const AsistenciaDashboard = () => {
                     {data.por_ficha.map((row) => (
                       <tr key={row.ficha_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{row.ficha_numero}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{row.programa_nombre || '-'}</td>
                         <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{row.sede_nombre || '-'}</td>
                         <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600 dark:text-primary-400">{row.cantidad_vinieron}</td>
                       </tr>

@@ -95,6 +95,7 @@ type AsistenciaDashboardResponse struct {
 type AsistenciaDashboardPorFicha struct {
 	FichaID              uint   `json:"ficha_id"`
 	FichaNumero          string `json:"ficha_numero"`
+	ProgramaNombre       string `json:"programa_nombre"`
 	SedeNombre           string `json:"sede_nombre"`
 	CantidadVinieron     int    `json:"cantidad_vinieron"`
 }

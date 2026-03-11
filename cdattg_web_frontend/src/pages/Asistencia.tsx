@@ -439,14 +439,28 @@ export const Asistencia = () => {
 
   const handleRegistrarIngreso = useCallback(
     async (aprendizId: number) => {
-      if (!sesionActual) return;
+      if (!sesionActual) {
+        console.warn('[Asistencia] Intento de registrar ingreso sin sesión activa', { aprendizId, sesionActual });
+        return;
+      }
+      console.log('[Asistencia] Click en botón de ENTRADA', {
+        aprendizId,
+        asistenciaId: sesionActual.id,
+      });
       try {
         const nuevo = await apiService.registrarIngresoAsistencia({
           asistencia_id: sesionActual.id,
           aprendiz_id: aprendizId,
         });
+        console.log('[Asistencia] Ingreso registrado correctamente', {
+          aprendizId,
+          asistenciaId: sesionActual.id,
+          asistenciaAprendizId: nuevo.id,
+          hora_ingreso: nuevo.hora_ingreso,
+        });
         upsertAsistenciaAprendizEnSesion(nuevo);
       } catch (e: any) {
+        console.error('[Asistencia] Error al registrar ingreso', e);
         alert(e.response?.data?.error || 'Error al registrar ingreso');
       }
     },
@@ -520,12 +534,23 @@ export const Asistencia = () => {
 
   const handleRegistrarPorDocumento = async (numeroDocumento: string) => {
     if (!sesionActual || !numeroDocumento.trim()) return;
+    console.log('[Asistencia] Registro por documento (manual/QR) iniciado', {
+      numeroDocumento: numeroDocumento.trim(),
+      asistenciaId: sesionActual.id,
+    });
     setErrorRegistroManual('');
     setMensajeRegistroManual('');
     setRegistrandoManual(true);
     try {
       const data = await apiService.registrarIngresoAsistenciaPorDocumento(sesionActual.id, numeroDocumento.trim());
       setDocumentoManual('');
+      console.log('[Asistencia] Registro por documento completado', {
+        numeroDocumento: numeroDocumento.trim(),
+        tipo_registro: data.tipo_registro,
+        asistenciaAprendizId: data.id,
+        hora_ingreso: data.hora_ingreso,
+        hora_salida: data.hora_salida,
+      });
       upsertAsistenciaAprendizEnSesion(data);
       setMensajeRegistroManual(
         data.mensaje ||
@@ -536,6 +561,7 @@ export const Asistencia = () => {
             : 'Asistencia completa')
       );
     } catch (e: any) {
+      console.error('[Asistencia] Error al registrar asistencia por documento', e);
       const msg = e.response?.data?.error || 'Error al registrar asistencia';
       setErrorRegistroManual(msg);
     } finally {

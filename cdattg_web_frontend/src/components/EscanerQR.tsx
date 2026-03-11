@@ -25,7 +25,9 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
 
   // Si el componente deja de estar activo (se cierra la sesión), apagar la cámara.
   useEffect(() => {
+    console.log('[EscanerQR] Cambio en prop "activo"', { activo });
     if (!activo) {
+      console.log('[EscanerQR] Desactivando cámara y reseteando estado');
       setCamaraActiva(false);
       setError(null);
       setPermisos(null);
@@ -33,7 +35,11 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
   }, [activo]);
 
   useEffect(() => {
-    if (!activo || !camaraActiva) return;
+    console.log('[EscanerQR] useEffect escaneo', { activo, camaraActiva, readerId });
+    if (!activo || !camaraActiva) {
+      console.log('[EscanerQR] Efecto de escaneo no se ejecuta porque no está activo o cámara apagada');
+      return;
+    }
 
     setError(null);
     setPermisos(null);
@@ -41,8 +47,10 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
     // Retrasar la creación del escáner hasta que el div esté en el DOM (evita pantalla en blanco tras permisos).
     let cancelado = false;
     const t = setTimeout(() => {
+      console.log('[EscanerQR] Intentando inicializar Html5Qrcode', { readerId });
       const container = document.getElementById(readerId);
       if (!container) {
+        console.error('[EscanerQR] Contenedor del escáner no encontrado en el DOM', { readerId });
         setError('Contenedor del escáner no disponible');
         return;
       }
@@ -52,22 +60,27 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
       Html5Qrcode.getCameras()
         .then((cameras) => {
           if (!cameras || cameras.length === 0) {
+            console.error('[EscanerQR] No se encontraron cámaras disponibles');
             setError('No se encontró ninguna cámara');
             return;
           }
+          console.log('[EscanerQR] Cámaras detectadas', cameras.map((c) => ({ id: c.id, label: c.label })));
           setPermisos(true);
           // Preferir cámara trasera (environment) cuando exista, ideal para uso en celular.
           const cameraId =
             cameras.find((cam) =>
               /back|rear|environment|posterior|trasera/i.test(cam.label || '')
             )?.id ?? cameras[0].id;
+          console.log('[EscanerQR] Usando cámara', { cameraId });
           return html5Qr
             .start(
               cameraId,
               { fps: 8, qrbox: { width: 220, height: 220 } },
               (decodedText) => {
+                console.log('[EscanerQR] Texto decodificado bruto', { decodedText, cancelado });
                 const doc = String(decodedText || '').trim();
                 if (doc && !cancelado) {
+                  console.log('[EscanerQR] Documento escaneado válido, se notificará al padre y se detendrá la cámara', { doc });
                   onEscaneadoRef.current(doc);
                   // Tras un escaneo válido, detener la cámara para evitar estados inconsistentes en móviles.
                   setCamaraActiva(false);
@@ -75,8 +88,10 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
                     .stop()
                     .catch(() => {
                       // Ignorar errores al detener si ya fue detenida por el navegador.
+                      console.warn('[EscanerQR] Error al detener la cámara (probablemente ya estaba detenida)');
                     })
                     .finally(() => {
+                      console.log('[EscanerQR] Cámara detenida, limpiando referencia interna');
                       scannerRef.current = null;
                     });
                 }
@@ -84,19 +99,31 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
               () => {}
             )
             .catch((err: Error) => {
+              console.error('[EscanerQR] Error al iniciar la cámara', err);
               setError(err?.message || 'Error al iniciar la cámara');
             });
         })
         .catch((err: Error) => {
+          console.error('[EscanerQR] Error al obtener cámaras o permisos de cámara', err);
           setError(err?.message || 'Error al solicitar permisos de cámara');
           setPermisos(false);
         });
     }, 150);
 
     return () => {
+      console.log('[EscanerQR] Cleanup efecto escaneo', { cancelado: true, readerId });
       cancelado = true;
       clearTimeout(t);
-      scannerRef.current?.stop().catch(() => {});
+      if (scannerRef.current) {
+        scannerRef.current
+          .stop()
+          .then(() => {
+            console.log('[EscanerQR] Cámara detenida correctamente en cleanup');
+          })
+          .catch(() => {
+            console.warn('[EscanerQR] Error al detener cámara en cleanup (probablemente ya estaba detenida)');
+          });
+      }
       scannerRef.current = null;
     };
   }, [activo, camaraActiva, readerId]);

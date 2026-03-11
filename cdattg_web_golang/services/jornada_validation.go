@@ -8,22 +8,22 @@ import (
 )
 
 // Horarios por defecto si la jornada no tiene hora_inicio/hora_fin en BD (según doc)
-// MAÑANA: 6:30 - 13:00 (a veces la clase se extiende hasta las 14:00)
+// MAÑANA: 6:00 - 13:00 (a veces la clase se extiende hasta las 14:00)
 var defaultHorarios = map[string]struct{ inicio, fin string }{
-	"MAÑANA":          {"06:30", "13:00"},
-	"TARDE":           {"13:00", "18:10"},
-	"NOCHE":           {"17:50", "23:10"},
-	"FINES DE SEMANA": {"06:00", "18:00"},
+	"MAÑANA":           {"03:00", "13:00"},
+	"TARDE":            {"13:00", "18:10"},
+	"NOCHE":            {"17:50", "23:10"},
+	"FINES DE SEMANA":  {"06:00", "18:00"},
 	"JORNADA CONTINUA": {"06:30", "18:00"}, // Mañana y tarde (ej. Enfermería): desde inicio mañana hasta fin tarde
 }
 
 // Minutos después de hora_fin en que aún se permite tomar asistencia / registrar salida (la clase a veces se extiende).
 // Si la jornada tiene MinutosExtensionFin en BD se usa ese valor; si no, este mapa por nombre; si no, 60.
 var defaultExtensionMinutos = map[string]int{
-	"MAÑANA":          60,
-	"TARDE":           60,
-	"NOCHE":           60,
-	"FINES DE SEMANA": 30,
+	"MAÑANA":           60,
+	"TARDE":            60,
+	"NOCHE":            60,
+	"FINES DE SEMANA":  30,
 	"JORNADA CONTINUA": 60, // mañana y tarde: extensión al cierre
 }
 

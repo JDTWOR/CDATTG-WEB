@@ -11,19 +11,19 @@ var jornadasNombres = []string{"MAÑANA", "TARDE", "NOCHE", "FINES DE SEMANA", "
 
 // Horarios oficiales (hora_fin a veces se extiende en la práctica; ver minutos_extension_fin)
 var jornadaHorarios = map[string]struct{ inicio, fin string }{
-	"MAÑANA":          {"06:30", "13:00"}, // 1 PM oficial; a veces la clase termina a las 2 PM
-	"TARDE":           {"13:00", "18:10"},
-	"NOCHE":           {"17:50", "23:10"},
-	"FINES DE SEMANA": {"06:00", "18:00"},
-	"JORNADA CONTINUA": {"06:30", "18:00"}, // Mañana y tarde (ej. Enfermería)
+	"MAÑANA":           {"03:00", "13:00"}, // 1 PM oficial; a veces la clase termina a las 2 PM
+	"TARDE":            {"13:00", "18:10"},
+	"NOCHE":            {"17:50", "23:10"},
+	"FINES DE SEMANA":  {"06:00", "18:00"},
+	"JORNADA CONTINUA": {"06:00", "18:00"}, // Mañana y tarde (ej. Enfermería) desde las 6:00 AM
 }
 
 // Minutos después de hora_fin en que aún se permite registrar salida (clase a veces se extiende)
 var jornadaExtensionFin = map[string]int{
-	"MAÑANA":          60,
-	"TARDE":           60,
-	"NOCHE":           60,
-	"FINES DE SEMANA": 30,
+	"MAÑANA":           60,
+	"TARDE":            60,
+	"NOCHE":            60,
+	"FINES DE SEMANA":  30,
 	"JORNADA CONTINUA": 60,
 }
 

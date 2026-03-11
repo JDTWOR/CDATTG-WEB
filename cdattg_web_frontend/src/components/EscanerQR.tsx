@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 const QR_READER_ID_DEFAULT = 'asistencia-qr-reader';
@@ -15,7 +15,7 @@ interface EscanerQRProps {
  * Componente que muestra la cámara y escanea códigos QR.
  * El QR debe contener únicamente el número de documento del aprendiz.
  */
-export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_READER_ID_DEFAULT }: EscanerQRProps) {
+function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_READER_ID_DEFAULT }: EscanerQRProps) {
   const [error, setError] = useState<string | null>(null);
   const [permisos, setPermisos] = useState<boolean | null>(null);
   const [camaraActiva, setCamaraActiva] = useState(false);
@@ -178,3 +178,5 @@ export function EscanerQR({ onEscaneado, activo, className = '', readerId = QR_R
     </div>
   );
 }
+
+export const EscanerQR = memo(EscanerQRInner);

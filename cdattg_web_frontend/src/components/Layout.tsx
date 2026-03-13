@@ -21,6 +21,8 @@ import {
   ShieldCheckIcon,
   ExclamationTriangleIcon,
   CalendarDaysIcon,
+  BuildingOffice2Icon,
+  EyeIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -74,6 +76,20 @@ const SIDEBAR_ITEMS: {
     permission: null,
     rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
   },
+  {
+    section: 'Infraestructura',
+    path: '/infra/ambientes',
+    label: 'Ambientes',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR'],
+  },
+  {
+    section: 'Control y seguimiento',
+    path: '/vigilancia/ambientes',
+    label: 'Vigilancia de ambientes',
+    permission: null,
+    rolesRequired: ['VIGILANTE', 'SUPER ADMINISTRADOR'],
+  },
   // Inventario desactivado
   { section: 'Administración', path: '/permisos', label: 'Permisos y roles', permission: 'ASIGNAR PERMISOS' },
 ];
@@ -97,6 +113,8 @@ const ICONS: Record<string, ReactNode> = {
   'inventario/ordenes/pendientes': <ClockIcon className="w-5 h-5" />,
   'inventario/devoluciones': <ArrowUturnLeftIcon className="w-5 h-5" />,
   permisos: <ShieldCheckIcon className="w-5 h-5" />,
+  'infra/ambientes': <BuildingOffice2Icon className="w-5 h-5" />,
+  'vigilancia/ambientes': <EyeIcon className="w-5 h-5" />,
 };
 
 export const Layout = ({ children }: LayoutProps) => {

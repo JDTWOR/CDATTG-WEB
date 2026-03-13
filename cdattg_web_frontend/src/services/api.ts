@@ -43,6 +43,16 @@ import type {
   MunicipioItem,
   ParametroItem,
   RegionalItem,
+  SedeCreateRequest,
+  SedeResponse,
+  AmbienteCreateRequest,
+  AmbienteResponse,
+  PisoCreateRequest,
+  PisoResponse,
+  BloqueInfraItem,
+  PisoInfraItem,
+  BloqueCreateRequest,
+  BloqueResponse,
   InventarioDashboardResponse,
   ProductoResponse,
   ProductoCreateRequest,
@@ -325,6 +335,37 @@ class ApiService {
     return response.data.data;
   }
 
+  // Infraestructura - Ambientes
+  async createSedeInfra(data: SedeCreateRequest): Promise<SedeResponse> {
+    const response = await this.api.post<SedeResponse>('/infra/sedes', data);
+    return response.data;
+  }
+
+  async createBloqueInfra(data: BloqueCreateRequest): Promise<BloqueResponse> {
+    const response = await this.api.post<BloqueResponse>('/infra/bloques', data);
+    return response.data;
+  }
+
+  async createPisoInfra(data: PisoCreateRequest): Promise<PisoResponse> {
+    const response = await this.api.post<PisoResponse>('/infra/pisos', data);
+    return response.data;
+  }
+
+  async createAmbiente(data: AmbienteCreateRequest): Promise<AmbienteResponse> {
+    const response = await this.api.post<AmbienteResponse>('/infra/ambientes', data);
+    return response.data;
+  }
+
+  async getInfraBloques(): Promise<BloqueInfraItem[]> {
+    const response = await this.api.get<{ data: BloqueInfraItem[] }>('/infra/bloques');
+    return response.data.data;
+  }
+
+  async getInfraPisos(): Promise<PisoInfraItem[]> {
+    const response = await this.api.get<{ data: PisoInfraItem[] }>('/infra/pisos');
+    return response.data.data;
+  }
+
   // Fichas de caracterización
   async getFichasCaracterizacion(
     page = 1,
@@ -565,6 +606,15 @@ class ApiService {
   async crearOActualizarObservacionesAsistencia(asistenciaId: number, aprendizId: number, observaciones: string): Promise<AsistenciaAprendizResponse> {
     const response = await this.api.put<AsistenciaAprendizResponse>(`/asistencias/${asistenciaId}/aprendiz/${aprendizId}/observaciones`, { observaciones });
     return response.data;
+  }
+
+  // --- Vigilancia / control de ambientes ---
+  /**
+   * Registra la hora de entrada de un grupo a un ambiente, seleccionando ambiente e instructor.
+   * El backend debe resolver la ficha/grupo asociado según la configuración del ambiente e instructor.
+   */
+  async registrarEntradaAmbiente(params: { ambiente_id: number; instructor_id: number }): Promise<void> {
+    await this.api.post('/vigilancia/entradas-ambiente', params);
   }
 
   // Inventario

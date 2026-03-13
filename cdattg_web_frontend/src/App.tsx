@@ -28,6 +28,8 @@ import { InventarioPendientesAprobacion } from './pages/InventarioPendientesApro
 import { InventarioDevoluciones } from './pages/InventarioDevoluciones';
 import { Permisos } from './pages/Permisos';
 import { Perfil } from './pages/Perfil';
+import { VigilanciaAmbientes } from './pages/VigilanciaAmbientes';
+import { InfraAmbientes } from './pages/InfraAmbientes';
 
 function App() {
   return (
@@ -262,6 +264,26 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <InventarioDevoluciones />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vigilancia/ambientes"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <VigilanciaAmbientes />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/infra/ambientes"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <InfraAmbientes />
                 </Layout>
               </ProtectedRoute>
             }

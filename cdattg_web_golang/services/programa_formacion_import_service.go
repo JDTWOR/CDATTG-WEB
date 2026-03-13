@@ -69,13 +69,16 @@ func (s *programaFormacionImportService) ImportFromCatalogoExcel(fileBytes []byt
 		return nil, fmt.Errorf("el archivo debe tener al menos encabezados y una fila de datos")
 	}
 
-	// Filtrar solo TÉCNICO y TECNÓLOGO
+	// Filtrar solo niveles de formación relevantes:
+	// TÉCNICO, TECNÓLOGO, OPERARIO y AUXILIAR
 	var candidatos [][]string
 	for i := 1; i < len(rows); i++ {
 		row := rows[i]
 		if colNivel >= len(row) { continue }
 		nivel := strings.TrimSpace(strings.ToUpper(normalizeAccents(row[colNivel])))
-		if nivel != "TECNICO" && nivel != "TECNOLOGO" { continue }
+		if nivel != "TECNICO" && nivel != "TECNOLOGO" && nivel != "OPERARIO" && nivel != "AUXILIAR" {
+			continue
+		}
 		candidatos = append(candidatos, row)
 	}
 

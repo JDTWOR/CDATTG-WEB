@@ -12,23 +12,54 @@ import type {
   AsistenciaAprendizResponse,
 } from '../types';
 
-function sameAsistenciaAprendiz(a: AsistenciaAprendizResponse | undefined, b: AsistenciaAprendizResponse | undefined): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return (
-    a.id === b.id &&
-    a.hora_ingreso === b.hora_ingreso &&
-    a.hora_salida === b.hora_salida &&
-    a.observaciones === b.observaciones &&
-    a.estado === b.estado &&
-    a.requiere_revision === b.requiere_revision &&
-    a.motivo_ajuste === b.motivo_ajuste
-  );
+/** Agrupa registros de sesión por aprendiz_id (soporta múltiples tramos por aprendiz). */
+function groupRegistrosByAprendiz(list: AsistenciaAprendizResponse[]): Map<number, AsistenciaAprendizResponse[]> {
+  const map = new Map<number, AsistenciaAprendizResponse[]>();
+  for (const aa of list) {
+    const id = aa.aprendiz_id;
+    if (!map.has(id)) map.set(id, []);
+    map.get(id)!.push(aa);
+  }
+  // Ordenar cada grupo por hora_ingreso (o id) para orden consistente
+  map.forEach((arr) => arr.sort((a, b) => (a.hora_ingreso && b.hora_ingreso ? new Date(a.hora_ingreso).getTime() - new Date(b.hora_ingreso).getTime() : (a.id - b.id))));
+  return map;
+}
+
+/** Resumen de múltiples tramos de un aprendiz: tramo abierto, primera entrada, última salida, observaciones. */
+function summaryRegistros(registros: AsistenciaAprendizResponse[]) {
+  const open = registros.find((r) => r.hora_ingreso && !r.hora_salida) ?? null;
+  const conIngreso = registros.filter((r) => r.hora_ingreso && !isNaN(new Date(r.hora_ingreso).getTime()));
+  const conSalida = registros.filter((r) => r.hora_salida && !isNaN(new Date(r.hora_salida).getTime()));
+  const firstIngreso =
+    conIngreso.length > 0
+      ? new Date(conIngreso.reduce((a, b) => (new Date(a.hora_ingreso!).getTime() < new Date(b.hora_ingreso!).getTime() ? a : b)).hora_ingreso!).toLocaleTimeString('es-CO', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : null;
+  const lastSalida =
+    conSalida.length > 0
+      ? new Date(conSalida.reduce((a, b) => (new Date(a.hora_salida!).getTime() > new Date(b.hora_salida!).getTime() ? a : b)).hora_salida!).toLocaleTimeString('es-CO', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : null;
+  const observaciones = open?.observaciones ?? (registros.length ? registros[registros.length - 1]?.observaciones ?? '' : '') ?? '';
+  const requiereRevisionRecord = registros.find((r) => r.requiere_revision) ?? null;
+  return { open, firstIngreso, lastSalida, observaciones, requiereRevisionRecord };
+}
+
+function sameRegistrosList(a: AsistenciaAprendizResponse[], b: AsistenciaAprendizResponse[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((aa, i) => {
+    const bb = b[i];
+    return bb && aa.id === bb.id && aa.hora_ingreso === bb.hora_ingreso && aa.hora_salida === bb.hora_salida;
+  });
 }
 
 type TarjetaAprendizAsistenciaProps = {
   aprendiz: AprendizResponse;
-  aa: AsistenciaAprendizResponse | undefined;
+  registros: AsistenciaAprendizResponse[];
   index: number;
   asistenciaId: number | null;
   onRegistrarIngreso: (aprendizId: number) => void;
@@ -39,7 +70,7 @@ type TarjetaAprendizAsistenciaProps = {
 
 const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
   aprendiz,
-  aa,
+  registros,
   index,
   asistenciaId,
   onRegistrarIngreso,
@@ -47,6 +78,7 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
   onAbrirEstado,
   onAbrirObservaciones,
 }: TarjetaAprendizAsistenciaProps) {
+  const { open, firstIngreso, lastSalida, observaciones, requiereRevisionRecord } = summaryRegistros(registros);
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -59,21 +91,43 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
           </p>
         </div>
         <span className="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">
-          {aa?.hora_ingreso && !isNaN(new Date(aa.hora_ingreso).getTime())
-            ? new Date(aa.hora_ingreso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
-            : '–'}
-          {aa?.hora_salida && !isNaN(new Date(aa.hora_salida).getTime()) && (
-            <> → {new Date(aa.hora_salida).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</>
-          )}
+          {firstIngreso ?? '–'}
+          {lastSalida != null && <> → {lastSalida}</>}
+          {open && lastSalida == null && ' → —'}
         </span>
       </div>
-      {aa?.observaciones ? (
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2" title={aa.observaciones}>
-          {aa.observaciones}
+      {observaciones ? (
+        <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2" title={observaciones}>
+          {observaciones}
         </p>
       ) : null}
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-        {!aa || !aa.hora_ingreso ? (
+        {open ? (
+          <button
+            type="button"
+            onClick={() => onRegistrarSalida(open.id)}
+            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center gap-2 rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
+            aria-label="Registrar salida"
+          >
+            <ArrowLeftOnRectangleIcon className="w-5 h-5 shrink-0" />
+            Salida
+          </button>
+        ) : requiereRevisionRecord ? (
+          <button
+            type="button"
+            onClick={() =>
+              onAbrirEstado({
+                asistenciaAprendizId: requiereRevisionRecord.id,
+                nombre: aprendiz.persona_nombre ?? 'Aprendiz',
+                estado: requiereRevisionRecord.estado || 'ASISTENCIA_COMPLETA',
+                motivo: requiereRevisionRecord.motivo_ajuste || '',
+              })
+            }
+            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center rounded-lg border border-amber-400 bg-amber-50 text-amber-800 text-sm font-medium touch-manipulation"
+          >
+            Resolver estado
+          </button>
+        ) : (
           <button
             type="button"
             onClick={() => onRegistrarIngreso(aprendiz.id)}
@@ -83,35 +137,6 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
             <ArrowRightOnRectangleIcon className="w-5 h-5 shrink-0" />
             Entrada
           </button>
-        ) : !aa.hora_salida ? (
-          <button
-            type="button"
-            onClick={() => onRegistrarSalida(aa.id)}
-            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center gap-2 rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
-            aria-label="Registrar salida"
-          >
-            <ArrowLeftOnRectangleIcon className="w-5 h-5 shrink-0" />
-            Salida
-          </button>
-        ) : aa?.requiere_revision ? (
-          <button
-            type="button"
-            onClick={() =>
-              onAbrirEstado({
-                asistenciaAprendizId: aa.id,
-                nombre: aprendiz.persona_nombre ?? 'Aprendiz',
-                estado: aa.estado || 'ASISTENCIA_COMPLETA',
-                motivo: aa.motivo_ajuste || '',
-              })
-            }
-            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center rounded-lg border border-amber-400 bg-amber-50 text-amber-800 text-sm font-medium touch-manipulation"
-          >
-            Resolver estado
-          </button>
-        ) : (
-          <span className="flex-1 min-h-[44px] flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-            Registrado
-          </span>
         )}
         {asistenciaId != null ? (
           <button
@@ -121,7 +146,7 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
                 asistenciaId,
                 aprendizId: aprendiz.id,
                 nombre: aprendiz.persona_nombre ?? 'Aprendiz',
-                observaciones: aa?.observaciones ?? '',
+                observaciones,
               })
             }
             className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 touch-manipulation"
@@ -139,7 +164,7 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
     prev.aprendiz.id === next.aprendiz.id &&
     prev.index === next.index &&
     prev.asistenciaId === next.asistenciaId &&
-    sameAsistenciaAprendiz(prev.aa, next.aa) &&
+    sameRegistrosList(prev.registros, next.registros) &&
     prev.onRegistrarIngreso === next.onRegistrarIngreso &&
     prev.onRegistrarSalida === next.onRegistrarSalida &&
     prev.onAbrirEstado === next.onAbrirEstado &&
@@ -149,7 +174,7 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
 
 type FilaAprendizAsistenciaProps = {
   aprendiz: AprendizResponse;
-  aa: AsistenciaAprendizResponse | undefined;
+  registros: AsistenciaAprendizResponse[];
   index: number;
   asistenciaId: number | null;
   onRegistrarIngreso: (aprendizId: number) => void;
@@ -160,7 +185,7 @@ type FilaAprendizAsistenciaProps = {
 
 const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
   aprendiz,
-  aa,
+  registros,
   index,
   asistenciaId,
   onRegistrarIngreso,
@@ -168,21 +193,32 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
   onAbrirEstado,
   onAbrirObservaciones,
 }: FilaAprendizAsistenciaProps) {
+  const { open, firstIngreso, lastSalida, observaciones, requiereRevisionRecord } = summaryRegistros(registros);
   return (
     <tr className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-600 dark:text-gray-400">{index}</td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">{aprendiz.persona_documento ?? '-'}</td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-medium">{aprendiz.persona_nombre ?? '-'}</td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-        {aa?.hora_ingreso && !isNaN(new Date(aa.hora_ingreso).getTime()) ? new Date(aa.hora_ingreso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '–'}
+        {firstIngreso ?? '–'}
       </td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-        {aa?.hora_salida && !isNaN(new Date(aa.hora_salida).getTime()) ? new Date(aa.hora_salida).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '–'}
+        {lastSalida ?? (open ? '—' : '–')}
       </td>
-      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-500 dark:text-gray-400">{aa?.observaciones || '–'}</td>
+      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-500 dark:text-gray-400">{observaciones || '–'}</td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
         <div className="flex items-center gap-2">
-          {!aa || !aa.hora_ingreso ? (
+          {open ? (
+            <button
+              type="button"
+              onClick={() => onRegistrarSalida(open.id)}
+              className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30 touch-manipulation transition-colors"
+              title="Registrar salida"
+              aria-label="Registrar salida"
+            >
+              <ArrowLeftOnRectangleIcon className="h-7 w-7" />
+            </button>
+          ) : !requiereRevisionRecord ? (
             <button
               type="button"
               onClick={() => onRegistrarIngreso(aprendiz.id)}
@@ -192,28 +228,18 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
             >
               <ArrowRightOnRectangleIcon className="h-7 w-7" />
             </button>
-          ) : !aa.hora_salida ? (
-            <button
-              type="button"
-              onClick={() => onRegistrarSalida(aa.id)}
-              className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30 touch-manipulation transition-colors"
-              title="Registrar salida"
-              aria-label="Registrar salida"
-            >
-              <ArrowLeftOnRectangleIcon className="h-7 w-7" />
-            </button>
           ) : (
             <span className="min-w-[52px] min-h-[52px] inline-block" aria-hidden />
           )}
-          {aa?.requiere_revision && (
+          {requiereRevisionRecord && (
             <button
               type="button"
               onClick={() =>
                 onAbrirEstado({
-                  asistenciaAprendizId: aa.id,
+                  asistenciaAprendizId: requiereRevisionRecord.id,
                   nombre: aprendiz.persona_nombre ?? 'Aprendiz',
-                  estado: aa.estado || 'ASISTENCIA_COMPLETA',
-                  motivo: aa.motivo_ajuste || '',
+                  estado: requiereRevisionRecord.estado || 'ASISTENCIA_COMPLETA',
+                  motivo: requiereRevisionRecord.motivo_ajuste || '',
                 })
               }
               className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200"
@@ -229,7 +255,7 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
                   asistenciaId,
                   aprendizId: aprendiz.id,
                   nombre: aprendiz.persona_nombre ?? 'Aprendiz',
-                  observaciones: aa?.observaciones ?? '',
+                  observaciones,
                 })
               }
               className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 touch-manipulation transition-colors"
@@ -248,7 +274,7 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
     prev.aprendiz.id === next.aprendiz.id &&
     prev.index === next.index &&
     prev.asistenciaId === next.asistenciaId &&
-    sameAsistenciaAprendiz(prev.aa, next.aa) &&
+    sameRegistrosList(prev.registros, next.registros) &&
     prev.onRegistrarIngreso === next.onRegistrarIngreso &&
     prev.onRegistrarSalida === next.onRegistrarSalida &&
     prev.onAbrirEstado === next.onAbrirEstado &&
@@ -300,8 +326,8 @@ export const Asistencia = () => {
         copia[byIdIndex] = actualizado;
         return copia;
       }
-      const sinDuplicados = prev.filter((aa) => aa.aprendiz_id !== actualizado.aprendiz_id);
-      return [...sinDuplicados, actualizado];
+      // Nuevo tramo del mismo aprendiz: añadir (mantener los demás tramos del aprendiz).
+      return [...prev, actualizado];
     });
   };
 
@@ -581,7 +607,7 @@ export const Asistencia = () => {
   // Referencia para evitar noUnusedLocals; uso futuro en la UI (crear sesión)
   void [_setInstructoresFicha, _setInstructorFichaSeleccionado, _setFechaSesion, _handleCrearSesion];
 
-  const registroPorAprendizId = new Map(aprendicesEnSesion.map((aa) => [aa.aprendiz_id, aa]));
+  const registroPorAprendizId = groupRegistrosByAprendiz(aprendicesEnSesion);
 
   // Sin fichas asignadas: superadmin o instructor sin asignaciones
   if (!fichasLoading && fichas.length === 0) {
@@ -660,7 +686,7 @@ export const Asistencia = () => {
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
                 <span className="text-sm text-gray-600">
-                  {aprendicesEnSesion.length} de {aprendicesFicha.length} con registro en sesión
+                  {new Set(aprendicesEnSesion.map((aa) => aa.aprendiz_id)).size} de {aprendicesFicha.length} con registro en sesión
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -753,7 +779,7 @@ export const Asistencia = () => {
                     <TarjetaAprendizAsistencia
                       key={aprendiz.id}
                       aprendiz={aprendiz}
-                      aa={registroPorAprendizId.get(aprendiz.id)}
+                      registros={registroPorAprendizId.get(aprendiz.id) ?? []}
                       index={idx + 1}
                       asistenciaId={sesionActual?.id ?? null}
                       onRegistrarIngreso={handleRegistrarIngreso}
@@ -783,7 +809,7 @@ export const Asistencia = () => {
                         <FilaAprendizAsistencia
                           key={aprendiz.id}
                           aprendiz={aprendiz}
-                          aa={registroPorAprendizId.get(aprendiz.id)}
+                          registros={registroPorAprendizId.get(aprendiz.id) ?? []}
                           index={idx + 1}
                           asistenciaId={sesionActual?.id ?? null}
                           onRegistrarIngreso={handleRegistrarIngreso}

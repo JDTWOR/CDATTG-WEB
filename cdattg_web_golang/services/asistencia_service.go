@@ -246,7 +246,7 @@ func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest, 
 	if asist.IsFinished {
 		return nil, errors.New("la sesión ya está finalizada")
 	}
-	// Regla: una sola entrada sin salida por día por aprendiz en la ficha
+	// Regla: no puede haber más de un tramo abierto (ingreso sin salida) por aprendiz en la ficha hoy.
 	var fichaID uint
 	if asist.InstructorFicha != nil {
 		fichaID = asist.InstructorFicha.FichaID
@@ -266,25 +266,18 @@ func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest, 
 			}
 		}
 	}
-	exist, _ := s.repoAA.FindByAsistenciaIDAndAprendizID(req.AsistenciaID, req.AprendizID)
-	if exist != nil && exist.HoraIngreso != nil {
-		return nil, errors.New("el aprendiz ya tiene registro de ingreso en esta sesión")
+	// Múltiples tramos: solo permitir nuevo ingreso si no hay tramo abierto en esta sesión.
+	open, _ := s.repoAA.FindOpenByAsistenciaIDAndAprendizID(req.AsistenciaID, req.AprendizID)
+	if open != nil {
+		return nil, errors.New("debe registrar primero la salida del tramo actual antes de registrar otra entrada")
 	}
 	now := time.Now()
 	aa := models.AsistenciaAprendiz{
-		AsistenciaID:                      req.AsistenciaID,
-		InstructorFichaID:                 &asist.InstructorFichaID,
-		InstructorFichaIDRegistroIngreso:  instructorFichaIDRegistroIngreso,
-		AprendizFichaID:                   req.AprendizID,
-		HoraIngreso:                       &now,
-	}
-	if exist != nil {
-		exist.HoraIngreso = &now
-		exist.InstructorFichaIDRegistroIngreso = instructorFichaIDRegistroIngreso
-		if err := s.repoAA.Update(exist); err != nil {
-			return nil, err
-		}
-		return s.aaToResponse(exist), nil
+		AsistenciaID:                     req.AsistenciaID,
+		InstructorFichaID:                &asist.InstructorFichaID,
+		InstructorFichaIDRegistroIngreso: instructorFichaIDRegistroIngreso,
+		AprendizFichaID:                  req.AprendizID,
+		HoraIngreso:                      &now,
 	}
 	if err := s.repoAA.Create(&aa); err != nil {
 		return nil, fmt.Errorf("error al registrar ingreso: %w", err)
@@ -314,7 +307,7 @@ func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngre
 	}
 	hoy := time.Now().Format("2006-01-02")
 	sessionIDs, _ := s.repo.FindIDsByFichaIDAndFecha(ifc.FichaID, hoy)
-	// Si ya tiene entrada sin salida hoy → registrar salida
+	// Si ya tiene un tramo abierto (entrada sin salida) hoy en esta ficha → registrar salida de ese tramo.
 	if len(sessionIDs) > 0 {
 		sinSalida, _ := s.repoAA.FindEntryWithoutExitByAprendizIDAndAsistenciaIDs(aprendiz.ID, sessionIDs)
 		if sinSalida != nil {
@@ -326,16 +319,8 @@ func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngre
 			resp.Mensaje = "Salida registrada"
 			return resp, nil
 		}
-		// Si ya tiene entrada y salida hoy → asistencia completa
-		conSalida, _ := s.repoAA.FindEntryWithExitByAprendizIDAndAsistenciaIDs(aprendiz.ID, sessionIDs)
-		if conSalida != nil {
-			r := s.aaToResponse(conSalida)
-			r.TipoRegistro = "asistencia_completa"
-			r.Mensaje = "Asistencia completa (ya registró entrada y salida hoy)"
-			return r, nil
-		}
 	}
-	// Primera vez hoy → registrar ingreso
+	// Sin tramo abierto → registrar nuevo ingreso (puede ser el primero o un tramo adicional).
 	resp, err := s.RegistrarIngreso(dto.AsistenciaAprendizRequest{
 		AsistenciaID: req.AsistenciaID,
 		AprendizID:   aprendiz.ID,
@@ -391,7 +376,11 @@ func (s *asistenciaService) CrearOActualizarObservaciones(asistenciaID, aprendiz
 	if asist.IsFinished {
 		return nil, errors.New("la sesión ya está finalizada")
 	}
-	aa, _ := s.repoAA.FindByAsistenciaIDAndAprendizID(asistenciaID, aprendizID)
+	// Con múltiples tramos: actualizar observaciones en el tramo abierto o en el último registro.
+	aa, _ := s.repoAA.FindOpenByAsistenciaIDAndAprendizID(asistenciaID, aprendizID)
+	if aa == nil {
+		aa, _ = s.repoAA.FindLastByAsistenciaIDAndAprendizID(asistenciaID, aprendizID)
+	}
 	if aa != nil {
 		aa.Observaciones = observaciones
 		if err := s.repoAA.Update(aa); err != nil {
@@ -400,10 +389,10 @@ func (s *asistenciaService) CrearOActualizarObservaciones(asistenciaID, aprendiz
 		return s.aaToResponse(aa), nil
 	}
 	aa = &models.AsistenciaAprendiz{
-		AsistenciaID:      asistenciaID,
-		InstructorFichaID:  &asist.InstructorFichaID,
-		AprendizFichaID:   aprendizID,
-		Observaciones:     observaciones,
+		AsistenciaID:     asistenciaID,
+		InstructorFichaID: &asist.InstructorFichaID,
+		AprendizFichaID:  aprendizID,
+		Observaciones:    observaciones,
 	}
 	if err := s.repoAA.Create(aa); err != nil {
 		return nil, fmt.Errorf("error al guardar observaciones: %w", err)

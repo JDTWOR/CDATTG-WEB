@@ -13,6 +13,10 @@ type AsistenciaAprendizRepository interface {
 	FindByID(id uint) (*models.AsistenciaAprendiz, error)
 	FindByAsistenciaID(asistenciaID uint) ([]models.AsistenciaAprendiz, error)
 	FindByAsistenciaIDAndAprendizID(asistenciaID, aprendizID uint) (*models.AsistenciaAprendiz, error)
+	// FindOpenByAsistenciaIDAndAprendizID devuelve el tramo abierto (ingreso sin salida) del aprendiz en la sesión, si existe.
+	FindOpenByAsistenciaIDAndAprendizID(asistenciaID, aprendizID uint) (*models.AsistenciaAprendiz, error)
+	// FindLastByAsistenciaIDAndAprendizID devuelve el último registro del aprendiz en la sesión (por id), para observaciones.
+	FindLastByAsistenciaIDAndAprendizID(asistenciaID, aprendizID uint) (*models.AsistenciaAprendiz, error)
 	FindEntryWithoutExitByAprendizIDAndAsistenciaIDs(aprendizID uint, asistenciaIDs []uint) (*models.AsistenciaAprendiz, error)
 	FindEntryWithExitByAprendizIDAndAsistenciaIDs(aprendizID uint, asistenciaIDs []uint) (*models.AsistenciaAprendiz, error)
 	FindPendientesRevisionByInstructorAndFecha(instructorID uint, fecha string) ([]models.AsistenciaAprendiz, error)
@@ -60,6 +64,24 @@ func (r *asistenciaAprendizRepository) FindByAsistenciaID(asistenciaID uint) ([]
 func (r *asistenciaAprendizRepository) FindByAsistenciaIDAndAprendizID(asistenciaID, aprendizID uint) (*models.AsistenciaAprendiz, error) {
 	var m models.AsistenciaAprendiz
 	if err := r.db.Where("asistencia_id = ? AND aprendiz_ficha_id = ?", asistenciaID, aprendizID).First(&m).Error; err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// FindOpenByAsistenciaIDAndAprendizID devuelve el registro con ingreso y sin salida del aprendiz en esta sesión (tramo abierto).
+func (r *asistenciaAprendizRepository) FindOpenByAsistenciaIDAndAprendizID(asistenciaID, aprendizID uint) (*models.AsistenciaAprendiz, error) {
+	var m models.AsistenciaAprendiz
+	if err := r.db.Where("asistencia_id = ? AND aprendiz_ficha_id = ? AND hora_ingreso IS NOT NULL AND hora_salida IS NULL", asistenciaID, aprendizID).First(&m).Error; err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// FindLastByAsistenciaIDAndAprendizID devuelve el último registro del aprendiz en la sesión (por id desc).
+func (r *asistenciaAprendizRepository) FindLastByAsistenciaIDAndAprendizID(asistenciaID, aprendizID uint) (*models.AsistenciaAprendiz, error) {
+	var m models.AsistenciaAprendiz
+	if err := r.db.Where("asistencia_id = ? AND aprendiz_ficha_id = ?", asistenciaID, aprendizID).Order("id DESC").First(&m).Error; err != nil {
 		return nil, err
 	}
 	return &m, nil

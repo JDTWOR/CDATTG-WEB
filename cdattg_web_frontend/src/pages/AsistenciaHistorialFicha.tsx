@@ -33,7 +33,7 @@ export const AsistenciaHistorialFicha = () => {
   const [error, setError] = useState('');
 
   const [aprendices, setAprendices] = useState<AprendizResponse[]>([]);
-  const [, setSesiones] = useState<AsistenciaResponse[]>([]);
+  const [sesiones, setSesiones] = useState<AsistenciaResponse[]>([]);
   const [aprendicesPorSesion, setAprendicesPorSesion] = useState<Map<number, AsistenciaAprendizResponse[]>>(new Map());
 
   const [modalSemanaAbierto, setModalSemanaAbierto] = useState(false);
@@ -103,6 +103,9 @@ export const AsistenciaHistorialFicha = () => {
     };
   }, [fichaId, fecha, fechaValida]);
 
+  const TOLERANCIA_MINUTOS_TARDE = 15;
+  const UMBRAL_POCAS_HORAS = 0.8; // 80 % de la sesión
+
   const filas: FilaHistorial[] = useMemo(() => {
     type Reg = {
       horaIngreso: string | null;
@@ -110,24 +113,71 @@ export const AsistenciaHistorialFicha = () => {
       observaciones: string;
       estado?: string;
       hasIngreso: boolean;
+      minutosSesion: number;
+      minutosEfectivos: number;
+      minutosTarde: number;
     };
     const byAprendizId = new Map<number, Reg>();
-    aprendicesPorSesion.forEach((list) => {
+
+    const parseHora = (iso?: string | null) => (iso ? new Date(iso) : null);
+
+    const diffMinutos = (a: Date, b: Date) => Math.max(0, Math.round((b.getTime() - a.getTime()) / 60000));
+
+    const obtenerSesionPorId = (id: number): AsistenciaResponse | undefined =>
+      sesiones.find((s) => s.id === id);
+
+    aprendicesPorSesion.forEach((list, asistenciaId) => {
+      const sesion = obtenerSesionPorId(asistenciaId);
+      const inicioSesion = sesion?.hora_inicio ? new Date(sesion.hora_inicio) : null;
+      const finSesion = sesion?.hora_fin ? new Date(sesion.hora_fin) : null;
+
       list.forEach((aa) => {
-        const ing = aa.hora_ingreso
-          ? new Date(aa.hora_ingreso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+        const ingresoDate = parseHora(aa.hora_ingreso);
+        const salidaDate = parseHora(aa.hora_salida);
+
+        const ing = ingresoDate
+          ? ingresoDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
           : null;
-        const sal = aa.hora_salida
-          ? new Date(aa.hora_salida).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+        const sal = salidaDate
+          ? salidaDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
           : null;
-        const hasIngreso = !!aa.hora_ingreso;
+
+        const hasIngreso = !!ingresoDate;
+
+        let minutosSesion = 0;
+        let minutosEfectivos = 0;
+        let minutosTarde = 0;
+
+        if (inicioSesion && finSesion && ingresoDate && salidaDate) {
+          const inicio = inicioSesion;
+          const fin = finSesion;
+          const desde = ingresoDate > inicio ? ingresoDate : inicio;
+          const hasta = salidaDate < fin ? salidaDate : fin;
+          if (hasta > desde) {
+            minutosSesion = diffMinutos(inicio, fin);
+            minutosEfectivos = diffMinutos(desde, hasta);
+          }
+
+          const limiteTarde = new Date(inicio.getTime() + TOLERANCIA_MINUTOS_TARDE * 60000);
+          if (ingresoDate > limiteTarde) {
+            minutosTarde = diffMinutos(limiteTarde, ingresoDate);
+          }
+        }
+
         const existing = byAprendizId.get(aa.aprendiz_id);
+        const acumuladoSesion = existing?.minutosSesion ?? 0;
+        const acumuladoEfectivos = existing?.minutosEfectivos ?? 0;
+        const acumuladoTarde = existing?.minutosTarde ?? 0;
+
         const reg: Reg = {
-          horaIngreso: ing,
-          horaSalida: sal,
-          observaciones: aa.observaciones ?? '',
-          estado: aa.estado,
+          horaIngreso: ing ?? existing?.horaIngreso ?? null,
+          horaSalida: sal ?? existing?.horaSalida ?? null,
+          observaciones: existing ? `${existing.observaciones} ${aa.observaciones ?? ''}`.trim() : aa.observaciones ?? '',
+          estado: aa.estado || existing?.estado,
           hasIngreso: existing ? existing.hasIngreso || hasIngreso : hasIngreso,
+          minutosSesion: acumuladoSesion + minutosSesion,
+          minutosEfectivos: acumuladoEfectivos + minutosEfectivos,
+          minutosTarde: acumuladoTarde + minutosTarde,
         };
         byAprendizId.set(aa.aprendiz_id, reg);
       });
@@ -135,6 +185,24 @@ export const AsistenciaHistorialFicha = () => {
 
     return aprendices.map((ap) => {
       const reg = byAprendizId.get(ap.id);
+      const minutosSesion = reg?.minutosSesion ?? 0;
+      const minutosEfectivos = reg?.minutosEfectivos ?? 0;
+      const minutosTarde = reg?.minutosTarde ?? 0;
+      const ratio = minutosSesion > 0 ? minutosEfectivos / minutosSesion : 0;
+
+      let badgeColor: 'green' | 'yellow' | 'gray' = 'gray';
+      let badgeText = 'No';
+
+      if (reg?.hasIngreso) {
+        if (ratio >= UMBRAL_POCAS_HORAS && minutosTarde === 0) {
+          badgeColor = 'green';
+          badgeText = 'Sí';
+        } else {
+          badgeColor = 'yellow';
+          badgeText = ratio > 0 ? 'Pocas horas' : 'Tarde';
+        }
+      }
+
       return {
         aprendiz: ap,
         asistio: reg?.hasIngreso ?? false,
@@ -142,9 +210,14 @@ export const AsistenciaHistorialFicha = () => {
         horaSalida: reg?.horaSalida ?? null,
         observaciones: reg?.observaciones ?? '',
         estado: reg?.estado,
+        // extra (no tipado en FilaHistorial original pero útil para render):
+        // @ts-expect-error campos adicionales para renderizado
+        badgeColor,
+        // @ts-expect-error campos adicionales para renderizado
+        badgeText,
       };
     });
-  }, [aprendices, aprendicesPorSesion]);
+  }, [aprendices, aprendicesPorSesion, sesiones]);
 
   const fechaMaxHoy = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -264,6 +337,45 @@ export const AsistenciaHistorialFicha = () => {
     return `${d}/${m}/${y}`;
   }
 
+  function calcularMinutosSesionYAsistencia(
+    sesionesDia: AsistenciaResponse[],
+    registros: AsistenciaAprendizResponse[],
+  ): { minutosSesion: number; minutosEfectivos: number; minutosTarde: number } {
+    const parseHora = (iso?: string | null) => (iso ? new Date(iso) : null);
+    const diffMinutos = (a: Date, b: Date) => Math.max(0, Math.round((b.getTime() - a.getTime()) / 60000));
+
+    let minutosSesion = 0;
+    let minutosEfectivos = 0;
+    let minutosTarde = 0;
+
+    sesionesDia.forEach((sesion) => {
+      const inicioSesion = sesion.hora_inicio ? new Date(sesion.hora_inicio) : null;
+      const finSesion = sesion.hora_fin ? new Date(sesion.hora_fin) : null;
+      if (!inicioSesion || !finSesion) return;
+
+      minutosSesion += diffMinutos(inicioSesion, finSesion);
+
+      registros
+        .filter((aa) => aa.asistencia_id === sesion.id)
+        .forEach((aa) => {
+          const ingreso = parseHora(aa.hora_ingreso);
+          const salida = parseHora(aa.hora_salida);
+          if (!ingreso || !salida) return;
+          const desde = ingreso > inicioSesion ? ingreso : inicioSesion;
+          const hasta = salida < finSesion ? salida : finSesion;
+          if (hasta > desde) {
+            minutosEfectivos += diffMinutos(desde, hasta);
+          }
+          const limiteTarde = new Date(inicioSesion.getTime() + TOLERANCIA_MINUTOS_TARDE * 60000);
+          if (ingreso > limiteTarde) {
+            minutosTarde += diffMinutos(limiteTarde, ingreso);
+          }
+        });
+    });
+
+    return { minutosSesion, minutosEfectivos, minutosTarde };
+  }
+
   const descargarExcelSemana = async () => {
     if (!fichaId || !Number.isFinite(fichaId)) return;
     const { inicio, fin } = rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes);
@@ -290,19 +402,36 @@ export const AsistenciaHistorialFicha = () => {
         if (ds <= hoyStr) fechasEnRango.push(ds);
         d.setDate(d.getDate() + 1);
       }
-      const asistenciaPorAprendizYFecha = new Map<number, Map<string, boolean>>();
+      const asistenciaPorAprendizYFecha = new Map<number, Map<string, { badgeText: string; badgeColor: 'green' | 'yellow' | 'gray' }>>();
       for (const fechaStr of fechasEnRango) {
         const sesionesDelDia = sesionesPorFecha.get(fechaStr) ?? [];
-        const aprendicesConAsistencia = new Set<number>();
+        const registrosDia: AsistenciaAprendizResponse[] = [];
         for (const sesion of sesionesDelDia) {
           const list = await apiService.getAsistenciaAprendices(sesion.id);
-          list.forEach((aa) => aprendicesConAsistencia.add(aa.aprendiz_id));
+          registrosDia.push(...list);
         }
         aprendicesActivos.forEach((ap) => {
+          const registrosAprendiz = registrosDia.filter((aa) => aa.aprendiz_id === ap.id);
+          const { minutosSesion, minutosEfectivos, minutosTarde } = calcularMinutosSesionYAsistencia(
+            sesionesDelDia,
+            registrosAprendiz,
+          );
+          const ratio = minutosSesion > 0 ? minutosEfectivos / minutosSesion : 0;
+          let badgeColor: 'green' | 'yellow' | 'gray' = 'gray';
+          let badgeText = 'No';
+          if (registrosAprendiz.length > 0 && minutosEfectivos > 0) {
+            if (ratio >= UMBRAL_POCAS_HORAS && minutosTarde === 0) {
+              badgeColor = 'green';
+              badgeText = 'Sí';
+            } else {
+              badgeColor = 'yellow';
+              badgeText = ratio > 0 ? 'Pocas horas' : 'Tarde';
+            }
+          }
           if (!asistenciaPorAprendizYFecha.has(ap.id)) {
             asistenciaPorAprendizYFecha.set(ap.id, new Map());
           }
-          asistenciaPorAprendizYFecha.get(ap.id)!.set(fechaStr, aprendicesConAsistencia.has(ap.id));
+          asistenciaPorAprendizYFecha.get(ap.id)!.set(fechaStr, { badgeText, badgeColor });
         });
       }
       const workbook = new ExcelJS.Workbook();
@@ -326,7 +455,7 @@ export const AsistenciaHistorialFicha = () => {
         const cells = [
           ap.persona_documento ?? '',
           ap.persona_nombre ?? '',
-          ...fechasEnRango.map((fechaStr) => (porFecha?.get(fechaStr) ? 'Sí' : 'No')),
+          ...fechasEnRango.map((fechaStr) => porFecha?.get(fechaStr)?.badgeText ?? 'No'),
         ];
         const row = sheet.addRow(cells);
         const isPar = index % 2 === 0;
@@ -335,8 +464,14 @@ export const AsistenciaHistorialFicha = () => {
         row.eachCell((cell, colNumber) => {
           cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
           if (colNumber >= 3) {
-            const asistio = porFecha?.get(fechasEnRango[colNumber - 3]);
-            cell.font = { color: { argb: asistio ? 'FF15803D' : 'FF6B7280' } };
+            const info = porFecha?.get(fechasEnRango[colNumber - 3]);
+            const color =
+              info?.badgeColor === 'green'
+                ? 'FF15803D'
+                : info?.badgeColor === 'yellow'
+                ? 'FF92400E'
+                : 'FF6B7280';
+            cell.font = { color: { argb: color } };
           }
         });
       });
@@ -555,7 +690,19 @@ export const AsistenciaHistorialFicha = () => {
                         {fila.aprendiz.persona_nombre ?? '–'}
                       </td>
                       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-                        {fila.asistio ? (
+                        {'badgeColor' in fila && 'badgeText' in fila ? (
+                          <span
+                            className={
+                              fila.badgeColor === 'green'
+                                ? 'inline-flex items-center rounded-full bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700 px-2 py-0.5 text-xs font-medium'
+                                : fila.badgeColor === 'yellow'
+                                ? 'inline-flex items-center rounded-full bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700 px-2 py-0.5 text-xs font-medium'
+                                : 'inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 px-2 py-0.5 text-xs font-medium'
+                            }
+                          >
+                            {fila.badgeText}
+                          </span>
+                        ) : fila.asistio ? (
                           <span className="inline-flex items-center rounded-full bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700 px-2 py-0.5 text-xs font-medium">
                             Sí
                           </span>

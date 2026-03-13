@@ -104,10 +104,14 @@ export const AsistenciaHistorialFicha = () => {
   }, [fichaId, fecha, fechaValida]);
 
   const filas: FilaHistorial[] = useMemo(() => {
-    const byAprendizId = new Map<
-      number,
-      { horaIngreso: string | null; horaSalida: string | null; observaciones: string; estado?: string }
-    >();
+    type Reg = {
+      horaIngreso: string | null;
+      horaSalida: string | null;
+      observaciones: string;
+      estado?: string;
+      hasIngreso: boolean;
+    };
+    const byAprendizId = new Map<number, Reg>();
     aprendicesPorSesion.forEach((list) => {
       list.forEach((aa) => {
         const ing = aa.hora_ingreso
@@ -116,12 +120,16 @@ export const AsistenciaHistorialFicha = () => {
         const sal = aa.hora_salida
           ? new Date(aa.hora_salida).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
           : null;
-        byAprendizId.set(aa.aprendiz_id, {
+        const hasIngreso = !!aa.hora_ingreso;
+        const existing = byAprendizId.get(aa.aprendiz_id);
+        const reg: Reg = {
           horaIngreso: ing,
           horaSalida: sal,
           observaciones: aa.observaciones ?? '',
           estado: aa.estado,
-        });
+          hasIngreso: existing ? existing.hasIngreso || hasIngreso : hasIngreso,
+        };
+        byAprendizId.set(aa.aprendiz_id, reg);
       });
     });
 
@@ -129,7 +137,7 @@ export const AsistenciaHistorialFicha = () => {
       const reg = byAprendizId.get(ap.id);
       return {
         aprendiz: ap,
-        asistio: !!reg,
+        asistio: reg?.hasIngreso ?? false,
         horaIngreso: reg?.horaIngreso ?? null,
         horaSalida: reg?.horaSalida ?? null,
         observaciones: reg?.observaciones ?? '',

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MoonIcon, SunIcon } from '@heroicons/react/24/outline';
+import LogoSena from '../../logo-sena-verde-complementario-svg-2022.svg';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -47,9 +48,11 @@ export const Login = () => {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex justify-center">
-            <div className="w-20 h-20 bg-sena-green rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-3xl">S</span>
-            </div>
+            <img
+              src={LogoSena}
+              alt="Logo SENA"
+              className="w-20 h-20 rounded-2xl shadow-lg"
+            />
           </div>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900 dark:text-white">
             CDATTG Web

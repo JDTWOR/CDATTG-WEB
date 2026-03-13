@@ -24,6 +24,7 @@ import {
   BuildingOffice2Icon,
   EyeIcon,
 } from '@heroicons/react/24/outline';
+import LogoSena from '../../logo-sena-verde-complementario-svg-2022.svg';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiService } from '../services/api';
@@ -223,9 +224,11 @@ export const Layout = ({ children }: LayoutProps) => {
                 <Bars3Icon className="w-6 h-6" />
               </button>
               <Link to="/perfil" className="flex items-center space-x-2" onClick={() => setSidebarOpen(false)}>
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-sena-green rounded-lg flex items-center justify-center shrink-0">
-                  <span className="text-white font-bold text-lg sm:text-xl">S</span>
-                </div>
+                <img
+                  src={LogoSena}
+                  alt="Logo SENA"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg shrink-0"
+                />
                 <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate max-w-[140px] sm:max-w-none">CDATTG Web</span>
               </Link>
             </div>

@@ -20,14 +20,18 @@ func SetupRouter() *gin.Engine {
 	authHandler := handlers.NewAuthHandler()
 	personaHandler := handlers.NewPersonaHandler()
 	programaHandler := handlers.NewProgramaFormacionHandler()
-		fichaHandler := handlers.NewFichaHandler()
-		catalogoHandler := handlers.NewCatalogoHandler()
-		aprendizHandler := handlers.NewAprendizHandler()
-		instructorHandler := handlers.NewInstructorHandler()
-		asistenciaHandler := handlers.NewAsistenciaHandler()
-		handlers.StartAsistenciaAutoFinalize(asistenciaHandler)
-		adminHandler := handlers.NewAdminHandler()
-		permisosHandler := handlers.NewPermisosHandler()
+	fichaHandler := handlers.NewFichaHandler()
+	catalogoHandler := handlers.NewCatalogoHandler()
+	aprendizHandler := handlers.NewAprendizHandler()
+	instructorHandler := handlers.NewInstructorHandler()
+	asistenciaHandler := handlers.NewAsistenciaHandler()
+	handlers.StartAsistenciaAutoFinalize(asistenciaHandler)
+	adminHandler := handlers.NewAdminHandler()
+	permisosHandler := handlers.NewPermisosHandler()
+	ambienteHandler := handlers.NewAmbienteHandler()
+	sedeInfraHandler := handlers.NewSedeHandler()
+	pisoInfraHandler := handlers.NewPisoHandler()
+	bloqueInfraHandler := handlers.NewBloqueHandler()
 		_ = handlers.NewProductoHandler() // inventario desactivado
 		_ = handlers.NewOrdenHandler()
 		_ = handlers.NewAprobacionHandler()
@@ -39,12 +43,12 @@ func SetupRouter() *gin.Engine {
 		_ = handlers.NewContratoConvenioHandler()
 
 	// Rutas públicas
-		api := r.Group("/api")
-		{
-			// WebSocket dashboard asistencia (token por query; solo superadmin; sin AuthMiddleware)
-			api.GET("/asistencias/dashboard/ws", handlers.DashboardWebSocket)
+	api := r.Group("/api")
+	{
+		// WebSocket dashboard asistencia (token por query; solo superadmin; sin AuthMiddleware)
+		api.GET("/asistencias/dashboard/ws", handlers.DashboardWebSocket)
 
-			auth := api.Group("/auth")
+		auth := api.Group("/auth")
 		{
 			auth.POST("/login", authHandler.Login)
 			auth.GET("/me", middleware.AuthMiddleware(), authHandler.GetCurrentUser)
@@ -183,6 +187,18 @@ func SetupRouter() *gin.Engine {
 				aprendices.POST("", middleware.RequirePermission("aprendiz", "CREAR APRENDIZ"), aprendizHandler.Create)
 				aprendices.PUT("/:id", middleware.RequirePermission("aprendiz", "EDITAR APRENDIZ"), aprendizHandler.Update)
 				aprendices.DELETE("/:id", middleware.RequirePermission("aprendiz", "ELIMINAR APRENDIZ"), aprendizHandler.Delete)
+			}
+
+			// Infraestructura: creación de ambientes (sólo SUPER ADMINISTRADOR)
+			infra := protected.Group("/infra")
+			infra.Use(middleware.RequireSuperAdmin())
+			{
+				infra.GET("/bloques", handlers.ListBloques)
+				infra.GET("/pisos", handlers.ListPisos)
+				infra.POST("/bloques", bloqueInfraHandler.Create)
+				infra.POST("/sedes", sedeInfraHandler.Create)
+				infra.POST("/pisos", pisoInfraHandler.Create)
+				infra.POST("/ambientes", ambienteHandler.Create)
 			}
 		}
 	}

@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { AmbienteItem } from '../types';
 import { apiService } from '../services/api';
 import { SelectSearch, type SelectOption } from '../components/SelectSearch';
 import { InstructorSelectAsync } from '../components/InstructorSelectAsync';
 
 export const VigilanciaAmbientes = () => {
-  const [ambientes, setAmbientes] = useState<AmbienteItem[]>([]);
   const [ambientesOptions, setAmbientesOptions] = useState<SelectOption[]>([]);
   const [ambientesLoading, setAmbientesLoading] = useState(false);
   const [ambientesError, setAmbientesError] = useState('');
@@ -23,7 +21,6 @@ export const VigilanciaAmbientes = () => {
       setAmbientesError('');
       try {
         const data = await apiService.getCatalogosAmbientes();
-        setAmbientes(data);
         setAmbientesOptions(
           data.map((a) => ({
             value: a.id,
@@ -33,7 +30,6 @@ export const VigilanciaAmbientes = () => {
       } catch (e: any) {
         const msg = e.response?.data?.error || 'No se pudieron cargar los ambientes.';
         setAmbientesError(msg);
-        setAmbientes([]);
         setAmbientesOptions([]);
       } finally {
         setAmbientesLoading(false);

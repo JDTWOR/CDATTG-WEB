@@ -36,13 +36,11 @@ export const InfraAmbientes = () => {
   const [bloquesOptions, setBloquesOptions] = useState<SelectOption[]>([]);
   const [pisosOptions, setPisosOptions] = useState<SelectOption[]>([]);
   const [lookupsLoading, setLookupsLoading] = useState(false);
-  const [lookupsError, setLookupsError] = useState('');
   const [sedesOptions, setSedesOptions] = useState<SelectOption[]>([]);
 
   useEffect(() => {
     const loadLookups = async () => {
       setLookupsLoading(true);
-      setLookupsError('');
       try {
         const [bloques, pisos] = await Promise.all([
           apiService.getInfraBloques(),
@@ -69,11 +67,10 @@ export const InfraAmbientes = () => {
           }))
         );
       } catch (e: any) {
-        const msg =
-          e.response?.data?.error ||
-          e.message ||
-          'No se pudieron cargar bloques y pisos.';
-        setLookupsError(msg);
+        // En esta primera versión simplemente dejamos el error en consola;
+        // el resto del módulo sigue siendo usable para sedes/bloques/pisos existentes.
+        // eslint-disable-next-line no-console
+        console.error('Error cargando lookups de infraestructura', e);
       } finally {
         setLookupsLoading(false);
       }

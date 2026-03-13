@@ -216,6 +216,70 @@ export interface RegionalItem {
   nombre: string;
 }
 
+// Infraestructura - Sede
+export interface SedeCreateRequest {
+  nombre: string;
+  direccion: string;
+  regional_id: number;
+}
+
+export interface SedeResponse {
+  id: number;
+  nombre: string;
+  direccion: string;
+  regional_id: number;
+  status: boolean;
+}
+
+// Ambientes (infraestructura)
+export interface AmbienteCreateRequest {
+  nombre: string;
+  piso_id: number;
+}
+
+export interface AmbienteResponse {
+  id: number;
+  nombre: string;
+  piso_id: number;
+  status: boolean;
+}
+
+// Piso (infraestructura)
+export interface PisoCreateRequest {
+  nombre: string;
+  bloque_id: number;
+}
+
+export interface PisoResponse {
+  id: number;
+  nombre: string;
+  bloque_id: number;
+}
+
+// Lookups infraestructura
+export interface BloqueInfraItem {
+  id: number;
+  nombre: string;
+  sede_nombre: string;
+}
+
+export interface PisoInfraItem {
+  id: number;
+  nombre: string;
+  bloque_nombre: string;
+}
+
+export interface BloqueCreateRequest {
+  nombre: string;
+  sede_id: number;
+}
+
+export interface BloqueResponse {
+  id: number;
+  nombre: string;
+  sede_id: number;
+}
+
 // Fichas de caracterización
 export interface FichaCaracterizacionRequest {
   programa_formacion_id: number;

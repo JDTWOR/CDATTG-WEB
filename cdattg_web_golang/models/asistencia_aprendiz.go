@@ -26,10 +26,12 @@ type AsistenciaAprendiz struct {
 	InstructorFichaIDRegistroSalida  *uint `gorm:"column:instructor_ficha_id_registro_salida" json:"instructor_ficha_id_registro_salida"`
 
 	// Relaciones
-	Asistencia               *Asistencia                    `gorm:"foreignKey:AsistenciaID" json:"asistencia,omitempty"`
-	Aprendiz                 *Aprendiz                      `gorm:"foreignKey:AprendizFichaID" json:"aprendiz,omitempty"`
+	Asistencia                *Asistencia                     `gorm:"foreignKey:AsistenciaID" json:"asistencia,omitempty"`
+	Aprendiz                  *Aprendiz                       `gorm:"foreignKey:AprendizFichaID" json:"aprendiz,omitempty"`
 	InstructorRegistroIngreso *InstructorFichaCaracterizacion `gorm:"foreignKey:InstructorFichaIDRegistroIngreso" json:"-"`
 	InstructorRegistroSalida  *InstructorFichaCaracterizacion `gorm:"foreignKey:InstructorFichaIDRegistroSalida" json:"-"`
+	// Tipos de observación predefinidos asociados (varios por registro)
+	TiposObservacion []TipoObservacionAsistencia `gorm:"many2many:asistencia_aprendiz_tipo_observacion;joinForeignKey:asistencia_aprendiz_id;joinReferences:tipo_observacion_id" json:"tipos_observacion,omitempty"`
 }
 
 // TableName especifica el nombre de la tabla

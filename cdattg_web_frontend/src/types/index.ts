@@ -435,6 +435,14 @@ export interface AsistenciaAprendizResponse {
   /** Por documento/QR: "ingreso" | "salida" | "asistencia_completa" */
   tipo_registro?: string;
   mensaje?: string;
+  /** Tipos de observación predefinidos asociados (varios por registro) */
+  tipos_observacion?: TipoObservacionAsistenciaItem[];
+}
+
+export interface TipoObservacionAsistenciaItem {
+  id: number;
+  codigo: string;
+  nombre: string;
 }
 
 /** Respuesta del dashboard de asistencia (solo superadmin) */

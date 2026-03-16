@@ -113,6 +113,7 @@ func Migrate() error {
 		// Asistencias
 		&models.Asistencia{},
 		&models.AsistenciaAprendiz{},
+		&models.TipoObservacionAsistencia{},
 		&models.Evidencia{},
 		&models.AlertaAsistenciaLog{},
 		

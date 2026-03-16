@@ -80,6 +80,9 @@ func RunAll() error {
 	if err := RunSyncInstructorRolesSeeder(db); err != nil {
 		return err
 	}
+	if err := RunTiposObservacionAsistenciaSeeder(db); err != nil {
+		return err
+	}
 
 	log.Println("Todos los seeders completados correctamente.")
 	return nil

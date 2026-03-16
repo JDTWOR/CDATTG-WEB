@@ -40,9 +40,10 @@ type AsistenciaIngresoPorDocumentoRequest struct {
 	NumeroDocumento string `json:"numero_documento" binding:"required"`
 }
 
-// AsistenciaAprendizObservacionesRequest actualizar observaciones de un registro de asistencia-aprendiz
+// AsistenciaAprendizObservacionesRequest actualizar observaciones de un registro de asistencia-aprendiz (texto libre + tipos predefinidos)
 type AsistenciaAprendizObservacionesRequest struct {
-	Observaciones string `json:"observaciones"`
+	Observaciones      string  `json:"observaciones"`
+	TipoObservacionIDs []uint  `json:"tipo_observacion_ids"` // opcional; varios por registro
 }
 
 // AsistenciaAprendizResponse registro de asistencia de un aprendiz
@@ -75,6 +76,15 @@ type AsistenciaAprendizResponse struct {
 	InstructorFichaIDRegistroSalida  *uint  `json:"instructor_ficha_id_registro_salida,omitempty"`
 	InstructorRegistroIngresoNombre   string `json:"instructor_registro_ingreso_nombre,omitempty"`
 	InstructorRegistroSalidaNombre    string `json:"instructor_registro_salida_nombre,omitempty"`
+	// Tipos de observación predefinidos asociados (varios por registro)
+	TiposObservacion []TipoObservacionAsistenciaItem `json:"tipos_observacion,omitempty"`
+}
+
+// TipoObservacionAsistenciaItem ítem del catálogo para dropdown y respuesta
+type TipoObservacionAsistenciaItem struct {
+	ID     uint   `json:"id"`
+	Codigo string `json:"codigo"`
+	Nombre string `json:"nombre"`
 }
 
 // AsistenciaAprendizEstadoRequest para ajustar estado/motivo de un registro de asistencia de aprendiz

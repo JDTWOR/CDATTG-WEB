@@ -10,6 +10,7 @@ import type {
   AsistenciaResponse,
   AprendizResponse,
   AsistenciaAprendizResponse,
+  TipoObservacionAsistenciaItem,
 } from '../types';
 
 /** Agrupa registros de sesión por aprendiz_id (soporta múltiples tramos por aprendiz). */
@@ -45,8 +46,9 @@ function summaryRegistros(registros: AsistenciaAprendizResponse[]) {
         })
       : null;
   const observaciones = open?.observaciones ?? (registros.length ? registros[registros.length - 1]?.observaciones ?? '' : '') ?? '';
+  const tiposObservacion = open?.tipos_observacion ?? (registros.length ? registros[registros.length - 1]?.tipos_observacion : undefined) ?? [];
   const requiereRevisionRecord = registros.find((r) => r.requiere_revision) ?? null;
-  return { open, firstIngreso, lastSalida, observaciones, requiereRevisionRecord };
+  return { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord };
 }
 
 function sameRegistrosList(a: AsistenciaAprendizResponse[], b: AsistenciaAprendizResponse[]): boolean {
@@ -65,7 +67,7 @@ type TarjetaAprendizAsistenciaProps = {
   onRegistrarIngreso: (aprendizId: number) => void;
   onRegistrarSalida: (asistenciaAprendizId: number) => void;
   onAbrirEstado: (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => void;
-  onAbrirObservaciones: (payload: { asistenciaId: number; aprendizId: number; nombre: string; observaciones: string }) => void;
+  onAbrirObservaciones: (payload: { asistenciaId: number; aprendizId: number; nombre: string; observaciones: string; tiposObservacion?: TipoObservacionAsistenciaItem[] }) => void;
 };
 
 const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
@@ -78,7 +80,7 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
   onAbrirEstado,
   onAbrirObservaciones,
 }: TarjetaAprendizAsistenciaProps) {
-  const { open, firstIngreso, lastSalida, observaciones, requiereRevisionRecord } = summaryRegistros(registros);
+  const { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord } = summaryRegistros(registros);
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -96,10 +98,19 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
           {open && lastSalida == null && ' → —'}
         </span>
       </div>
-      {observaciones ? (
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2" title={observaciones}>
-          {observaciones}
-        </p>
+      {(observaciones || tiposObservacion.length > 0) ? (
+        <div className="text-sm text-gray-600 dark:text-gray-300 mb-3 space-y-1">
+          {tiposObservacion.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {tiposObservacion.map((t) => (
+                <span key={t.id} className="inline-flex items-center rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
+                  {t.nombre}
+                </span>
+              ))}
+            </div>
+          )}
+          {observaciones ? <p className="line-clamp-2" title={observaciones}>{observaciones}</p> : null}
+        </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
         {open ? (
@@ -147,6 +158,7 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
                 aprendizId: aprendiz.id,
                 nombre: aprendiz.persona_nombre ?? 'Aprendiz',
                 observaciones,
+                tiposObservacion,
               })
             }
             className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 touch-manipulation"
@@ -180,7 +192,7 @@ type FilaAprendizAsistenciaProps = {
   onRegistrarIngreso: (aprendizId: number) => void;
   onRegistrarSalida: (asistenciaAprendizId: number) => void;
   onAbrirEstado: (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => void;
-  onAbrirObservaciones: (payload: { asistenciaId: number; aprendizId: number; nombre: string; observaciones: string }) => void;
+  onAbrirObservaciones: (payload: { asistenciaId: number; aprendizId: number; nombre: string; observaciones: string; tiposObservacion?: TipoObservacionAsistenciaItem[] }) => void;
 };
 
 const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
@@ -193,7 +205,7 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
   onAbrirEstado,
   onAbrirObservaciones,
 }: FilaAprendizAsistenciaProps) {
-  const { open, firstIngreso, lastSalida, observaciones, requiereRevisionRecord } = summaryRegistros(registros);
+  const { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord } = summaryRegistros(registros);
   return (
     <tr className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-600 dark:text-gray-400">{index}</td>
@@ -205,7 +217,16 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
         {lastSalida ?? (open ? '—' : '–')}
       </td>
-      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-500 dark:text-gray-400">{observaciones || '–'}</td>
+      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-500 dark:text-gray-400">
+        {tiposObservacion.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-1">
+            {tiposObservacion.map((t) => (
+              <span key={t.id} className="inline-flex rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs">{t.nombre}</span>
+            ))}
+          </div>
+        )}
+        {observaciones || (tiposObservacion.length === 0 ? '–' : null)}
+      </td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
         <div className="flex items-center gap-2">
           {open ? (
@@ -256,6 +277,7 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
                   aprendizId: aprendiz.id,
                   nombre: aprendiz.persona_nombre ?? 'Aprendiz',
                   observaciones,
+                  tiposObservacion,
                 })
               }
               className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 touch-manipulation transition-colors"
@@ -309,7 +331,14 @@ export const Asistencia = () => {
   const [errorRegistroManual, setErrorRegistroManual] = useState('');
   const [mensajeRegistroManual, setMensajeRegistroManual] = useState('');
   const [registrandoManual, setRegistrandoManual] = useState(false);
-  const [observacionesModal, setObservacionesModal] = useState<{ asistenciaId: number; aprendizId: number; nombre: string; observaciones: string } | null>(null);
+  const [observacionesModal, setObservacionesModal] = useState<{
+    asistenciaId: number;
+    aprendizId: number;
+    nombre: string;
+    observaciones: string;
+    tipoObservacionIds: number[];
+  } | null>(null);
+  const [tiposObservacionCatalog, setTiposObservacionCatalog] = useState<TipoObservacionAsistenciaItem[]>([]);
   const [observacionesGuardando, setObservacionesGuardando] = useState(false);
   const [estadoModal, setEstadoModal] = useState<{ asistenciaAprendizId: number; nombre: string; estado: string; motivo: string } | null>(null);
   const [estadoGuardando, setEstadoGuardando] = useState(false);
@@ -416,6 +445,11 @@ export const Asistencia = () => {
     }
   }, [sesionActual?.id, fichaId]);
 
+  useEffect(() => {
+    if (!sesionActual) return;
+    apiService.getTiposObservacionAsistencia().then(setTiposObservacionCatalog).catch(() => setTiposObservacionCatalog([]));
+  }, [sesionActual?.id]);
+
   const handleTomarAsistencia = async (id: number) => {
     setError('');
     setErrorAprendices('');
@@ -510,8 +544,20 @@ export const Asistencia = () => {
   );
 
   const onAbrirObservacionesModal = useCallback(
-    (payload: { asistenciaId: number; aprendizId: number; nombre: string; observaciones: string }) => {
-      setObservacionesModal(payload);
+    (payload: {
+      asistenciaId: number;
+      aprendizId: number;
+      nombre: string;
+      observaciones: string;
+      tiposObservacion?: TipoObservacionAsistenciaItem[];
+    }) => {
+      setObservacionesModal({
+        asistenciaId: payload.asistenciaId,
+        aprendizId: payload.aprendizId,
+        nombre: payload.nombre,
+        observaciones: payload.observaciones,
+        tipoObservacionIds: payload.tiposObservacion?.map((t) => t.id) ?? [],
+      });
     },
     []
   );
@@ -523,7 +569,8 @@ export const Asistencia = () => {
       const actualizado = await apiService.crearOActualizarObservacionesAsistencia(
         observacionesModal.asistenciaId,
         observacionesModal.aprendizId,
-        observacionesModal.observaciones
+        observacionesModal.observaciones,
+        observacionesModal.tipoObservacionIds.length > 0 ? observacionesModal.tipoObservacionIds : undefined
       );
       setObservacionesModal(null);
       upsertAsistenciaAprendizEnSesion(actualizado);
@@ -829,16 +876,72 @@ export const Asistencia = () => {
         {/* Modal observaciones */}
         {observacionesModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-observaciones-title">
-            <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
-              <h3 id="modal-observaciones-title" className="mb-3 text-lg font-semibold text-gray-900">Observaciones — {observacionesModal.nombre}</h3>
-              <textarea
-                value={observacionesModal.observaciones}
-                onChange={(e) => setObservacionesModal((prev) => prev ? { ...prev, observaciones: e.target.value } : null)}
-                placeholder="Escriba aquí las observaciones del aprendiz..."
-                rows={4}
-                className="input-field mb-4 w-full resize-y"
-                disabled={observacionesGuardando}
-              />
+            <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 p-5 shadow-lg">
+              <h3 id="modal-observaciones-title" className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">Observaciones — {observacionesModal.nombre}</h3>
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipos de observación</label>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    if (!id) return;
+                    e.target.value = '';
+                    if (observacionesModal.tipoObservacionIds.includes(id)) return;
+                    setObservacionesModal((prev) => prev ? { ...prev, tipoObservacionIds: [...prev.tipoObservacionIds, id] } : null);
+                  }}
+                  className="input-field w-full"
+                  disabled={observacionesGuardando}
+                  aria-label="Agregar tipo de observación"
+                >
+                  <option value="">Agregar tipo…</option>
+                  {tiposObservacionCatalog
+                    .filter((t) => !observacionesModal.tipoObservacionIds.includes(t.id))
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nombre}
+                      </option>
+                    ))}
+                </select>
+                {observacionesModal.tipoObservacionIds.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {observacionesModal.tipoObservacionIds.map((id) => {
+                      const tipo = tiposObservacionCatalog.find((t) => t.id === id);
+                      return (
+                        <span
+                          key={id}
+                          className="inline-flex items-center gap-1 rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-200"
+                        >
+                          {tipo?.nombre ?? id}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setObservacionesModal((prev) =>
+                                prev ? { ...prev, tipoObservacionIds: prev.tipoObservacionIds.filter((x) => x !== id) } : null
+                              )
+                            }
+                            className="rounded p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600"
+                            aria-label="Quitar"
+                            disabled={observacionesGuardando}
+                          >
+                            <span aria-hidden>×</span>
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Observación libre</label>
+                <textarea
+                  value={observacionesModal.observaciones}
+                  onChange={(e) => setObservacionesModal((prev) => prev ? { ...prev, observaciones: e.target.value } : null)}
+                  placeholder="Escriba aquí las observaciones del aprendiz..."
+                  rows={4}
+                  className="input-field w-full resize-y"
+                  disabled={observacionesGuardando}
+                />
+              </div>
               <div className="flex justify-end gap-2">
                 <button
                   type="button"

@@ -22,8 +22,9 @@ type AsistenciaService interface {
 	RegistrarIngresoPorDocumento(req dto.AsistenciaIngresoPorDocumentoRequest, instructorFichaIDRegistroIngreso *uint) (*dto.AsistenciaAprendizResponse, error)
 	RegistrarSalida(asistenciaAprendizID uint, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error)
 	ActualizarObservaciones(asistenciaAprendizID uint, observaciones string) (*dto.AsistenciaAprendizResponse, error)
-	CrearOActualizarObservaciones(asistenciaID, aprendizID uint, observaciones string) (*dto.AsistenciaAprendizResponse, error)
+	CrearOActualizarObservaciones(asistenciaID, aprendizID uint, observaciones string, tipoObservacionIDs []uint) (*dto.AsistenciaAprendizResponse, error)
 	ListAprendicesEnSesion(asistenciaID uint) ([]dto.AsistenciaAprendizResponse, error)
+	ListTiposObservacionAsistencia() ([]dto.TipoObservacionAsistenciaItem, error)
 	GetDashboard(sedeID *uint, fecha string) (*dto.AsistenciaDashboardResponse, error)
 	GetCasosBienestar(sedeID *uint, dias, minFallas int) (*dto.CasosBienestarResponse, error)
 	AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error)
@@ -34,6 +35,7 @@ type AsistenciaService interface {
 type asistenciaService struct {
 	repo          repositories.AsistenciaRepository
 	repoAA        repositories.AsistenciaAprendizRepository
+	tipoObsRepo   repositories.TipoObservacionAsistenciaRepository
 	instFichaRepo repositories.InstructorFichaRepository
 	instRepo      repositories.InstructorRepository
 	personaRepo   repositories.PersonaRepository
@@ -54,6 +56,7 @@ func NewAsistenciaService() AsistenciaService {
 	return &asistenciaService{
 		repo:          repositories.NewAsistenciaRepository(),
 		repoAA:        repositories.NewAsistenciaAprendizRepository(),
+		tipoObsRepo:   repositories.NewTipoObservacionAsistenciaRepository(),
 		instFichaRepo: repositories.NewInstructorFichaRepository(),
 		instRepo:      repositories.NewInstructorRepository(),
 		personaRepo:   repositories.NewPersonaRepository(),
@@ -368,7 +371,7 @@ func (s *asistenciaService) ActualizarObservaciones(asistenciaAprendizID uint, o
 	return s.aaToResponse(aa), nil
 }
 
-func (s *asistenciaService) CrearOActualizarObservaciones(asistenciaID, aprendizID uint, observaciones string) (*dto.AsistenciaAprendizResponse, error) {
+func (s *asistenciaService) CrearOActualizarObservaciones(asistenciaID, aprendizID uint, observaciones string, tipoObservacionIDs []uint) (*dto.AsistenciaAprendizResponse, error) {
 	asist, err := s.repo.FindByID(asistenciaID)
 	if err != nil || asist == nil {
 		return nil, errors.New("sesión de asistencia no encontrada")
@@ -386,6 +389,15 @@ func (s *asistenciaService) CrearOActualizarObservaciones(asistenciaID, aprendiz
 		if err := s.repoAA.Update(aa); err != nil {
 			return nil, err
 		}
+		// Actualizar tipos de observación predefinidos (reemplazar lista)
+		if len(tipoObservacionIDs) > 0 {
+			tipos, _ := s.tipoObsRepo.FindByIDs(tipoObservacionIDs)
+			_ = s.repoAA.ReplaceTiposObservacion(aa, tipos)
+		} else {
+			_ = s.repoAA.ReplaceTiposObservacion(aa, nil)
+		}
+		// Recargar para devolver TiposObservacion en la respuesta
+		aa, _ = s.repoAA.FindByID(aa.ID)
 		return s.aaToResponse(aa), nil
 	}
 	aa = &models.AsistenciaAprendiz{
@@ -397,7 +409,23 @@ func (s *asistenciaService) CrearOActualizarObservaciones(asistenciaID, aprendiz
 	if err := s.repoAA.Create(aa); err != nil {
 		return nil, fmt.Errorf("error al guardar observaciones: %w", err)
 	}
+	if len(tipoObservacionIDs) > 0 {
+		tipos, _ := s.tipoObsRepo.FindByIDs(tipoObservacionIDs)
+		_ = s.repoAA.ReplaceTiposObservacion(aa, tipos)
+	}
 	return s.GetAsistenciaAprendizByID(aa.ID)
+}
+
+func (s *asistenciaService) ListTiposObservacionAsistencia() ([]dto.TipoObservacionAsistenciaItem, error) {
+	list, err := s.tipoObsRepo.ListActivos()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dto.TipoObservacionAsistenciaItem, len(list))
+	for i := range list {
+		out[i] = dto.TipoObservacionAsistenciaItem{ID: list[i].ID, Codigo: list[i].Codigo, Nombre: list[i].Nombre}
+	}
+	return out, nil
 }
 
 func (s *asistenciaService) ListAprendicesEnSesion(asistenciaID uint) ([]dto.AsistenciaAprendizResponse, error) {
@@ -523,6 +551,12 @@ func (s *asistenciaService) aaToResponse(aa *models.AsistenciaAprendiz) *dto.Asi
 		MotivoAjuste:                 aa.MotivoAjuste,
 		InstructorFichaIDRegistroIngreso: aa.InstructorFichaIDRegistroIngreso,
 		InstructorFichaIDRegistroSalida:  aa.InstructorFichaIDRegistroSalida,
+	}
+	if len(aa.TiposObservacion) > 0 {
+		r.TiposObservacion = make([]dto.TipoObservacionAsistenciaItem, len(aa.TiposObservacion))
+		for i := range aa.TiposObservacion {
+			r.TiposObservacion[i] = dto.TipoObservacionAsistenciaItem{ID: aa.TiposObservacion[i].ID, Codigo: aa.TiposObservacion[i].Codigo, Nombre: aa.TiposObservacion[i].Nombre}
+		}
 	}
 	if aa.Asistencia != nil && aa.Asistencia.InstructorFicha != nil && aa.Asistencia.InstructorFicha.Ficha != nil {
 		r.FichaID = aa.Asistencia.InstructorFicha.FichaID

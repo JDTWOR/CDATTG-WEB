@@ -257,12 +257,22 @@ func (h *AsistenciaHandler) CrearOActualizarObservaciones(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "observaciones inv?lido"})
 		return
 	}
-	resp, err := h.svc.CrearOActualizarObservaciones(uint(asistenciaID), uint(aprendizID), req.Observaciones)
+	resp, err := h.svc.CrearOActualizarObservaciones(uint(asistenciaID), uint(aprendizID), req.Observaciones, req.TipoObservacionIDs)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+// ListTiposObservacionAsistencia devuelve el catálogo de tipos de observación activos (para dropdown).
+func (h *AsistenciaHandler) ListTiposObservacionAsistencia(c *gin.Context) {
+	list, err := h.svc.ListTiposObservacionAsistencia()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": list})
 }
 
 func (h *AsistenciaHandler) ListAprendicesEnSesion(c *gin.Context) {

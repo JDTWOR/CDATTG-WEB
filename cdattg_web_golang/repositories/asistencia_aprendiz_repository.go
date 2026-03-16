@@ -21,6 +21,7 @@ type AsistenciaAprendizRepository interface {
 	FindEntryWithExitByAprendizIDAndAsistenciaIDs(aprendizID uint, asistenciaIDs []uint) (*models.AsistenciaAprendiz, error)
 	FindPendientesRevisionByInstructorAndFecha(instructorID uint, fecha string) ([]models.AsistenciaAprendiz, error)
 	Update(a *models.AsistenciaAprendiz) error
+	ReplaceTiposObservacion(aa *models.AsistenciaAprendiz, tipos []models.TipoObservacionAsistencia) error
 }
 
 type asistenciaAprendizRepository struct {
@@ -39,10 +40,10 @@ func (r *asistenciaAprendizRepository) FindByID(id uint) (*models.AsistenciaApre
 	var m models.AsistenciaAprendiz
 	if err := r.db.Preload("Aprendiz").Preload("Aprendiz.Persona").
 		Preload("Asistencia").
-		Preload("Asistencia.InstructorFicha").
-		Preload("Asistencia.InstructorFicha.Ficha").
+		Preload("Asistencia.InstructorFicha").Preload("Asistencia.InstructorFicha.Ficha").
 		Preload("InstructorRegistroIngreso").Preload("InstructorRegistroIngreso.Instructor").Preload("InstructorRegistroIngreso.Instructor.Persona").
 		Preload("InstructorRegistroSalida").Preload("InstructorRegistroSalida.Instructor").Preload("InstructorRegistroSalida.Instructor.Persona").
+		Preload("TiposObservacion").
 		First(&m, id).Error; err != nil {
 		return nil, err
 	}
@@ -55,6 +56,7 @@ func (r *asistenciaAprendizRepository) FindByAsistenciaID(asistenciaID uint) ([]
 		Preload("Aprendiz").Preload("Aprendiz.Persona").
 		Preload("InstructorRegistroIngreso").Preload("InstructorRegistroIngreso.Instructor").Preload("InstructorRegistroIngreso.Instructor.Persona").
 		Preload("InstructorRegistroSalida").Preload("InstructorRegistroSalida.Instructor").Preload("InstructorRegistroSalida.Instructor.Persona").
+		Preload("TiposObservacion").
 		Find(&list).Error; err != nil {
 		return nil, err
 	}
@@ -146,4 +148,8 @@ func (r *asistenciaAprendizRepository) FindPendientesRevisionByInstructorAndFech
 
 func (r *asistenciaAprendizRepository) Update(a *models.AsistenciaAprendiz) error {
 	return r.db.Save(a).Error
+}
+
+func (r *asistenciaAprendizRepository) ReplaceTiposObservacion(aa *models.AsistenciaAprendiz, tipos []models.TipoObservacionAsistencia) error {
+	return r.db.Model(aa).Association("TiposObservacion").Replace(tipos)
 }

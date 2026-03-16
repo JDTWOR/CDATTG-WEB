@@ -31,6 +31,7 @@ import type {
   AsistenciaResponse,
   AsistenciaAprendizRequest,
   AsistenciaAprendizResponse,
+  TipoObservacionAsistenciaItem,
   AsistenciaDashboardResponse,
   CasosBienestarResponse,
   SedeItem,
@@ -603,8 +604,21 @@ class ApiService {
     return response.data;
   }
 
-  async crearOActualizarObservacionesAsistencia(asistenciaId: number, aprendizId: number, observaciones: string): Promise<AsistenciaAprendizResponse> {
-    const response = await this.api.put<AsistenciaAprendizResponse>(`/asistencias/${asistenciaId}/aprendiz/${aprendizId}/observaciones`, { observaciones });
+  async getTiposObservacionAsistencia(): Promise<TipoObservacionAsistenciaItem[]> {
+    const response = await this.api.get<{ data: TipoObservacionAsistenciaItem[] }>('/asistencias/tipos-observacion');
+    return response.data.data;
+  }
+
+  async crearOActualizarObservacionesAsistencia(
+    asistenciaId: number,
+    aprendizId: number,
+    observaciones: string,
+    tipoObservacionIds?: number[]
+  ): Promise<AsistenciaAprendizResponse> {
+    const response = await this.api.put<AsistenciaAprendizResponse>(
+      `/asistencias/${asistenciaId}/aprendiz/${aprendizId}/observaciones`,
+      { observaciones, tipo_observacion_ids: tipoObservacionIds ?? [] }
+    );
     return response.data;
   }
 

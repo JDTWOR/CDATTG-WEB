@@ -17,6 +17,8 @@ type FilaHistorial = {
   horaSalida: string | null;
   observaciones: string;
   estado?: string;
+  badgeColor: 'green' | 'yellow' | 'gray';
+  badgeText: string;
 };
 
 export const AsistenciaHistorialFicha = () => {
@@ -210,10 +212,7 @@ export const AsistenciaHistorialFicha = () => {
         horaSalida: reg?.horaSalida ?? null,
         observaciones: reg?.observaciones ?? '',
         estado: reg?.estado,
-        // extra (no tipado en FilaHistorial original pero útil para render):
-        // @ts-expect-error campos adicionales para renderizado
         badgeColor,
-        // @ts-expect-error campos adicionales para renderizado
         badgeText,
       };
     });
@@ -690,27 +689,17 @@ export const AsistenciaHistorialFicha = () => {
                         {fila.aprendiz.persona_nombre ?? '–'}
                       </td>
                       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-                        {'badgeColor' in fila && 'badgeText' in fila ? (
-                          <span
-                            className={
-                              fila.badgeColor === 'green'
-                                ? 'inline-flex items-center rounded-full bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700 px-2 py-0.5 text-xs font-medium'
-                                : fila.badgeColor === 'yellow'
-                                ? 'inline-flex items-center rounded-full bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700 px-2 py-0.5 text-xs font-medium'
-                                : 'inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 px-2 py-0.5 text-xs font-medium'
-                            }
-                          >
-                            {fila.badgeText}
-                          </span>
-                        ) : fila.asistio ? (
-                          <span className="inline-flex items-center rounded-full bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700 px-2 py-0.5 text-xs font-medium">
-                            Sí
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 px-2 py-0.5 text-xs font-medium">
-                            No
-                          </span>
-                        )}
+                        <span
+                          className={
+                            fila.badgeColor === 'green'
+                              ? 'inline-flex items-center rounded-full bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700 px-2 py-0.5 text-xs font-medium'
+                              : fila.badgeColor === 'yellow'
+                              ? 'inline-flex items-center rounded-full bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700 px-2 py-0.5 text-xs font-medium'
+                              : 'inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 px-2 py-0.5 text-xs font-medium'
+                          }
+                        >
+                          {fila.badgeText}
+                        </span>
                       </td>
                       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
                         {fila.horaIngreso ?? '–'}

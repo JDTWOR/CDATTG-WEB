@@ -70,7 +70,7 @@ type TarjetaAprendizAsistenciaProps = {
   onAbrirObservaciones: (payload: { asistenciaId: number; aprendizId: number; nombre: string; observaciones: string; tiposObservacion?: TipoObservacionAsistenciaItem[] }) => void;
 };
 
-const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
+function TarjetaAprendizAsistencia({
   aprendiz,
   registros,
   index,
@@ -81,21 +81,18 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
   onAbrirObservaciones,
 }: TarjetaAprendizAsistenciaProps) {
   const { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord } = summaryRegistros(registros);
+  const rango = `${firstIngreso ?? '–'}${lastSalida ? ` → ${lastSalida}` : open ? ' → —' : ''}`;
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-gray-900 dark:text-white truncate">
-            {aprendiz.persona_nombre ?? '–'}
-          </p>
+          <p className="font-semibold text-gray-900 dark:text-white truncate">{aprendiz.persona_nombre ?? '–'}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Doc: {aprendiz.persona_documento ?? '–'} · #{index}
           </p>
         </div>
         <span className="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">
-          {firstIngreso ?? '–'}
-          {lastSalida != null && <> → {lastSalida}</>}
-          {open && lastSalida == null && ' → —'}
+          {rango}
         </span>
       </div>
       {(observaciones || tiposObservacion.length > 0) ? (
@@ -117,10 +114,9 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
           <button
             type="button"
             onClick={() => onRegistrarSalida(open.id)}
-            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center gap-2 rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
+            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
             aria-label="Registrar salida"
           >
-            <ArrowLeftOnRectangleIcon className="w-5 h-5 shrink-0" />
             Salida
           </button>
         ) : requiereRevisionRecord ? (
@@ -142,10 +138,9 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
           <button
             type="button"
             onClick={() => onRegistrarIngreso(aprendiz.id)}
-            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center gap-2 rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
+            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
             aria-label="Registrar entrada"
           >
-            <ArrowRightOnRectangleIcon className="w-5 h-5 shrink-0" />
             Entrada
           </button>
         )}
@@ -171,18 +166,7 @@ const TarjetaAprendizAsistencia = memo(function TarjetaAprendizAsistencia({
       </div>
     </div>
   );
-}, (prev, next) => {
-  return (
-    prev.aprendiz.id === next.aprendiz.id &&
-    prev.index === next.index &&
-    prev.asistenciaId === next.asistenciaId &&
-    sameRegistrosList(prev.registros, next.registros) &&
-    prev.onRegistrarIngreso === next.onRegistrarIngreso &&
-    prev.onRegistrarSalida === next.onRegistrarSalida &&
-    prev.onAbrirEstado === next.onAbrirEstado &&
-    prev.onAbrirObservaciones === next.onAbrirObservaciones
-  );
-});
+}
 
 type FilaAprendizAsistenciaProps = {
   aprendiz: AprendizResponse;
@@ -647,10 +631,6 @@ export const Asistencia = () => {
     handleRegistrarPorDocumento(documentoManual);
   };
 
-  const handleQREscaneado = (numeroDocumento: string) => {
-    handleRegistrarPorDocumento(numeroDocumento);
-  };
-
   // Referencia para evitar noUnusedLocals; uso futuro en la UI (crear sesión)
   void [_setInstructoresFicha, _setInstructorFichaSeleccionado, _setFechaSesion, _handleCrearSesion];
 
@@ -754,7 +734,7 @@ export const Asistencia = () => {
             <EscanerQR
               key={sesionActual.id}
               activo={!!sesionActual}
-              onEscaneado={handleQREscaneado}
+              onEscaneado={handleRegistrarPorDocumento}
               className="lg:w-[340px]"
               readerId={`qr-sesion-${sesionActual.id}`}
             />
@@ -809,7 +789,7 @@ export const Asistencia = () => {
               </p>
             </div>
 
-            {/* Listado de aprendices: en móvil tarjetas, en desktop tabla */}
+            {/* Listado de aprendices: mostrar solo tabla (también en móvil) para aislar error de renderizado */}
             {loadingAprendices ? (
               <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-8 text-center text-gray-500 text-sm">
                 Cargando listado de aprendices...
@@ -820,7 +800,7 @@ export const Asistencia = () => {
               </div>
             ) : (
               <>
-                {/* Vista móvil: tarjetas por aprendiz (memoizadas para evitar salto de scroll) */}
+                {/* Vista móvil: tarjetas por aprendiz */}
                 <div className="md:hidden space-y-3">
                   {aprendicesFicha.map((aprendiz, idx) => (
                     <TarjetaAprendizAsistencia

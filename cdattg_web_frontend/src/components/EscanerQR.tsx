@@ -55,7 +55,9 @@ function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_REA
         setError('Contenedor del escáner no disponible');
         return;
       }
-      const html5Qr = new Html5Qrcode(container);
+      // Usamos el id del contenedor (string) para respetar la firma de tipos de Html5Qrcode,
+      // pero validamos la existencia del nodo mediante la referencia de React.
+      const html5Qr = new Html5Qrcode(readerId);
       scannerRef.current = html5Qr;
 
       Html5Qrcode.getCameras()
@@ -115,14 +117,12 @@ function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_REA
       console.log('[EscanerQR] Cleanup efecto escaneo', { cancelado: true, readerId });
       cancelado = true;
       clearTimeout(t);
-      if (scannerRef.current) {
-        scannerRef.current
+      const currentScanner = scannerRef.current;
+      if (currentScanner) {
+        currentScanner
           .stop()
           .then(() => {
             console.log('[EscanerQR] Cámara detenida correctamente en cleanup');
-            return scannerRef.current?.clear().catch(() => {
-              console.warn('[EscanerQR] Error al limpiar contenedor en cleanup (probablemente ya estaba limpio)');
-            });
           })
           .catch(() => {
             console.warn('[EscanerQR] Error al detener cámara en cleanup (probablemente ya estaba detenida)');

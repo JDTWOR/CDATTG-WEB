@@ -20,6 +20,7 @@ function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_REA
   const [permisos, setPermisos] = useState<boolean | null>(null);
   const [camaraActiva, setCamaraActiva] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const readerContainerRef = useRef<HTMLDivElement | null>(null);
   const onEscaneadoRef = useRef(onEscaneado);
   onEscaneadoRef.current = onEscaneado;
 
@@ -48,13 +49,13 @@ function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_REA
     let cancelado = false;
     const t = setTimeout(() => {
       console.log('[EscanerQR] Intentando inicializar Html5Qrcode', { readerId });
-      const container = document.getElementById(readerId);
+      const container = readerContainerRef.current;
       if (!container) {
         console.error('[EscanerQR] Contenedor del escáner no encontrado en el DOM', { readerId });
         setError('Contenedor del escáner no disponible');
         return;
       }
-      const html5Qr = new Html5Qrcode(readerId);
+      const html5Qr = new Html5Qrcode(container);
       scannerRef.current = html5Qr;
 
       Html5Qrcode.getCameras()
@@ -119,6 +120,9 @@ function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_REA
           .stop()
           .then(() => {
             console.log('[EscanerQR] Cámara detenida correctamente en cleanup');
+            return scannerRef.current?.clear().catch(() => {
+              console.warn('[EscanerQR] Error al limpiar contenedor en cleanup (probablemente ya estaba limpio)');
+            });
           })
           .catch(() => {
             console.warn('[EscanerQR] Error al detener cámara en cleanup (probablemente ya estaba detenida)');
@@ -164,7 +168,7 @@ function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_REA
                 Permisos de cámara denegados. Use el registro manual por documento.
               </div>
             )}
-            <div id={readerId} className="min-h-[240px] w-full max-w-sm" />
+            <div ref={readerContainerRef} id={readerId} className="min-h-[240px] w-full max-w-sm" />
             <button
               type="button"
               onClick={() => setCamaraActiva(false)}

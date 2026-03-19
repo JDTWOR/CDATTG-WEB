@@ -151,6 +151,7 @@ func SetupRouter() *gin.Engine {
 			asistencias.PUT("/aprendiz/:asistenciaAprendizId/estado", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.AjustarEstadoAprendiz)
 			// Catálogo de tipos de observación: solo requiere estar autenticado (no hay id de sesión para fallback de instructor)
 			asistencias.GET("/tipos-observacion", asistenciaHandler.ListTiposObservacionAsistencia)
+			asistencias.POST("/tipos-observacion", middleware.RequireSuperAdmin(), asistenciaHandler.CrearTipoObservacionAsistencia)
 			asistencias.GET("/:id/aprendices", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.ListAprendicesEnSesion)
 			asistencias.PUT("/:id/aprendiz/:aprendizId/observaciones", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.CrearOActualizarObservaciones)
 			asistencias.GET("/:id", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.GetByID)

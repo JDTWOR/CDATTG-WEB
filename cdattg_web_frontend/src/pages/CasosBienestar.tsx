@@ -29,6 +29,7 @@ export const CasosBienestar = () => {
               string,
               {
                 ficha_numero: string;
+                programa_nombre: string;
                 sede_nombre: string;
                 casos: CasoBienestarItem[];
                 totalInasistencias: number;
@@ -41,6 +42,7 @@ export const CasosBienestar = () => {
             if (!acc[key]) {
               acc[key] = {
                 ficha_numero: caso.ficha_numero,
+                programa_nombre: caso.programa_nombre || '',
                 sede_nombre: caso.sede_nombre,
                 casos: [],
                 totalInasistencias: 0,
@@ -219,6 +221,9 @@ export const CasosBienestar = () => {
                           </p>
                           <p className="text-lg font-semibold text-gray-900 dark:text-white">
                             {ficha.ficha_numero}
+                          </p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                            {ficha.programa_nombre || 'Programa sin especificar'}
                           </p>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
                             {ficha.sede_nombre || 'Sede sin especificar'}

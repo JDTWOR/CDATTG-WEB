@@ -106,8 +106,10 @@ type AsistenciaDashboardPorFicha struct {
 	FichaID              uint   `json:"ficha_id"`
 	FichaNumero          string `json:"ficha_numero"`
 	ProgramaNombre       string `json:"programa_nombre"`
+	JornadaNombre        string `json:"jornada_nombre"`
 	SedeNombre           string `json:"sede_nombre"`
 	CantidadVinieron     int    `json:"cantidad_vinieron"`
+	TotalAprendices      int    `json:"total_aprendices"`
 }
 
 // CasosBienestarResponse lista de aprendices con indicadores de riesgo (para oficina de bienestar)

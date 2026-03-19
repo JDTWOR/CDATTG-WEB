@@ -49,8 +49,10 @@ type DashboardFichaRow struct {
 	FichaID         uint
 	FichaNumero     string
 	ProgramaNombre  string
-	SedeNombre  string
-	Cantidad    int
+	JornadaNombre   string
+	SedeNombre      string
+	Cantidad        int
+	TotalAprendices int
 }
 
 type asistenciaRepository struct {
@@ -182,24 +184,29 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 	}
 	totalAprendices = int(total)
 
-	// Por ficha: ficha_id, ficha_numero, programa_nombre, sede_nombre, count(aa.id)
+	// Por ficha: ficha_id, ficha_numero, programa_nombre, jornada_nombre, sede_nombre, count(aa.id)
 	type row struct {
 		FichaID        uint   `gorm:"column:ficha_id"`
 		FichaNumero    string `gorm:"column:ficha_numero"`
 		ProgramaNombre string `gorm:"column:programa_nombre"`
+		JornadaNombre  string `gorm:"column:jornada_nombre"`
 		SedeNombre     string `gorm:"column:sede_nombre"`
 		Cantidad       int    `gorm:"column:cantidad"`
+		TotalAprendices int   `gorm:"column:total_aprendices"`
 	}
 	var rows []row
 	raw := `
-		SELECT fc.id AS ficha_id, fc.ficha AS ficha_numero, COALESCE(pf.nombre, '') AS programa_nombre, COALESCE(s.nombre, '') AS sede_nombre,
-		       COUNT(aa.id)::int AS cantidad
+		SELECT fc.id AS ficha_id, fc.ficha AS ficha_numero, COALESCE(pf.nombre, '') AS programa_nombre, COALESCE(j.nombre, '') AS jornada_nombre, COALESCE(s.nombre, '') AS sede_nombre,
+		       COUNT(DISTINCT aa.id)::int AS cantidad,
+		       COUNT(DISTINCT af.id)::int AS total_aprendices
 		FROM asistencias a
 		INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
 		INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id
 		LEFT JOIN programas_formacion pf ON fc.programa_formacion_id = pf.id
+		LEFT JOIN jornadas j ON fc.jornada_id = j.id
 		LEFT JOIN sedes s ON fc.sede_id = s.id
 		LEFT JOIN asistencia_aprendices aa ON aa.asistencia_id = a.id AND aa.hora_ingreso IS NOT NULL AND aa.hora_salida IS NULL
+		LEFT JOIN aprendices af ON af.ficha_caracterizacion_id = fc.id AND af.estado = true
 		WHERE a.fecha >= ? AND a.fecha < ?
 	`
 	args := []interface{}{tInicio, tFin}
@@ -207,7 +214,7 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 		raw += " AND fc.sede_id = ?"
 		args = append(args, *sedeID)
 	}
-	raw += " GROUP BY fc.id, fc.ficha, pf.nombre, s.nombre ORDER BY fc.ficha"
+	raw += " GROUP BY fc.id, fc.ficha, pf.nombre, j.nombre, s.nombre ORDER BY fc.ficha"
 	if err := r.db.Raw(raw, args...).Scan(&rows).Error; err != nil {
 		return totalAprendices, nil, err
 	}
@@ -217,8 +224,10 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 			FichaID:        rows[i].FichaID,
 			FichaNumero:    rows[i].FichaNumero,
 			ProgramaNombre: rows[i].ProgramaNombre,
+			JornadaNombre:  rows[i].JornadaNombre,
 			SedeNombre:     rows[i].SedeNombre,
 			Cantidad:       rows[i].Cantidad,
+			TotalAprendices: rows[i].TotalAprendices,
 		}
 	}
 	return totalAprendices, porFicha, nil

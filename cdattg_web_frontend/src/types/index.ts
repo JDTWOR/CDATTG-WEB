@@ -445,6 +445,12 @@ export interface TipoObservacionAsistenciaItem {
   nombre: string;
 }
 
+export interface TipoObservacionAsistenciaCreateRequest {
+  codigo: string;
+  nombre: string;
+  activo?: boolean;
+}
+
 /** Respuesta del dashboard de asistencia (solo superadmin) */
 export interface AsistenciaDashboardResponse {
   fecha: string;
@@ -465,6 +471,7 @@ export interface CasoBienestarItem {
   persona_nombre: string;
   numero_documento: string;
   ficha_numero: string;
+  programa_nombre?: string;
   sede_nombre: string;
   total_sesiones: number;
   asistencias_efectivas: number;

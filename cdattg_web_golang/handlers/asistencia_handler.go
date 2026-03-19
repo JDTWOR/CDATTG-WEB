@@ -275,6 +275,21 @@ func (h *AsistenciaHandler) ListTiposObservacionAsistencia(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": list})
 }
 
+// CrearTipoObservacionAsistencia crea un nuevo tipo de observación (solo superadmin).
+func (h *AsistenciaHandler) CrearTipoObservacionAsistencia(c *gin.Context) {
+	var req dto.TipoObservacionAsistenciaCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "datos inválidos", "details": err.Error()})
+		return
+	}
+	item, err := h.svc.CrearTipoObservacionAsistencia(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, item)
+}
+
 func (h *AsistenciaHandler) ListAprendicesEnSesion(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {

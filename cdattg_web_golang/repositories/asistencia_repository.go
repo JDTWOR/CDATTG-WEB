@@ -30,6 +30,7 @@ type CasosBienestarRow struct {
 	PersonaNombre        string
 	NumeroDocumento      string
 	FichaNumero          string
+	ProgramaNombre       string
 	SedeNombre           string
 	TotalSesiones        int
 	AsistenciasEfectivas int
@@ -273,6 +274,7 @@ func (r *asistenciaRepository) GetCasosBienestar(sedeID *uint, fechaInicio, fech
 		PersonaNombre        string `gorm:"column:persona_nombre"`
 		NumeroDocumento      string `gorm:"column:numero_documento"`
 		FichaNumero          string `gorm:"column:ficha_numero"`
+		ProgramaNombre       string `gorm:"column:programa_nombre"`
 		SedeNombre           string `gorm:"column:sede_nombre"`
 		TotalSesiones        int    `gorm:"column:total_sesiones"`
 		AsistenciasEfectivas int    `gorm:"column:asistencias_efectivas"`
@@ -312,6 +314,7 @@ SELECT
   TRIM(COALESCE(p.primer_nombre,'') || ' ' || COALESCE(p.segundo_nombre,'') || ' ' || COALESCE(p.primer_apellido,'') || ' ' || COALESCE(p.segundo_apellido,'')) AS persona_nombre,
   COALESCE(p.numero_documento,'') AS numero_documento,
   fc.ficha AS ficha_numero,
+  COALESCE(pf.nombre,'') AS programa_nombre,
   COALESCE(s.nombre,'') AS sede_nombre,
   COALESCE(tpf.total_sesiones, 0) AS total_sesiones,
   COALESCE(aa.asistencias_efectivas, 0) AS asistencias_efectivas,
@@ -319,6 +322,7 @@ SELECT
 FROM aprendices ap
 INNER JOIN personas p ON p.id = ap.persona_id
 INNER JOIN fichas_caracterizacion fc ON fc.id = ap.ficha_caracterizacion_id
+LEFT JOIN programas_formacion pf ON pf.id = fc.programa_formacion_id
 LEFT JOIN sedes s ON s.id = fc.sede_id
 INNER JOIN totales_por_ficha tpf ON tpf.ficha_id = ap.ficha_caracterizacion_id
 LEFT JOIN asistencias_aprendiz aa ON aa.aprendiz_ficha_id = ap.id AND aa.ficha_id = ap.ficha_caracterizacion_id
@@ -339,6 +343,7 @@ ORDER BY inasistencias DESC, ap.id
 			PersonaNombre:        rows[i].PersonaNombre,
 			NumeroDocumento:      rows[i].NumeroDocumento,
 			FichaNumero:          rows[i].FichaNumero,
+			ProgramaNombre:       rows[i].ProgramaNombre,
 			SedeNombre:           rows[i].SedeNombre,
 			TotalSesiones:        rows[i].TotalSesiones,
 			AsistenciasEfectivas: rows[i].AsistenciasEfectivas,

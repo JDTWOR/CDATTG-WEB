@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"strings"
 	"time"
 
 	"github.com/sena/cdattg-web-golang/database"
@@ -20,6 +21,7 @@ type AsistenciaRepository interface {
 	GetDashboardResumen(sedeID *uint, fecha string) (totalAprendices int, porFicha []DashboardFichaRow, err error)
 	CountPendientesRevisionByFecha(sedeID *uint, fecha string) (int, error)
 	GetCasosBienestar(sedeID *uint, fechaInicio, fechaFin string, minFallas int) ([]CasosBienestarRow, error)
+	GetDetalleInasistenciasAprendiz(fichaNumero string, aprendizID uint, fechaInicio, fechaFin string, sedeNombre string) ([]InasistenciaDetalleRow, error)
 	FindSesionesNoFinalizadasDesde(fechaDesde string) ([]models.Asistencia, error)
 	GetPendientesRevisionPorInstructor(sedeID *uint, fechaInicio, fechaFin string) ([]PendienteInstructorRow, error)
 }
@@ -43,6 +45,11 @@ type PendienteInstructorRow struct {
 	InstructorNombre            string
 	NumeroDocumento             string
 	CantidadAprendicesSinSalida int
+}
+
+type InasistenciaDetalleRow struct {
+	Fecha         string
+	Observaciones string
 }
 
 // DashboardFichaRow una fila del resumen por ficha para el dashboard
@@ -348,6 +355,82 @@ ORDER BY inasistencias DESC, ap.id
 			TotalSesiones:        rows[i].TotalSesiones,
 			AsistenciasEfectivas: rows[i].AsistenciasEfectivas,
 			Inasistencias:        rows[i].Inasistencias,
+		}
+	}
+	return out, nil
+}
+
+func (r *asistenciaRepository) GetDetalleInasistenciasAprendiz(fichaNumero string, aprendizID uint, fechaInicio, fechaFin string, sedeNombre string) ([]InasistenciaDetalleRow, error) {
+	tInicio, err := time.Parse("2006-01-02", fechaInicio)
+	if err != nil {
+		return nil, err
+	}
+	tFin, err := time.Parse("2006-01-02", fechaFin)
+	if err != nil {
+		return nil, err
+	}
+	tFin = tFin.AddDate(0, 0, 1)
+
+	type row struct {
+		Fecha         string `gorm:"column:fecha"`
+		Observaciones string `gorm:"column:observaciones"`
+	}
+
+	raw := `
+WITH sesiones_rango AS (
+  SELECT a.id AS asistencia_id, a.fecha::date AS fecha
+  FROM asistencias a
+  INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
+  INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id
+  LEFT JOIN sedes s ON s.id = fc.sede_id
+  WHERE a.fecha >= ? AND a.fecha < ?
+    AND fc.ficha = ?
+`
+	args := []interface{}{tInicio, tFin, fichaNumero}
+	if strings.TrimSpace(sedeNombre) != "" {
+		raw += " AND COALESCE(s.nombre, '') = ?"
+		args = append(args, sedeNombre)
+	}
+	raw += `
+),
+resumen_por_sesion AS (
+  SELECT
+    sr.fecha,
+    COALESCE(
+      BOOL_OR(
+        aa.hora_ingreso IS NOT NULL
+        AND (aa.estado IS NULL OR aa.estado = '' OR aa.estado = 'ASISTENCIA_COMPLETA' OR aa.estado = 'ASISTENCIA_PARCIAL')
+      ),
+      false
+    ) AS asistio_efectivo,
+    COALESCE(
+      STRING_AGG(DISTINCT NULLIF(TRIM(COALESCE(aa.observaciones, '')), ''), ' | '),
+      ''
+    ) AS observaciones
+  FROM sesiones_rango sr
+  LEFT JOIN asistencia_aprendices aa
+    ON aa.asistencia_id = sr.asistencia_id
+   AND aa.aprendiz_ficha_id = ?
+  GROUP BY sr.fecha
+)
+SELECT
+  TO_CHAR(fecha, 'YYYY-MM-DD') AS fecha,
+  observaciones
+FROM resumen_por_sesion
+WHERE asistio_efectivo = false
+ORDER BY fecha
+`
+	args = append(args, aprendizID)
+
+	var rows []row
+	if err := r.db.Raw(raw, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]InasistenciaDetalleRow, len(rows))
+	for i := range rows {
+		out[i] = InasistenciaDetalleRow{
+			Fecha:         rows[i].Fecha,
+			Observaciones: rows[i].Observaciones,
 		}
 	}
 	return out, nil

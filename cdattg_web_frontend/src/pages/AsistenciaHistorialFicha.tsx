@@ -16,6 +16,7 @@ type FilaHistorial = {
   horaIngreso: string | null;
   horaSalida: string | null;
   observaciones: string;
+  tiposObservacion: string[];
   estado?: string;
   badgeColor: 'green' | 'yellow' | 'gray';
   badgeText: string;
@@ -113,6 +114,7 @@ export const AsistenciaHistorialFicha = () => {
       horaIngreso: string | null;
       horaSalida: string | null;
       observaciones: string;
+      tiposObservacion: string[];
       estado?: string;
       hasIngreso: boolean;
       minutosSesion: number;
@@ -170,11 +172,16 @@ export const AsistenciaHistorialFicha = () => {
         const acumuladoSesion = existing?.minutosSesion ?? 0;
         const acumuladoEfectivos = existing?.minutosEfectivos ?? 0;
         const acumuladoTarde = existing?.minutosTarde ?? 0;
+        const tiposObservacionSet = new Set<string>(existing?.tiposObservacion ?? []);
+        (aa.tipos_observacion ?? []).forEach((tipo) => {
+          if (tipo?.nombre) tiposObservacionSet.add(tipo.nombre);
+        });
 
         const reg: Reg = {
           horaIngreso: ing ?? existing?.horaIngreso ?? null,
           horaSalida: sal ?? existing?.horaSalida ?? null,
           observaciones: existing ? `${existing.observaciones} ${aa.observaciones ?? ''}`.trim() : aa.observaciones ?? '',
+          tiposObservacion: Array.from(tiposObservacionSet),
           estado: aa.estado || existing?.estado,
           hasIngreso: existing ? existing.hasIngreso || hasIngreso : hasIngreso,
           minutosSesion: acumuladoSesion + minutosSesion,
@@ -211,6 +218,7 @@ export const AsistenciaHistorialFicha = () => {
         horaIngreso: reg?.horaIngreso ?? null,
         horaSalida: reg?.horaSalida ?? null,
         observaciones: reg?.observaciones ?? '',
+        tiposObservacion: reg?.tiposObservacion ?? [],
         estado: reg?.estado,
         badgeColor,
         badgeText,
@@ -733,7 +741,21 @@ export const AsistenciaHistorialFicha = () => {
                         {fila.horaSalida ?? '–'}
                       </td>
                       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-700 dark:text-gray-300 max-w-xs truncate" title={fila.observaciones || undefined}>
-                        {fila.observaciones || '–'}
+                        <div className="space-y-1">
+                          {fila.tiposObservacion.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {fila.tiposObservacion.map((tipo) => (
+                                <span
+                                  key={tipo}
+                                  className="inline-flex items-center rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs text-gray-700 dark:text-gray-300"
+                                >
+                                  {tipo}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <span>{fila.observaciones || (fila.tiposObservacion.length === 0 ? '–' : '')}</span>
+                        </div>
                       </td>
                     </tr>
                   ))

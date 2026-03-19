@@ -466,6 +466,19 @@ export interface CasosBienestarResponse {
   casos: CasoBienestarItem[];
 }
 
+export interface InasistenciaDetalleItem {
+  fecha: string;
+  observaciones?: string;
+}
+
+export interface CasoBienestarAprendizDetalleResponse {
+  ficha_numero: string;
+  aprendiz_id: number;
+  fecha_inicio: string;
+  fecha_fin: string;
+  inasistencias: InasistenciaDetalleItem[];
+}
+
 export interface CasoBienestarItem {
   aprendiz_id: number;
   persona_nombre: string;

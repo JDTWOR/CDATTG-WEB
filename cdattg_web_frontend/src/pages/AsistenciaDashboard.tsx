@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeftIcon, UserGroupIcon, ChartBarIcon, SignalIcon, ExclamationTriangleIcon, DocumentMagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, UserGroupIcon, ChartBarIcon, SignalIcon, ExclamationTriangleIcon, DocumentMagnifyingGlassIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { getAsistenciaDashboardWsUrl } from '../config/api';
@@ -13,8 +13,12 @@ export const AsistenciaDashboard = () => {
   const [error, setError] = useState('');
   const [wsConnected, setWsConnected] = useState(false);
   const [casosBienestarCount, setCasosBienestarCount] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [jornadaFilter, setJornadaFilter] = useState('');
+  const [page, setPage] = useState(1);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pageSize = 20;
 
   const canViewBienestar = roles.includes('SUPER ADMINISTRADOR') || roles.includes('BIENESTAR AL APRENDIZ');
 
@@ -85,6 +89,36 @@ export const AsistenciaDashboard = () => {
       setWsConnected(false);
     };
   }, [canViewBienestar, token]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, jornadaFilter]);
+
+  const jornadasDisponibles = useMemo(() => {
+    const set = new Set<string>();
+    (data?.por_ficha ?? []).forEach((row) => {
+      if (row.jornada_nombre) set.add(row.jornada_nombre);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [data]);
+
+  const fichasFiltradas = useMemo(() => {
+    const rows = data?.por_ficha ?? [];
+    const q = searchQuery.trim().toLowerCase();
+    return rows.filter(
+      (row) =>
+        (jornadaFilter === '' || (row.jornada_nombre ?? '') === jornadaFilter) &&
+        (q === '' ||
+          row.ficha_numero?.toLowerCase().includes(q) ||
+          row.programa_nombre?.toLowerCase().includes(q))
+    );
+  }, [data, searchQuery, jornadaFilter]);
+
+  const totalPages = Math.ceil(fichasFiltradas.length / pageSize);
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return fichasFiltradas.slice(start, start + pageSize);
+  }, [fichasFiltradas, page]);
 
   if (!canViewBienestar) {
     return (
@@ -220,8 +254,43 @@ export const AsistenciaDashboard = () => {
 
           <div className="card">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Por ficha (vinieron a formación hoy)</h2>
-            {data.por_ficha.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400">No hay sesiones de asistencia registradas para hoy.</p>
+            <div className="flex flex-col sm:flex-row gap-4 items-end sm:items-center bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600 mb-4">
+              <div className="w-full sm:w-auto flex-1 min-w-[250px]">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Buscar ficha
+                </label>
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por código de ficha o programa..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-shadow"
+                  />
+                </div>
+              </div>
+              <div className="w-full sm:w-auto min-w-[250px]">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Filtrar por jornada
+                </label>
+                <select
+                  value={jornadaFilter}
+                  onChange={(e) => setJornadaFilter(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-shadow"
+                >
+                  <option value="">Todas las jornadas</option>
+                  {jornadasDisponibles.map((jornada) => (
+                    <option key={jornada} value={jornada}>
+                      {jornada}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {fichasFiltradas.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400">No hay fichas registradas</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
@@ -229,21 +298,48 @@ export const AsistenciaDashboard = () => {
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ficha</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nombre</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Jornada</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sede</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vinieron hoy</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
-                    {data.por_ficha.map((row) => (
+                    {paginatedRows.map((row) => (
                       <tr key={row.ficha_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{row.ficha_numero}</td>
                         <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{row.programa_nombre || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{row.jornada_nombre || '-'}</td>
                         <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{row.sede_nombre || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600 dark:text-primary-400">{row.cantidad_vinieron}</td>
+                        <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600 dark:text-primary-400">
+                          {row.cantidad_vinieron} / {row.total_aprendices ?? 0}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+            {totalPages > 1 && (
+              <div className="mt-4 flex justify-between items-center">
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Pagina {page} de {totalPages} ({fichasFiltradas.length} total)
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="btn-secondary disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="btn-secondary disabled:opacity-50"
+                  >
+                    Siguiente
+                  </button>
+                </div>
               </div>
             )}
           </div>

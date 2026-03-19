@@ -140,6 +140,21 @@ type CasoBienestarItem struct {
 	Inasistencias      int    `json:"inasistencias"`
 }
 
+// InasistenciaDetalleItem representa una fecha de sesión en la que el aprendiz no asistió.
+type InasistenciaDetalleItem struct {
+	Fecha         string `json:"fecha"` // YYYY-MM-DD
+	Observaciones string `json:"observaciones,omitempty"`
+}
+
+// CasoBienestarAprendizDetalleResponse detalle de inasistencias por aprendiz en una ficha.
+type CasoBienestarAprendizDetalleResponse struct {
+	FichaNumero    string                  `json:"ficha_numero"`
+	AprendizID     uint                    `json:"aprendiz_id"`
+	FechaInicio    string                  `json:"fecha_inicio"`
+	FechaFin       string                  `json:"fecha_fin"`
+	Inasistencias  []InasistenciaDetalleItem `json:"inasistencias"`
+}
+
 // InstructorPendienteItem resume cuántos aprendices tiene un instructor con registros "por corregir" (requiere_revision=true) en el período analizado.
 type InstructorPendienteItem struct {
 	InstructorID                uint   `json:"instructor_id"`

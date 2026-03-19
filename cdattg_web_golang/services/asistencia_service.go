@@ -457,8 +457,10 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 			FichaID:          porFicha[i].FichaID,
 			FichaNumero:      porFicha[i].FichaNumero,
 			ProgramaNombre:   porFicha[i].ProgramaNombre,
+			JornadaNombre:    porFicha[i].JornadaNombre,
 			SedeNombre:       porFicha[i].SedeNombre,
 			CantidadVinieron: porFicha[i].Cantidad,
+			TotalAprendices:  porFicha[i].TotalAprendices,
 		}
 	}
 	return resp, nil

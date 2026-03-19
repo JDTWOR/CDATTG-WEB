@@ -435,3 +435,26 @@ func (h *AsistenciaHandler) GetCasosBienestar(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, resp)
 }
+
+// GetDetalleInasistenciasAprendiz devuelve las fechas de inasistencia y observaciones de un aprendiz en una ficha.
+func (h *AsistenciaHandler) GetDetalleInasistenciasAprendiz(c *gin.Context) {
+	fichaNumero := c.Param("fichaNumero")
+	aprendizID64, err := strconv.ParseUint(c.Param("aprendizId"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "aprendiz_id inválido"})
+		return
+	}
+	dias := 30
+	if s := c.Query("dias"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			dias = n
+		}
+	}
+	sedeNombre := c.Query("sede")
+	resp, err := h.svc.GetDetalleInasistenciasAprendiz(fichaNumero, uint(aprendizID64), dias, sedeNombre)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}

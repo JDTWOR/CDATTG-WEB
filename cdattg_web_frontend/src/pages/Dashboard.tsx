@@ -1,8 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { UsersIcon, AcademicCapIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import {
+  UsersIcon,
+  AcademicCapIcon,
+  UserGroupIcon,
+  ChartBarIcon,
+  ExclamationTriangleIcon,
+  ClipboardDocumentListIcon,
+  CalendarDaysIcon,
+} from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
+import type { AsistenciaDashboardResponse, CasosBienestarResponse } from '../types';
 
 const DASHBOARD_ALLOWED_ROLES = ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'] as const;
 
@@ -11,6 +20,10 @@ export const Dashboard = () => {
   const [totalPersonas, setTotalPersonas] = useState<number | null>(null);
   const [totalInstructores, setTotalInstructores] = useState<number | null>(null);
   const [totalAprendices, setTotalAprendices] = useState<number | null>(null);
+  const [asistenciaHoy, setAsistenciaHoy] = useState<number | null>(null);
+  const [pendientesRevisionHoy, setPendientesRevisionHoy] = useState<number | null>(null);
+  const [casosBienestar, setCasosBienestar] = useState<number | null>(null);
+  const [asistenciaDashboard, setAsistenciaDashboard] = useState<AsistenciaDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -26,23 +39,27 @@ export const Dashboard = () => {
       setLoading(true);
       setError('');
       try {
-        // Personas: usar paginación para obtener el total
-        if (hasPermission('VER PERSONAS')) {
-          const personasRes = await apiService.getPersonas(1, 1);
-          setTotalPersonas(personasRes.total);
-        }
+        const canSeePersonasNow = hasPermission('VER PERSONAS');
+        const canSeeInstructoresNow = hasPermission('VER FICHAS');
+        const canSeeAprendicesNow = hasPermission('VER APRENDICES');
+        const canSeeAsistenciaNow = hasPermission('VER ASISTENCIA');
+        const canSeeBienestarNow = roles.includes('SUPER ADMINISTRADOR') || roles.includes('BIENESTAR AL APRENDIZ');
 
-        // Instructores: paginado, usamos total
-        if (hasPermission('VER FICHAS')) {
-          const instructoresRes = await apiService.getInstructores(1, 1);
-          setTotalInstructores(instructoresRes.total);
-        }
+        const [personasRes, instructoresRes, aprendicesRes, asistenciaRes, casosRes] = await Promise.all([
+          canSeePersonasNow ? apiService.getPersonas(1, 1) : Promise.resolve(null),
+          canSeeInstructoresNow ? apiService.getInstructores(1, 1) : Promise.resolve(null),
+          canSeeAprendicesNow ? apiService.getAprendices(1, 1) : Promise.resolve(null),
+          canSeeAsistenciaNow ? apiService.getAsistenciaDashboard() : Promise.resolve(null),
+          canSeeBienestarNow ? apiService.getCasosBienestar({ dias: 30, min_fallas: 3 }) : Promise.resolve(null),
+        ]);
 
-        // Aprendices: usar paginación para obtener el total
-        if (hasPermission('VER APRENDICES')) {
-          const aprendicesRes = await apiService.getAprendices(1, 1);
-          setTotalAprendices(aprendicesRes.total);
-        }
+        setTotalPersonas(personasRes?.total ?? null);
+        setTotalInstructores(instructoresRes?.total ?? null);
+        setTotalAprendices(aprendicesRes?.total ?? null);
+        setAsistenciaDashboard(asistenciaRes);
+        setAsistenciaHoy(asistenciaRes?.total_aprendices_en_formacion ?? null);
+        setPendientesRevisionHoy(asistenciaRes?.pendientes_revision ?? null);
+        setCasosBienestar(Array.isArray((casosRes as CasosBienestarResponse | null)?.casos) ? (casosRes as CasosBienestarResponse).casos.length : null);
       } catch (e: any) {
         // Si alguna llamada falla, mostrar mensaje general pero no romper la vista
         const msg = e?.response?.data?.error ?? 'No se pudo cargar el resumen general.';
@@ -53,7 +70,7 @@ export const Dashboard = () => {
     };
 
     fetchData();
-  }, [hasPermission, hasRoleAccess]);
+  }, [hasPermission, hasRoleAccess, roles]);
 
   const renderValor = (valor: number | null, canSee: boolean) => {
     if (!canSee) return '—';
@@ -65,6 +82,40 @@ export const Dashboard = () => {
   const canSeePersonas = hasPermission('VER PERSONAS');
   const canSeeInstructores = hasPermission('VER FICHAS'); // listado de instructores usa permiso de fichas
   const canSeeAprendices = hasPermission('VER APRENDICES');
+  const canSeeAsistencia = hasPermission('VER ASISTENCIA');
+  const canSeeBienestar = roles.includes('SUPER ADMINISTRADOR') || roles.includes('BIENESTAR AL APRENDIZ');
+
+  const filasPorSede = useMemo(() => {
+    const map = new Map<string, { vinieron: number; total: number }>();
+    (asistenciaDashboard?.por_ficha ?? []).forEach((row) => {
+      const key = row.sede_nombre || 'Sin sede';
+      const prev = map.get(key) ?? { vinieron: 0, total: 0 };
+      map.set(key, {
+        vinieron: prev.vinieron + (row.cantidad_vinieron ?? 0),
+        total: prev.total + (row.total_aprendices ?? 0),
+      });
+    });
+    return Array.from(map.entries())
+      .map(([nombre, valores]) => ({ nombre, ...valores }))
+      .sort((a, b) => b.vinieron - a.vinieron)
+      .slice(0, 5);
+  }, [asistenciaDashboard]);
+
+  const filasPorJornada = useMemo(() => {
+    const map = new Map<string, { vinieron: number; total: number }>();
+    (asistenciaDashboard?.por_ficha ?? []).forEach((row) => {
+      const key = row.jornada_nombre || 'Sin jornada';
+      const prev = map.get(key) ?? { vinieron: 0, total: 0 };
+      map.set(key, {
+        vinieron: prev.vinieron + (row.cantidad_vinieron ?? 0),
+        total: prev.total + (row.total_aprendices ?? 0),
+      });
+    });
+    return Array.from(map.entries())
+      .map(([nombre, valores]) => ({ nombre, ...valores }))
+      .sort((a, b) => b.vinieron - a.vinieron)
+      .slice(0, 5);
+  }, [asistenciaDashboard]);
 
   if (!hasRoleAccess) {
     return (
@@ -94,7 +145,8 @@ export const Dashboard = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Fila 1: KPI rápidos */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
@@ -135,6 +187,137 @@ export const Dashboard = () => {
               <UserGroupIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Asistencia hoy</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
+                {renderValor(asistenciaHoy, canSeeAsistencia)}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center">
+              <ChartBarIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Fila 2: riesgo */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Casos bienestar</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
+                {renderValor(casosBienestar, canSeeBienestar)}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/40 rounded-lg flex items-center justify-center">
+              <ExclamationTriangleIcon className="w-6 h-6 text-red-600 dark:text-red-400" />
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pendientes de revisión</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
+                {renderValor(pendientesRevisionHoy, canSeeAsistencia)}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/40 rounded-lg flex items-center justify-center">
+              <ClipboardDocumentListIcon className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Fila 3: segmentación */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="card">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Asistencia por sede</h2>
+          {!canSeeAsistencia ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sin permiso para ver asistencia.</p>
+          ) : filasPorSede.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sin datos para hoy.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left text-gray-500 dark:text-gray-400">
+                    <th className="pb-2">Sede</th>
+                    <th className="pb-2 text-right">Vinieron / Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filasPorSede.map((row) => (
+                    <tr key={row.nombre} className="border-t border-gray-100 dark:border-gray-700">
+                      <td className="py-2 text-gray-700 dark:text-gray-300">{row.nombre}</td>
+                      <td className="py-2 text-right font-medium text-gray-900 dark:text-white">
+                        {row.vinieron} / {row.total}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <div className="card">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Asistencia por jornada</h2>
+          {!canSeeAsistencia ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sin permiso para ver asistencia.</p>
+          ) : filasPorJornada.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sin datos para hoy.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left text-gray-500 dark:text-gray-400">
+                    <th className="pb-2">Jornada</th>
+                    <th className="pb-2 text-right">Vinieron / Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filasPorJornada.map((row) => (
+                    <tr key={row.nombre} className="border-t border-gray-100 dark:border-gray-700">
+                      <td className="py-2 text-gray-700 dark:text-gray-300">{row.nombre}</td>
+                      <td className="py-2 text-right font-medium text-gray-900 dark:text-white">
+                        {row.vinieron} / {row.total}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Fila 4: acciones */}
+      <div className="card">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Accesos directos</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Link to="/asistencia" className="btn-secondary inline-flex items-center justify-center">
+            Tomar asistencia
+          </Link>
+          <Link to="/asistencia/historial" className="btn-secondary inline-flex items-center justify-center">
+            <CalendarDaysIcon className="w-5 h-5 mr-2" />
+            Historial asistencias
+          </Link>
+          <Link to="/asistencia/dashboard" className="btn-secondary inline-flex items-center justify-center">
+            Dashboard asistencia
+          </Link>
+          <Link to="/asistencia/dashboard/casos-bienestar" className="btn-secondary inline-flex items-center justify-center">
+            Casos bienestar
+          </Link>
+          {roles.includes('SUPER ADMINISTRADOR') && (
+            <Link to="/asistencia/tipos-observacion" className="btn-secondary inline-flex items-center justify-center">
+              Tipos de observación
+            </Link>
+          )}
         </div>
       </div>
     </div>

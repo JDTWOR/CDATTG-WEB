@@ -78,6 +78,13 @@ const SIDEBAR_ITEMS: {
     rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
   },
   {
+    section: 'Control y seguimiento',
+    path: '/asistencia/tipos-observacion',
+    label: 'Tipos de observación',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR'],
+  },
+  {
     section: 'Infraestructura',
     path: '/infra/ambientes',
     label: 'Ambientes',
@@ -107,6 +114,7 @@ const ICONS: Record<string, ReactNode> = {
   'asistencia/historial': <CalendarDaysIcon className="w-5 h-5" />,
   'asistencia/dashboard': <ChartBarIcon className="w-5 h-5" />,
   'asistencia/dashboard/casos-bienestar': <ExclamationTriangleIcon className="w-5 h-5" />,
+  'asistencia/tipos-observacion': <ClipboardDocumentListIcon className="w-5 h-5" />,
   inventario: <CubeIcon className="w-5 h-5" />,
   'inventario/dashboard': <CubeIcon className="w-5 h-5" />,
   'inventario/productos': <CubeIcon className="w-5 h-5" />,

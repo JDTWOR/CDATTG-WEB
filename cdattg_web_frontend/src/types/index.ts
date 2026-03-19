@@ -476,7 +476,9 @@ export interface AsistenciaDashboardPorFicha {
   ficha_numero: string;
   programa_nombre: string;
   sede_nombre: string;
+  jornada_nombre?: string;
   cantidad_vinieron: number;
+  total_aprendices?: number;
 }
 
 // --- Inventario (documentacion_inventario.md) ---

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeftIcon, ArrowDownTrayIcon, CalendarDaysIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArrowDownTrayIcon, CalendarDaysIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import ExcelJS from 'exceljs';
 import { apiService } from '../services/api';
 import type {
@@ -219,6 +219,14 @@ export const AsistenciaHistorialFicha = () => {
   }, [aprendices, aprendicesPorSesion, sesiones]);
 
   const fechaMaxHoy = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const moverFecha = (dias: number) => {
+    const base = new Date(`${fecha}T00:00:00`);
+    if (Number.isNaN(base.getTime())) return;
+    base.setDate(base.getDate() + dias);
+    const nueva = base.toISOString().slice(0, 10);
+    setFecha(nueva > fechaMaxHoy ? fechaMaxHoy : nueva);
+  };
 
   const descargarExcel = async () => {
     const workbook = new ExcelJS.Workbook();
@@ -524,6 +532,14 @@ export const AsistenciaHistorialFicha = () => {
       <div className="flex flex-wrap items-center gap-4">
         <label className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Fecha:</span>
+          <button
+            type="button"
+            onClick={() => moverFecha(-1)}
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 p-2 hover:bg-gray-50 dark:hover:bg-gray-700"
+            aria-label="Día anterior"
+          >
+            <ChevronLeftIcon className="w-5 h-5" />
+          </button>
           <input
             type="date"
             value={fecha}
@@ -534,6 +550,15 @@ export const AsistenciaHistorialFicha = () => {
             }}
             className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
           />
+          <button
+            type="button"
+            onClick={() => moverFecha(1)}
+            disabled={fecha >= fechaMaxHoy}
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+            aria-label="Día siguiente"
+          >
+            <ChevronRightIcon className="w-5 h-5" />
+          </button>
         </label>
         {!loading && (
           <>

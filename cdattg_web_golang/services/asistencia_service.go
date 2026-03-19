@@ -25,6 +25,7 @@ type AsistenciaService interface {
 	CrearOActualizarObservaciones(asistenciaID, aprendizID uint, observaciones string, tipoObservacionIDs []uint) (*dto.AsistenciaAprendizResponse, error)
 	ListAprendicesEnSesion(asistenciaID uint) ([]dto.AsistenciaAprendizResponse, error)
 	ListTiposObservacionAsistencia() ([]dto.TipoObservacionAsistenciaItem, error)
+	CrearTipoObservacionAsistencia(req dto.TipoObservacionAsistenciaCreateRequest) (*dto.TipoObservacionAsistenciaItem, error)
 	GetDashboard(sedeID *uint, fecha string) (*dto.AsistenciaDashboardResponse, error)
 	GetCasosBienestar(sedeID *uint, dias, minFallas int) (*dto.CasosBienestarResponse, error)
 	AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error)
@@ -428,6 +429,32 @@ func (s *asistenciaService) ListTiposObservacionAsistencia() ([]dto.TipoObservac
 	return out, nil
 }
 
+func (s *asistenciaService) CrearTipoObservacionAsistencia(req dto.TipoObservacionAsistenciaCreateRequest) (*dto.TipoObservacionAsistenciaItem, error) {
+	codigo := strings.TrimSpace(req.Codigo)
+	nombre := strings.TrimSpace(req.Nombre)
+	if codigo == "" {
+		return nil, errors.New("el código es obligatorio")
+	}
+	if nombre == "" {
+		return nil, errors.New("el nombre es obligatorio")
+	}
+	activo := true
+	if req.Activo != nil {
+		activo = *req.Activo
+	}
+	item := &models.TipoObservacionAsistencia{
+		Codigo: strings.ToUpper(codigo),
+		Nombre: nombre,
+		Activo: activo,
+	}
+	if err := s.tipoObsRepo.Create(item); err != nil {
+		return nil, err
+	}
+	return &dto.TipoObservacionAsistenciaItem{
+		ID: item.ID, Codigo: item.Codigo, Nombre: item.Nombre,
+	}, nil
+}
+
 func (s *asistenciaService) ListAprendicesEnSesion(asistenciaID uint) ([]dto.AsistenciaAprendizResponse, error) {
 	list, err := s.repoAA.FindByAsistenciaID(asistenciaID)
 	if err != nil {
@@ -493,6 +520,7 @@ func (s *asistenciaService) GetCasosBienestar(sedeID *uint, dias, minFallas int)
 			PersonaNombre:        rows[i].PersonaNombre,
 			NumeroDocumento:       rows[i].NumeroDocumento,
 			FichaNumero:          rows[i].FichaNumero,
+			ProgramaNombre:       rows[i].ProgramaNombre,
 			SedeNombre:           rows[i].SedeNombre,
 			TotalSesiones:        rows[i].TotalSesiones,
 			AsistenciasEfectivas: rows[i].AsistenciasEfectivas,

@@ -35,6 +35,7 @@ import type {
   TipoObservacionAsistenciaCreateRequest,
   AsistenciaDashboardResponse,
   CasosBienestarResponse,
+  CasoBienestarAprendizDetalleResponse,
   SedeItem,
   AmbienteItem,
   ModalidadFormacionItem,
@@ -543,6 +544,18 @@ class ApiService {
   /** Casos de bienestar: aprendices con N+ inasistencias (riesgo deserción). Params: dias (default 30), min_fallas (default 3), sede_id (opcional). */
   async getCasosBienestar(params?: { dias?: number; min_fallas?: number; sede_id?: number }): Promise<CasosBienestarResponse> {
     const response = await this.api.get<CasosBienestarResponse>('/asistencias/dashboard/casos-bienestar', { params });
+    return response.data;
+  }
+
+  async getCasoBienestarAprendizDetalle(
+    fichaNumero: string,
+    aprendizId: number,
+    params?: { dias?: number; sede?: string }
+  ): Promise<CasoBienestarAprendizDetalleResponse> {
+    const response = await this.api.get<CasoBienestarAprendizDetalleResponse>(
+      `/asistencias/dashboard/casos-bienestar/ficha/${encodeURIComponent(fichaNumero)}/aprendiz/${aprendizId}/detalle`,
+      { params }
+    );
     return response.data;
   }
 

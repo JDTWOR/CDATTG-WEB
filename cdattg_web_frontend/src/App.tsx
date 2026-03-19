@@ -20,6 +20,7 @@ import { AsistenciaHistorialFicha } from './pages/AsistenciaHistorialFicha';
 import { AsistenciaDashboard } from './pages/AsistenciaDashboard';
 import { CasosBienestar } from './pages/CasosBienestar';
 import { CasosBienestarFichaDetalle } from './pages/CasosBienestarFichaDetalle';
+import { AsistenciaTiposObservacion } from './pages/AsistenciaTiposObservacion';
 import { InventarioDashboard } from './pages/InventarioDashboard';
 import { InventarioProductos } from './pages/InventarioProductos';
 import { InventarioOrdenes } from './pages/InventarioOrdenes';
@@ -204,6 +205,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <CasosBienestarFichaDetalle />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/asistencia/tipos-observacion"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AsistenciaTiposObservacion />
                 </Layout>
               </ProtectedRoute>
             }

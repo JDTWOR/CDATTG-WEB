@@ -9,6 +9,7 @@ import (
 type TipoObservacionAsistenciaRepository interface {
 	ListActivos() ([]models.TipoObservacionAsistencia, error)
 	FindByIDs(ids []uint) ([]models.TipoObservacionAsistencia, error)
+	Create(item *models.TipoObservacionAsistencia) error
 }
 
 type tipoObservacionAsistenciaRepository struct {
@@ -36,4 +37,8 @@ func (r *tipoObservacionAsistenciaRepository) FindByIDs(ids []uint) ([]models.Ti
 		return nil, err
 	}
 	return list, nil
+}
+
+func (r *tipoObservacionAsistenciaRepository) Create(item *models.TipoObservacionAsistencia) error {
+	return r.db.Create(item).Error
 }

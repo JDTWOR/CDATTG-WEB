@@ -3,7 +3,11 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeftIcon, ExclamationTriangleIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import type { CasosBienestarResponse, CasoBienestarItem } from '../types';
+import type {
+  CasosBienestarResponse,
+  CasoBienestarItem,
+  InasistenciaDetalleItem,
+} from '../types';
 
 export const CasosBienestarFichaDetalle = () => {
   const { roles } = useAuth();
@@ -12,6 +16,10 @@ export const CasosBienestarFichaDetalle = () => {
   const [data, setData] = useState<CasosBienestarResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [aprendizDetalle, setAprendizDetalle] = useState<CasoBienestarItem | null>(null);
+  const [detalleLoading, setDetalleLoading] = useState(false);
+  const [detalleError, setDetalleError] = useState('');
+  const [detalleInasistencias, setDetalleInasistencias] = useState<InasistenciaDetalleItem[]>([]);
 
   const diasParam = Number(searchParams.get('dias') || '');
   const minFallasParam = Number(searchParams.get('min_fallas') || '');
@@ -79,6 +87,26 @@ export const CasosBienestarFichaDetalle = () => {
 
   const totalSesiones = casosFicha.reduce((sum, c) => sum + c.total_sesiones, 0);
   const totalInasistencias = casosFicha.reduce((sum, c) => sum + c.inasistencias, 0);
+
+  const abrirDetalleAprendiz = async (aprendiz: CasoBienestarItem) => {
+    if (!fichaNumero) return;
+    setAprendizDetalle(aprendiz);
+    setDetalleLoading(true);
+    setDetalleError('');
+    setDetalleInasistencias([]);
+    try {
+      const res = await apiService.getCasoBienestarAprendizDetalle(fichaNumero, aprendiz.aprendiz_id, {
+        dias,
+        sede: sedeNombreParam || undefined,
+      });
+      setDetalleInasistencias(res.inasistencias ?? []);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } };
+      setDetalleError(err.response?.data?.error || 'No se pudo cargar el detalle de inasistencias.');
+    } finally {
+      setDetalleLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -220,6 +248,9 @@ export const CasosBienestarFichaDetalle = () => {
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                         Inasistencias
                       </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                        Detalle
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
@@ -246,6 +277,15 @@ export const CasosBienestarFichaDetalle = () => {
                         <td className="px-4 py-3 text-sm text-right font-semibold text-amber-600 dark:text-amber-400">
                           {c.inasistencias}
                         </td>
+                        <td className="px-4 py-3 text-sm text-right">
+                          <button
+                            type="button"
+                            onClick={() => abrirDetalleAprendiz(c)}
+                            className="btn-secondary text-xs"
+                          >
+                            Ver detalle
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -254,6 +294,67 @@ export const CasosBienestarFichaDetalle = () => {
             )}
           </div>
         </>
+      )}
+
+      {aprendizDetalle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Inasistencias por fecha
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {aprendizDetalle.persona_nombre} · {aprendizDetalle.numero_documento}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAprendizDetalle(null)}
+                className="btn-secondary text-xs"
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="p-5">
+              {detalleError && (
+                <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+                  {detalleError}
+                </div>
+              )}
+              {detalleLoading ? (
+                <p className="text-gray-500 dark:text-gray-400">Cargando detalle...</p>
+              ) : detalleInasistencias.length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400">
+                  No se encontraron fechas de inasistencia para este aprendiz en el período.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                    <thead className="bg-gray-50 dark:bg-gray-700/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                          Fecha de inasistencia
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                          Observaciones
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                      {detalleInasistencias.map((item, idx) => (
+                        <tr key={`${item.fecha}-${idx}`}>
+                          <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{item.fecha}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.observaciones || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

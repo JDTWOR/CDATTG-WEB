@@ -87,6 +87,13 @@ type TipoObservacionAsistenciaItem struct {
 	Nombre string `json:"nombre"`
 }
 
+// TipoObservacionAsistenciaCreateRequest para crear nuevos tipos de observación (superadmin)
+type TipoObservacionAsistenciaCreateRequest struct {
+	Codigo string `json:"codigo" binding:"required"`
+	Nombre string `json:"nombre" binding:"required"`
+	Activo *bool  `json:"activo"`
+}
+
 // AsistenciaAprendizEstadoRequest para ajustar estado/motivo de un registro de asistencia de aprendiz
 type AsistenciaAprendizEstadoRequest struct {
 	Estado string `json:"estado" binding:"required"` // ASISTENCIA_COMPLETA, ASISTENCIA_PARCIAL, ABANDONO_JORNADA, REGISTRO_POR_CORREGIR
@@ -126,6 +133,7 @@ type CasoBienestarItem struct {
 	PersonaNombre      string `json:"persona_nombre"`
 	NumeroDocumento    string `json:"numero_documento"`
 	FichaNumero        string `json:"ficha_numero"`
+	ProgramaNombre     string `json:"programa_nombre"`
 	SedeNombre         string `json:"sede_nombre"`
 	TotalSesiones      int    `json:"total_sesiones"`
 	AsistenciasEfectivas int  `json:"asistencias_efectivas"`

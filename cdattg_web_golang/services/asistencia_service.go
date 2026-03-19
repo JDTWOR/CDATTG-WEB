@@ -28,6 +28,7 @@ type AsistenciaService interface {
 	CrearTipoObservacionAsistencia(req dto.TipoObservacionAsistenciaCreateRequest) (*dto.TipoObservacionAsistenciaItem, error)
 	GetDashboard(sedeID *uint, fecha string) (*dto.AsistenciaDashboardResponse, error)
 	GetCasosBienestar(sedeID *uint, dias, minFallas int) (*dto.CasosBienestarResponse, error)
+	GetDetalleInasistenciasAprendiz(fichaNumero string, aprendizID uint, dias int, sedeNombre string) (*dto.CasoBienestarAprendizDetalleResponse, error)
 	AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error)
 	ListPendientesRevision(instructorID uint, fecha string) ([]dto.AsistenciaAprendizResponse, error)
 	FinalizarSesionesVencidas()
@@ -537,6 +538,38 @@ func (s *asistenciaService) GetCasosBienestar(sedeID *uint, dias, minFallas int)
 				NumeroDocumento:             instrRows[i].NumeroDocumento,
 				CantidadAprendicesSinSalida: instrRows[i].CantidadAprendicesSinSalida,
 			}
+		}
+	}
+	return resp, nil
+}
+
+func (s *asistenciaService) GetDetalleInasistenciasAprendiz(fichaNumero string, aprendizID uint, dias int, sedeNombre string) (*dto.CasoBienestarAprendizDetalleResponse, error) {
+	if strings.TrimSpace(fichaNumero) == "" || aprendizID == 0 {
+		return nil, errors.New("ficha y aprendiz son requeridos")
+	}
+	if dias <= 0 {
+		dias = 30
+	}
+	fechaFin := time.Now()
+	fechaInicio := fechaFin.AddDate(0, 0, -dias)
+	fechaInicioStr := fechaInicio.Format("2006-01-02")
+	fechaFinStr := fechaFin.Format("2006-01-02")
+
+	rows, err := s.repo.GetDetalleInasistenciasAprendiz(fichaNumero, aprendizID, fechaInicioStr, fechaFinStr, sedeNombre)
+	if err != nil {
+		return nil, err
+	}
+	resp := &dto.CasoBienestarAprendizDetalleResponse{
+		FichaNumero:   fichaNumero,
+		AprendizID:    aprendizID,
+		FechaInicio:   fechaInicioStr,
+		FechaFin:      fechaFinStr,
+		Inasistencias: make([]dto.InasistenciaDetalleItem, len(rows)),
+	}
+	for i := range rows {
+		resp.Inasistencias[i] = dto.InasistenciaDetalleItem{
+			Fecha:         rows[i].Fecha,
+			Observaciones: rows[i].Observaciones,
 		}
 	}
 	return resp, nil

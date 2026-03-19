@@ -55,7 +55,18 @@ function sameRegistrosList(a: AsistenciaAprendizResponse[], b: AsistenciaAprendi
   if (a.length !== b.length) return false;
   return a.every((aa, i) => {
     const bb = b[i];
-    return bb && aa.id === bb.id && aa.hora_ingreso === bb.hora_ingreso && aa.hora_salida === bb.hora_salida;
+    if (!bb) return false;
+    const tiposA = (aa.tipos_observacion ?? []).map((t) => t.id).sort((x, y) => x - y);
+    const tiposB = (bb.tipos_observacion ?? []).map((t) => t.id).sort((x, y) => x - y);
+    const mismosTipos =
+      tiposA.length === tiposB.length && tiposA.every((id, idx) => id === tiposB[idx]);
+    return (
+      aa.id === bb.id &&
+      aa.hora_ingreso === bb.hora_ingreso &&
+      aa.hora_salida === bb.hora_salida &&
+      aa.observaciones === bb.observaciones &&
+      mismosTipos
+    );
   });
 }
 

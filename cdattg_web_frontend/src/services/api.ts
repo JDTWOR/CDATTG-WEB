@@ -417,6 +417,13 @@ class ApiService {
     return response.data;
   }
 
+  async exportAllFichasExcel(): Promise<Blob> {
+    const response = await this.api.get<Blob>('/fichas-caracterizacion/export/all', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
   // Instructores de una ficha
   async getFichaInstructores(fichaId: number): Promise<InstructorFichaResponse[]> {
     const response = await this.api.get<{ data: InstructorFichaResponse[] }>(`/fichas-caracterizacion/${fichaId}/instructores`);

@@ -32,15 +32,15 @@ func SetupRouter() *gin.Engine {
 	sedeInfraHandler := handlers.NewSedeHandler()
 	pisoInfraHandler := handlers.NewPisoHandler()
 	bloqueInfraHandler := handlers.NewBloqueHandler()
-		_ = handlers.NewProductoHandler() // inventario desactivado
-		_ = handlers.NewOrdenHandler()
-		_ = handlers.NewAprobacionHandler()
-		_ = handlers.NewDevolucionHandler()
-		_ = handlers.NewInventarioDashboardHandler()
-		_ = handlers.NewProveedorHandler()
-		_ = handlers.NewCategoriaHandler()
-		_ = handlers.NewMarcaHandler()
-		_ = handlers.NewContratoConvenioHandler()
+	_ = handlers.NewProductoHandler() // inventario desactivado
+	_ = handlers.NewOrdenHandler()
+	_ = handlers.NewAprobacionHandler()
+	_ = handlers.NewDevolucionHandler()
+	_ = handlers.NewInventarioDashboardHandler()
+	_ = handlers.NewProveedorHandler()
+	_ = handlers.NewCategoriaHandler()
+	_ = handlers.NewMarcaHandler()
+	_ = handlers.NewContratoConvenioHandler()
 
 	// Rutas públicas
 	api := r.Group("/api")
@@ -110,6 +110,7 @@ func SetupRouter() *gin.Engine {
 				fichas.GET("/:id/codigo", middleware.RequirePermissionVerFichaOrInstructorDeFicha(), fichaHandler.GetCodigo)
 				fichas.GET("/:id", middleware.RequirePermission("ficha", "VER FICHA"), fichaHandler.GetByID)
 				fichas.POST("/import", middleware.RequirePermission("ficha", "CREAR FICHA"), fichaHandler.ImportFichas)
+				fichas.GET("/export/all", middleware.RequirePermission("ficha", "VER FICHAS"), fichaHandler.ExportAllExcel)
 				fichas.POST("", middleware.RequirePermission("ficha", "CREAR FICHA"), fichaHandler.Create)
 				fichas.PUT("/:id", middleware.RequirePermission("ficha", "EDITAR FICHA"), fichaHandler.Update)
 				fichas.DELETE("/:id", middleware.RequirePermission("ficha", "ELIMINAR FICHA"), fichaHandler.Delete)

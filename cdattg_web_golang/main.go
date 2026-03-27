@@ -29,7 +29,7 @@ func main() {
 	// Iniciar servidor
 	serverAddr := config.AppConfig.Server.Host + ":" + config.AppConfig.Server.Port
 	log.Printf("Servidor iniciado en http://%s", serverAddr)
-	
+
 	if err := r.Run(serverAddr); err != nil {
 		log.Fatal("Error iniciando servidor:", err)
 	}

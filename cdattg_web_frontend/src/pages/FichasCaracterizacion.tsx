@@ -17,6 +17,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
   ArrowUpTrayIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -57,6 +58,7 @@ export const FichasCaracterizacion = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importLoading, setImportLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const [importResult, setImportResult] = useState<FichaImportResult | null>(null);
   const [importError, setImportError] = useState('');
   const [modalAsignar, setModalAsignar] = useState<{ ficha: FichaCaracterizacionResponse; tipo: 'instructores' | 'aprendices' } | null>(null);
@@ -279,6 +281,25 @@ export const FichasCaracterizacion = () => {
     }
   };
 
+  const handleExportAllFichas = async () => {
+    try {
+      setExportLoading(true);
+      const blob = await apiService.exportAllFichasExcel();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'fichas_aprendices.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      alert((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al exportar fichas');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const totalPages = Math.ceil(total / pageSize);
 
   const filteredList =
@@ -448,6 +469,10 @@ export const FichasCaracterizacion = () => {
           <p className="mt-2 text-gray-600">Gestión de fichas por programa de formación</p>
         </div>
         <div className="flex gap-2">
+          <button onClick={handleExportAllFichas} disabled={exportLoading} className="btn-secondary disabled:opacity-50">
+            <ArrowDownTrayIcon className="w-5 h-5 mr-2 inline" />
+            {exportLoading ? 'Exportando...' : 'Exportar todas las fichas'}
+          </button>
           <button onClick={openImportModal} className="btn-secondary">
             <ArrowUpTrayIcon className="w-5 h-5 mr-2 inline" />
             Importar fichas

@@ -5,25 +5,28 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
 	"github.com/sena/cdattg-web-golang/services"
+	"github.com/xuri/excelize/v2"
 )
 
 type FichaHandler struct {
-	svc         services.FichaService
-	importSvc  services.FichaImportService
-	instRepo    repositories.InstructorRepository
+	svc       services.FichaService
+	importSvc services.FichaImportService
+	instRepo  repositories.InstructorRepository
 }
 
 func NewFichaHandler() *FichaHandler {
 	return &FichaHandler{
-		svc:        services.NewFichaService(),
-		importSvc:  services.NewFichaImportService(),
-		instRepo:   repositories.NewInstructorRepository(),
+		svc:       services.NewFichaService(),
+		importSvc: services.NewFichaImportService(),
+		instRepo:  repositories.NewInstructorRepository(),
 	}
 }
 
@@ -284,4 +287,116 @@ func (h *FichaHandler) ImportFichas(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+// ExportAllExcel genera un archivo Excel con una hoja por ficha y su listado de aprendices activos.
+func (h *FichaHandler) ExportAllExcel(c *gin.Context) {
+	var fichas []models.FichaCaracterizacion
+	if err := database.GetDB().
+		Preload("ProgramaFormacion").
+		Preload("Aprendices", "estado = ?", true).
+		Preload("Aprendices.Persona").
+		Order("ficha ASC").
+		Find(&fichas).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "No se pudo consultar las fichas"})
+		return
+	}
+
+	xlsx := excelize.NewFile()
+	firstSheet := xlsx.GetSheetName(0)
+	sheetIndex := 0
+	usedSheetNames := map[string]int{}
+	for _, ficha := range fichas {
+		baseSheetName := sanitizeSheetName(ficha.Ficha)
+		if baseSheetName == "" {
+			baseSheetName = "Ficha"
+		}
+		sheetName := uniqueSheetName(baseSheetName, usedSheetNames)
+		if sheetIndex == 0 {
+			xlsx.SetSheetName(firstSheet, sheetName)
+		} else {
+			xlsx.NewSheet(sheetName)
+		}
+		sheetIndex++
+
+		_ = xlsx.SetCellValue(sheetName, "A1", "Ficha")
+		_ = xlsx.SetCellValue(sheetName, "B1", ficha.Ficha)
+		_ = xlsx.SetCellValue(sheetName, "A2", "Programa de formación")
+		if ficha.ProgramaFormacion != nil {
+			_ = xlsx.SetCellValue(sheetName, "B2", ficha.ProgramaFormacion.Nombre)
+		} else {
+			_ = xlsx.SetCellValue(sheetName, "B2", "")
+		}
+
+		_ = xlsx.SetCellValue(sheetName, "A4", "Documento")
+		_ = xlsx.SetCellValue(sheetName, "B4", "Nombre completo")
+		_ = xlsx.SetCellValue(sheetName, "C4", "Correo")
+		_ = xlsx.SetCellValue(sheetName, "D4", "Celular")
+
+		row := 5
+		for _, aprendiz := range ficha.Aprendices {
+			if aprendiz.Persona == nil {
+				continue
+			}
+			_ = xlsx.SetCellValue(sheetName, "A"+strconv.Itoa(row), aprendiz.Persona.NumeroDocumento)
+			_ = xlsx.SetCellValue(sheetName, "B"+strconv.Itoa(row), aprendiz.Persona.GetFullName())
+			_ = xlsx.SetCellValue(sheetName, "C"+strconv.Itoa(row), aprendiz.Persona.Email)
+			_ = xlsx.SetCellValue(sheetName, "D"+strconv.Itoa(row), aprendiz.Persona.Celular)
+			row++
+		}
+
+		_ = xlsx.SetColWidth(sheetName, "A", "D", 28)
+	}
+
+	buffer, err := xlsx.WriteToBuffer()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "No se pudo generar el Excel"})
+		return
+	}
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", `attachment; filename="fichas_aprendices.xlsx"`)
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer.Bytes())
+}
+
+func sanitizeSheetName(name string) string {
+	n := strings.TrimSpace(name)
+	replacer := strings.NewReplacer(
+		"/", "-",
+		"\\", "-",
+		"*", "",
+		"?", "",
+		"[", "(",
+		"]", ")",
+		":", "-",
+	)
+	n = replacer.Replace(n)
+	if utf8.RuneCountInString(n) > 31 {
+		runes := []rune(n)
+		n = string(runes[:31])
+	}
+	return n
+}
+
+func uniqueSheetName(base string, used map[string]int) string {
+	if _, exists := used[base]; !exists {
+		used[base] = 1
+		return base
+	}
+	for {
+		suffix := "_" + strconv.Itoa(used[base])
+		maxLen := 31 - len(suffix)
+		candidateBase := base
+		if utf8.RuneCountInString(candidateBase) > maxLen {
+			runes := []rune(candidateBase)
+			candidateBase = string(runes[:maxLen])
+		}
+		candidate := candidateBase + suffix
+		if _, exists := used[candidate]; !exists {
+			used[base]++
+			used[candidate] = 1
+			return candidate
+		}
+		used[base]++
+	}
 }

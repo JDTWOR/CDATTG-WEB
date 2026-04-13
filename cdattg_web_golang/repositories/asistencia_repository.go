@@ -26,6 +26,8 @@ type AsistenciaRepository interface {
 	FindIDsByFichaIDAndFecha(fichaID uint, fecha string) ([]uint, error)
 	Update(a *models.Asistencia) error
 	GetDashboardResumen(sedeID *uint, fecha string) (totalAprendices int, porFicha []DashboardFichaRow, err error)
+	// GetFichasSinSesionHoy lista todas las fichas (no eliminadas) sin ninguna sesión de asistencia en la fecha dada.
+	GetFichasSinSesionHoy(sedeID *uint, fecha string) ([]DashboardFichaSinSesionRow, error)
 	CountPendientesRevisionByFecha(sedeID *uint, fecha string) (int, error)
 	GetCasosBienestar(sedeID *uint, fechaInicio, fechaFin string, minFallas int) ([]CasosBienestarRow, error)
 	GetDetalleInasistenciasAprendiz(fichaNumero string, aprendizID uint, fechaInicio, fechaFin string, sedeNombre string) ([]InasistenciaDetalleRow, error)
@@ -70,12 +72,32 @@ type DashboardFichaRow struct {
 	TotalAprendices int
 }
 
+// DashboardFichaSinSesionRow ficha sin ninguna asistencia registrada en el día consultado
+type DashboardFichaSinSesionRow struct {
+	FichaID         uint
+	FichaNumero     string
+	ProgramaNombre  string
+	JornadaNombre   string
+	SedeNombre      string
+	TotalAprendices int
+}
+
 type asistenciaRepository struct {
 	db *gorm.DB
 }
 
 func NewAsistenciaRepository() AsistenciaRepository {
 	return &asistenciaRepository{db: database.GetDB()}
+}
+
+// parseDashboardFechaRange devuelve [inicio, fin) del día civil en la zona horaria local del servidor,
+// alineado con time.ParseInLocation al crear sesiones de asistencia (evita desfase respecto a UTC).
+func parseDashboardFechaRange(fecha string) (time.Time, time.Time, error) {
+	tInicio, err := time.ParseInLocation(time.DateOnly, fecha, time.Local)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	return tInicio, tInicio.AddDate(0, 0, 1), nil
 }
 
 func (r *asistenciaRepository) Create(a *models.Asistencia) error {
@@ -164,14 +186,12 @@ func (r *asistenciaRepository) Update(a *models.Asistencia) error {
 }
 
 // GetDashboardResumen devuelve total de aprendices en formación en la fecha y desglose por ficha (opcional por sede).
-// Usa rango de fechas (fecha inicio y fin de día) para evitar problemas de zona horaria con DATE().
+// Usa rango del día en hora local (coherente con la creación de sesiones).
 func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (totalAprendices int, porFicha []DashboardFichaRow, err error) {
-	// Rango del día en UTC (igual que Go guarda con time.DateOnly)
-	tInicio, err := time.Parse(time.DateOnly, fecha)
+	tInicio, tFin, err := parseDashboardFechaRange(fecha)
 	if err != nil {
 		return 0, nil, err
 	}
-	tFin := tInicio.AddDate(0, 0, 1)
 
 	// IDs de asistencias del día (y sede si aplica)
 	var asistenciaIDs []uint
@@ -248,13 +268,72 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 	return totalAprendices, porFicha, nil
 }
 
+// GetFichasSinSesionHoy devuelve todas las fichas no eliminadas que no tienen ninguna fila en asistencias
+// para el rango del día indicado (coherente con GetDashboardResumen). Opcional filtro por sede.
+func (r *asistenciaRepository) GetFichasSinSesionHoy(sedeID *uint, fecha string) ([]DashboardFichaSinSesionRow, error) {
+	tInicio, tFin, err := parseDashboardFechaRange(fecha)
+	if err != nil {
+		return nil, err
+	}
+
+	type row struct {
+		FichaID         uint   `gorm:"column:ficha_id"`
+		FichaNumero     string `gorm:"column:ficha_numero"`
+		ProgramaNombre  string `gorm:"column:programa_nombre"`
+		JornadaNombre   string `gorm:"column:jornada_nombre"`
+		SedeNombre      string `gorm:"column:sede_nombre"`
+		TotalAprendices int    `gorm:"column:total_aprendices"`
+	}
+	var rows []row
+	raw := `
+SELECT fc.id AS ficha_id, fc.ficha AS ficha_numero,
+			COALESCE(pf.nombre, '') AS programa_nombre,
+			COALESCE(j.nombre, '') AS jornada_nombre,
+			COALESCE(s.nombre, '') AS sede_nombre,
+			COUNT(DISTINCT af.id)::int AS total_aprendices
+		FROM fichas_caracterizacion fc
+		LEFT JOIN programas_formacion pf ON fc.programa_formacion_id = pf.id
+		LEFT JOIN jornadas j ON fc.jornada_id = j.id
+		LEFT JOIN sedes s ON fc.sede_id = s.id
+		LEFT JOIN aprendices af ON af.ficha_caracterizacion_id = fc.id AND af.estado = true AND af.deleted_at IS NULL
+		WHERE fc.deleted_at IS NULL
+		AND NOT EXISTS (
+			SELECT 1 FROM asistencias a
+			INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
+			WHERE ifc.ficha_id = fc.id
+			AND a.deleted_at IS NULL
+			AND a.fecha >= ? AND a.fecha < ?
+		)
+	`
+	args := []interface{}{tInicio, tFin}
+	if sedeID != nil && *sedeID > 0 {
+		raw += " AND fc.sede_id = ?"
+		args = append(args, *sedeID)
+	}
+	raw += " GROUP BY fc.id, fc.ficha, pf.nombre, j.nombre, s.nombre ORDER BY fc.ficha"
+	if err := r.db.Raw(raw, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]DashboardFichaSinSesionRow, len(rows))
+	for i := range rows {
+		out[i] = DashboardFichaSinSesionRow{
+			FichaID:         rows[i].FichaID,
+			FichaNumero:     rows[i].FichaNumero,
+			ProgramaNombre:  rows[i].ProgramaNombre,
+			JornadaNombre:   rows[i].JornadaNombre,
+			SedeNombre:      rows[i].SedeNombre,
+			TotalAprendices: rows[i].TotalAprendices,
+		}
+	}
+	return out, nil
+}
+
 // CountPendientesRevisionByFecha cuenta registros de asistencia del día con requiere_revision = true (opcional por sede).
 func (r *asistenciaRepository) CountPendientesRevisionByFecha(sedeID *uint, fecha string) (int, error) {
-	tInicio, err := time.Parse(time.DateOnly, fecha)
+	tInicio, tFin, err := parseDashboardFechaRange(fecha)
 	if err != nil {
 		return 0, err
 	}
-	tFin := tInicio.AddDate(0, 0, 1)
 	q := r.db.Table("asistencia_aprendices aa").
 		Joins("INNER JOIN asistencias a ON a.id = aa.asistencia_id").
 		Joins("INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id").

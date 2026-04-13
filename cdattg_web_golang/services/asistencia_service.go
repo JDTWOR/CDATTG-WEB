@@ -15,10 +15,10 @@ const (
 	errMsgSesionAsistenciaNoEncontrada   = "SESIÓN DE ASISTENCIA NO ENCONTRADA"
 	errMsgSesionYaFinalizada             = "LA SESIÓN YA ESTÁ FINALIZADA"
 	errMsgRegistroAsistenciaNoEncontrado = "REGISTRO DE ASISTENCIA NO ENCONTRADO"
-	errMsgFechaInvalida                 = "FECHA INVÁLIDA, USE YYYY-MM-DD"
-	errMsgYaExisteSesionActiva         = "YA EXISTE UNA SESIÓN DE ASISTENCIA ACTIVA PARA ESTA FICHA. FINALÍCELA ANTES DE CREAR OTRA"
-	errMsgNoEstaCreadoComoInstructor = "NO ESTÁ CREADO COMO INSTRUCTOR DE ESTA FICHA"
-	errMsgFueraDelHorarioJornada     = "FUERA DEL HORARIO DE LA JORNADA DE LA FICHA; SOLO SE PUEDE TOMAR ASISTENCIA EN EL HORARIO CONFIGURADO"
+	errMsgFechaInvalida                  = "FECHA INVÁLIDA, USE YYYY-MM-DD"
+	errMsgYaExisteSesionActiva           = "YA EXISTE UNA SESIÓN DE ASISTENCIA ACTIVA PARA ESTA FICHA. FINALÍCELA ANTES DE CREAR OTRA"
+	errMsgNoEstaCreadoComoInstructor     = "NO ESTÁ CREADO COMO INSTRUCTOR DE ESTA FICHA"
+	errMsgFueraDelHorarioJornada         = "FUERA DEL HORARIO DE LA JORNADA DE LA FICHA; SOLO SE PUEDE TOMAR ASISTENCIA EN EL HORARIO CONFIGURADO"
 )
 
 type AsistenciaService interface {
@@ -413,10 +413,10 @@ func (s *asistenciaService) CrearOActualizarObservaciones(asistenciaID, aprendiz
 		return s.aaToResponse(aa), nil
 	}
 	aa = &models.AsistenciaAprendiz{
-		AsistenciaID:     asistenciaID,
+		AsistenciaID:      asistenciaID,
 		InstructorFichaID: &asist.InstructorFichaID,
-		AprendizFichaID:  aprendizID,
-		Observaciones:    observaciones,
+		AprendizFichaID:   aprendizID,
+		Observaciones:     observaciones,
 	}
 	if err := s.repoAA.Create(aa); err != nil {
 		return nil, fmt.Errorf("error al guardar observaciones: %w", err)
@@ -484,11 +484,22 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 		return nil, err
 	}
 	pendientes, _ := s.repo.CountPendientesRevisionByFecha(sedeID, fecha)
+	sinSesion, errSin := s.repo.GetFichasSinSesionHoy(sedeID, fecha)
+	if errSin != nil {
+		return nil, errSin
+	}
+	var totalFichas int64
+	if n, errC := s.fichaRepo.CountAll(sedeID); errC == nil {
+		totalFichas = n
+	}
 	resp := &dto.AsistenciaDashboardResponse{
 		Fecha:                      fecha,
 		TotalAprendicesEnFormacion: total,
 		PendientesRevision:         pendientes,
 		PorFicha:                   make([]dto.AsistenciaDashboardPorFicha, len(porFicha)),
+		FichasSinAsistenciaHoy:     make([]dto.AsistenciaDashboardFichaSinSesion, len(sinSesion)),
+		TotalFichasRegistradas:     int(totalFichas),
+		FichasConSesionHoy:         len(porFicha),
 	}
 	for i := range porFicha {
 		resp.PorFicha[i] = dto.AsistenciaDashboardPorFicha{
@@ -499,6 +510,16 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 			SedeNombre:       porFicha[i].SedeNombre,
 			CantidadVinieron: porFicha[i].Cantidad,
 			TotalAprendices:  porFicha[i].TotalAprendices,
+		}
+	}
+	for i := range sinSesion {
+		resp.FichasSinAsistenciaHoy[i] = dto.AsistenciaDashboardFichaSinSesion{
+			FichaID:         sinSesion[i].FichaID,
+			FichaNumero:     sinSesion[i].FichaNumero,
+			ProgramaNombre:  sinSesion[i].ProgramaNombre,
+			JornadaNombre:   sinSesion[i].JornadaNombre,
+			SedeNombre:      sinSesion[i].SedeNombre,
+			TotalAprendices: sinSesion[i].TotalAprendices,
 		}
 	}
 	return resp, nil
@@ -529,7 +550,7 @@ func (s *asistenciaService) GetCasosBienestar(sedeID *uint, dias, minFallas int)
 		resp.Casos[i] = dto.CasoBienestarItem{
 			AprendizID:           rows[i].AprendizID,
 			PersonaNombre:        rows[i].PersonaNombre,
-			NumeroDocumento:       rows[i].NumeroDocumento,
+			NumeroDocumento:      rows[i].NumeroDocumento,
 			FichaNumero:          rows[i].FichaNumero,
 			ProgramaNombre:       rows[i].ProgramaNombre,
 			SedeNombre:           rows[i].SedeNombre,
@@ -595,13 +616,13 @@ func (s *asistenciaService) GetAsistenciaAprendizByID(id uint) (*dto.AsistenciaA
 
 func (s *asistenciaService) asistenciaToResponse(a *models.Asistencia) *dto.AsistenciaResponse {
 	r := &dto.AsistenciaResponse{
-		ID:                a.ID,
-		InstructorFichaID: a.InstructorFichaID,
-		Fecha:             a.Fecha,
-		HoraInicio:        a.HoraInicio,
-		HoraFin:           a.HoraFin,
-		IsFinished:        a.IsFinished,
-		Observaciones:     a.Observaciones,
+		ID:                 a.ID,
+		InstructorFichaID:  a.InstructorFichaID,
+		Fecha:              a.Fecha,
+		HoraInicio:         a.HoraInicio,
+		HoraFin:            a.HoraFin,
+		IsFinished:         a.IsFinished,
+		Observaciones:      a.Observaciones,
 		CantidadAprendices: len(a.AsistenciaAprendices),
 	}
 	if a.InstructorFicha != nil && a.InstructorFicha.Ficha != nil {
@@ -613,15 +634,15 @@ func (s *asistenciaService) asistenciaToResponse(a *models.Asistencia) *dto.Asis
 
 func (s *asistenciaService) aaToResponse(aa *models.AsistenciaAprendiz) *dto.AsistenciaAprendizResponse {
 	r := &dto.AsistenciaAprendizResponse{
-		ID:                           aa.ID,
-		AsistenciaID:                 aa.AsistenciaID,
-		AprendizID:                   aa.AprendizFichaID,
-		HoraIngreso:                  aa.HoraIngreso,
-		HoraSalida:                   aa.HoraSalida,
-		Observaciones:                aa.Observaciones,
-		Estado:                       aa.Estado,
-		RequiereRevision:             aa.RequiereRevision,
-		MotivoAjuste:                 aa.MotivoAjuste,
+		ID:                               aa.ID,
+		AsistenciaID:                     aa.AsistenciaID,
+		AprendizID:                       aa.AprendizFichaID,
+		HoraIngreso:                      aa.HoraIngreso,
+		HoraSalida:                       aa.HoraSalida,
+		Observaciones:                    aa.Observaciones,
+		Estado:                           aa.Estado,
+		RequiereRevision:                 aa.RequiereRevision,
+		MotivoAjuste:                     aa.MotivoAjuste,
 		InstructorFichaIDRegistroIngreso: aa.InstructorFichaIDRegistroIngreso,
 		InstructorFichaIDRegistroSalida:  aa.InstructorFichaIDRegistroSalida,
 	}
@@ -636,7 +657,7 @@ func (s *asistenciaService) aaToResponse(aa *models.AsistenciaAprendiz) *dto.Asi
 		r.FichaNumero = aa.Asistencia.InstructorFicha.Ficha.Ficha
 	}
 	if aa.Aprendiz != nil && aa.Aprendiz.Persona != nil {
-		r.AprendizNombre  = aa.Aprendiz.Persona.GetFullName()
+		r.AprendizNombre = aa.Aprendiz.Persona.GetFullName()
 		r.NumeroDocumento = aa.Aprendiz.Persona.NumeroDocumento
 	}
 	if aa.InstructorRegistroIngreso != nil && aa.InstructorRegistroIngreso.Instructor != nil && aa.InstructorRegistroIngreso.Instructor.Persona != nil {

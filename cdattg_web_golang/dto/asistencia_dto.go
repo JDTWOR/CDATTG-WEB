@@ -16,16 +16,16 @@ type AsistenciaRequest struct {
 
 // AsistenciaResponse sesión de asistencia
 type AsistenciaResponse struct {
-	ID               uint       `json:"id"`
-	InstructorFichaID uint      `json:"instructor_ficha_id"`
-	FichaID          uint      `json:"ficha_id"`
-	FichaNumero      string    `json:"ficha_numero,omitempty"`
-	Fecha            time.Time  `json:"fecha"`
-	HoraInicio       *time.Time `json:"hora_inicio"`
-	HoraFin          *time.Time `json:"hora_fin"`
-	IsFinished       bool      `json:"is_finished"`
-	Observaciones    string    `json:"observaciones"`
-	CantidadAprendices int      `json:"cantidad_aprendices,omitempty"`
+	ID                 uint       `json:"id"`
+	InstructorFichaID  uint       `json:"instructor_ficha_id"`
+	FichaID            uint       `json:"ficha_id"`
+	FichaNumero        string     `json:"ficha_numero,omitempty"`
+	Fecha              time.Time  `json:"fecha"`
+	HoraInicio         *time.Time `json:"hora_inicio"`
+	HoraFin            *time.Time `json:"hora_fin"`
+	IsFinished         bool       `json:"is_finished"`
+	Observaciones      string     `json:"observaciones"`
+	CantidadAprendices int        `json:"cantidad_aprendices,omitempty"`
 }
 
 // AsistenciaAprendizRequest registrar ingreso
@@ -42,8 +42,8 @@ type AsistenciaIngresoPorDocumentoRequest struct {
 
 // AsistenciaAprendizObservacionesRequest actualizar observaciones de un registro de asistencia-aprendiz (texto libre + tipos predefinidos)
 type AsistenciaAprendizObservacionesRequest struct {
-	Observaciones      string  `json:"observaciones"`
-	TipoObservacionIDs []uint  `json:"tipo_observacion_ids"` // opcional; varios por registro
+	Observaciones      string `json:"observaciones"`
+	TipoObservacionIDs []uint `json:"tipo_observacion_ids"` // opcional; varios por registro
 }
 
 // AsistenciaAprendizResponse registro de asistencia de un aprendiz
@@ -74,8 +74,8 @@ type AsistenciaAprendizResponse struct {
 	// Quién registró ingreso/salida (auditoría)
 	InstructorFichaIDRegistroIngreso *uint  `json:"instructor_ficha_id_registro_ingreso,omitempty"`
 	InstructorFichaIDRegistroSalida  *uint  `json:"instructor_ficha_id_registro_salida,omitempty"`
-	InstructorRegistroIngresoNombre   string `json:"instructor_registro_ingreso_nombre,omitempty"`
-	InstructorRegistroSalidaNombre    string `json:"instructor_registro_salida_nombre,omitempty"`
+	InstructorRegistroIngresoNombre  string `json:"instructor_registro_ingreso_nombre,omitempty"`
+	InstructorRegistroSalidaNombre   string `json:"instructor_registro_salida_nombre,omitempty"`
 	// Tipos de observación predefinidos asociados (varios por registro)
 	TiposObservacion []TipoObservacionAsistenciaItem `json:"tipos_observacion,omitempty"`
 }
@@ -102,42 +102,58 @@ type AsistenciaAprendizEstadoRequest struct {
 
 // AsistenciaDashboardResponse resumen para el dashboard de asistencia (solo superadmin)
 type AsistenciaDashboardResponse struct {
-	Fecha                       string                          `json:"fecha"` // YYYY-MM-DD
-	TotalAprendicesEnFormacion  int                             `json:"total_aprendices_en_formacion"`
-	PendientesRevision          int                             `json:"pendientes_revision"` // registros del día que requieren revisión
-	PorFicha                    []AsistenciaDashboardPorFicha   `json:"por_ficha"`
+	Fecha                      string                        `json:"fecha"` // YYYY-MM-DD
+	TotalAprendicesEnFormacion int                           `json:"total_aprendices_en_formacion"`
+	PendientesRevision         int                           `json:"pendientes_revision"` // registros del día que requieren revisión
+	PorFicha                   []AsistenciaDashboardPorFicha `json:"por_ficha"`
+	// FichasSinAsistenciaHoy: todas las fichas del sistema sin ninguna sesión de asistencia en la fecha consultada
+	FichasSinAsistenciaHoy []AsistenciaDashboardFichaSinSesion `json:"fichas_sin_asistencia_hoy"`
+	// TotalFichasRegistradas fichas no eliminadas (mismo filtro sede que el resto del dashboard, si aplica)
+	TotalFichasRegistradas int `json:"total_fichas_registradas"`
+	// FichasConSesionHoy cantidad de fichas con al menos una sesión ese día (len(PorFicha))
+	FichasConSesionHoy int `json:"fichas_con_sesion_hoy"`
+}
+
+// AsistenciaDashboardFichaSinSesion ficha sin sesión de asistencia en el día del resumen
+type AsistenciaDashboardFichaSinSesion struct {
+	FichaID         uint   `json:"ficha_id"`
+	FichaNumero     string `json:"ficha_numero"`
+	ProgramaNombre  string `json:"programa_nombre"`
+	JornadaNombre   string `json:"jornada_nombre"`
+	SedeNombre      string `json:"sede_nombre"`
+	TotalAprendices int    `json:"total_aprendices"`
 }
 
 // AsistenciaDashboardPorFicha cantidad de aprendices que vinieron a formación por ficha
 type AsistenciaDashboardPorFicha struct {
-	FichaID              uint   `json:"ficha_id"`
-	FichaNumero          string `json:"ficha_numero"`
-	ProgramaNombre       string `json:"programa_nombre"`
-	JornadaNombre        string `json:"jornada_nombre"`
-	SedeNombre           string `json:"sede_nombre"`
-	CantidadVinieron     int    `json:"cantidad_vinieron"`
-	TotalAprendices      int    `json:"total_aprendices"`
+	FichaID          uint   `json:"ficha_id"`
+	FichaNumero      string `json:"ficha_numero"`
+	ProgramaNombre   string `json:"programa_nombre"`
+	JornadaNombre    string `json:"jornada_nombre"`
+	SedeNombre       string `json:"sede_nombre"`
+	CantidadVinieron int    `json:"cantidad_vinieron"`
+	TotalAprendices  int    `json:"total_aprendices"`
 }
 
 // CasosBienestarResponse lista de aprendices con indicadores de riesgo (para oficina de bienestar)
 type CasosBienestarResponse struct {
-	DiasAnalizados int                   `json:"dias_analizados"`
-	MinFallas      int                   `json:"min_fallas"`
-	Casos          []CasoBienestarItem   `json:"casos"`
+	DiasAnalizados int                       `json:"dias_analizados"`
+	MinFallas      int                       `json:"min_fallas"`
+	Casos          []CasoBienestarItem       `json:"casos"`
 	Instructores   []InstructorPendienteItem `json:"instructores"`
 }
 
 // CasoBienestarItem un aprendiz con inasistencias >= umbral
 type CasoBienestarItem struct {
-	AprendizID         uint   `json:"aprendiz_id"`
-	PersonaNombre      string `json:"persona_nombre"`
-	NumeroDocumento    string `json:"numero_documento"`
-	FichaNumero        string `json:"ficha_numero"`
-	ProgramaNombre     string `json:"programa_nombre"`
-	SedeNombre         string `json:"sede_nombre"`
-	TotalSesiones      int    `json:"total_sesiones"`
-	AsistenciasEfectivas int  `json:"asistencias_efectivas"`
-	Inasistencias      int    `json:"inasistencias"`
+	AprendizID           uint   `json:"aprendiz_id"`
+	PersonaNombre        string `json:"persona_nombre"`
+	NumeroDocumento      string `json:"numero_documento"`
+	FichaNumero          string `json:"ficha_numero"`
+	ProgramaNombre       string `json:"programa_nombre"`
+	SedeNombre           string `json:"sede_nombre"`
+	TotalSesiones        int    `json:"total_sesiones"`
+	AsistenciasEfectivas int    `json:"asistencias_efectivas"`
+	Inasistencias        int    `json:"inasistencias"`
 }
 
 // InasistenciaDetalleItem representa una fecha de sesión en la que el aprendiz no asistió.
@@ -148,11 +164,11 @@ type InasistenciaDetalleItem struct {
 
 // CasoBienestarAprendizDetalleResponse detalle de inasistencias por aprendiz en una ficha.
 type CasoBienestarAprendizDetalleResponse struct {
-	FichaNumero    string                  `json:"ficha_numero"`
-	AprendizID     uint                    `json:"aprendiz_id"`
-	FechaInicio    string                  `json:"fecha_inicio"`
-	FechaFin       string                  `json:"fecha_fin"`
-	Inasistencias  []InasistenciaDetalleItem `json:"inasistencias"`
+	FichaNumero   string                    `json:"ficha_numero"`
+	AprendizID    uint                      `json:"aprendiz_id"`
+	FechaInicio   string                    `json:"fecha_inicio"`
+	FechaFin      string                    `json:"fecha_fin"`
+	Inasistencias []InasistenciaDetalleItem `json:"inasistencias"`
 }
 
 // InstructorPendienteItem resume cuántos aprendices tiene un instructor con registros "por corregir" (requiere_revision=true) en el período analizado.

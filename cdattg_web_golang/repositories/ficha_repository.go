@@ -21,6 +21,8 @@ type FichaRepository interface {
 	Delete(id uint) error
 	ExistsByFicha(ficha string) bool
 	ExistsByFichaExcludingID(ficha string, excludeID uint) bool
+	// CountAll cuenta fichas no eliminadas; sedeID opcional filtra por sede.
+	CountAll(sedeID *uint) (int64, error)
 }
 
 type fichaRepository struct {
@@ -124,13 +126,13 @@ func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instruct
 func (r *fichaRepository) Search(query string) ([]models.FichaCaracterizacion, error) {
 	var fichas []models.FichaCaracterizacion
 	searchPattern := "%" + query + "%"
-	
+
 	if err := r.db.Where("ficha LIKE ?", searchPattern).
 		Or("id IN (SELECT id FROM programas_formacion WHERE nombre LIKE ?)", searchPattern).
 		Preload("ProgramaFormacion").Find(&fichas).Error; err != nil {
 		return nil, err
 	}
-	
+
 	return fichas, nil
 }
 
@@ -156,4 +158,16 @@ func (r *fichaRepository) ExistsByFichaExcludingID(ficha string, excludeID uint)
 	var count int64
 	r.db.Model(&models.FichaCaracterizacion{}).Where("ficha = ? AND id != ?", ficha, excludeID).Count(&count)
 	return count > 0
+}
+
+func (r *fichaRepository) CountAll(sedeID *uint) (int64, error) {
+	var n int64
+	q := r.db.Model(&models.FichaCaracterizacion{})
+	if sedeID != nil && *sedeID > 0 {
+		q = q.Where("sede_id = ?", *sedeID)
+	}
+	if err := q.Count(&n).Error; err != nil {
+		return 0, err
+	}
+	return n, nil
 }

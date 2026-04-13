@@ -43,28 +43,28 @@ var (
 	}
 	// PermisosInventario desactivado: módulo inventario no en uso
 	PermisosInventario = []string{}
-	PermisosUsuario = []string{
+	PermisosUsuario    = []string{
 		"CREAR USUARIO", "ASIGNAR PERMISOS",
 	}
 )
 
 // ObjPersona, ObjPrograma, ... nombres de objeto usados en rutas y Casbin.
 const (
-	ObjPersona     = "persona"
-	ObjPrograma    = "programa"
-	ObjFicha       = "ficha"
-	ObjAprendiz    = "aprendiz"
-	ObjInstructor  = "instructor"
-	ObjAsistencia  = "asistencia"
-	ObjUsuario     = "usuario"
-	ObjInventario  = "inventario"
-	ObjProducto    = "producto"
-	ObjOrden       = "orden"
-	ObjDevolucion  = "devolucion"
-	ObjProveedor   = "proveedor"
-	ObjCategoria   = "categoria"
-	ObjMarca       = "marca"
-	ObjContrato    = "contrato"
+	ObjPersona    = "persona"
+	ObjPrograma   = "programa"
+	ObjFicha      = "ficha"
+	ObjAprendiz   = "aprendiz"
+	ObjInstructor = "instructor"
+	ObjAsistencia = "asistencia"
+	ObjUsuario    = "usuario"
+	ObjInventario = "inventario"
+	ObjProducto   = "producto"
+	ObjOrden      = "orden"
+	ObjDevolucion = "devolucion"
+	ObjProveedor  = "proveedor"
+	ObjCategoria  = "categoria"
+	ObjMarca      = "marca"
+	ObjContrato   = "contrato"
 )
 
 // IsValidPermiso indica si (obj, act) es un permiso definido en el sistema.

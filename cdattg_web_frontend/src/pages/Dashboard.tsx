@@ -8,6 +8,7 @@ import {
   ExclamationTriangleIcon,
   ClipboardDocumentListIcon,
   CalendarDaysIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
@@ -44,13 +45,15 @@ export const Dashboard = () => {
         const canSeeInstructoresNow = hasPermission('VER FICHAS');
         const canSeeAprendicesNow = hasPermission('VER APRENDICES');
         const canSeeAsistenciaNow = hasPermission('VER ASISTENCIA');
-        const canSeeBienestarNow = roles.includes('SUPER ADMINISTRADOR') || roles.includes('BIENESTAR AL APRENDIZ');
+        const isSuperAdminNow = roles.includes('SUPER ADMINISTRADOR');
+        const canLoadAsistenciaDashboard = canSeeAsistenciaNow || isSuperAdminNow;
+        const canSeeBienestarNow = isSuperAdminNow || roles.includes('BIENESTAR AL APRENDIZ');
 
         const [personasRes, instructoresRes, aprendicesRes, asistenciaRes, casosRes] = await Promise.all([
           canSeePersonasNow ? apiService.getPersonas(1, 1) : Promise.resolve(null),
           canSeeInstructoresNow ? apiService.getInstructores(1, 1) : Promise.resolve(null),
           canSeeAprendicesNow ? apiService.getAprendices(1, 1) : Promise.resolve(null),
-          canSeeAsistenciaNow ? apiService.getAsistenciaDashboard() : Promise.resolve(null),
+          canLoadAsistenciaDashboard ? apiService.getAsistenciaDashboard() : Promise.resolve(null),
           canSeeBienestarNow ? apiService.getCasosBienestar({ dias: 30, min_fallas: 3 }) : Promise.resolve(null),
         ]);
 
@@ -85,6 +88,12 @@ export const Dashboard = () => {
   const canSeeAprendices = hasPermission('VER APRENDICES');
   const canSeeAsistencia = hasPermission('VER ASISTENCIA');
   const canSeeBienestar = roles.includes('SUPER ADMINISTRADOR') || roles.includes('BIENESTAR AL APRENDIZ');
+  const esSuperAdmin = roles.includes('SUPER ADMINISTRADOR');
+
+  const fichasSinAsistenciaHoy = useMemo(
+    () => asistenciaDashboard?.fichas_sin_asistencia_hoy ?? [],
+    [asistenciaDashboard],
+  );
 
   const filasPorSede = useMemo(() => {
     const map = new Map<string, { vinieron: number; total: number }>();
@@ -193,7 +202,10 @@ export const Dashboard = () => {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Asistencia hoy</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Aprendices en formación ahora</p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
+                Con ingreso hoy y sin salida registrada (no es el número de fichas).
+              </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
                 {renderValor(asistenciaHoy, canSeeAsistencia)}
               </p>
@@ -234,6 +246,98 @@ export const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Superadmin: fichas del sistema sin sesión de asistencia hoy */}
+      {esSuperAdmin && (canSeeAsistencia || asistenciaDashboard != null) && (
+        <div className="card border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-900/10">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <ExclamationTriangleIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" aria-hidden />
+                Fichas pendientes (sin sesión hoy)
+              </h2>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Fichas que aún no tienen una sesión de asistencia creada para el día{' '}
+                <span className="font-medium text-gray-800 dark:text-gray-200">{asistenciaDashboard?.fecha ?? '—'}</span>
+                {loading && !asistenciaDashboard ? ' (cargando…)' : ''}. Si solo existe una ficha en el sistema y ya se abrió
+                sesión, este listado quedará vacío.
+              </p>
+              {asistenciaDashboard != null &&
+                typeof asistenciaDashboard.total_fichas_registradas === 'number' &&
+                typeof asistenciaDashboard.fichas_con_sesion_hoy === 'number' && (
+                  <p className="mt-2 text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Resumen:{' '}
+                    <span className="tabular-nums">{asistenciaDashboard.total_fichas_registradas}</span> fichas en el sistema ·{' '}
+                    <span className="tabular-nums">{asistenciaDashboard.fichas_con_sesion_hoy}</span> con sesión hoy ·{' '}
+                    <span className="tabular-nums text-amber-700 dark:text-amber-300">
+                      {fichasSinAsistenciaHoy.length}
+                    </span>{' '}
+                    sin sesión
+                  </p>
+                )}
+            </div>
+            <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 shrink-0 tabular-nums">
+              {loading && fichasSinAsistenciaHoy.length === 0 ? '…' : fichasSinAsistenciaHoy.length}
+            </p>
+          </div>
+          {fichasSinAsistenciaHoy.length === 0 ? (
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              No hay fichas pendientes: todas las fichas registradas ya tienen al menos una sesión de asistencia para este día,
+              o en el sistema solo hay una ficha y ya se abrió sesión. Revise el resumen numérico arriba.
+            </p>
+          ) : (
+            <div className="overflow-x-auto max-h-[28rem] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-600">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600 text-sm">
+                <caption className="sr-only">
+                  Listado de fichas sin sesión de asistencia en la fecha del resumen
+                </caption>
+                <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Ficha
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Programa
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Jornada
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Sede
+                    </th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Aprendices
+                    </th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-28">
+                      Acción
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-900/40 divide-y divide-gray-200 dark:divide-gray-700">
+                  {fichasSinAsistenciaHoy.map((row) => (
+                    <tr key={row.ficha_id} className="hover:bg-gray-50 dark:hover:bg-gray-800/80">
+                      <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">{row.ficha_numero}</td>
+                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{row.programa_nombre || '—'}</td>
+                      <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{row.jornada_nombre || '—'}</td>
+                      <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{row.sede_nombre || '—'}</td>
+                      <td className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">{row.total_aprendices}</td>
+                      <td className="px-4 py-2 text-right">
+                        <Link
+                          to={`/fichas/${row.ficha_id}`}
+                          className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline text-xs font-medium"
+                        >
+                          <DocumentTextIcon className="w-4 h-4" aria-hidden />
+                          Ver ficha
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Fila 3: segmentación */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

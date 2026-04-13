@@ -452,11 +452,24 @@ export interface TipoObservacionAsistenciaCreateRequest {
 }
 
 /** Respuesta del dashboard de asistencia (solo superadmin) */
+export interface AsistenciaDashboardFichaSinSesion {
+  ficha_id: number;
+  ficha_numero: string;
+  programa_nombre?: string;
+  jornada_nombre?: string;
+  sede_nombre?: string;
+  total_aprendices: number;
+}
+
 export interface AsistenciaDashboardResponse {
   fecha: string;
   total_aprendices_en_formacion: number;
   pendientes_revision?: number;
   por_ficha: AsistenciaDashboardPorFicha[];
+  /** Fichas del sistema sin ninguna sesión de asistencia en la fecha del resumen */
+  fichas_sin_asistencia_hoy?: AsistenciaDashboardFichaSinSesion[];
+  total_fichas_registradas?: number;
+  fichas_con_sesion_hoy?: number;
 }
 
 /** Casos de bienestar: aprendices con N+ inasistencias (riesgo deserción) */

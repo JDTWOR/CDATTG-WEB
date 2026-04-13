@@ -1,12 +1,22 @@
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, memo, useRef, type ComponentProps, type ReactNode } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { ExclamationTriangleIcon, ArrowLeftIcon, DocumentTextIcon, UserPlusIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon, PencilSquareIcon, ChartBarIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
+import {
+  ExclamationTriangleIcon,
+  ArrowLeftIcon,
+  DocumentTextIcon,
+  UserPlusIcon,
+  ArrowRightStartOnRectangleIcon,
+  ArrowLeftEndOnRectangleIcon,
+  PencilSquareIcon,
+  ChartBarIcon,
+  CalendarDaysIcon,
+} from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import { EscanerQR } from '../components/EscanerQR';
 import { useAuth } from '../context/AuthContext';
 import type {
   FichaCaracterizacionResponse,
-  InstructorFichaResponse,
   AsistenciaResponse,
   AprendizResponse,
   AsistenciaAprendizResponse,
@@ -21,34 +31,98 @@ function groupRegistrosByAprendiz(list: AsistenciaAprendizResponse[]): Map<numbe
     if (!map.has(id)) map.set(id, []);
     map.get(id)!.push(aa);
   }
-  // Ordenar cada grupo por hora_ingreso (o id) para orden consistente
-  map.forEach((arr) => arr.sort((a, b) => (a.hora_ingreso && b.hora_ingreso ? new Date(a.hora_ingreso).getTime() - new Date(b.hora_ingreso).getTime() : (a.id - b.id))));
+  for (const arr of map.values()) {
+    arr.sort((a, b) => {
+      if (a.hora_ingreso && b.hora_ingreso) {
+        return new Date(a.hora_ingreso).getTime() - new Date(b.hora_ingreso).getTime();
+      }
+      return a.id - b.id;
+    });
+  }
   return map;
 }
 
 /** Resumen de múltiples tramos de un aprendiz: tramo abierto, primera entrada, última salida, observaciones. */
 function summaryRegistros(registros: AsistenciaAprendizResponse[]) {
   const open = registros.find((r) => r.hora_ingreso && !r.hora_salida) ?? null;
-  const conIngreso = registros.filter((r) => r.hora_ingreso && !isNaN(new Date(r.hora_ingreso).getTime()));
-  const conSalida = registros.filter((r) => r.hora_salida && !isNaN(new Date(r.hora_salida).getTime()));
-  const firstIngreso =
-    conIngreso.length > 0
-      ? new Date(conIngreso.reduce((a, b) => (new Date(a.hora_ingreso!).getTime() < new Date(b.hora_ingreso!).getTime() ? a : b)).hora_ingreso!).toLocaleTimeString('es-CO', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : null;
-  const lastSalida =
-    conSalida.length > 0
-      ? new Date(conSalida.reduce((a, b) => (new Date(a.hora_salida!).getTime() > new Date(b.hora_salida!).getTime() ? a : b)).hora_salida!).toLocaleTimeString('es-CO', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : null;
-  const observaciones = open?.observaciones ?? (registros.length ? registros[registros.length - 1]?.observaciones ?? '' : '') ?? '';
-  const tiposObservacion = open?.tipos_observacion ?? (registros.length ? registros[registros.length - 1]?.tipos_observacion : undefined) ?? [];
+  const conIngreso = registros.filter((r) => {
+    if (!r.hora_ingreso) return false;
+    return !Number.isNaN(new Date(r.hora_ingreso).getTime());
+  });
+  const conSalida = registros.filter((r) => {
+    if (!r.hora_salida) return false;
+    return !Number.isNaN(new Date(r.hora_salida).getTime());
+  });
+
+  let firstIngreso: string | null = null;
+  if (conIngreso.length > 0) {
+    const earliest = conIngreso.reduce((best, cur) =>
+      new Date(cur.hora_ingreso!).getTime() < new Date(best.hora_ingreso!).getTime() ? cur : best,
+      conIngreso[0],
+    );
+    firstIngreso = new Date(earliest.hora_ingreso!).toLocaleTimeString('es-CO', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  let lastSalida: string | null = null;
+  if (conSalida.length > 0) {
+    const latest = conSalida.reduce((best, cur) =>
+      new Date(cur.hora_salida!).getTime() > new Date(best.hora_salida!).getTime() ? cur : best,
+      conSalida[0],
+    );
+    lastSalida = new Date(latest.hora_salida!).toLocaleTimeString('es-CO', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  const lastReg = registros.length > 0 ? registros.at(-1) : undefined;
+  const observaciones = open?.observaciones ?? (lastReg?.observaciones ?? '');
+  const tiposObservacion = open?.tipos_observacion ?? lastReg?.tipos_observacion ?? [];
+
   const requiereRevisionRecord = registros.find((r) => r.requiere_revision) ?? null;
   return { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord };
+}
+
+function buildRangoText(firstIngreso: string | null, lastSalida: string | null, open: AsistenciaAprendizResponse | null): string {
+  const left = firstIngreso ?? '–';
+  if (lastSalida) {
+    return `${left} → ${lastSalida}`;
+  }
+  if (open) {
+    return `${left} → —`;
+  }
+  return left;
+}
+
+const ASIST_MODAL_IDS = {
+  obsTipo: 'asistencia-modal-obs-tipo',
+  obsLibre: 'asistencia-modal-obs-libre',
+  estado: 'asistencia-modal-estado',
+  estadoMotivo: 'asistencia-modal-estado-motivo',
+} as const;
+
+/** Ids distintos del modal de estado en la vista raíz (evita colisión si se reutiliza el mismo árbol). */
+const ASIST_MODAL_IDS_ROOT = {
+  estado: 'asistencia-modal-estado-root',
+  estadoMotivo: 'asistencia-modal-estado-motivo-root',
+} as const;
+
+const ASIST_REGISTRO_DOC_INPUT_ID = 'asistencia-registro-doc-manual';
+
+function mensajeRegistroPorTipo(data: { mensaje?: string | null; tipo_registro?: string }): string {
+  if (data.mensaje) {
+    return data.mensaje;
+  }
+  if (data.tipo_registro === 'ingreso') {
+    return 'Ingreso registrado';
+  }
+  if (data.tipo_registro === 'salida') {
+    return 'Salida registrada';
+  }
+  return 'Asistencia completa';
 }
 
 function sameRegistrosList(a: AsistenciaAprendizResponse[], b: AsistenciaAprendizResponse[]): boolean {
@@ -70,7 +144,7 @@ function sameRegistrosList(a: AsistenciaAprendizResponse[], b: AsistenciaAprendi
   });
 }
 
-type TarjetaAprendizAsistenciaProps = {
+type TarjetaAprendizAsistenciaProps = Readonly<{
   aprendiz: AprendizResponse;
   registros: AsistenciaAprendizResponse[];
   index: number;
@@ -78,8 +152,14 @@ type TarjetaAprendizAsistenciaProps = {
   onRegistrarIngreso: (aprendizId: number) => void;
   onRegistrarSalida: (asistenciaAprendizId: number) => void;
   onAbrirEstado: (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => void;
-  onAbrirObservaciones: (payload: { asistenciaId: number; aprendizId: number; nombre: string; observaciones: string; tiposObservacion?: TipoObservacionAsistenciaItem[] }) => void;
-};
+  onAbrirObservaciones: (payload: {
+    asistenciaId: number;
+    aprendizId: number;
+    nombre: string;
+    observaciones: string;
+    tiposObservacion?: TipoObservacionAsistenciaItem[];
+  }) => void;
+}>;
 
 function TarjetaAprendizAsistencia({
   aprendiz,
@@ -92,7 +172,50 @@ function TarjetaAprendizAsistencia({
   onAbrirObservaciones,
 }: TarjetaAprendizAsistenciaProps) {
   const { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord } = summaryRegistros(registros);
-  const rango = `${firstIngreso ?? '–'}${lastSalida ? ` → ${lastSalida}` : open ? ' → —' : ''}`;
+  const rango = buildRangoText(firstIngreso, lastSalida, open);
+
+  let accionPrincipalTarjeta: ReactNode;
+  if (open) {
+    accionPrincipalTarjeta = (
+      <button
+        type="button"
+        onClick={() => onRegistrarSalida(open.id)}
+        className="flex min-h-[44px] min-w-[120px] flex-1 items-center justify-center rounded-lg bg-primary-600 text-sm font-medium text-white hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
+        aria-label="Registrar salida"
+      >
+        Salida
+      </button>
+    );
+  } else if (requiereRevisionRecord) {
+    accionPrincipalTarjeta = (
+      <button
+        type="button"
+        onClick={() =>
+          onAbrirEstado({
+            asistenciaAprendizId: requiereRevisionRecord.id,
+            nombre: aprendiz.persona_nombre ?? 'Aprendiz',
+            estado: requiereRevisionRecord.estado || 'ASISTENCIA_COMPLETA',
+            motivo: requiereRevisionRecord.motivo_ajuste || '',
+          })
+        }
+        className="flex min-h-[44px] min-w-[120px] flex-1 items-center justify-center rounded-lg border border-amber-400 bg-amber-50 text-sm font-medium text-amber-800 touch-manipulation"
+      >
+        Resolver estado
+      </button>
+    );
+  } else {
+    accionPrincipalTarjeta = (
+      <button
+        type="button"
+        onClick={() => onRegistrarIngreso(aprendiz.id)}
+        className="flex min-h-[44px] min-w-[120px] flex-1 items-center justify-center rounded-lg bg-primary-600 text-sm font-medium text-white hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
+        aria-label="Registrar entrada"
+      >
+        Entrada
+      </button>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -106,7 +229,7 @@ function TarjetaAprendizAsistencia({
           {rango}
         </span>
       </div>
-      {(observaciones || tiposObservacion.length > 0) ? (
+      {(tiposObservacion.length > 0 || observaciones) ? (
         <div className="text-sm text-gray-600 dark:text-gray-300 mb-3 space-y-1">
           {tiposObservacion.length > 0 && (
             <div className="flex flex-wrap gap-1">
@@ -120,42 +243,9 @@ function TarjetaAprendizAsistencia({
           {observaciones ? <p className="line-clamp-2" title={observaciones}>{observaciones}</p> : null}
         </div>
       ) : null}
-      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-        {open ? (
-          <button
-            type="button"
-            onClick={() => onRegistrarSalida(open.id)}
-            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
-            aria-label="Registrar salida"
-          >
-            Salida
-          </button>
-        ) : requiereRevisionRecord ? (
-          <button
-            type="button"
-            onClick={() =>
-              onAbrirEstado({
-                asistenciaAprendizId: requiereRevisionRecord.id,
-                nombre: aprendiz.persona_nombre ?? 'Aprendiz',
-                estado: requiereRevisionRecord.estado || 'ASISTENCIA_COMPLETA',
-                motivo: requiereRevisionRecord.motivo_ajuste || '',
-              })
-            }
-            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center rounded-lg border border-amber-400 bg-amber-50 text-amber-800 text-sm font-medium touch-manipulation"
-          >
-            Resolver estado
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onRegistrarIngreso(aprendiz.id)}
-            className="flex-1 min-w-[120px] min-h-[44px] flex items-center justify-center rounded-lg bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
-            aria-label="Registrar entrada"
-          >
-            Entrada
-          </button>
-        )}
-        {asistenciaId != null ? (
+      <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-2 dark:border-gray-700">
+        {accionPrincipalTarjeta}
+        {asistenciaId === null ? null : (
           <button
             type="button"
             onClick={() =>
@@ -173,13 +263,13 @@ function TarjetaAprendizAsistencia({
           >
             <PencilSquareIcon className="w-5 h-5" />
           </button>
-        ) : null}
+        )}
       </div>
     </div>
   );
 }
 
-type FilaAprendizAsistenciaProps = {
+type FilaAprendizAsistenciaProps = Readonly<{
   aprendiz: AprendizResponse;
   registros: AsistenciaAprendizResponse[];
   index: number;
@@ -187,8 +277,14 @@ type FilaAprendizAsistenciaProps = {
   onRegistrarIngreso: (aprendizId: number) => void;
   onRegistrarSalida: (asistenciaAprendizId: number) => void;
   onAbrirEstado: (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => void;
-  onAbrirObservaciones: (payload: { asistenciaId: number; aprendizId: number; nombre: string; observaciones: string; tiposObservacion?: TipoObservacionAsistenciaItem[] }) => void;
-};
+  onAbrirObservaciones: (payload: {
+    asistenciaId: number;
+    aprendizId: number;
+    nombre: string;
+    observaciones: string;
+    tiposObservacion?: TipoObservacionAsistenciaItem[];
+  }) => void;
+}>;
 
 const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
   aprendiz,
@@ -201,6 +297,54 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
   onAbrirObservaciones,
 }: FilaAprendizAsistenciaProps) {
   const { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord } = summaryRegistros(registros);
+
+  let textoCeldaSalida: string;
+  if (lastSalida) {
+    textoCeldaSalida = lastSalida;
+  } else if (open) {
+    textoCeldaSalida = '—';
+  } else {
+    textoCeldaSalida = '–';
+  }
+
+  let textoObsCelda: string | null;
+  if (observaciones) {
+    textoObsCelda = observaciones;
+  } else if (tiposObservacion.length === 0) {
+    textoObsCelda = '–';
+  } else {
+    textoObsCelda = null;
+  }
+
+  let iconoEntradaSalida: ReactNode;
+  if (open) {
+    iconoEntradaSalida = (
+      <button
+        type="button"
+        onClick={() => onRegistrarSalida(open.id)}
+        className="flex min-h-[52px] min-w-[52px] items-center justify-center rounded-xl text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300 touch-manipulation"
+        title="Registrar salida"
+        aria-label="Registrar salida"
+      >
+        <ArrowLeftEndOnRectangleIcon className="h-7 w-7" />
+      </button>
+    );
+  } else if (requiereRevisionRecord) {
+    iconoEntradaSalida = <span className="inline-block min-h-[52px] min-w-[52px]" aria-hidden />;
+  } else {
+    iconoEntradaSalida = (
+      <button
+        type="button"
+        onClick={() => onRegistrarIngreso(aprendiz.id)}
+        className="flex min-h-[52px] min-w-[52px] items-center justify-center rounded-xl text-green-600 transition-colors hover:bg-green-50 hover:text-green-700 dark:text-green-500 dark:hover:bg-green-900/30 dark:hover:text-green-400 touch-manipulation"
+        title="Registrar entrada"
+        aria-label="Registrar entrada"
+      >
+        <ArrowRightStartOnRectangleIcon className="h-7 w-7" />
+      </button>
+    );
+  }
+
   return (
     <tr className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-600 dark:text-gray-400">{index}</td>
@@ -209,44 +353,22 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
         {firstIngreso ?? '–'}
       </td>
-      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-        {lastSalida ?? (open ? '—' : '–')}
-      </td>
+      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">{textoCeldaSalida}</td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-500 dark:text-gray-400">
         {tiposObservacion.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-1">
+          <div className="mb-1 flex flex-wrap gap-1">
             {tiposObservacion.map((t) => (
-              <span key={t.id} className="inline-flex rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs">{t.nombre}</span>
+              <span key={t.id} className="inline-flex rounded bg-gray-100 px-1.5 py-0.5 text-xs dark:bg-gray-700">
+                {t.nombre}
+              </span>
             ))}
           </div>
         )}
-        {observaciones || (tiposObservacion.length === 0 ? '–' : null)}
+        {textoObsCelda}
       </td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
         <div className="flex items-center gap-2">
-          {open ? (
-            <button
-              type="button"
-              onClick={() => onRegistrarSalida(open.id)}
-              className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30 touch-manipulation transition-colors"
-              title="Registrar salida"
-              aria-label="Registrar salida"
-            >
-              <ArrowLeftOnRectangleIcon className="h-7 w-7" />
-            </button>
-          ) : !requiereRevisionRecord ? (
-            <button
-              type="button"
-              onClick={() => onRegistrarIngreso(aprendiz.id)}
-              className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-500 dark:hover:text-green-400 dark:hover:bg-green-900/30 touch-manipulation transition-colors"
-              title="Registrar entrada"
-              aria-label="Registrar entrada"
-            >
-              <ArrowRightOnRectangleIcon className="h-7 w-7" />
-            </button>
-          ) : (
-            <span className="min-w-[52px] min-h-[52px] inline-block" aria-hidden />
-          )}
+          {iconoEntradaSalida}
           {requiereRevisionRecord && (
             <button
               type="button"
@@ -263,7 +385,7 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
               Resolver estado
             </button>
           )}
-          {asistenciaId != null ? (
+          {asistenciaId === null ? null : (
             <button
               type="button"
               onClick={() =>
@@ -275,13 +397,13 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
                   tiposObservacion,
                 })
               }
-              className="min-w-[52px] min-h-[52px] flex items-center justify-center rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 touch-manipulation transition-colors"
+              className="flex min-h-[52px] min-w-[52px] items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 touch-manipulation"
               title="Observaciones"
               aria-label="Registrar observaciones"
             >
               <PencilSquareIcon className="h-7 w-7" />
             </button>
-          ) : null}
+          )}
         </div>
       </td>
     </tr>
@@ -306,11 +428,10 @@ export const Asistencia = () => {
   const [fichas, setFichas] = useState<FichaCaracterizacionResponse[]>([]);
   const [fichasLoading, setFichasLoading] = useState(true);
   const [fichaId, setFichaId] = useState<number | ''>(() => {
-    const id = fichaFromUrl ? parseInt(fichaFromUrl, 10) : NaN;
+    const id = fichaFromUrl ? Number.parseInt(fichaFromUrl, 10) : Number.NaN;
     return Number.isFinite(id) ? id : '';
   });
-  const [, _setInstructoresFicha] = useState<InstructorFichaResponse[]>([]);
-  const [, setAsistencias] = useState<AsistenciaResponse[]>([]);
+  const [asistenciasSesion, setAsistenciasSesion] = useState<AsistenciaResponse[]>([]);
   const [sesionActual, setSesionActual] = useState<AsistenciaResponse | null>(null);
   const [aprendicesFicha, setAprendicesFicha] = useState<AprendizResponse[]>([]);
   const [aprendicesEnSesion, setAprendicesEnSesion] = useState<AsistenciaAprendizResponse[]>([]);
@@ -318,10 +439,13 @@ export const Asistencia = () => {
   const [errorAprendices, setErrorAprendices] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [instructorFichaSeleccionado, _setInstructorFichaSeleccionado] = useState<number | ''>('');
-  const [, setMostrarNuevaSesion] = useState(false);
-  const [fechaSesion, _setFechaSesion] = useState(() => new Date().toISOString().slice(0, 10));
-  const [, setErrorSesion] = useState('');
+  /** Valores por defecto para crear sesión (ampliar con UI cuando exista selector). */
+  const nuevaSesionPayloadRef = useRef({
+    instructorFichaSeleccionado: '' as number | '',
+    fechaSesion: new Date().toISOString().slice(0, 10),
+  });
+  const [mostrarNuevaSesion, setMostrarNuevaSesion] = useState(false);
+  const [errorSesionMsg, setErrorSesionMsg] = useState('');
   const [documentoManual, setDocumentoManual] = useState('');
   const [errorRegistroManual, setErrorRegistroManual] = useState('');
   const [mensajeRegistroManual, setMensajeRegistroManual] = useState('');
@@ -361,8 +485,11 @@ export const Asistencia = () => {
     try {
       const res = await apiService.getFichasCaracterizacion(1, 200, undefined, true);
       setFichas(res.data);
-    } catch (_) {
+    } catch (cause: unknown) {
       setFichas([]);
+      if (import.meta.env.DEV) {
+        console.warn('[Asistencia] No se pudieron cargar fichas', cause);
+      }
     } finally {
       setFichasLoading(false);
     }
@@ -380,12 +507,12 @@ export const Asistencia = () => {
       try {
         const data = await apiService.getAsistenciaPendientesRevision();
         setPendientesRevision(data);
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const status = (e as { response?: { status?: number } }).response?.status;
         const msg =
-          e.response?.data?.error ||
-          (e.response?.status === 403
+          status === 403
             ? 'Solo instructores con permiso de asistencia pueden ver pendientes de revisión.'
-            : 'No se pudo cargar la bandeja de pendientes de revisión.');
+            : axiosErrorMessage(e, 'No se pudo cargar la bandeja de pendientes de revisión.');
         setPendientesError(msg);
         setPendientesRevision([]);
       } finally {
@@ -397,7 +524,7 @@ export const Asistencia = () => {
 
   useEffect(() => {
     if (fichaFromUrl) {
-      const id = parseInt(fichaFromUrl, 10);
+      const id = Number.parseInt(fichaFromUrl, 10);
       if (Number.isFinite(id)) setFichaId(id);
     }
   }, [fichaFromUrl]);
@@ -409,40 +536,48 @@ export const Asistencia = () => {
     }
   }, [fichaId]);
 
-  const loadAprendicesYSesion = async (asistenciaId: number, fichaIdParam?: number) => {
-    const fid = fichaIdParam ?? fichaId;
-    if (!fid) return;
-    setErrorAprendices('');
-    setLoadingAprendices(true);
-    setAprendicesFicha([]);
-    try {
-      const [aprendices, enSesion] = await Promise.all([
-        apiService.getFichaAprendices(fid),
-        apiService.getAsistenciaAprendices(asistenciaId),
-      ]);
-      setAprendicesFicha(aprendices.filter((a) => a.estado));
-      setAprendicesEnSesion(enSesion);
-    } catch (e: any) {
-      const msg = e.response?.data?.error || e.message || 'No se pudo cargar el listado de aprendices. Verifique permisos (VER ASISTENCIA) o que los aprendices estén asignados a la ficha.';
-      setErrorAprendices(msg);
+  const loadAprendicesYSesion = useCallback(
+    async (asistenciaId: number, fichaIdParam?: number) => {
+      const fid = fichaIdParam ?? fichaId;
+      if (!fid) return;
+      setErrorAprendices('');
+      setLoadingAprendices(true);
       setAprendicesFicha([]);
-      setAprendicesEnSesion([]);
-    } finally {
-      setLoadingAprendices(false);
-    }
-  };
+      try {
+        const [aprendices, enSesion] = await Promise.all([
+          apiService.getFichaAprendices(fid),
+          apiService.getAsistenciaAprendices(asistenciaId),
+        ]);
+        setAprendicesFicha(aprendices.filter((a) => a.estado));
+        setAprendicesEnSesion(enSesion);
+      } catch (e: unknown) {
+        const msg = axiosErrorMessage(
+          e,
+          'No se pudo cargar el listado de aprendices. Verifique permisos (VER ASISTENCIA) o que los aprendices estén asignados a la ficha.',
+        );
+        setErrorAprendices(msg);
+        setAprendicesFicha([]);
+        setAprendicesEnSesion([]);
+      } finally {
+        setLoadingAprendices(false);
+      }
+    },
+    [fichaId],
+  );
 
   useEffect(() => {
-    if (sesionActual && fichaId) loadAprendicesYSesion(sesionActual.id, fichaId);
+    if (sesionActual && fichaId) void loadAprendicesYSesion(sesionActual.id, fichaId);
     else {
       setAprendicesEnSesion([]);
       if (!sesionActual) setAprendicesFicha([]);
     }
-  }, [sesionActual?.id, fichaId]);
+  }, [sesionActual, fichaId, loadAprendicesYSesion]);
 
   useEffect(() => {
     if (!sesionActual) return;
     apiService.getTiposObservacionAsistencia().then(setTiposObservacionCatalog).catch(() => setTiposObservacionCatalog([]));
+    // Dependencia solo del id: evita recargar el catálogo cuando cambian otros campos del objeto sesión.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps deliberadas: sesionActual?.id únicamente
   }, [sesionActual?.id]);
 
   const handleTomarAsistencia = async (id: number) => {
@@ -456,8 +591,8 @@ export const Asistencia = () => {
       setSearchParams({ ficha: String(id) });
       setSesionActual(sesion);
       if (id) loadAprendicesYSesion(sesion.id, id);
-    } catch (e: any) {
-      const msg = e.response?.data?.error || 'No está asignado como instructor de esta ficha.';
+    } catch (e: unknown) {
+      const msg = axiosErrorMessage(e, 'No está asignado como instructor de esta ficha.');
       setError(msg);
     } finally {
       setLoading(false);
@@ -472,8 +607,9 @@ export const Asistencia = () => {
   };
 
   const _handleCrearSesion = async () => {
+    const { instructorFichaSeleccionado, fechaSesion } = nuevaSesionPayloadRef.current;
     if (!instructorFichaSeleccionado) return;
-    setErrorSesion('');
+    setErrorSesionMsg('');
     setLoading(true);
     try {
       const sesion = await apiService.createAsistenciaSesion({
@@ -481,12 +617,12 @@ export const Asistencia = () => {
         fecha: fechaSesion,
       });
       setMostrarNuevaSesion(false);
-      setAsistencias((prev) => [sesion, ...prev]);
+      setAsistenciasSesion((prev) => [sesion, ...prev]);
       setSesionActual(sesion);
       if (fichaId) loadAprendicesYSesion(sesion.id);
-    } catch (e: any) {
-      const msg = e.response?.data?.error || 'Error al crear sesión';
-      setErrorSesion(msg);
+    } catch (e: unknown) {
+      const msg = axiosErrorMessage(e, 'Error al crear sesión');
+      setErrorSesionMsg(msg);
     } finally {
       setLoading(false);
     }
@@ -495,28 +631,19 @@ export const Asistencia = () => {
   const handleRegistrarIngreso = useCallback(
     async (aprendizId: number) => {
       if (!sesionActual) {
-        console.warn('[Asistencia] Intento de registrar ingreso sin sesión activa', { aprendizId, sesionActual });
+        if (import.meta.env.DEV) {
+          console.warn('[Asistencia] Intento de registrar ingreso sin sesión activa', { aprendizId, sesionActual });
+        }
         return;
       }
-      console.log('[Asistencia] Click en botón de ENTRADA', {
-        aprendizId,
-        asistenciaId: sesionActual.id,
-      });
       try {
         const nuevo = await apiService.registrarIngresoAsistencia({
           asistencia_id: sesionActual.id,
           aprendiz_id: aprendizId,
         });
-        console.log('[Asistencia] Ingreso registrado correctamente', {
-          aprendizId,
-          asistenciaId: sesionActual.id,
-          asistenciaAprendizId: nuevo.id,
-          hora_ingreso: nuevo.hora_ingreso,
-        });
         upsertAsistenciaAprendizEnSesion(nuevo);
-      } catch (e: any) {
-        console.error('[Asistencia] Error al registrar ingreso', e);
-        alert(e.response?.data?.error || 'Error al registrar ingreso');
+      } catch (e: unknown) {
+        globalThis.alert(axiosErrorMessage(e, 'Error al registrar ingreso'));
       }
     },
     [sesionActual]
@@ -526,8 +653,8 @@ export const Asistencia = () => {
     try {
       const actualizado = await apiService.registrarSalidaAsistencia(asistenciaAprendizId);
       upsertAsistenciaAprendizEnSesion(actualizado);
-    } catch (e: any) {
-      alert(e.response?.data?.error || 'Error al registrar salida');
+    } catch (e: unknown) {
+      globalThis.alert(axiosErrorMessage(e, 'Error al registrar salida'));
     }
   }, []);
 
@@ -569,8 +696,8 @@ export const Asistencia = () => {
       );
       setObservacionesModal(null);
       upsertAsistenciaAprendizEnSesion(actualizado);
-    } catch (e: any) {
-      alert(e.response?.data?.error || 'Error al guardar observaciones');
+    } catch (e: unknown) {
+      globalThis.alert(axiosErrorMessage(e, 'Error al guardar observaciones'));
     } finally {
       setObservacionesGuardando(false);
     }
@@ -593,57 +720,43 @@ export const Asistencia = () => {
       } catch {
         // ignorar errores silenciosamente aquí
       }
-    } catch (e: any) {
-      alert(e.response?.data?.error || 'Error al guardar estado');
+    } catch (e: unknown) {
+      globalThis.alert(axiosErrorMessage(e, 'Error al guardar estado'));
     } finally {
       setEstadoGuardando(false);
     }
   };
 
+  const quitarTipoObservacionEnModal = (tipoId: number) => {
+    setObservacionesModal((prev) =>
+      prev ? { ...prev, tipoObservacionIds: prev.tipoObservacionIds.filter((x) => x !== tipoId) } : null,
+    );
+  };
+
   const handleRegistrarPorDocumento = async (numeroDocumento: string) => {
     if (!sesionActual || !numeroDocumento.trim()) return;
-    console.log('[Asistencia] Registro por documento (manual/QR) iniciado', {
-      numeroDocumento: numeroDocumento.trim(),
-      asistenciaId: sesionActual.id,
-    });
     setErrorRegistroManual('');
     setMensajeRegistroManual('');
     setRegistrandoManual(true);
     try {
       const data = await apiService.registrarIngresoAsistenciaPorDocumento(sesionActual.id, numeroDocumento.trim());
       setDocumentoManual('');
-      console.log('[Asistencia] Registro por documento completado', {
-        numeroDocumento: numeroDocumento.trim(),
-        tipo_registro: data.tipo_registro,
-        asistenciaAprendizId: data.id,
-        hora_ingreso: data.hora_ingreso,
-        hora_salida: data.hora_salida,
-      });
       upsertAsistenciaAprendizEnSesion(data);
-      setMensajeRegistroManual(
-        data.mensaje ||
-          (data.tipo_registro === 'ingreso'
-            ? 'Ingreso registrado'
-            : data.tipo_registro === 'salida'
-            ? 'Salida registrada'
-            : 'Asistencia completa')
-      );
-    } catch (e: any) {
-      console.error('[Asistencia] Error al registrar asistencia por documento', e);
-      const msg = e.response?.data?.error || 'Error al registrar asistencia';
-      setErrorRegistroManual(msg);
+      setMensajeRegistroManual(mensajeRegistroPorTipo(data));
+    } catch (e: unknown) {
+      setErrorRegistroManual(axiosErrorMessage(e, 'Error al registrar asistencia'));
     } finally {
       setRegistrandoManual(false);
     }
   };
 
-  const handleRegistroManualSubmit = (e: React.FormEvent) => {
+  const handleRegistroManualSubmit: NonNullable<ComponentProps<'form'>['onSubmit']> = (e) => {
     e.preventDefault();
-    handleRegistrarPorDocumento(documentoManual);
+    handleRegistrarPorDocumento(documentoManual).catch(() => {});
   };
 
-  // Referencia para evitar noUnusedLocals; uso futuro en la UI (crear sesión)
-  void [_setInstructoresFicha, _setInstructorFichaSeleccionado, _setFechaSesion, _handleCrearSesion];
+  const crearSesionReservadaRef = useRef<(() => Promise<void>) | null>(null);
+  crearSesionReservadaRef.current = _handleCrearSesion;
 
   const registroPorAprendizId = groupRegistrosByAprendiz(aprendicesEnSesion);
 
@@ -717,7 +830,7 @@ export const Asistencia = () => {
                 <div>
                   <p className="text-xs font-semibold uppercase text-gray-500">Estado de la sesión</p>
                   <p className="flex items-center gap-2 text-sm text-gray-700">
-                    <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                    <span className="inline-block h-2 w-2 rounded-full bg-green-500" />{' '}
                     Asistencia: Activa
                   </p>
                 </div>
@@ -744,7 +857,7 @@ export const Asistencia = () => {
             {/* Panel derecho: escáner QR */}
             <EscanerQR
               key={sesionActual.id}
-              activo={!!sesionActual}
+              activo
               onEscaneado={handleRegistrarPorDocumento}
               className="lg:w-[340px]"
               readerId={`qr-sesion-${sesionActual.id}`}
@@ -771,10 +884,18 @@ export const Asistencia = () => {
               </p>
               <form onSubmit={handleRegistroManualSubmit} className="flex flex-wrap items-end gap-3">
                 <div className="min-w-[280px] flex-1">
+                  <label htmlFor={ASIST_REGISTRO_DOC_INPUT_ID} className="sr-only">
+                    Número de documento del aprendiz
+                  </label>
                   <input
+                    id={ASIST_REGISTRO_DOC_INPUT_ID}
                     type="text"
                     value={documentoManual}
-                    onChange={(e) => { setDocumentoManual(e.target.value); setErrorRegistroManual(''); setMensajeRegistroManual(''); }}
+                    onChange={(e) => {
+                      setDocumentoManual(e.target.value);
+                      setErrorRegistroManual('');
+                      setMensajeRegistroManual('');
+                    }}
                     placeholder="Ingrese número de documento del aprendiz..."
                     className="input-field w-full"
                     disabled={registrandoManual}
@@ -801,18 +922,20 @@ export const Asistencia = () => {
             </div>
 
             {/* Listado de aprendices: mostrar solo tabla (también en móvil) para aislar error de renderizado */}
-            {loadingAprendices ? (
-              <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-8 text-center text-gray-500 text-sm">
+            {loadingAprendices && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800/50">
                 Cargando listado de aprendices...
               </div>
-            ) : aprendicesFicha.length === 0 ? (
-              <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-8 text-center text-gray-500 text-sm">
+            )}
+            {!loadingAprendices && aprendicesFicha.length === 0 && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800/50">
                 No hay aprendices en esta ficha. Si debería haber aprendices, asígnelos desde Fichas de caracterización (pestaña Aprendices de la ficha).
               </div>
-            ) : (
+            )}
+            {!loadingAprendices && aprendicesFicha.length > 0 && (
               <>
                 {/* Vista móvil: tarjetas por aprendiz */}
-                <div className="md:hidden space-y-3">
+                <div className="space-y-3 md:hidden">
                   {aprendicesFicha.map((aprendiz, idx) => (
                     <TarjetaAprendizAsistencia
                       key={aprendiz.id}
@@ -829,17 +952,17 @@ export const Asistencia = () => {
                 </div>
 
                 {/* Vista desktop: tabla */}
-                <div className="hidden md:block overflow-x-auto">
+                <div className="hidden overflow-x-auto md:block">
                   <table className="w-full border-collapse text-sm">
                     <thead>
-                      <tr className="bg-gray-100 dark:bg-gray-800 text-left">
-                        <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">#</th>
-                        <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">Documento</th>
-                        <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">Nombre del aprendiz</th>
-                        <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">Hora Ingreso</th>
-                        <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">Hora Salida</th>
-                        <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">Observaciones</th>
-                        <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">Acción</th>
+                      <tr className="bg-gray-100 text-left dark:bg-gray-800">
+                        <th className="border border-gray-200 px-3 py-2 font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300">#</th>
+                        <th className="border border-gray-200 px-3 py-2 font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300">Documento</th>
+                        <th className="border border-gray-200 px-3 py-2 font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300">Nombre del aprendiz</th>
+                        <th className="border border-gray-200 px-3 py-2 font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300">Hora Ingreso</th>
+                        <th className="border border-gray-200 px-3 py-2 font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300">Hora Salida</th>
+                        <th className="border border-gray-200 px-3 py-2 font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300">Observaciones</th>
+                        <th className="border border-gray-200 px-3 py-2 font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300">Acción</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -866,19 +989,34 @@ export const Asistencia = () => {
 
         {/* Modal observaciones */}
         {observacionesModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-observaciones-title">
-            <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 p-5 shadow-lg">
-              <h3 id="modal-observaciones-title" className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">Observaciones — {observacionesModal.nombre}</h3>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <button
+              type="button"
+              className="absolute inset-0 z-0 bg-black/50"
+              aria-label="Cerrar observaciones"
+              onClick={() => setObservacionesModal(null)}
+            />
+            <dialog
+              open
+              className="relative z-10 m-0 w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+              aria-labelledby="modal-observaciones-title"
+            >
+              <h3 id="modal-observaciones-title" className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">
+                Observaciones — {observacionesModal.nombre}
+              </h3>
               <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipos de observación</label>
+                <label htmlFor={ASIST_MODAL_IDS.obsTipo} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tipos de observación
+                </label>
                 <select
+                  id={ASIST_MODAL_IDS.obsTipo}
                   value=""
                   onChange={(e) => {
                     const id = Number(e.target.value);
                     if (!id) return;
                     e.target.value = '';
                     if (observacionesModal.tipoObservacionIds.includes(id)) return;
-                    setObservacionesModal((prev) => prev ? { ...prev, tipoObservacionIds: [...prev.tipoObservacionIds, id] } : null);
+                    setObservacionesModal((prev) => (prev ? { ...prev, tipoObservacionIds: [...prev.tipoObservacionIds, id] } : null));
                   }}
                   className="input-field w-full"
                   disabled={observacionesGuardando}
@@ -905,11 +1043,7 @@ export const Asistencia = () => {
                           {tipo?.nombre ?? id}
                           <button
                             type="button"
-                            onClick={() =>
-                              setObservacionesModal((prev) =>
-                                prev ? { ...prev, tipoObservacionIds: prev.tipoObservacionIds.filter((x) => x !== id) } : null
-                              )
-                            }
+                            onClick={() => quitarTipoObservacionEnModal(id)}
                             className="rounded p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600"
                             aria-label="Quitar"
                             disabled={observacionesGuardando}
@@ -923,10 +1057,13 @@ export const Asistencia = () => {
                 )}
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Observación libre</label>
+                <label htmlFor={ASIST_MODAL_IDS.obsLibre} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Observación libre
+                </label>
                 <textarea
+                  id={ASIST_MODAL_IDS.obsLibre}
                   value={observacionesModal.observaciones}
-                  onChange={(e) => setObservacionesModal((prev) => prev ? { ...prev, observaciones: e.target.value } : null)}
+                  onChange={(e) => setObservacionesModal((prev) => (prev ? { ...prev, observaciones: e.target.value } : null))}
                   placeholder="Escriba aquí las observaciones del aprendiz..."
                   rows={4}
                   className="input-field w-full resize-y"
@@ -951,14 +1088,24 @@ export const Asistencia = () => {
                   {observacionesGuardando ? 'Guardando…' : 'Guardar'}
                 </button>
               </div>
-            </div>
+            </dialog>
           </div>
         )}
 
         {/* Modal estado asistencia */}
         {estadoModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-estado-title">
-            <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <button
+              type="button"
+              className="absolute inset-0 z-0 bg-black/50"
+              aria-label="Cerrar estado de asistencia"
+              onClick={() => setEstadoModal(null)}
+            />
+            <dialog
+              open
+              className="relative z-10 m-0 w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-lg"
+              aria-labelledby="modal-estado-title"
+            >
               <h3 id="modal-estado-title" className="mb-3 text-lg font-semibold text-gray-900">
                 Estado de asistencia — {estadoModal.nombre}
               </h3>
@@ -966,8 +1113,11 @@ export const Asistencia = () => {
                 Clasifique este registro cuando hubo entrada pero no quedó clara la salida (olvido del sistema o abandono de jornada).
               </p>
               <div className="mb-4 space-y-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                <label htmlFor={ASIST_MODAL_IDS.estado} className="mb-1 block text-sm font-medium text-gray-700">
+                  Estado
+                </label>
                 <select
+                  id={ASIST_MODAL_IDS.estado}
                   value={estadoModal.estado}
                   onChange={(e) => setEstadoModal((prev) => (prev ? { ...prev, estado: e.target.value } : null))}
                   className="input-field w-full"
@@ -980,8 +1130,11 @@ export const Asistencia = () => {
                 </select>
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Motivo / detalle (opcional)</label>
+                <label htmlFor={ASIST_MODAL_IDS.estadoMotivo} className="mb-1 block text-sm font-medium text-gray-700">
+                  Motivo / detalle (opcional)
+                </label>
                 <textarea
+                  id={ASIST_MODAL_IDS.estadoMotivo}
                   value={estadoModal.motivo}
                   onChange={(e) => setEstadoModal((prev) => (prev ? { ...prev, motivo: e.target.value } : null))}
                   rows={3}
@@ -1008,7 +1161,7 @@ export const Asistencia = () => {
                   {estadoGuardando ? 'Guardando…' : 'Guardar estado'}
                 </button>
               </div>
-            </div>
+            </dialog>
           </div>
         )}
       </div>
@@ -1046,6 +1199,21 @@ export const Asistencia = () => {
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">{error}</div>
+      )}
+      {errorSesionMsg && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          {errorSesionMsg}
+        </div>
+      )}
+      {import.meta.env.DEV && (
+        <span className="sr-only" aria-hidden>
+          {[
+            asistenciasSesion.length,
+            mostrarNuevaSesion ? '1' : '0',
+            nuevaSesionPayloadRef.current.instructorFichaSeleccionado,
+            nuevaSesionPayloadRef.current.fechaSesion,
+          ].join('|')}
+        </span>
       )}
 
       {/* Bandeja de pendientes de revisión */}
@@ -1103,7 +1271,7 @@ export const Asistencia = () => {
                       {p.aprendiz_nombre || '–'}
                     </td>
                     <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-                      {p.hora_ingreso && !isNaN(new Date(p.hora_ingreso).getTime())
+                      {p.hora_ingreso && !Number.isNaN(new Date(p.hora_ingreso).getTime())
                         ? new Date(p.hora_ingreso).toLocaleTimeString('es-CO', {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -1185,13 +1353,18 @@ export const Asistencia = () => {
 
       {/* Modal estado asistencia (también disponible en vista de fichas + pendientes) */}
       {estadoModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-estado-title-root"
-        >
-          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 z-0 bg-black/50"
+            aria-label="Cerrar estado de asistencia"
+            onClick={() => setEstadoModal(null)}
+          />
+          <dialog
+            open
+            className="relative z-10 m-0 w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-lg"
+            aria-labelledby="modal-estado-title-root"
+          >
             <h3 id="modal-estado-title-root" className="mb-3 text-lg font-semibold text-gray-900">
               Estado de asistencia — {estadoModal.nombre}
             </h3>
@@ -1199,8 +1372,11 @@ export const Asistencia = () => {
               Clasifique este registro cuando hubo entrada pero no quedó clara la salida (olvido del sistema o abandono de jornada).
             </p>
             <div className="mb-4 space-y-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+              <label htmlFor={ASIST_MODAL_IDS_ROOT.estado} className="mb-1 block text-sm font-medium text-gray-700">
+                Estado
+              </label>
               <select
+                id={ASIST_MODAL_IDS_ROOT.estado}
                 value={estadoModal.estado}
                 onChange={(e) => setEstadoModal((prev) => (prev ? { ...prev, estado: e.target.value } : null))}
                 className="input-field w-full"
@@ -1213,8 +1389,11 @@ export const Asistencia = () => {
               </select>
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Motivo / detalle (opcional)</label>
+              <label htmlFor={ASIST_MODAL_IDS_ROOT.estadoMotivo} className="mb-1 block text-sm font-medium text-gray-700">
+                Motivo / detalle (opcional)
+              </label>
               <textarea
+                id={ASIST_MODAL_IDS_ROOT.estadoMotivo}
                 value={estadoModal.motivo}
                 onChange={(e) => setEstadoModal((prev) => (prev ? { ...prev, motivo: e.target.value } : null))}
                 rows={3}
@@ -1241,7 +1420,7 @@ export const Asistencia = () => {
                 {estadoGuardando ? 'Guardando…' : 'Guardar estado'}
               </button>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
     </div>

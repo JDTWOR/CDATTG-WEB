@@ -12,6 +12,8 @@ import (
 	"github.com/sena/cdattg-web-golang/repositories"
 )
 
+const errMsgInstructorNoEncontrado = "instructor no encontrado"
+
 type InstructorService interface {
 	CreateFromPersona(req dto.CreateInstructorRequest) (*dto.InstructorItem, error)
 	GetByID(id uint) (*dto.InstructorItem, error)
@@ -91,7 +93,7 @@ func (s *instructorService) GetByID(id uint) (*dto.InstructorItem, error) {
 func (s *instructorService) Update(id uint, req dto.UpdateInstructorRequest) (*dto.InstructorItem, error) {
 	inst, err := s.repo.FindByID(id)
 	if err != nil {
-		return nil, errors.New("instructor no encontrado")
+		return nil, errors.New(errMsgInstructorNoEncontrado)
 	}
 	if req.RegionalID != nil {
 		inst.RegionalID = req.RegionalID
@@ -108,7 +110,7 @@ func (s *instructorService) Update(id uint, req dto.UpdateInstructorRequest) (*d
 
 func (s *instructorService) Delete(id uint) error {
 	if _, err := s.repo.FindByID(id); err != nil {
-		return errors.New("instructor no encontrado")
+		return errors.New(errMsgInstructorNoEncontrado)
 	}
 	return s.repo.Delete(id)
 }

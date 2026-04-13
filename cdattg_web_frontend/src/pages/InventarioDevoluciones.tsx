@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, type ComponentProps } from 'react';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import type { OrdenResponse, DetalleOrdenResponse, DevolucionCreateRequest } from '../types';
 
 export const InventarioDevoluciones = () => {
@@ -15,7 +16,7 @@ export const InventarioDevoluciones = () => {
     observaciones: '',
   });
 
-  const fetchOrdenes = async () => {
+  const fetchOrdenes = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiService.getOrdenes(1, 100, true);
@@ -31,19 +32,19 @@ export const InventarioDevoluciones = () => {
       });
       setDetallesPendientes(detalles);
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al cargar órdenes');
+      setError(axiosErrorMessage(err, 'Error al cargar órdenes'));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchOrdenes();
-  }, []);
+    void fetchOrdenes();
+  }, [fetchOrdenes]);
 
   const selectedDetalle = detallesPendientes.find((d) => d.id === form.detalle_orden_id);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit: NonNullable<ComponentProps<'form'>['onSubmit']> = (e) => {
     e.preventDefault();
     if (!form.detalle_orden_id) {
       alert('Seleccione un detalle de orden.');
@@ -61,15 +62,17 @@ export const InventarioDevoluciones = () => {
       alert(`La cantidad no puede superar la pendiente por devolver (${selectedDetalle.pendiente_devolver}).`);
       return;
     }
-    try {
-      await apiService.createDevolucion(form);
-      setSuccess('Devolución registrada correctamente.');
-      setForm({ detalle_orden_id: 0, cantidad_devuelta: 0, cierra_sin_stock: false, observaciones: '' });
-      fetchOrdenes();
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err: unknown) {
-      alert((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al registrar devolución');
-    }
+    void (async () => {
+      try {
+        await apiService.createDevolucion(form);
+        setSuccess('Devolución registrada correctamente.');
+        setForm({ detalle_orden_id: 0, cantidad_devuelta: 0, cierra_sin_stock: false, observaciones: '' });
+        void fetchOrdenes();
+        setTimeout(() => setSuccess(''), 3000);
+      } catch (err: unknown) {
+        alert(axiosErrorMessage(err, 'Error al registrar devolución'));
+      }
+    })();
   };
 
   return (
@@ -80,14 +83,20 @@ export const InventarioDevoluciones = () => {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-red-700 dark:text-red-300">
+        <div
+          role="alert"
+          className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-red-700 dark:text-red-300"
+        >
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 text-green-700 dark:text-green-300">
+        <output
+          aria-live="polite"
+          className="block w-full rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 text-green-700 dark:text-green-300"
+        >
           {success}
-        </div>
+        </output>
       )}
 
       <div className="card max-w-xl">
@@ -96,11 +105,14 @@ export const InventarioDevoluciones = () => {
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Detalle de orden (préstamo aprobado con pendiente) *</label>
+              <label htmlFor="inv-dev-detalle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Detalle de orden (préstamo aprobado con pendiente) *
+              </label>
               <select
+                id="inv-dev-detalle"
                 value={form.detalle_orden_id || ''}
                 onChange={(e) => {
-                  const id = parseInt(e.target.value, 10);
+                  const id = Number.parseInt(e.target.value, 10);
                   const d = detallesPendientes.find((x) => x.id === id);
                   setForm({
                     ...form,
@@ -126,13 +138,18 @@ export const InventarioDevoluciones = () => {
             {selectedDetalle && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cantidad devuelta *</label>
+                  <label htmlFor="inv-dev-cantidad" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Cantidad devuelta *
+                  </label>
                   <input
+                    id="inv-dev-cantidad"
                     type="number"
                     min={0}
                     max={selectedDetalle.pendiente_devolver}
                     value={form.cantidad_devuelta}
-                    onChange={(e) => setForm({ ...form, cantidad_devuelta: parseInt(e.target.value, 10) || 0 })}
+                    onChange={(e) =>
+                      setForm({ ...form, cantidad_devuelta: Number.parseInt(e.target.value, 10) || 0 })
+                    }
                     className="input-field w-full"
                   />
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Máximo: {selectedDetalle.pendiente_devolver}. Use 0 solo para cierre sin stock (consumibles).</p>
@@ -150,8 +167,11 @@ export const InventarioDevoluciones = () => {
                   </label>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Observaciones {form.cierra_sin_stock ? '*' : '(opcional)'}</label>
+                  <label htmlFor="inv-dev-observaciones" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Observaciones {form.cierra_sin_stock ? '*' : '(opcional)'}
+                  </label>
                   <textarea
+                    id="inv-dev-observaciones"
                     value={form.observaciones ?? ''}
                     onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
                     className="input-field w-full"

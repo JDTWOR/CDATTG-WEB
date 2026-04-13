@@ -20,12 +20,12 @@ func NewProductoHandler() *ProductoHandler {
 }
 
 func (h *ProductoHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	if page < 1 {
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
 		page = 1
 	}
-	if pageSize < 1 || pageSize > 100 {
+	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if err != nil || pageSize < 1 || pageSize > 100 {
 		pageSize = 20
 	}
 	offset := (page - 1) * pageSize
@@ -40,7 +40,7 @@ func (h *ProductoHandler) List(c *gin.Context) {
 func (h *ProductoHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	resp, err := h.svc.GetByID(uint(id))
@@ -55,12 +55,12 @@ func (h *ProductoHandler) Create(c *gin.Context) {
 	user, _ := c.Get("user")
 	u, _ := user.(*models.User)
 	if u == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "no autenticado"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuario no autenticado"})
 		return
 	}
 	var req dto.ProductoCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	resp, err := h.svc.Create(req, u.ID)
@@ -74,12 +74,12 @@ func (h *ProductoHandler) Create(c *gin.Context) {
 func (h *ProductoHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	var req dto.ProductoUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	resp, err := h.svc.Update(uint(id), req)
@@ -93,7 +93,7 @@ func (h *ProductoHandler) Update(c *gin.Context) {
 func (h *ProductoHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	if err := h.svc.Delete(uint(id)); err != nil {

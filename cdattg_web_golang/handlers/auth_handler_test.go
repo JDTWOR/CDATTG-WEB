@@ -13,11 +13,19 @@ import (
 	"github.com/sena/cdattg-web-golang/testutil"
 )
 
+const (
+	testPathAuthLogin        = "/api/auth/login"
+	testPathAuthMe           = "/api/auth/me"
+	testPathAuthChangePass   = "/api/auth/change-password"
+	testLoginEmail           = "user@test.com"
+	testErrFmtMessage        = "error message: got %v, want %q"
+)
+
 // mockAuthService implementa services.AuthService para tests.
 type mockAuthService struct {
-	loginFunc       func(dto.LoginRequest) (*dto.LoginResponse, error)
-	getCurrentUser  func(uint) (*dto.UserResponse, error)
-	changePassword  func(uint, dto.ChangePasswordRequest) error
+	loginFunc      func(dto.LoginRequest) (*dto.LoginResponse, error)
+	getCurrentUser func(uint) (*dto.UserResponse, error)
+	changePassword func(uint, dto.ChangePasswordRequest) error
 }
 
 func (m *mockAuthService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {
@@ -41,7 +49,29 @@ func (m *mockAuthService) ChangePassword(userID uint, req dto.ChangePasswordRequ
 	return nil
 }
 
-func TestAuthHandler_Login(t *testing.T) {
+func assertResponseErrorEquals(t *testing.T, w *httptest.ResponseRecorder, want string) {
+	t.Helper()
+	var m map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&m); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if errMsg, ok := m["error"].(string); !ok || errMsg != want {
+		t.Errorf(testErrFmtMessage, m["error"], want)
+	}
+}
+
+func assertLoginResponseHasToken(t *testing.T, w *httptest.ResponseRecorder) {
+	t.Helper()
+	var m map[string]interface{}
+	if err := json.NewDecoder(bytes.NewReader(w.Body.Bytes())).Decode(&m); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if _, ok := m["token"]; !ok {
+		t.Error("expected token in response")
+	}
+}
+
+func TestAuthHandlerLogin(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupRequest   func() (*httptest.ResponseRecorder, *gin.Context)
@@ -54,7 +84,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			name: "body_vacio_retorna_400",
 			setupRequest: func() (*httptest.ResponseRecorder, *gin.Context) {
 				w := httptest.NewRecorder()
-				req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+				req := httptest.NewRequest(http.MethodPost, testPathAuthLogin, nil)
 				req.Header.Set("Content-Type", "application/json")
 				c, _ := gin.CreateTestContext(w)
 				c.Request = req
@@ -66,7 +96,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			name: "json_invalido_retorna_400",
 			setupRequest: func() (*httptest.ResponseRecorder, *gin.Context) {
 				w := httptest.NewRecorder()
-				req := testutil.RequestWithBody(http.MethodPost, "/api/auth/login", []byte(`{invalid}`), "application/json")
+				req := testutil.RequestWithBody(http.MethodPost, testPathAuthLogin, []byte(`{invalid}`), "application/json")
 				c, _ := gin.CreateTestContext(w)
 				c.Request = req
 				return w, c
@@ -76,14 +106,14 @@ func TestAuthHandler_Login(t *testing.T) {
 		{
 			name: "campos_requeridos_faltantes_retorna_400",
 			setupRequest: func() (*httptest.ResponseRecorder, *gin.Context) {
-				return testutil.RecorderAndContext(http.MethodPost, "/api/auth/login", map[string]string{"email": "test@test.com"})
+				return testutil.RecorderAndContext(http.MethodPost, testPathAuthLogin, map[string]string{"email": "test@test.com"})
 			},
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name: "credenciales_invalidas_retorna_401",
 			setupRequest: func() (*httptest.ResponseRecorder, *gin.Context) {
-				return testutil.RecorderAndContext(http.MethodPost, "/api/auth/login", dto.LoginRequest{Email: "user@test.com", Password: "wrong"})
+				return testutil.RecorderAndContext(http.MethodPost, testPathAuthLogin, dto.LoginRequest{Email: testLoginEmail, Password: "wrong"})
 			},
 			mockLogin: func(dto.LoginRequest) (*dto.LoginResponse, error) {
 				return nil, errors.New("credenciales inválidas")
@@ -94,13 +124,13 @@ func TestAuthHandler_Login(t *testing.T) {
 		{
 			name: "login_exitoso_retorna_200_y_token",
 			setupRequest: func() (*httptest.ResponseRecorder, *gin.Context) {
-				return testutil.RecorderAndContext(http.MethodPost, "/api/auth/login", dto.LoginRequest{Email: "user@test.com", Password: "secret"})
+				return testutil.RecorderAndContext(http.MethodPost, testPathAuthLogin, dto.LoginRequest{Email: testLoginEmail, Password: "secret"})
 			},
 			mockLogin: func(dto.LoginRequest) (*dto.LoginResponse, error) {
 				return &dto.LoginResponse{
 					Token: "jwt-token-here",
 					Type:  "Bearer",
-					User:  dto.UserResponse{ID: 1, Email: "user@test.com", FullName: "Test User", Status: true},
+					User:  dto.UserResponse{ID: 1, Email: testLoginEmail, FullName: "Test User", Status: true},
 					Roles: []string{"ADMIN"}, Permissions: []string{"VER PERSONAS"},
 				}, nil
 			},
@@ -118,28 +148,16 @@ func TestAuthHandler_Login(t *testing.T) {
 			h.Login(c)
 			testutil.AssertStatus(t, w, tt.wantStatus)
 			if tt.wantErrMessage != "" {
-				var m map[string]interface{}
-				if err := json.NewDecoder(w.Body).Decode(&m); err != nil {
-					t.Fatalf("decode response: %v", err)
-				}
-				if errMsg, ok := m["error"].(string); !ok || errMsg != tt.wantErrMessage {
-					t.Errorf("error message: got %v, want %q", m["error"], tt.wantErrMessage)
-				}
+				assertResponseErrorEquals(t, w, tt.wantErrMessage)
 			}
 			if tt.wantToken {
-				var m map[string]interface{}
-				if err := json.NewDecoder(bytes.NewReader(w.Body.Bytes())).Decode(&m); err != nil {
-					t.Fatalf("decode response: %v", err)
-				}
-				if _, ok := m["token"]; !ok {
-					t.Error("expected token in response")
-				}
+				assertLoginResponseHasToken(t, w)
 			}
 		})
 	}
 }
 
-func TestAuthHandler_GetCurrentUser(t *testing.T) {
+func TestAuthHandlerGetCurrentUser(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	tests := []struct {
 		name           string
@@ -150,15 +168,15 @@ func TestAuthHandler_GetCurrentUser(t *testing.T) {
 		wantErrMessage string
 	}{
 		{
-			name:       "sin_user_id_en_contexto_retorna_401",
-			setUserID:  false,
-			wantStatus: http.StatusUnauthorized,
+			name:           "sin_user_id_en_contexto_retorna_401",
+			setUserID:      false,
+			wantStatus:     http.StatusUnauthorized,
 			wantErrMessage: "Usuario no autenticado",
 		},
 		{
-			name:       "usuario_no_encontrado_retorna_404",
-			setUserID:  true,
-			userID:     999,
+			name:      "usuario_no_encontrado_retorna_404",
+			setUserID: true,
+			userID:    999,
 			mockGetUser: func(uint) (*dto.UserResponse, error) {
 				return nil, errors.New("usuario no encontrado")
 			},
@@ -170,7 +188,7 @@ func TestAuthHandler_GetCurrentUser(t *testing.T) {
 			setUserID: true,
 			userID:    1,
 			mockGetUser: func(uint) (*dto.UserResponse, error) {
-				return &dto.UserResponse{ID: 1, Email: "user@test.com", FullName: "Test User", Status: true}, nil
+				return &dto.UserResponse{ID: 1, Email: testLoginEmail, FullName: "Test User", Status: true}, nil
 			},
 			wantStatus: http.StatusOK,
 		},
@@ -182,24 +200,20 @@ func TestAuthHandler_GetCurrentUser(t *testing.T) {
 			h := NewAuthHandlerWithService(mock)
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+			c.Request = httptest.NewRequest(http.MethodGet, testPathAuthMe, nil)
 			if tt.setUserID {
 				c.Set("userID", tt.userID)
 			}
 			h.GetCurrentUser(c)
 			testutil.AssertStatus(t, w, tt.wantStatus)
 			if tt.wantErrMessage != "" {
-				var m map[string]interface{}
-				_ = json.NewDecoder(w.Body).Decode(&m)
-				if errMsg, ok := m["error"].(string); !ok || errMsg != tt.wantErrMessage {
-					t.Errorf("error message: got %v, want %q", m["error"], tt.wantErrMessage)
-				}
+				assertResponseErrorEquals(t, w, tt.wantErrMessage)
 			}
 		})
 	}
 }
 
-func TestAuthHandler_ChangePassword(t *testing.T) {
+func TestAuthHandlerChangePassword(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	tests := []struct {
 		name           string
@@ -211,17 +225,17 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 		wantErrMessage string
 	}{
 		{
-			name:       "sin_user_id_retorna_401",
-			setUserID:  false,
-			body:       dto.ChangePasswordRequest{PasswordActual: "old", PasswordNueva: "new123"},
-			wantStatus: http.StatusUnauthorized,
+			name:           "sin_user_id_retorna_401",
+			setUserID:      false,
+			body:           dto.ChangePasswordRequest{PasswordActual: "old", PasswordNueva: "new123"},
+			wantStatus:     http.StatusUnauthorized,
 			wantErrMessage: "Usuario no autenticado",
 		},
 		{
-			name:      "datos_invalidos_retorna_400",
-			setUserID: true,
-			userID:    1,
-			body:      map[string]string{"password_actual": "old"},
+			name:       "datos_invalidos_retorna_400",
+			setUserID:  true,
+			userID:     1,
+			body:       map[string]string{"password_actual": "old"},
 			wantStatus: http.StatusBadRequest,
 		},
 		{
@@ -251,18 +265,14 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockAuthService{changePassword: tt.mockChange}
 			h := NewAuthHandlerWithService(mock)
-			w, c := testutil.RecorderAndContext(http.MethodPost, "/api/auth/change-password", tt.body)
+			w, c := testutil.RecorderAndContext(http.MethodPost, testPathAuthChangePass, tt.body)
 			if tt.setUserID {
 				c.Set("userID", tt.userID)
 			}
 			h.ChangePassword(c)
 			testutil.AssertStatus(t, w, tt.wantStatus)
 			if tt.wantErrMessage != "" {
-				var m map[string]interface{}
-				_ = json.NewDecoder(w.Body).Decode(&m)
-				if errMsg, ok := m["error"].(string); !ok || errMsg != tt.wantErrMessage {
-					t.Errorf("error message: got %v, want %q", m["error"], tt.wantErrMessage)
-				}
+				assertResponseErrorEquals(t, w, tt.wantErrMessage)
 			}
 		})
 	}

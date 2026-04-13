@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, type ComponentProps } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeftIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import { useAuth } from '../context/AuthContext';
 import type { TipoObservacionAsistenciaItem } from '../types';
 
@@ -15,20 +16,21 @@ export const AsistenciaTiposObservacion = () => {
   const [nombre, setNombre] = useState('');
 
   const isSuperAdmin = roles.includes('SUPER ADMINISTRADOR');
+  const TIPO_OBS_CODIGO_ID = 'tipo-obs-codigo';
+  const TIPO_OBS_NOMBRE_ID = 'tipo-obs-nombre';
 
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
       const res = await apiService.getTiposObservacionAsistencia();
       setItems(res);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al cargar tipos de observación.';
-      setError(msg);
+      setError(axiosErrorMessage(e, 'Error al cargar tipos de observación.'));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!isSuperAdmin) {
@@ -36,32 +38,33 @@ export const AsistenciaTiposObservacion = () => {
       setError('Solo el superadministrador puede gestionar tipos de observación.');
       return;
     }
-    cargar();
-  }, [isSuperAdmin]);
+    void cargar();
+  }, [isSuperAdmin, cargar]);
 
-  const crear = async (e: React.FormEvent) => {
+  const crear: ComponentProps<'form'>['onSubmit'] = (e) => {
     e.preventDefault();
     if (!codigo.trim() || !nombre.trim()) {
       setError('Código y nombre son obligatorios.');
       return;
     }
-    try {
-      setSaving(true);
-      setError('');
-      await apiService.createTipoObservacionAsistencia({
-        codigo: codigo.trim().toUpperCase(),
-        nombre: nombre.trim(),
-        activo: true,
-      });
-      setCodigo('');
-      setNombre('');
-      await cargar();
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al crear tipo de observación.';
-      setError(msg);
-    } finally {
-      setSaving(false);
-    }
+    void (async () => {
+      try {
+        setSaving(true);
+        setError('');
+        await apiService.createTipoObservacionAsistencia({
+          codigo: codigo.trim().toUpperCase(),
+          nombre: nombre.trim(),
+          activo: true,
+        });
+        setCodigo('');
+        setNombre('');
+        await cargar();
+      } catch (e: unknown) {
+        setError(axiosErrorMessage(e, 'Error al crear tipo de observación.'));
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   return (
@@ -74,13 +77,16 @@ export const AsistenciaTiposObservacion = () => {
           </p>
         </div>
         <Link to="/asistencia" className="btn-secondary inline-flex items-center gap-2">
-          <ArrowLeftIcon className="w-5 h-5" />
+          <ArrowLeftIcon className="w-5 h-5" aria-hidden />
           Volver a asistencia
         </Link>
       </div>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+        <div
+          role="alert"
+          className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg"
+        >
           {error}
         </div>
       )}
@@ -89,8 +95,11 @@ export const AsistenciaTiposObservacion = () => {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Crear nuevo tipo</h2>
         <form onSubmit={crear} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Código</label>
+            <label htmlFor={TIPO_OBS_CODIGO_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Código
+            </label>
             <input
+              id={TIPO_OBS_CODIGO_ID}
               type="text"
               value={codigo}
               onChange={(e) => setCodigo(e.target.value)}
@@ -100,8 +109,11 @@ export const AsistenciaTiposObservacion = () => {
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre</label>
+            <label htmlFor={TIPO_OBS_NOMBRE_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Nombre
+            </label>
             <input
+              id={TIPO_OBS_NOMBRE_ID}
               type="text"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
@@ -112,8 +124,8 @@ export const AsistenciaTiposObservacion = () => {
           </div>
           <div className="md:col-span-3">
             <button type="submit" disabled={saving || !isSuperAdmin} className="btn-primary inline-flex items-center gap-2 disabled:opacity-50">
-              <PlusIcon className="w-5 h-5" />
-              {saving ? 'Creando...' : 'Crear tipo de observación'}
+              <PlusIcon className="w-5 h-5" aria-hidden />
+              {saving ? 'Creando…' : 'Crear tipo de observación'}
             </button>
           </div>
         </form>
@@ -121,13 +133,18 @@ export const AsistenciaTiposObservacion = () => {
 
       <div className="card overflow-hidden">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tipos activos</h2>
-        {loading ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">Cargando...</div>
-        ) : items.length === 0 ? (
+        {loading && (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
+            Cargando…
+          </div>
+        )}
+        {!loading && items.length === 0 && (
           <p className="text-gray-500 dark:text-gray-400">No hay tipos de observación activos.</p>
-        ) : (
+        )}
+        {!loading && items.length > 0 && (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+              <caption className="sr-only">Listado de tipos de observación activos para asistencia</caption>
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Código</th>

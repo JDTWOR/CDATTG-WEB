@@ -1,13 +1,59 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type DragEvent } from 'react';
 import { XMarkIcon, UserGroupIcon, AcademicCapIcon, MagnifyingGlassIcon, ArrowRightIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import { SelectSearch } from './SelectSearch';
 import type {
   InstructorFichaResponse,
   InstructorItem,
   AprendizResponse,
   PersonaResponse,
+  FichaCaracterizacionRequest,
+  FichaCaracterizacionResponse,
 } from '../types';
+
+function toDateInputString(iso?: string | null): string | undefined {
+  if (iso == null || iso === '') return undefined;
+  const s = String(iso).trim();
+  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  return undefined;
+}
+
+function normalizeDiaIds(ids?: (number | string)[] | null): number[] {
+  if (!ids?.length) return [];
+  return [...new Set(ids.map(Number).filter((n) => !Number.isNaN(n) && n > 0))];
+}
+
+function buildFichaUpdatePayload(f: FichaCaracterizacionResponse, nuevoInstructorId: number): FichaCaracterizacionRequest {
+  return {
+    programa_formacion_id: f.programa_formacion_id,
+    ficha: f.ficha,
+    instructor_id: nuevoInstructorId,
+    fecha_inicio: toDateInputString(f.fecha_inicio),
+    fecha_fin: toDateInputString(f.fecha_fin),
+    sede_id: f.sede_id ?? null,
+    modalidad_formacion_id: f.modalidad_formacion_id ?? null,
+    ambiente_id: f.ambiente_id ?? null,
+    jornada_id: f.jornada_id ?? null,
+    total_horas: f.total_horas,
+    status: f.status,
+    dias_formacion_ids: normalizeDiaIds(f.dias_formacion_ids),
+  };
+}
+
+type WithDisplayName = {
+  nombre?: string;
+  persona_nombre?: string;
+  full_name?: string;
+  instructor_nombre?: string;
+};
+
+function displayNameFromItem(x: WithDisplayName): string {
+  if ('nombre' in x && x.nombre) return String(x.nombre);
+  if ('persona_nombre' in x && x.persona_nombre) return String(x.persona_nombre);
+  if ('instructor_nombre' in x && x.instructor_nombre) return String(x.instructor_nombre);
+  return String((x as unknown as { full_name?: string }).full_name || '');
+}
 
 const DEBOUNCE_MS = 350;
 
@@ -29,7 +75,8 @@ const finAnio = () => {
   return d.toISOString().slice(0, 10);
 };
 
-export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSuccess }: ModalAsignarFichaProps) {
+export function ModalAsignarFicha(props: Readonly<ModalAsignarFichaProps>) {
+  const { fichaId, fichaNombre, tipo, onClose, onSuccess } = props;
   const [asignados, setAsignados] = useState<InstructorFichaResponse[] | AprendizResponse[]>([]);
   const [noAsignados, setNoAsignados] = useState<InstructorItem[] | PersonaResponse[]>([]);
   const [instructorPrincipalId, setInstructorPrincipalId] = useState<number | undefined>(undefined);
@@ -46,16 +93,22 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
     setError('');
     try {
       if (isInstructores) {
-        const instFicha = await apiService.getFichaInstructores(fichaId);
+        const [instFicha, ficha] = await Promise.all([
+          apiService.getFichaInstructores(fichaId),
+          apiService.getFichaCaracterizacionById(fichaId),
+        ]);
         setAsignados(instFicha);
-        if (instFicha.length > 0) {
-          setInstructorPrincipalId((prev) => {
-            const ids = new Set(instFicha.map((i) => i.instructor_id));
-            if (prev === undefined || !ids.has(prev)) return instFicha[0].instructor_id;
-            return prev;
-          });
-        } else {
+        const idsAsignados = new Set(instFicha.map((i) => i.instructor_id));
+        if (instFicha.length === 0) {
           setInstructorPrincipalId(undefined);
+        } else {
+          const liderBd =
+            ficha.instructor_id != null &&
+            ficha.instructor_id > 0 &&
+            idsAsignados.has(ficha.instructor_id)
+              ? ficha.instructor_id
+              : instFicha[0].instructor_id;
+          setInstructorPrincipalId(liderBd);
         }
       } else {
         const aprendices = await apiService.getFichaAprendices(fichaId);
@@ -63,11 +116,39 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
         setAsignados(activos);
       }
     } catch (e: unknown) {
-      setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al cargar');
+      setError(axiosErrorMessage(e, 'Error al cargar'));
     } finally {
       setLoading(false);
     }
   }, [fichaId, isInstructores]);
+
+  const handleCambioInstructorPrincipal = async (v: number | undefined) => {
+    const prev = instructorPrincipalId;
+    if (v === undefined) {
+      setInstructorPrincipalId(prev);
+      return;
+    }
+    if (v === prev) return;
+    setSaving(true);
+    setError('');
+    try {
+      const ficha = await apiService.getFichaCaracterizacionById(fichaId);
+      if (v === ficha.instructor_id) {
+        setInstructorPrincipalId(v);
+        return;
+      }
+      const payload = buildFichaUpdatePayload(ficha, v);
+      await apiService.updateFichaCaracterizacion(fichaId, payload);
+      setInstructorPrincipalId(v);
+      onSuccess?.();
+      await load();
+    } catch (e: unknown) {
+      setInstructorPrincipalId(prev);
+      setError(axiosErrorMessage(e, 'No se pudo actualizar el instructor principal'));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     load();
@@ -97,18 +178,10 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
     return () => { cancelled = true; };
   }, [asignados, debouncedFilterNoAsignados, isInstructores]);
 
-  type WithDisplayName = { nombre?: string; persona_nombre?: string; full_name?: string; instructor_nombre?: string };
   const filterByQuery = <T extends WithDisplayName>(list: T[], query: string): T[] => {
     const q = query.trim().toLowerCase();
     if (!q) return list;
-    return list.filter((x) => {
-      const name =
-        'nombre' in x && x.nombre ? x.nombre
-        : 'persona_nombre' in x && x.persona_nombre ? x.persona_nombre
-        : 'instructor_nombre' in x && x.instructor_nombre ? x.instructor_nombre
-        : (x as unknown as { full_name?: string }).full_name || '';
-      return String(name).toLowerCase().includes(q);
-    });
+    return list.filter((x) => displayNameFromItem(x).toLowerCase().includes(q));
   };
 
   const asignadosConNombre = isInstructores
@@ -162,13 +235,13 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
     try {
       await apiService.desasignarInstructor(fichaId, instructorId);
       if (instructorPrincipalId === instructorId) {
-        const rest = (asignados as InstructorFichaResponse[]).filter((i) => i.instructor_id !== instructorId);
-        setInstructorPrincipalId(rest[0]?.instructor_id);
+        const next = (asignados as InstructorFichaResponse[]).find((i) => i.instructor_id !== instructorId);
+        setInstructorPrincipalId(next?.instructor_id);
       }
       onSuccess?.();
       await load();
     } catch (e: unknown) {
-      setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al desasignar');
+      setError(axiosErrorMessage(e, 'Error al desasignar'));
     } finally {
       setSaving(false);
     }
@@ -182,7 +255,7 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
       onSuccess?.();
       await load();
     } catch (e: unknown) {
-      setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al asignar');
+      setError(axiosErrorMessage(e, 'Error al asignar'));
     } finally {
       setSaving(false);
     }
@@ -196,29 +269,39 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
       onSuccess?.();
       await load();
     } catch (e: unknown) {
-      setError((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al desasignar');
+      setError(axiosErrorMessage(e, 'Error al desasignar'));
     } finally {
       setSaving(false);
     }
   };
 
-  const onDragOver = (e: React.DragEvent) => {
+  const onDragOver = (e: DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
-      <div
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-gray-200 dark:border-gray-700"
-        onClick={(e) => e.stopPropagation()}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 z-0 bg-black/50"
+        aria-label="Cerrar ventana"
+        onClick={onClose}
+      />
+      <dialog
+        open
+        className="relative z-10 m-0 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-0 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+        aria-labelledby="modal-asignar-ficha-title"
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
+          <h2
+            id="modal-asignar-ficha-title"
+            className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white"
+          >
             {isInstructores ? (
-              <AcademicCapIcon className="w-6 h-6 text-primary-600" />
+              <AcademicCapIcon className="h-6 w-6 text-primary-600" />
             ) : (
-              <UserGroupIcon className="w-6 h-6 text-primary-600" />
+              <UserGroupIcon className="h-6 w-6 text-primary-600" />
             )}
             {isInstructores ? 'Asignar instructores' : 'Asignar aprendices'} — Ficha {fichaNombre}
           </h2>
@@ -240,16 +323,23 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
 
         {isInstructores && (asignados as InstructorFichaResponse[]).length > 0 && (
           <div className="px-4 pt-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Instructor principal</label>
+            <label
+              htmlFor="modal-asignar-instructor-principal"
+              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Instructor principal
+            </label>
             <div className="max-w-xs">
               <SelectSearch
+                inputId="modal-asignar-instructor-principal"
                 options={(asignados as InstructorFichaResponse[]).map((i) => ({
                   value: i.instructor_id,
                   label: i.instructor_nombre,
                 }))}
                 value={instructorPrincipalId}
-                onChange={(v) => setInstructorPrincipalId(v)}
+                onChange={(v) => void handleCambioInstructorPrincipal(v)}
                 placeholder="Seleccione instructor principal"
+                isDisabled={saving}
               />
             </div>
           </div>
@@ -260,8 +350,9 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
             <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">Cargando...</div>
           ) : (
             <div className="grid grid-cols-2 gap-4 flex-1 min-h-0 overflow-hidden">
-              <div
-                className="border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-lg p-3 flex flex-col min-h-0 overflow-hidden bg-gray-50/50 dark:bg-gray-900/30"
+              <section
+                aria-label={isInstructores ? 'Instructores asignados. Arrastre aquí para asignar.' : 'Aprendices asignados. Arrastre aquí para asignar.'}
+                className="flex min-h-0 flex-col overflow-hidden rounded-lg border-2 border-dashed border-gray-200 bg-gray-50/50 p-3 dark:border-gray-600 dark:bg-gray-900/30"
                 onDragOver={onDragOver}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -321,10 +412,11 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
                     })
                   )}
                 </ul>
-              </div>
+              </section>
 
-              <div
-                className="border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-lg p-3 flex flex-col min-h-0 overflow-hidden bg-gray-50/50 dark:bg-gray-900/30"
+              <section
+                aria-label={isInstructores ? 'Instructores disponibles para asignar' : 'Personas disponibles para asignar'}
+                className="flex min-h-0 flex-col overflow-hidden rounded-lg border-2 border-dashed border-gray-200 bg-gray-50/50 p-3 dark:border-gray-600 dark:bg-gray-900/30"
                 onDragOver={onDragOver}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -384,17 +476,17 @@ export function ModalAsignarFicha({ fichaId, fichaNombre, tipo, onClose, onSucce
                     })
                   )}
                 </ul>
-              </div>
+              </section>
             </div>
           )}
         </div>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+        <div className="flex justify-end border-t border-gray-200 p-4 dark:border-gray-700">
           <button type="button" onClick={onClose} className="btn-secondary">
             Cerrar
           </button>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

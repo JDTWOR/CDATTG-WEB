@@ -30,12 +30,12 @@ type FichaImportService interface {
 }
 
 type fichaImportService struct {
-	personaRepo   repositories.PersonaRepository
-	programaRepo  repositories.ProgramaFormacionRepository
-	fichaRepo     repositories.FichaRepository
-	aprendizRepo  repositories.AprendizRepository
-	catalogoRepo  repositories.CatalogoRepository
-	personaSvc    PersonaService
+	personaRepo  repositories.PersonaRepository
+	programaRepo repositories.ProgramaFormacionRepository
+	fichaRepo    repositories.FichaRepository
+	aprendizRepo repositories.AprendizRepository
+	catalogoRepo repositories.CatalogoRepository
+	personaSvc   PersonaService
 }
 
 func NewFichaImportService() FichaImportService {
@@ -45,18 +45,18 @@ func NewFichaImportService() FichaImportService {
 		fichaRepo:    repositories.NewFichaRepository(),
 		aprendizRepo: repositories.NewAprendizRepository(),
 		catalogoRepo: repositories.NewCatalogoRepository(),
-		personaSvc:  NewPersonaService(),
+		personaSvc:   NewPersonaService(),
 	}
 }
 
 type FichaImportResult struct {
-	ProcessedCount   int `json:"processed_count"`
-	UpdatedCount    int `json:"updated_count"`
-	CreatedCount    int `json:"created_count"`
-	DuplicatesCount int `json:"duplicates_count"`
-	ErrorCount      int `json:"error_count"`
-	FichaCreated    bool `json:"ficha_created"`
-	Status          string `json:"status"`
+	ProcessedCount       int    `json:"processed_count"`
+	UpdatedCount         int    `json:"updated_count"`
+	CreatedCount         int    `json:"created_count"`
+	DuplicatesCount      int    `json:"duplicates_count"`
+	ErrorCount           int    `json:"error_count"`
+	FichaCreated         bool   `json:"ficha_created"`
+	Status               string `json:"status"`
 	IncidentReportBase64 string `json:"incident_report_base64,omitempty"`
 }
 
@@ -109,80 +109,49 @@ func (s *fichaImportService) readXLSXRows(fileBytes []byte) ([][]string, error) 
 	return rows, nil
 }
 
-func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) (*FichaImportResult, error) {
-	rows, err := s.readExcelRows(fileBytes, filename)
-	if err != nil {
-		return nil, err
-	}
-	if len(rows) < 6 {
-		return nil, fmt.Errorf("el archivo debe tener al menos cabecera y una fila de datos")
-	}
-
-	// Buscar fila "Ficha de Caracterización:" y extraer "CODE - NOMBRE PROGRAMA"
-	var fichaCode, programName string
-	for i, row := range rows {
-		if len(row) > 2 {
-			cell0 := strings.TrimSpace(strings.ToLower(row[0]))
-			if strings.Contains(cell0, "ficha") && strings.Contains(cell0, "caracterización") {
-				val := strings.TrimSpace(row[2])
-				if val != "" {
-					idx := strings.Index(val, " - ")
-					if idx > 0 {
-						fichaCode = strings.TrimSpace(val[:idx])
-						programName = strings.TrimSpace(val[idx+3:])
-					} else {
-						fichaCode = val
-					}
-				}
+func extractFichaYProgramaDesdeRows(rows [][]string) (fichaCode, programName string, err error) {
+	for _, row := range rows {
+		if len(row) <= 2 {
+			continue
+		}
+		cell0 := strings.TrimSpace(strings.ToLower(row[0]))
+		if strings.Contains(cell0, "ficha") && strings.Contains(cell0, "caracterización") {
+			val := strings.TrimSpace(row[2])
+			if val == "" {
 				break
 			}
+			idx := strings.Index(val, " - ")
+			if idx > 0 {
+				fichaCode = strings.TrimSpace(val[:idx])
+				programName = strings.TrimSpace(val[idx+3:])
+			} else {
+				fichaCode = val
+			}
+			break
 		}
-		_ = i
 	}
 	if fichaCode == "" {
-		return nil, fmt.Errorf("no se encontró la línea 'Ficha de Caracterización' con código y nombre de programa")
+		return "", "", fmt.Errorf("no se encontró la línea 'Ficha de Caracterización' con código y nombre de programa")
 	}
+	return fichaCode, programName, nil
+}
 
-	// Buscar fila de cabecera (Tipo de Documento, Número de Documento, Nombre, Apellidos...)
-	dataStartRow := -1
+func findFilaCabeceraAprendices(rows [][]string) (dataStartRow int, err error) {
 	for i, row := range rows {
-		if len(row) > 5 {
-			c0 := strings.TrimSpace(strings.ToLower(row[0]))
-			c1 := strings.TrimSpace(strings.ToLower(row[1]))
-			if (strings.Contains(c0, "tipo") && strings.Contains(c0, "documento")) &&
-				(strings.Contains(c1, "número") || strings.Contains(c1, "numero")) {
-				dataStartRow = i + 1
-				break
-			}
+		if len(row) <= 5 {
+			continue
+		}
+		c0 := strings.TrimSpace(strings.ToLower(row[0]))
+		c1 := strings.TrimSpace(strings.ToLower(row[1]))
+		if (strings.Contains(c0, "tipo") && strings.Contains(c0, "documento")) &&
+			(strings.Contains(c1, "número") || strings.Contains(c1, "numero")) {
+			return i + 1, nil
 		}
 	}
-	if dataStartRow < 0 {
-		return nil, fmt.Errorf("no se encontró la fila de cabecera (Tipo de Documento, Número de Documento, Nombre, Apellidos...)")
-	}
+	return -1, fmt.Errorf("no se encontró la fila de cabecera (Tipo de Documento, Número de Documento, Nombre, Apellidos...)")
+}
 
-	// Programa por nombre
-	programa, err := s.programaRepo.FindFirstByNombreContaining(programName)
-	if err != nil {
-		return nil, fmt.Errorf("programa de formación no encontrado por nombre: %q", programName)
-	}
-
-	// Obtener o crear ficha
-	var ficha *models.FichaCaracterizacion
-	fichaCreated := false
-	ficha, err = s.fichaRepo.FindByFicha(fichaCode)
-	if err != nil {
-		ficha = &models.FichaCaracterizacion{
-			ProgramaFormacionID: programa.ID,
-			Ficha:               fichaCode,
-			Status:              true,
-		}
-		if err := s.fichaRepo.Create(ficha); err != nil {
-			return nil, fmt.Errorf("error al crear ficha %s: %w", fichaCode, err)
-		}
-		fichaCreated = true
-	}
-
-	// Tipos de documento (CC -> ID)
+func (s *fichaImportService) buildTipoDocumentoCodeMap() map[string]uint {
 	tiposDoc, _ := s.catalogoRepo.FindTiposDocumento()
 	tipoByCode := make(map[string]uint)
 	for _, t := range tiposDoc {
@@ -193,221 +162,341 @@ func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) 
 			}
 		}
 	}
+	return tipoByCode
+}
 
-	var processed, updated, created, duplicates, errors int
-
-	// Mapa para detectar duplicados dentro del mismo archivo (solo nuevas personas creadas en esta importación)
-	seenEmailPersona := make(map[string]uint)
-	seenCelularPersona := make(map[string]uint)
-
-	// Libro para reporte de incidencias
-	incidentFile := excelize.NewFile()
-	incidentSheet := "Incidencias"
-	defaultSheet := incidentFile.GetSheetName(0)
-	if defaultSheet != "" {
-		_ = incidentFile.SetSheetName(defaultSheet, incidentSheet)
-	}
-	incidentHeaders := []string{"tipo_incidente", "numero_documento", "nombre", "apellidos", "correo_original", "celular_original", "ficha_origen", "ficha_destino", "detalle"}
-	for i, h := range incidentHeaders {
-		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
-		_ = incidentFile.SetCellValue(incidentSheet, cell, h)
-	}
-	incidentRow := 2
-	hasIncidents := false
-
-	addIncident := func(tipo, numeroDoc, nombre, apellidos, correoOrig, celularOrig, fichaOrigen, fichaDestino, detalle string) {
-		hasIncidents = true
-		values := []string{tipo, numeroDoc, nombre, apellidos, correoOrig, celularOrig, fichaOrigen, fichaDestino, detalle}
-		for i, v := range values {
-			cell, _ := excelize.CoordinatesToCellName(i+1, incidentRow)
-			_ = incidentFile.SetCellValue(incidentSheet, cell, v)
+func (s *fichaImportService) getOrCreateFicha(fichaCode string, programa *models.ProgramaFormacion) (*models.FichaCaracterizacion, bool, error) {
+	ficha, err := s.fichaRepo.FindByFicha(fichaCode)
+	if err != nil {
+		ficha = &models.FichaCaracterizacion{
+			ProgramaFormacionID: programa.ID,
+			Ficha:               fichaCode,
+			Status:              true,
 		}
-		incidentRow++
+		if err := s.fichaRepo.Create(ficha); err != nil {
+			return nil, false, fmt.Errorf("error al crear ficha %s: %w", fichaCode, err)
+		}
+		return ficha, true, nil
+	}
+	return ficha, false, nil
+}
+
+// fichaImportIncident una fila del reporte de incidencias (evita funciones con demasiados parámetros).
+type fichaImportIncident struct {
+	Tipo            string
+	NumeroDocumento string
+	Nombre          string
+	Apellidos       string
+	CorreoOriginal  string
+	CelularOriginal string
+	FichaOrigen     string
+	FichaDestino    string
+	Detalle         string
+}
+
+type fichaImportIncidentWriter struct {
+	file    *excelize.File
+	sheet   string
+	nextRow int
+	has     bool
+}
+
+func newFichaImportIncidentWriter() *fichaImportIncidentWriter {
+	f := excelize.NewFile()
+	sheet := "Incidencias"
+	defaultSheet := f.GetSheetName(0)
+	if defaultSheet != "" {
+		_ = f.SetSheetName(defaultSheet, sheet)
+	}
+	headers := []string{"tipo_incidente", "numero_documento", "nombre", "apellidos", "correo_original", "celular_original", "ficha_origen", "ficha_destino", "detalle"}
+	for i, h := range headers {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		_ = f.SetCellValue(sheet, cell, h)
+	}
+	return &fichaImportIncidentWriter{file: f, sheet: sheet, nextRow: 2}
+}
+
+func (w *fichaImportIncidentWriter) add(inc fichaImportIncident) {
+	w.has = true
+	values := []string{
+		inc.Tipo, inc.NumeroDocumento, inc.Nombre, inc.Apellidos,
+		inc.CorreoOriginal, inc.CelularOriginal, inc.FichaOrigen, inc.FichaDestino, inc.Detalle,
+	}
+	for i, v := range values {
+		cell, _ := excelize.CoordinatesToCellName(i+1, w.nextRow)
+		_ = w.file.SetCellValue(w.sheet, cell, v)
+	}
+	w.nextRow++
+}
+
+func (w *fichaImportIncidentWriter) toBase64() string {
+	if !w.has {
+		return ""
+	}
+	var buf bytes.Buffer
+	if err := w.file.Write(&buf); err != nil {
+		return ""
+	}
+	return base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+type fichaImportCounters struct {
+	processed, updated, created, duplicates, errCount int
+}
+
+type fichaImportRunner struct {
+	s           *fichaImportService
+	ficha       *models.FichaCaracterizacion
+	fichaCode   string
+	tipoByCode  map[string]uint
+	seenEmail   map[string]uint
+	seenCelular map[string]uint
+	incidents   *fichaImportIncidentWriter
+	c           *fichaImportCounters
+}
+
+type parsedFichaRow struct {
+	tipoDocStr, numeroDoc, nombreStr, apellidosStr string
+	celular, correo, correoOriginal, celularOriginal string
+	primerNombre, segundoNombre, primerApellido, segundoApellido string
+	tipoID                                                       uint
+}
+
+func (r *fichaImportRunner) parseFichaRow(row []string) (parsedFichaRow, bool) {
+	var p parsedFichaRow
+	if len(row) <= fichaColNumDoc {
+		return p, false
+	}
+	p.numeroDoc = strings.TrimSpace(row[fichaColNumDoc])
+	if p.numeroDoc == "" {
+		return p, false
+	}
+	p.tipoDocStr = strings.TrimSpace(strings.ToUpper(row[fichaColTipoDoc]))
+	p.nombreStr = strings.TrimSpace(row[fichaColNombre])
+	p.apellidosStr = strings.TrimSpace(row[fichaColApellidos])
+	if len(row) > fichaColCelular {
+		p.celular = strings.TrimSpace(row[fichaColCelular])
+	}
+	if len(row) > fichaColCorreo {
+		p.correo = strings.TrimSpace(row[fichaColCorreo])
+	}
+	p.correoOriginal = p.correo
+	p.celularOriginal = p.celular
+
+	p.primerNombre, p.segundoNombre = splitNombre(p.nombreStr)
+	p.primerApellido, p.segundoApellido = splitNombre(p.apellidosStr)
+	if p.primerNombre == "" && p.primerApellido == "" {
+		p.primerNombre = p.nombreStr
+		p.primerApellido = p.apellidosStr
+	}
+	p.tipoID = r.tipoByCode[p.tipoDocStr]
+	return p, true
+}
+
+func (r *fichaImportRunner) applyEmailDuplicateRules(p *parsedFichaRow) {
+	var firstPersonaEmailID uint
+	var emailSeen bool
+	if p.correo != "" {
+		firstPersonaEmailID, emailSeen = r.seenEmail[strings.ToLower(p.correo)]
+	}
+	emailDuplicadoBD := p.correo != "" && r.s.personaRepo.ExistsByEmail(p.correo)
+	emailDuplicadoEnImport := p.correo != "" && emailSeen
+
+	if p.correo == "" || (!emailDuplicadoBD && !emailDuplicadoEnImport) {
+		return
+	}
+	r.incidents.add(fichaImportIncident{
+		Tipo: "EMAIL_DUPLICADO", NumeroDocumento: p.numeroDoc, Nombre: p.nombreStr, Apellidos: p.apellidosStr,
+		CorreoOriginal: p.correoOriginal, CelularOriginal: p.celularOriginal, FichaOrigen: "", FichaDestino: r.fichaCode,
+		Detalle: "Correo ya registrado en otra persona",
+	})
+	if emailDuplicadoEnImport && firstPersonaEmailID != 0 {
+		if persona, err := r.s.personaRepo.FindByID(firstPersonaEmailID); err == nil && persona != nil && persona.Email != "" {
+			persona.Email = ""
+			_ = r.s.personaRepo.Update(persona)
+		}
+	}
+	p.correo = ""
+}
+
+func (r *fichaImportRunner) applyCelularDuplicateRules(p *parsedFichaRow) {
+	var firstPersonaCelID uint
+	var celSeen bool
+	if p.celular != "" {
+		firstPersonaCelID, celSeen = r.seenCelular[p.celular]
+	}
+	celDuplicadoBD := p.celular != "" && r.s.personaRepo.ExistsByCelular(p.celular)
+	celDuplicadoEnImport := p.celular != "" && celSeen
+
+	if p.celular == "" || (!celDuplicadoBD && !celDuplicadoEnImport) {
+		return
+	}
+	r.incidents.add(fichaImportIncident{
+		Tipo: "CELULAR_DUPLICADO", NumeroDocumento: p.numeroDoc, Nombre: p.nombreStr, Apellidos: p.apellidosStr,
+		CorreoOriginal: p.correoOriginal, CelularOriginal: p.celularOriginal, FichaOrigen: "", FichaDestino: r.fichaCode,
+		Detalle: "Celular ya registrado en otra persona",
+	})
+	if celDuplicadoEnImport && firstPersonaCelID != 0 {
+		if persona, err := r.s.personaRepo.FindByID(firstPersonaCelID); err == nil && persona != nil && persona.Celular != "" {
+			persona.Celular = ""
+			_ = r.s.personaRepo.Update(persona)
+		}
+	}
+	p.celular = ""
+}
+
+func (r *fichaImportRunner) upsertPersona(p *parsedFichaRow) (personaID uint, isNew bool, ok bool) {
+	req := dto.PersonaRequest{
+		NumeroDocumento: p.numeroDoc,
+		PrimerNombre:    p.primerNombre,
+		SegundoNombre:   p.segundoNombre,
+		PrimerApellido:  p.primerApellido,
+		SegundoApellido: p.segundoApellido,
+		Celular:         p.celular,
+		Email:           p.correo,
+		Status:          ptrBool(true),
+	}
+	if p.tipoID != 0 {
+		req.TipoDocumento = &p.tipoID
+	}
+
+	persona, errFind := r.s.personaRepo.FindByNumeroDocumento(p.numeroDoc)
+	if errFind != nil || persona == nil {
+		createdResp, errCreate := r.s.personaSvc.Create(req)
+		if errCreate != nil {
+			r.c.errCount++
+			return 0, false, false
+		}
+		r.c.created++
+		return createdResp.ID, true, true
+	}
+	if _, errUpdate := r.s.personaSvc.Update(persona.ID, req); errUpdate != nil {
+		r.c.errCount++
+		return 0, false, false
+	}
+	r.c.updated++
+	return persona.ID, false, true
+}
+
+func (r *fichaImportRunner) recordSeenForNewPersona(p *parsedFichaRow, personaID uint, isNew bool) {
+	if !isNew {
+		return
+	}
+	if p.correoOriginal != "" {
+		r.seenEmail[strings.ToLower(p.correoOriginal)] = personaID
+	}
+	if p.celularOriginal != "" {
+		r.seenCelular[p.celularOriginal] = personaID
+	}
+}
+
+func (r *fichaImportRunner) tryEnrollAprendiz(p *parsedFichaRow, personaID uint) {
+	if existingAprendiz, errAprendiz := r.s.aprendizRepo.FindByPersonaID(personaID); errAprendiz == nil && existingAprendiz != nil {
+		if existingAprendiz.FichaCaracterizacionID == r.ficha.ID {
+			r.c.duplicates++
+			return
+		}
+		r.c.duplicates++
+		fichaOrigenCodigo := ""
+		if fichaOrigen, errFicha := r.s.fichaRepo.FindByID(existingAprendiz.FichaCaracterizacionID); errFicha == nil && fichaOrigen != nil {
+			fichaOrigenCodigo = fichaOrigen.Ficha
+		}
+		r.incidents.add(fichaImportIncident{
+			Tipo: "YA_EN_OTRA_FICHA", NumeroDocumento: p.numeroDoc, Nombre: p.nombreStr, Apellidos: p.apellidosStr,
+			CorreoOriginal: p.correoOriginal, CelularOriginal: p.celularOriginal, FichaOrigen: fichaOrigenCodigo, FichaDestino: r.fichaCode,
+			Detalle: "Persona ya inscrita en otra ficha de formación",
+		})
+		return
+	}
+
+	if _, errAprendiz := r.s.aprendizRepo.FindByPersonaIDAndFichaID(personaID, r.ficha.ID); errAprendiz == nil {
+		r.c.duplicates++
+		return
+	}
+	aprendiz := models.Aprendiz{
+		PersonaID:              personaID,
+		FichaCaracterizacionID: r.ficha.ID,
+		Estado:                 true,
+	}
+	if err := r.s.aprendizRepo.Create(&aprendiz); err != nil {
+		r.c.errCount++
+		return
+	}
+	r.c.processed++
+}
+
+func (r *fichaImportRunner) processRow(row []string) {
+	p, ok := r.parseFichaRow(row)
+	if !ok {
+		return
+	}
+	r.applyEmailDuplicateRules(&p)
+	r.applyCelularDuplicateRules(&p)
+	personaID, isNew, ok := r.upsertPersona(&p)
+	if !ok {
+		return
+	}
+	r.recordSeenForNewPersona(&p, personaID, isNew)
+	r.tryEnrollAprendiz(&p, personaID)
+}
+
+func (s *fichaImportService) ImportFromExcel(fileBytes []byte, filename string) (*FichaImportResult, error) {
+	rows, err := s.readExcelRows(fileBytes, filename)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) < 6 {
+		return nil, fmt.Errorf("el archivo debe tener al menos cabecera y una fila de datos")
+	}
+
+	fichaCode, programName, err := extractFichaYProgramaDesdeRows(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	dataStartRow, err := findFilaCabeceraAprendices(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	programa, err := s.programaRepo.FindFirstByNombreContaining(programName)
+	if err != nil {
+		return nil, fmt.Errorf("programa de formación no encontrado por nombre: %q", programName)
+	}
+
+	ficha, fichaCreated, err := s.getOrCreateFicha(fichaCode, programa)
+	if err != nil {
+		return nil, err
+	}
+
+	tipoByCode := s.buildTipoDocumentoCodeMap()
+	incidentW := newFichaImportIncidentWriter()
+
+	counters := &fichaImportCounters{}
+	runner := &fichaImportRunner{
+		s:           s,
+		ficha:       ficha,
+		fichaCode:   fichaCode,
+		tipoByCode:  tipoByCode,
+		seenEmail:   make(map[string]uint),
+		seenCelular: make(map[string]uint),
+		incidents:   incidentW,
+		c:           counters,
 	}
 
 	for i := dataStartRow; i < len(rows); i++ {
-		row := rows[i]
-		if len(row) <= fichaColNumDoc {
-			continue
-		}
-		numeroDoc := strings.TrimSpace(row[fichaColNumDoc])
-		if numeroDoc == "" {
-			continue
-		}
-
-		tipoDocStr := strings.TrimSpace(strings.ToUpper(row[fichaColTipoDoc]))
-		nombreStr := strings.TrimSpace(row[fichaColNombre])
-		apellidosStr := strings.TrimSpace(row[fichaColApellidos])
-		celular := ""
-		if len(row) > fichaColCelular {
-			celular = strings.TrimSpace(row[fichaColCelular])
-		}
-		correo := ""
-		if len(row) > fichaColCorreo {
-			correo = strings.TrimSpace(row[fichaColCorreo])
-		}
-
-		correoOriginal := correo
-		celularOriginal := celular
-
-		primerNombre, segundoNombre := splitNombre(nombreStr)
-		primerApellido, segundoApellido := splitNombre(apellidosStr)
-		if primerNombre == "" && primerApellido == "" {
-			primerNombre = nombreStr
-			primerApellido = apellidosStr
-		}
-
-		tipoID := tipoByCode[tipoDocStr]
-
-		// Reglas de duplicados de correo/celular:
-		// - Si el correo ya existe en BD o ya se usó en esta misma importación para otra persona nueva,
-		//   no se guarda el correo en esta persona y se registra incidencia.
-		// - Si el celular ya existe en BD o ya se usó en esta misma importación para otra persona nueva,
-		//   no se guarda el celular en esta persona y se registra incidencia.
-		// - Si el duplicado es dentro del mismo archivo (seen*), se limpia también el valor de la primera persona creada.
-
-		var firstPersonaEmailID uint
-		var emailSeen bool
-		if correo != "" {
-			firstPersonaEmailID, emailSeen = seenEmailPersona[strings.ToLower(correo)]
-		}
-		emailDuplicadoBD := correo != "" && s.personaRepo.ExistsByEmail(correo)
-		emailDuplicadoEnImport := correo != "" && emailSeen
-
-		if correo != "" && (emailDuplicadoBD || emailDuplicadoEnImport) {
-			detalle := "Correo ya registrado en otra persona"
-			addIncident("EMAIL_DUPLICADO", numeroDoc, nombreStr, apellidosStr, correoOriginal, celularOriginal, "", fichaCode, detalle)
-			// Si es duplicado dentro del mismo archivo y la primera persona fue creada en esta importación,
-			// se limpia también el correo de la primera persona.
-			if emailDuplicadoEnImport && firstPersonaEmailID != 0 {
-				if p, err := s.personaRepo.FindByID(firstPersonaEmailID); err == nil && p != nil && p.Email != "" {
-					p.Email = ""
-					_ = s.personaRepo.Update(p)
-				}
-			}
-			// No guardar correo para esta persona
-			correo = ""
-		}
-
-		var firstPersonaCelID uint
-		var celSeen bool
-		if celular != "" {
-			firstPersonaCelID, celSeen = seenCelularPersona[celular]
-		}
-		celDuplicadoBD := celular != "" && s.personaRepo.ExistsByCelular(celular)
-		celDuplicadoEnImport := celular != "" && celSeen
-
-		if celular != "" && (celDuplicadoBD || celDuplicadoEnImport) {
-			detalle := "Celular ya registrado en otra persona"
-			addIncident("CELULAR_DUPLICADO", numeroDoc, nombreStr, apellidosStr, correoOriginal, celularOriginal, "", fichaCode, detalle)
-			if celDuplicadoEnImport && firstPersonaCelID != 0 {
-				if p, err := s.personaRepo.FindByID(firstPersonaCelID); err == nil && p != nil && p.Celular != "" {
-					p.Celular = ""
-					_ = s.personaRepo.Update(p)
-				}
-			}
-			// No guardar celular para esta persona
-			celular = ""
-		}
-		req := dto.PersonaRequest{
-			NumeroDocumento: numeroDoc,
-			PrimerNombre:    primerNombre,
-			SegundoNombre:   segundoNombre,
-			PrimerApellido:  primerApellido,
-			SegundoApellido: segundoApellido,
-			Celular:         celular,
-			Email:           correo,
-			Status:          ptrBool(true),
-		}
-		if tipoID != 0 {
-			req.TipoDocumento = &tipoID
-		}
-
-		persona, errFind := s.personaRepo.FindByNumeroDocumento(numeroDoc)
-		var personaID uint
-		isNewPersona := false
-		if errFind != nil || persona == nil {
-			createdResp, errCreate := s.personaSvc.Create(req)
-			if errCreate != nil {
-				errors++
-				continue
-			}
-			personaID = createdResp.ID
-			isNewPersona = true
-			created++
-		} else {
-			personaID = persona.ID
-			_, errUpdate := s.personaSvc.Update(persona.ID, req)
-			if errUpdate != nil {
-				errors++
-				continue
-			}
-			updated++
-		}
-
-		// Registrar correos/celulares usados por personas nuevas creadas en esta importación
-		if isNewPersona && correoOriginal != "" {
-			seenEmailPersona[strings.ToLower(correoOriginal)] = personaID
-		}
-		if isNewPersona && celularOriginal != "" {
-			seenCelularPersona[celularOriginal] = personaID
-		}
-
-		// Reglas de inscripción en ficha:
-		// - Si ya está inscrito en esta ficha: contar como duplicado y no volver a inscribir.
-		// - Si ya está inscrito en otra ficha diferente: no inscribir en esta ficha y registrar incidencia.
-
-		if existingAprendiz, errAprendiz := s.aprendizRepo.FindByPersonaID(personaID); errAprendiz == nil && existingAprendiz != nil {
-			if existingAprendiz.FichaCaracterizacionID == ficha.ID {
-				duplicates++
-				continue
-			}
-
-			duplicates++
-
-			fichaOrigenCodigo := ""
-			if fichaOrigen, errFicha := s.fichaRepo.FindByID(existingAprendiz.FichaCaracterizacionID); errFicha == nil && fichaOrigen != nil {
-				fichaOrigenCodigo = fichaOrigen.Ficha
-			}
-
-			detalle := "Persona ya inscrita en otra ficha de formación"
-			addIncident("YA_EN_OTRA_FICHA", numeroDoc, nombreStr, apellidosStr, correoOriginal, celularOriginal, fichaOrigenCodigo, fichaCode, detalle)
-			continue
-		}
-
-		if _, errAprendiz := s.aprendizRepo.FindByPersonaIDAndFichaID(personaID, ficha.ID); errAprendiz == nil {
-			duplicates++
-			continue
-		}
-		aprendiz := models.Aprendiz{
-			PersonaID:            personaID,
-			FichaCaracterizacionID: ficha.ID,
-			Estado:               true,
-		}
-		if err := s.aprendizRepo.Create(&aprendiz); err != nil {
-			errors++
-			continue
-		}
-		processed++
-	}
-
-	var incidentBase64 string
-	if hasIncidents {
-		var buf bytes.Buffer
-		if err := incidentFile.Write(&buf); err == nil {
-			incidentBase64 = base64.StdEncoding.EncodeToString(buf.Bytes())
-		}
+		runner.processRow(rows[i])
 	}
 
 	return &FichaImportResult{
-		ProcessedCount:   processed,
-		UpdatedCount:    updated,
-		CreatedCount:    created,
-		DuplicatesCount: duplicates,
-		ErrorCount:      errors,
-		FichaCreated:    fichaCreated,
-		Status:          "completado",
-		IncidentReportBase64: incidentBase64,
+		ProcessedCount:       counters.processed,
+		UpdatedCount:         counters.updated,
+		CreatedCount:         counters.created,
+		DuplicatesCount:      counters.duplicates,
+		ErrorCount:           counters.errCount,
+		FichaCreated:         fichaCreated,
+		Status:               "completado",
+		IncidentReportBase64: incidentW.toBase64(),
 	}, nil
 }
 

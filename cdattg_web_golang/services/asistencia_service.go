@@ -11,6 +11,16 @@ import (
 	"github.com/sena/cdattg-web-golang/repositories"
 )
 
+const (
+	errMsgSesionAsistenciaNoEncontrada   = "SESIÓN DE ASISTENCIA NO ENCONTRADA"
+	errMsgSesionYaFinalizada             = "LA SESIÓN YA ESTÁ FINALIZADA"
+	errMsgRegistroAsistenciaNoEncontrado = "REGISTRO DE ASISTENCIA NO ENCONTRADO"
+	errMsgFechaInvalida                 = "FECHA INVÁLIDA, USE YYYY-MM-DD"
+	errMsgYaExisteSesionActiva         = "YA EXISTE UNA SESIÓN DE ASISTENCIA ACTIVA PARA ESTA FICHA. FINALÍCELA ANTES DE CREAR OTRA"
+	errMsgNoEstaCreadoComoInstructor = "NO ESTÁ CREADO COMO INSTRUCTOR DE ESTA FICHA"
+	errMsgFueraDelHorarioJornada     = "FUERA DEL HORARIO DE LA JORNADA DE LA FICHA; SOLO SE PUEDE TOMAR ASISTENCIA EN EL HORARIO CONFIGURADO"
+)
+
 type AsistenciaService interface {
 	CreateSesion(req dto.AsistenciaRequest) (*dto.AsistenciaResponse, error)
 	EntrarTomarAsistencia(instructorID uint, fichaID uint) (*dto.AsistenciaResponse, error)
@@ -70,7 +80,7 @@ func NewAsistenciaService() AsistenciaService {
 
 func (s *asistenciaService) CreateSesion(req dto.AsistenciaRequest) (*dto.AsistenciaResponse, error) {
 	// Parsear como medianoche en hora local para que el día de la sesión sea correcto en cualquier zona horaria.
-	fecha, err := time.ParseInLocation("2006-01-02", req.Fecha, time.Local)
+	fecha, err := time.ParseInLocation(time.DateOnly, req.Fecha, time.Local)
 	if err != nil {
 		return nil, errors.New("fecha inválida, use YYYY-MM-DD")
 	}
@@ -138,7 +148,7 @@ func (s *asistenciaService) EntrarTomarAsistencia(instructorID uint, fichaID uin
 		return s.asistenciaToResponse(activaFicha), nil
 	}
 	// 3) No hay sesión activa de hoy → crear una nueva
-	hoy := time.Now().Format("2006-01-02")
+	hoy := time.Now().Format(time.DateOnly)
 	return s.CreateSesion(dto.AsistenciaRequest{
 		InstructorFichaID: ifc.ID,
 		Fecha:             hoy,
@@ -148,7 +158,7 @@ func (s *asistenciaService) EntrarTomarAsistencia(instructorID uint, fichaID uin
 func (s *asistenciaService) GetByID(id uint) (*dto.AsistenciaResponse, error) {
 	a, err := s.repo.FindByID(id)
 	if err != nil {
-		return nil, errors.New("sesión de asistencia no encontrada")
+		return nil, errors.New(errMsgSesionAsistenciaNoEncontrada)
 	}
 	return s.asistenciaToResponse(a), nil
 }
@@ -183,7 +193,7 @@ func (s *asistenciaService) Finalizar(id uint) (*dto.AsistenciaResponse, error) 
 		return nil, errors.New("sesión no encontrada")
 	}
 	if a.IsFinished {
-		return nil, errors.New("la sesión ya está finalizada")
+		return nil, errors.New(errMsgSesionYaFinalizada)
 	}
 	// Marcar registros con ingreso y sin salida como "REGISTRO_POR_CORREGIR",
 	// para que el instructor pueda revisar si fue olvido de salida o abandono de jornada.
@@ -217,7 +227,7 @@ func (s *asistenciaService) Finalizar(id uint) (*dto.AsistenciaResponse, error) 
 // Se ejecuta de forma periódica (p. ej. cada 5 min). La finalización es automática; los instructores no pueden finalizar manualmente.
 func (s *asistenciaService) FinalizarSesionesVencidas() {
 	now := time.Now()
-	fechaDesde := now.AddDate(0, 0, -1).Format("2006-01-02")
+	fechaDesde := now.AddDate(0, 0, -1).Format(time.DateOnly)
 	list, err := s.repo.FindSesionesNoFinalizadasDesde(fechaDesde)
 	if err != nil || len(list) == 0 {
 		return
@@ -246,10 +256,10 @@ func (s *asistenciaService) FinalizarSesionesVencidas() {
 func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest, instructorFichaIDRegistroIngreso *uint) (*dto.AsistenciaAprendizResponse, error) {
 	asist, err := s.repo.FindByID(req.AsistenciaID)
 	if err != nil {
-		return nil, errors.New("sesión de asistencia no encontrada")
+		return nil, errors.New(errMsgSesionAsistenciaNoEncontrada)
 	}
 	if asist.IsFinished {
-		return nil, errors.New("la sesión ya está finalizada")
+		return nil, errors.New(errMsgSesionYaFinalizada)
 	}
 	// Regla: no puede haber más de un tramo abierto (ingreso sin salida) por aprendiz en la ficha hoy.
 	var fichaID uint
@@ -262,7 +272,7 @@ func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest, 
 		}
 	}
 	if fichaID > 0 {
-		hoy := time.Now().Format("2006-01-02")
+		hoy := time.Now().Format(time.DateOnly)
 		sessionIDs, _ := s.repo.FindIDsByFichaIDAndFecha(fichaID, hoy)
 		if len(sessionIDs) > 0 {
 			sinSalida, _ := s.repoAA.FindEntryWithoutExitByAprendizIDAndAsistenciaIDs(req.AprendizID, sessionIDs)
@@ -293,10 +303,10 @@ func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest, 
 func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngresoPorDocumentoRequest, instructorFichaIDRegistroIngreso *uint) (*dto.AsistenciaAprendizResponse, error) {
 	asist, err := s.repo.FindByID(req.AsistenciaID)
 	if err != nil {
-		return nil, errors.New("sesión de asistencia no encontrada")
+		return nil, errors.New(errMsgSesionAsistenciaNoEncontrada)
 	}
 	if asist.IsFinished {
-		return nil, errors.New("la sesión ya está finalizada")
+		return nil, errors.New(errMsgSesionYaFinalizada)
 	}
 	ifc, err := s.instFichaRepo.FindByID(asist.InstructorFichaID)
 	if err != nil || ifc == nil {
@@ -310,7 +320,7 @@ func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngre
 	if err != nil || aprendiz == nil {
 		return nil, errors.New("el documento no corresponde a un aprendiz de esta ficha")
 	}
-	hoy := time.Now().Format("2006-01-02")
+	hoy := time.Now().Format(time.DateOnly)
 	sessionIDs, _ := s.repo.FindIDsByFichaIDAndFecha(ifc.FichaID, hoy)
 	// Si ya tiene un tramo abierto (entrada sin salida) hoy en esta ficha → registrar salida de ese tramo.
 	if len(sessionIDs) > 0 {
@@ -341,7 +351,7 @@ func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngre
 func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error) {
 	aa, err := s.repoAA.FindByID(asistenciaAprendizID)
 	if err != nil {
-		return nil, errors.New("registro de asistencia no encontrado")
+		return nil, errors.New(errMsgRegistroAsistenciaNoEncontrado)
 	}
 	if aa.HoraIngreso == nil {
 		return nil, errors.New("el aprendiz no tiene hora de ingreso")
@@ -364,7 +374,7 @@ func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint, instructo
 func (s *asistenciaService) ActualizarObservaciones(asistenciaAprendizID uint, observaciones string) (*dto.AsistenciaAprendizResponse, error) {
 	aa, err := s.repoAA.FindByID(asistenciaAprendizID)
 	if err != nil {
-		return nil, errors.New("registro de asistencia no encontrado")
+		return nil, errors.New(errMsgRegistroAsistenciaNoEncontrado)
 	}
 	aa.Observaciones = observaciones
 	if err := s.repoAA.Update(aa); err != nil {
@@ -376,10 +386,10 @@ func (s *asistenciaService) ActualizarObservaciones(asistenciaAprendizID uint, o
 func (s *asistenciaService) CrearOActualizarObservaciones(asistenciaID, aprendizID uint, observaciones string, tipoObservacionIDs []uint) (*dto.AsistenciaAprendizResponse, error) {
 	asist, err := s.repo.FindByID(asistenciaID)
 	if err != nil || asist == nil {
-		return nil, errors.New("sesión de asistencia no encontrada")
+		return nil, errors.New(errMsgSesionAsistenciaNoEncontrada)
 	}
 	if asist.IsFinished {
-		return nil, errors.New("la sesión ya está finalizada")
+		return nil, errors.New(errMsgSesionYaFinalizada)
 	}
 	// Con múltiples tramos: actualizar observaciones en el tramo abierto o en el último registro.
 	aa, _ := s.repoAA.FindOpenByAsistenciaIDAndAprendizID(asistenciaID, aprendizID)
@@ -503,8 +513,8 @@ func (s *asistenciaService) GetCasosBienestar(sedeID *uint, dias, minFallas int)
 	}
 	fechaFin := time.Now()
 	fechaInicio := fechaFin.AddDate(0, 0, -dias)
-	fechaInicioStr := fechaInicio.Format("2006-01-02")
-	fechaFinStr := fechaFin.Format("2006-01-02")
+	fechaInicioStr := fechaInicio.Format(time.DateOnly)
+	fechaFinStr := fechaFin.Format(time.DateOnly)
 
 	rows, err := s.repo.GetCasosBienestar(sedeID, fechaInicioStr, fechaFinStr, minFallas)
 	if err != nil {
@@ -552,8 +562,8 @@ func (s *asistenciaService) GetDetalleInasistenciasAprendiz(fichaNumero string, 
 	}
 	fechaFin := time.Now()
 	fechaInicio := fechaFin.AddDate(0, 0, -dias)
-	fechaInicioStr := fechaInicio.Format("2006-01-02")
-	fechaFinStr := fechaFin.Format("2006-01-02")
+	fechaInicioStr := fechaInicio.Format(time.DateOnly)
+	fechaFinStr := fechaFin.Format(time.DateOnly)
 
 	rows, err := s.repo.GetDetalleInasistenciasAprendiz(fichaNumero, aprendizID, fechaInicioStr, fechaFinStr, sedeNombre)
 	if err != nil {
@@ -643,7 +653,7 @@ func (s *asistenciaService) aaToResponse(aa *models.AsistenciaAprendiz) *dto.Asi
 func (s *asistenciaService) AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error) {
 	aa, err := s.repoAA.FindByID(asistenciaAprendizID)
 	if err != nil {
-		return nil, errors.New("registro de asistencia no encontrado")
+		return nil, errors.New(errMsgRegistroAsistenciaNoEncontrado)
 	}
 	if aa.HoraIngreso == nil {
 		return nil, errors.New("no se puede ajustar estado sin hora de ingreso")

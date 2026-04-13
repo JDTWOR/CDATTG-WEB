@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import type { OrdenResponse, OrdenFromCarritoRequest, ProductoResponse, CarritoItem } from '../types';
 
 export const InventarioOrdenes = () => {
@@ -23,22 +24,22 @@ export const InventarioOrdenes = () => {
 
   const verTodas = hasPermission('VER TODAS LAS ORDENES');
 
-  const fetchList = async () => {
+  const fetchList = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiService.getOrdenes(page, pageSize, verTodas);
       setList(res.data);
       setTotal(res.total);
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al cargar órdenes');
+      setError(axiosErrorMessage(err, 'Error al cargar órdenes'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, verTodas]);
 
   useEffect(() => {
-    fetchList();
-  }, [page, verTodas]);
+    void fetchList();
+  }, [fetchList]);
 
   useEffect(() => {
     if (modalOpen) {
@@ -54,7 +55,10 @@ export const InventarioOrdenes = () => {
       const idx = prev.findIndex((i) => i.producto_id === productoId);
       const next = idx >= 0 ? [...prev] : [...prev, { producto_id: productoId, cantidad: 0 }];
       if (idx >= 0) next[idx].cantidad += cantidad;
-      else next[next.length - 1].cantidad = cantidad;
+      else {
+        const last = next.at(-1);
+        if (last) last.cantidad = cantidad;
+      }
       return next;
     });
   };
@@ -87,7 +91,7 @@ export const InventarioOrdenes = () => {
       setModalOpen(false);
       fetchList();
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al crear la orden');
+      alert(axiosErrorMessage(err, 'Error al crear la orden'));
     }
   };
 
@@ -104,27 +108,33 @@ export const InventarioOrdenes = () => {
           <Link to="/inventario/ordenes/pendientes" className="btn-secondary">
             Pendientes de aprobación
           </Link>
-          <button onClick={() => setModalOpen(true)} className="btn-primary">
+          <button type="button" onClick={() => setModalOpen(true)} className="btn-primary">
             Nueva orden (desde carrito)
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-red-700 dark:text-red-300">
+        <div
+          role="alert"
+          className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-red-700 dark:text-red-300"
+        >
           {error}
         </div>
       )}
 
       <div className="card overflow-hidden">
-        {loading ? (
+        {loading && (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">Cargando...</div>
-        ) : list.length === 0 ? (
+        )}
+        {!loading && list.length === 0 && (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">No hay órdenes.</div>
-        ) : (
+        )}
+        {!loading && list.length > 0 && (
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <caption className="sr-only">Listado de órdenes de inventario</caption>
                 <thead className="bg-gray-50 dark:bg-gray-800">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Número</th>
@@ -141,7 +151,13 @@ export const InventarioOrdenes = () => {
                       <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{o.numero_orden}</td>
                       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{o.tipo_orden}</td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-1 text-xs rounded ${o.estado === 'EN_ESPERA' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs rounded ${
+                            o.estado === 'EN_ESPERA'
+                              ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
                           {o.estado}
                         </span>
                       </td>
@@ -163,10 +179,20 @@ export const InventarioOrdenes = () => {
                   Página {page} de {totalPages} ({total} registros)
                 </span>
                 <div className="flex gap-2">
-                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="btn-secondary text-sm">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="btn-secondary text-sm"
+                  >
                     Anterior
                   </button>
-                  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="btn-secondary text-sm">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="btn-secondary text-sm"
+                  >
                     Siguiente
                   </button>
                 </div>
@@ -177,13 +203,28 @@ export const InventarioOrdenes = () => {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setModalOpen(false)}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Nueva orden desde carrito</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Cerrar modal"
+            onClick={() => setModalOpen(false)}
+          />
+          <dialog
+            open
+            aria-labelledby="inv-ord-modal-title"
+            className="relative z-10 m-0 max-h-[90vh] max-w-2xl w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          >
+            <h2 id="inv-ord-modal-title" className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              Nueva orden desde carrito
+            </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo *</label>
+                <label htmlFor="inv-ord-tipo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Tipo *
+                </label>
                 <select
+                  id="inv-ord-tipo"
                   value={form.tipo}
                   onChange={(e) => setForm({ ...form, tipo: e.target.value as 'prestamo' | 'salida' })}
                   className="input-field w-full"
@@ -194,8 +235,11 @@ export const InventarioOrdenes = () => {
               </div>
               {form.tipo === 'prestamo' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha de devolución *</label>
+                  <label htmlFor="inv-ord-fecha-devolucion" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Fecha de devolución *
+                  </label>
                   <input
+                    id="inv-ord-fecha-devolucion"
                     type="date"
                     value={form.fecha_devolucion ?? ''}
                     onChange={(e) => setForm({ ...form, fecha_devolucion: e.target.value || undefined })}
@@ -205,8 +249,11 @@ export const InventarioOrdenes = () => {
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción *</label>
+                <label htmlFor="inv-ord-descripcion" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Descripción *
+                </label>
                 <textarea
+                  id="inv-ord-descripcion"
                   value={form.descripcion}
                   onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
                   className="input-field w-full"
@@ -214,20 +261,24 @@ export const InventarioOrdenes = () => {
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agregar producto</label>
+              <fieldset className="space-y-2 border-0 p-0 min-w-0">
+                <legend className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 px-0">
+                  Agregar producto
+                </legend>
                 <div className="flex gap-2 flex-wrap">
                   {productos.slice(0, 20).map((p) => (
                     <div key={p.id} className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded px-2 py-1">
                       <span className="text-sm">{p.name}</span>
                       <input
+                        id={`inv-ord-cant-${p.id}`}
                         type="number"
                         min={1}
                         className="w-16 input-field text-sm"
                         placeholder="Cant."
+                        aria-label={`Cantidad para ${p.name}`}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            const n = parseInt((e.target as HTMLInputElement).value, 10);
+                            const n = Number.parseInt((e.target as HTMLInputElement).value, 10);
                             if (n >= 1) addToCarrito(p.id, n);
                           }
                         }}
@@ -235,17 +286,18 @@ export const InventarioOrdenes = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          const q = parseInt(prompt('Cantidad:', '1') ?? '1', 10);
+                          const q = Number.parseInt(prompt('Cantidad:', '1') ?? '1', 10);
                           if (q >= 1) addToCarrito(p.id, q);
                         }}
                         className="text-primary-600 dark:text-primary-400 text-sm"
+                        aria-label={`Añadir ${p.name} con cantidad solicitada`}
                       >
-                        +
+                        <span aria-hidden>+</span>
                       </button>
                     </div>
                   ))}
                 </div>
-              </div>
+              </fieldset>
               <div>
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Carrito ({carrito.length} ítems)</p>
                 <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400">
@@ -271,7 +323,7 @@ export const InventarioOrdenes = () => {
                 Crear orden
               </button>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
     </div>

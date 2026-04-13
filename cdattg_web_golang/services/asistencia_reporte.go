@@ -30,26 +30,48 @@ func GenerateReporteFinalizacion(asist *models.Asistencia, aprendicesFicha []mod
 	if err := os.MkdirAll(reporteAsistenciaDir, 0755); err != nil {
 		return "", fmt.Errorf("crear directorio reportes: %w", err)
 	}
-	fichaNum := "ficha"
-	if asist.InstructorFicha != nil && asist.InstructorFicha.Ficha != nil {
-		fichaNum = asist.InstructorFicha.Ficha.Ficha
-	}
-	fecha := asist.Fecha.Format("2006-01-02")
+	fichaNum := fichaNumeroParaReporte(asist)
+	fecha := asist.Fecha.Format(time.DateOnly)
 	nombreArchivo := fmt.Sprintf("asistencia_%s_%s_%d.pdf", fichaNum, fecha, asist.ID)
 	ruta := filepath.Join(reporteAsistenciaDir, nombreArchivo)
 
-	idsConIngreso := make(map[uint]bool)
-	for i := range asist.AsistenciaAprendices {
-		aa := &asist.AsistenciaAprendices[i]
-		if aa.HoraIngreso != nil {
-			idsConIngreso[aa.AprendizFichaID] = true
-		}
-	}
+	idsConIngreso := idsAprendizConIngreso(asist)
 
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(15, 15, 15)
 	pdf.SetAutoPageBreak(true, 15)
 	pdf.AddPage()
+	pdfReporteEncabezado(pdf, fichaNum, fecha, asist)
+
+	const wDoc, wNom, wIng, wSal = 35.0, 70.0, 28.0, 28.0
+	pdfReporteTablaAsistieron(pdf, asist, wDoc, wNom, wIng, wSal)
+	pdfReporteTablaNoAsistieron(pdf, aprendicesFicha, idsConIngreso, wDoc)
+
+	if err := pdf.OutputFileAndClose(ruta); err != nil {
+		return "", fmt.Errorf("escribir PDF: %w", err)
+	}
+	return ruta, nil
+}
+
+func fichaNumeroParaReporte(asist *models.Asistencia) string {
+	if asist.InstructorFicha != nil && asist.InstructorFicha.Ficha != nil {
+		return asist.InstructorFicha.Ficha.Ficha
+	}
+	return "ficha"
+}
+
+func idsAprendizConIngreso(asist *models.Asistencia) map[uint]bool {
+	ids := make(map[uint]bool)
+	for i := range asist.AsistenciaAprendices {
+		aa := &asist.AsistenciaAprendices[i]
+		if aa.HoraIngreso != nil {
+			ids[aa.AprendizFichaID] = true
+		}
+	}
+	return ids
+}
+
+func pdfReporteEncabezado(pdf *gofpdf.Fpdf, fichaNum, fecha string, asist *models.Asistencia) {
 	pdf.SetFont("Helvetica", "B", 14)
 	pdf.CellFormat(0, 8, "REPORTE DE ASISTENCIA", "", 1, "C", false, 0, "")
 	pdf.Ln(4)
@@ -57,12 +79,12 @@ func GenerateReporteFinalizacion(asist *models.Asistencia, aprendicesFicha []mod
 	pdf.CellFormat(0, 6, fmt.Sprintf("Ficha: %s  |  Fecha: %s  |  Sesion ID: %d", fichaNum, fecha, asist.ID), "", 1, "L", false, 0, "")
 	pdf.CellFormat(0, 6, fmt.Sprintf("Hora inicio: %s  |  Hora fin: %s", formatTime(asist.HoraInicio), formatTime(asist.HoraFin)), "", 1, "L", false, 0, "")
 	pdf.Ln(6)
+}
 
-	// Tabla ASISTIERON
+func pdfReporteTablaAsistieron(pdf *gofpdf.Fpdf, asist *models.Asistencia, wDoc, wNom, wIng, wSal float64) {
 	pdf.SetFont("Helvetica", "B", 11)
 	pdf.CellFormat(0, 7, "ASISTIERON", "", 1, "L", false, 0, "")
 	pdf.SetFont("Helvetica", "", 9)
-	wDoc, wNom, wIng, wSal := 35.0, 70.0, 28.0, 28.0
 	pdf.SetFillColor(230, 230, 230)
 	pdf.CellFormat(wDoc, 7, "Documento", "1", 0, "L", true, 0, "")
 	pdf.CellFormat(wNom, 7, "Nombre", "1", 0, "L", true, 0, "")
@@ -84,8 +106,9 @@ func GenerateReporteFinalizacion(asist *models.Asistencia, aprendicesFicha []mod
 		pdf.CellFormat(wSal, 6, formatTime(a.HoraSalida), "1", 1, "C", false, 0, "")
 	}
 	pdf.Ln(8)
+}
 
-	// Tabla NO ASISTIERON
+func pdfReporteTablaNoAsistieron(pdf *gofpdf.Fpdf, aprendicesFicha []models.Aprendiz, idsConIngreso map[uint]bool, wDoc float64) {
 	pdf.SetFont("Helvetica", "B", 11)
 	pdf.CellFormat(0, 7, "NO ASISTIERON", "", 1, "L", false, 0, "")
 	pdf.SetFont("Helvetica", "", 9)
@@ -105,11 +128,6 @@ func GenerateReporteFinalizacion(asist *models.Asistencia, aprendicesFicha []mod
 		pdf.CellFormat(wDoc, 6, paraPDF(doc), "1", 0, "L", false, 0, "")
 		pdf.CellFormat(0, 6, nombre, "1", 1, "L", false, 0, "")
 	}
-
-	if err := pdf.OutputFileAndClose(ruta); err != nil {
-		return "", fmt.Errorf("escribir PDF: %w", err)
-	}
-	return ruta, nil
 }
 
 func formatTime(t *time.Time) string {

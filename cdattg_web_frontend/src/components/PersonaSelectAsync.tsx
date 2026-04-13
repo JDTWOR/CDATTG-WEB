@@ -66,6 +66,9 @@ interface PersonaSelectAsyncProps {
   placeholder?: string;
   isDisabled?: boolean;
   isRequired?: boolean;
+  /** Para asociar <label htmlFor="..."> al control de react-select */
+  inputId?: string;
+  ariaLabel?: string;
 }
 
 /**
@@ -78,11 +81,15 @@ export function PersonaSelectAsync({
   placeholder = 'Buscar por nombre o documento...',
   isDisabled = false,
   isRequired = false,
-}: PersonaSelectAsyncProps) {
+  inputId,
+  ariaLabel,
+}: Readonly<PersonaSelectAsyncProps>) {
   const [selectedOption, setSelectedOption] = useState<SelectOption | null>(null);
 
   useEffect(() => {
-    if (value === undefined || value == null) setSelectedOption(null);
+    if (value == null) {
+      setSelectedOption(null);
+    }
   }, [value]);
 
   const loadOptions = useCallback(async (inputValue: string): Promise<SelectOption[]> => {
@@ -97,6 +104,7 @@ export function PersonaSelectAsync({
   return (
     <div className="react-select-wrapper">
       <AsyncSelect<SelectOption, false>
+        inputId={inputId}
         loadOptions={loadOptions}
         defaultOptions={false}
         value={selectedOption}
@@ -106,6 +114,7 @@ export function PersonaSelectAsync({
         }}
         placeholder={placeholder}
         isDisabled={isDisabled}
+        aria-label={ariaLabel}
         isClearable
         isSearchable
         noOptionsMessage={({ inputValue }) =>

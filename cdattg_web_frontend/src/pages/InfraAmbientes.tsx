@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import { SelectSearch, type SelectOption } from '../components/SelectSearch';
+
+type FormOnSubmit = NonNullable<ComponentProps<'form'>['onSubmit']>;
 
 export const InfraAmbientes = () => {
   // Sede
@@ -66,10 +69,7 @@ export const InfraAmbientes = () => {
             label: s.nombre,
           }))
         );
-      } catch (e: any) {
-        // En esta primera versión simplemente dejamos el error en consola;
-        // el resto del módulo sigue siendo usable para sedes/bloques/pisos existentes.
-        // eslint-disable-next-line no-console
+      } catch (e: unknown) {
         console.error('Error cargando lookups de infraestructura', e);
       } finally {
         setLookupsLoading(false);
@@ -78,7 +78,7 @@ export const InfraAmbientes = () => {
     loadLookups();
   }, []);
 
-  const handleCrearSede = async (e: React.FormEvent) => {
+  const handleCrearSede: FormOnSubmit = (e) => {
     e.preventDefault();
     setSedeError('');
     setSedeMensaje('');
@@ -89,28 +89,26 @@ export const InfraAmbientes = () => {
       return;
     }
 
-    setSedeLoading(true);
-    try {
-      const res = await apiService.createSedeInfra({
-        nombre,
-        direccion: sedeDireccion.trim(),
-        regional_id: Number(sedeRegionalId),
-      });
-      setSedeMensaje(`Sede creada con ID ${res.id}.`);
-      setSedeNombre('');
-      setSedeDireccion('');
-    } catch (e: any) {
-      const msg =
-        e.response?.data?.error ||
-        e.message ||
-        'No se pudo crear la sede.';
-      setSedeError(msg);
-    } finally {
-      setSedeLoading(false);
-    }
+    void (async () => {
+      setSedeLoading(true);
+      try {
+        const res = await apiService.createSedeInfra({
+          nombre,
+          direccion: sedeDireccion.trim(),
+          regional_id: Number(sedeRegionalId),
+        });
+        setSedeMensaje(`Sede creada con ID ${res.id}.`);
+        setSedeNombre('');
+        setSedeDireccion('');
+      } catch (err: unknown) {
+        setSedeError(axiosErrorMessage(err, 'No se pudo crear la sede.'));
+      } finally {
+        setSedeLoading(false);
+      }
+    })();
   };
 
-  const handleCrearPiso = async (e: React.FormEvent) => {
+  const handleCrearPiso: FormOnSubmit = (e) => {
     e.preventDefault();
     setPisoError('');
     setPisoMensaje('');
@@ -121,39 +119,36 @@ export const InfraAmbientes = () => {
       return;
     }
 
-    setPisoLoading(true);
-    try {
-      const res = await apiService.createPisoInfra({
-        nombre,
-        bloque_id: pisoBloqueId,
-      });
-      setPisoMensaje(`Piso creado con ID ${res.id}.`);
-      setPisoNombre('');
-      setPisoBloqueId(undefined);
-      // refrescar pisos
+    void (async () => {
+      setPisoLoading(true);
       try {
-        const pisos = await apiService.getInfraPisos();
-        setPisosOptions(
-          pisos.map((p) => ({
-            value: p.id,
-            label: `${p.bloque_nombre} / ${p.nombre}`,
-          }))
-        );
-      } catch {
-        // ignorar
+        const res = await apiService.createPisoInfra({
+          nombre,
+          bloque_id: pisoBloqueId,
+        });
+        setPisoMensaje(`Piso creado con ID ${res.id}.`);
+        setPisoNombre('');
+        setPisoBloqueId(undefined);
+        try {
+          const pisos = await apiService.getInfraPisos();
+          setPisosOptions(
+            pisos.map((p) => ({
+              value: p.id,
+              label: `${p.bloque_nombre} / ${p.nombre}`,
+            }))
+          );
+        } catch {
+          // refresco opcional
+        }
+      } catch (err: unknown) {
+        setPisoError(axiosErrorMessage(err, 'No se pudo crear el piso.'));
+      } finally {
+        setPisoLoading(false);
       }
-    } catch (e: any) {
-      const msg =
-        e.response?.data?.error ||
-        e.message ||
-        'No se pudo crear el piso.';
-      setPisoError(msg);
-    } finally {
-      setPisoLoading(false);
-    }
+    })();
   };
 
-  const handleCrearBloque = async (e: React.FormEvent) => {
+  const handleCrearBloque: FormOnSubmit = (e) => {
     e.preventDefault();
     setBloqueError('');
     setBloqueMensaje('');
@@ -164,39 +159,36 @@ export const InfraAmbientes = () => {
       return;
     }
 
-    setBloqueLoading(true);
-    try {
-      const res = await apiService.createBloqueInfra({
-        nombre,
-        sede_id: bloqueSedeId,
-      });
-      setBloqueMensaje(`Bloque creado con ID ${res.id}.`);
-      setBloqueNombre('');
-      setBloqueSedeId(undefined);
-      // refrescar bloques
+    void (async () => {
+      setBloqueLoading(true);
       try {
-        const bloques = await apiService.getInfraBloques();
-        setBloquesOptions(
-          bloques.map((b) => ({
-            value: b.id,
-            label: `${b.nombre} — ${b.sede_nombre}`,
-          }))
-        );
-      } catch {
-        // ignorar
+        const res = await apiService.createBloqueInfra({
+          nombre,
+          sede_id: bloqueSedeId,
+        });
+        setBloqueMensaje(`Bloque creado con ID ${res.id}.`);
+        setBloqueNombre('');
+        setBloqueSedeId(undefined);
+        try {
+          const bloques = await apiService.getInfraBloques();
+          setBloquesOptions(
+            bloques.map((b) => ({
+              value: b.id,
+              label: `${b.nombre} — ${b.sede_nombre}`,
+            }))
+          );
+        } catch {
+          // refresco opcional
+        }
+      } catch (err: unknown) {
+        setBloqueError(axiosErrorMessage(err, 'No se pudo crear el bloque.'));
+      } finally {
+        setBloqueLoading(false);
       }
-    } catch (e: any) {
-      const msg =
-        e.response?.data?.error ||
-        e.message ||
-        'No se pudo crear el bloque.';
-      setBloqueError(msg);
-    } finally {
-      setBloqueLoading(false);
-    }
+    })();
   };
 
-  const handleCrearAmbiente = async (e: React.FormEvent) => {
+  const handleCrearAmbiente: FormOnSubmit = (e) => {
     e.preventDefault();
     setAmbError('');
     setAmbMensaje('');
@@ -207,24 +199,22 @@ export const InfraAmbientes = () => {
       return;
     }
 
-    setAmbLoading(true);
-    try {
-      const res = await apiService.createAmbiente({
-        nombre,
-        piso_id: ambPisoId,
-      });
-      setAmbMensaje(`Ambiente creado con ID ${res.id}.`);
-      setAmbNombre('');
-      setAmbPisoId(undefined);
-    } catch (e: any) {
-      const msg =
-        e.response?.data?.error ||
-        e.message ||
-        'No se pudo crear el ambiente.';
-      setAmbError(msg);
-    } finally {
-      setAmbLoading(false);
-    }
+    void (async () => {
+      setAmbLoading(true);
+      try {
+        const res = await apiService.createAmbiente({
+          nombre,
+          piso_id: ambPisoId,
+        });
+        setAmbMensaje(`Ambiente creado con ID ${res.id}.`);
+        setAmbNombre('');
+        setAmbPisoId(undefined);
+      } catch (err: unknown) {
+        setAmbError(axiosErrorMessage(err, 'No se pudo crear el ambiente.'));
+      } finally {
+        setAmbLoading(false);
+      }
+    })();
   };
 
   return (
@@ -245,50 +235,60 @@ export const InfraAmbientes = () => {
             Crear sede
           </h2>
           {sedeError && (
-            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+            <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
               {sedeError}
             </div>
           )}
           {sedeMensaje && (
-            <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
+            <output
+              aria-live="polite"
+              className="mb-3 block w-full rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+            >
               {sedeMensaje}
-            </div>
+            </output>
           )}
           <form onSubmit={handleCrearSede} className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="infra-sede-nombre" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Nombre de la sede *
               </label>
               <input
+                id="infra-sede-nombre"
                 type="text"
                 value={sedeNombre}
                 onChange={(e) => setSedeNombre(e.target.value)}
                 className="input-field w-full"
                 placeholder="Ej: MODELO, CENTRO"
                 disabled={sedeLoading}
+                autoComplete="off"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="infra-sede-direccion" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Dirección
               </label>
               <input
+                id="infra-sede-direccion"
                 type="text"
                 value={sedeDireccion}
                 onChange={(e) => setSedeDireccion(e.target.value)}
                 className="input-field w-full"
                 placeholder="Dirección física de la sede"
                 disabled={sedeLoading}
+                autoComplete="street-address"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="infra-sede-regional-id" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 ID de regional *
               </label>
               <input
+                id="infra-sede-regional-id"
                 type="number"
                 value={sedeRegionalId}
-                onChange={(e) => setSedeRegionalId(e.target.value ? Number(e.target.value) : '')}
+                onChange={(e) =>
+                  setSedeRegionalId(e.target.value ? Number.parseInt(e.target.value, 10) : '')
+                }
                 className="input-field w-full"
                 min={1}
                 disabled={sedeLoading}
@@ -312,34 +312,40 @@ export const InfraAmbientes = () => {
             Crear bloque
           </h2>
           {bloqueError && (
-            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+            <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
               {bloqueError}
             </div>
           )}
           {bloqueMensaje && (
-            <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
+            <output
+              aria-live="polite"
+              className="mb-3 block w-full rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+            >
               {bloqueMensaje}
-            </div>
+            </output>
           )}
           <form onSubmit={handleCrearBloque} className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="infra-bloque-nombre" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Nombre del bloque *
               </label>
               <input
+                id="infra-bloque-nombre"
                 type="text"
                 value={bloqueNombre}
                 onChange={(e) => setBloqueNombre(e.target.value)}
                 className="input-field w-full"
                 placeholder="Ej: B2, B3"
                 disabled={bloqueLoading}
+                autoComplete="off"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="infra-bloque-sede" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Sede *
               </label>
               <SelectSearch
+                inputId="infra-bloque-sede"
                 options={sedesOptions}
                 value={bloqueSedeId}
                 onChange={(val) => setBloqueSedeId(val)}
@@ -369,34 +375,40 @@ export const InfraAmbientes = () => {
             Crear piso
           </h2>
           {pisoError && (
-            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+            <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
               {pisoError}
             </div>
           )}
           {pisoMensaje && (
-            <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
+            <output
+              aria-live="polite"
+              className="mb-3 block w-full rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+            >
               {pisoMensaje}
-            </div>
+            </output>
           )}
           <form onSubmit={handleCrearPiso} className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="infra-piso-nombre" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Nombre del piso *
               </label>
               <input
+                id="infra-piso-nombre"
                 type="text"
                 value={pisoNombre}
                 onChange={(e) => setPisoNombre(e.target.value)}
                 className="input-field w-full"
                 placeholder="Ej: P1, P2, P3"
                 disabled={pisoLoading}
+                autoComplete="off"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="infra-piso-bloque" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Bloque *
               </label>
               <SelectSearch
+                inputId="infra-piso-bloque"
                 options={bloquesOptions}
                 value={pisoBloqueId}
                 onChange={(val) => setPisoBloqueId(val)}
@@ -429,34 +441,40 @@ export const InfraAmbientes = () => {
             Crear ambiente
           </h2>
           {ambError && (
-            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+            <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
               {ambError}
             </div>
           )}
           {ambMensaje && (
-            <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
+            <output
+              aria-live="polite"
+              className="mb-3 block w-full rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+            >
               {ambMensaje}
-            </div>
+            </output>
           )}
           <form onSubmit={handleCrearAmbiente} className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="infra-amb-nombre" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Nombre del ambiente *
               </label>
               <input
+                id="infra-amb-nombre"
                 type="text"
                 value={ambNombre}
                 onChange={(e) => setAmbNombre(e.target.value)}
                 className="input-field w-full"
                 placeholder="Ej: B2-P2-A4, CENTRO-P1-A8-ELECTRICIDAD"
                 disabled={ambLoading}
+                autoComplete="off"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="infra-amb-piso" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Piso (bloque / piso) *
               </label>
               <SelectSearch
+                inputId="infra-amb-piso"
                 options={pisosOptions}
                 value={ambPisoId}
                 onChange={(val) => setAmbPisoId(val)}

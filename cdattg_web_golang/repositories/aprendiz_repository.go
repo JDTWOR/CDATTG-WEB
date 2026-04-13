@@ -8,6 +8,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	aprendizPreloadFichaPrograma     = "FichaCaracterizacion.ProgramaFormacion"
+	aprendizPreloadFichaSedeRegional = "FichaCaracterizacion.Sede.Regional"
+)
+
 type AprendizRepository interface {
 	FindByID(id uint) (*models.Aprendiz, error)
 	FindByFichaID(fichaID uint) ([]models.Aprendiz, error)
@@ -29,7 +34,7 @@ func NewAprendizRepository() AprendizRepository {
 
 func (r *aprendizRepository) FindByID(id uint) (*models.Aprendiz, error) {
 	var a models.Aprendiz
-	if err := r.db.Preload("Persona").Preload("FichaCaracterizacion.ProgramaFormacion").Preload("FichaCaracterizacion.Sede.Regional").First(&a, id).Error; err != nil {
+	if err := r.db.Preload("Persona").Preload(aprendizPreloadFichaPrograma).Preload(aprendizPreloadFichaSedeRegional).First(&a, id).Error; err != nil {
 		return nil, err
 	}
 	return &a, nil
@@ -37,7 +42,7 @@ func (r *aprendizRepository) FindByID(id uint) (*models.Aprendiz, error) {
 
 func (r *aprendizRepository) FindByFichaID(fichaID uint) ([]models.Aprendiz, error) {
 	var list []models.Aprendiz
-	if err := r.db.Where("ficha_caracterizacion_id = ?", fichaID).Preload("Persona").Preload("FichaCaracterizacion.ProgramaFormacion").Preload("FichaCaracterizacion.Sede.Regional").Find(&list).Error; err != nil {
+	if err := r.db.Where("ficha_caracterizacion_id = ?", fichaID).Preload("Persona").Preload(aprendizPreloadFichaPrograma).Preload(aprendizPreloadFichaSedeRegional).Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -91,7 +96,7 @@ func (r *aprendizRepository) FindAll(page, pageSize int, fichaID *uint, search s
 		return nil, 0, err
 	}
 	offset := (page - 1) * pageSize
-	findQ := r.db.Model(&models.Aprendiz{}).Preload("Persona").Preload("FichaCaracterizacion.ProgramaFormacion").Preload("FichaCaracterizacion.Sede.Regional")
+	findQ := r.db.Model(&models.Aprendiz{}).Preload("Persona").Preload(aprendizPreloadFichaPrograma).Preload(aprendizPreloadFichaSedeRegional)
 	if fichaID != nil && *fichaID > 0 {
 		findQ = findQ.Where("aprendices.ficha_caracterizacion_id = ?", *fichaID)
 	}

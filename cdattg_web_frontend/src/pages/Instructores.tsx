@@ -1,10 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, type ComponentProps } from 'react';
 import { Link } from 'react-router-dom';
 import { PlusIcon, EyeIcon, PencilSquareIcon, TrashIcon, XMarkIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import { SelectSearch } from '../components/SelectSearch';
 import { PersonaSelectAsync } from '../components/PersonaSelectAsync';
 import type { InstructorItem, RegionalItem, UpdateInstructorRequest } from '../types';
+
+function instructorEstaActivo(estado: boolean | undefined): boolean {
+  return estado !== false;
+}
+
+function instructorEstadoBadgeClass(activo: boolean): string {
+  return activo
+    ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+}
 
 export const Instructores = () => {
   const [list, setList] = useState<InstructorItem[]>([]);
@@ -27,22 +38,22 @@ export const Instructores = () => {
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(20);
 
-  const fetchInstructores = async () => {
+  const fetchInstructores = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiService.getInstructores(page, pageSize, searchText.trim() || undefined);
       setList(res.data);
       setTotal(res.total);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al cargar instructores');
+    } catch (err: unknown) {
+      setError(axiosErrorMessage(err, 'Error al cargar instructores'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, searchText]);
 
   useEffect(() => {
-    fetchInstructores();
-  }, [page, searchText]);
+    void fetchInstructores();
+  }, [fetchInstructores]);
 
   useEffect(() => {
     apiService.getCatalogosRegionales().then(setRegionales).catch(() => {});
@@ -54,51 +65,56 @@ export const Instructores = () => {
     setModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit: NonNullable<ComponentProps<'form'>['onSubmit']> = (e) => {
     e.preventDefault();
     const pid = personaId === '' ? undefined : personaId;
     if (pid == null) {
       alert('Seleccione una persona');
       return;
     }
-    setSaving(true);
-    try {
-      await apiService.createInstructorFromPersona({
-        persona_id: pid,
-        regional_id: regionalId === '' ? undefined : Number(regionalId),
-      });
-      setModalOpen(false);
-      fetchInstructores();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al crear instructor');
-    } finally {
-      setSaving(false);
-    }
+    void (async () => {
+      setSaving(true);
+      try {
+        await apiService.createInstructorFromPersona({
+          persona_id: pid,
+          regional_id: regionalId === '' ? undefined : Number(regionalId),
+        });
+        setModalOpen(false);
+        fetchInstructores();
+      } catch (err: unknown) {
+        alert(axiosErrorMessage(err, 'Error al crear instructor'));
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   const openEdit = (item: InstructorItem) => {
     setModalEdit(item);
-    setEditRegionalId(item.regional_id != null ? String(item.regional_id) : '');
-    setEditEstado(item.estado !== false);
+    setEditRegionalId(item.regional_id == null ? '' : String(item.regional_id));
+    setEditEstado(instructorEstaActivo(item.estado));
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
+  const handleUpdate: NonNullable<ComponentProps<'form'>['onSubmit']> = (e) => {
     e.preventDefault();
     if (!modalEdit) return;
-    setSaving(true);
-    try {
-      const payload: UpdateInstructorRequest = {
-        regional_id: editRegionalId === '' ? undefined : Number(editRegionalId),
-        estado: editEstado,
-      };
-      await apiService.updateInstructor(modalEdit.id, payload);
-      setModalEdit(null);
-      fetchInstructores();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al actualizar instructor');
-    } finally {
-      setSaving(false);
-    }
+    const id = modalEdit.id;
+    void (async () => {
+      setSaving(true);
+      try {
+        const payload: UpdateInstructorRequest = {
+          regional_id: editRegionalId === '' ? undefined : Number(editRegionalId),
+          estado: editEstado,
+        };
+        await apiService.updateInstructor(id, payload);
+        setModalEdit(null);
+        fetchInstructores();
+      } catch (err: unknown) {
+        alert(axiosErrorMessage(err, 'Error al actualizar instructor'));
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   const handleDelete = async () => {
@@ -108,8 +124,8 @@ export const Instructores = () => {
       await apiService.deleteInstructor(modalDelete.id);
       setModalDelete(null);
       fetchInstructores();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al eliminar instructor');
+    } catch (err: unknown) {
+      alert(axiosErrorMessage(err, 'Error al eliminar instructor'));
     } finally {
       setSaving(false);
     }
@@ -136,12 +152,12 @@ export const Instructores = () => {
         </div>
         <div className="flex items-center gap-2">
           <Link to="/instructores/importar" className="btn-secondary inline-flex items-center">
-            <ArrowUpTrayIcon className="w-5 h-5 mr-2" />
+            <ArrowUpTrayIcon className="w-5 h-5 mr-2" aria-hidden />
             Importar instructores
           </Link>
-          <button onClick={handleCreate} className="btn-primary">
+          <button type="button" onClick={handleCreate} className="btn-primary">
             <span className="inline-flex items-center">
-              <PlusIcon className="w-5 h-5 mr-2" />
+              <PlusIcon className="w-5 h-5 mr-2" aria-hidden />
               Nuevo Instructor
             </span>
           </button>
@@ -149,7 +165,12 @@ export const Instructores = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">{error}</div>
+        <div
+          role="alert"
+          className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg"
+        >
+          {error}
+        </div>
       )}
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-200 dark:border-gray-700">
@@ -190,6 +211,7 @@ export const Instructores = () => {
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">Cargando...</div>
         ) : (
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+            <caption className="sr-only">Listado de instructores</caption>
             <thead className="bg-gray-50 dark:bg-gray-700/50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
@@ -208,8 +230,10 @@ export const Instructores = () => {
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.numero_documento ?? '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.regional_nombre ?? '-'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs rounded ${item.estado !== false ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
-                      {item.estado !== false ? 'Activo' : 'Inactivo'}
+                    <span
+                      className={`px-2 py-1 text-xs rounded ${instructorEstadoBadgeClass(instructorEstaActivo(item.estado))}`}
+                    >
+                      {instructorEstaActivo(item.estado) ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -220,7 +244,7 @@ export const Instructores = () => {
                         className="p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 rounded-lg transition-colors"
                         title="Ver"
                       >
-                        <EyeIcon className="w-5 h-5" />
+                        <EyeIcon className="w-5 h-5" aria-hidden />
                       </button>
                       <button
                         type="button"
@@ -228,7 +252,7 @@ export const Instructores = () => {
                         className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
                         title="Editar"
                       >
-                        <PencilSquareIcon className="w-5 h-5" />
+                        <PencilSquareIcon className="w-5 h-5" aria-hidden />
                       </button>
                       <button
                         type="button"
@@ -236,7 +260,7 @@ export const Instructores = () => {
                         className="p-2 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                         title="Eliminar"
                       >
-                        <TrashIcon className="w-5 h-5" />
+                        <TrashIcon className="w-5 h-5" aria-hidden />
                       </button>
                     </div>
                   </td>
@@ -279,13 +303,28 @@ export const Instructores = () => {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-gray-200 dark:border-gray-600">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Crear Instructor</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Cerrar modal"
+            onClick={() => setModalOpen(false)}
+          />
+          <dialog
+            open
+            aria-labelledby="inst-modal-create-title"
+            className="relative z-10 m-0 max-h-[90vh] max-w-md w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          >
+            <h2 id="inst-modal-create-title" className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              Crear Instructor
+            </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Persona *</label>
+                <label htmlFor="inst-create-persona" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Persona *
+                </label>
                 <PersonaSelectAsync
+                  inputId="inst-create-persona"
                   value={personaId === '' ? undefined : personaId}
                   onChange={(v) => setPersonaId(v ?? '')}
                   placeholder="Buscar por nombre o documento..."
@@ -293,8 +332,11 @@ export const Instructores = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Regional</label>
+                <label htmlFor="inst-create-regional" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Regional
+                </label>
                 <SelectSearch
+                  inputId="inst-create-regional"
                   options={regionales.map((r) => ({ value: r.id, label: r.nombre }))}
                   value={regionalId === '' ? undefined : regionalId}
                   onChange={(v) => setRegionalId(v ?? '')}
@@ -310,17 +352,29 @@ export const Instructores = () => {
                 </button>
               </div>
             </form>
-          </div>
+          </dialog>
         </div>
       )}
 
       {modalView && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setModalView(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-gray-200 dark:border-gray-600" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Cerrar modal"
+            onClick={() => setModalView(null)}
+          />
+          <dialog
+            open
+            aria-labelledby="inst-modal-view-title"
+            className="relative z-10 m-0 max-h-[90vh] max-w-md w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          >
             <div className="flex justify-between items-start mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detalle del instructor</h2>
+              <h2 id="inst-modal-view-title" className="text-xl font-bold text-gray-900 dark:text-white">
+                Detalle del instructor
+              </h2>
               <button type="button" onClick={() => setModalView(null)} className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded">
-                <XMarkIcon className="w-6 h-6" />
+                <XMarkIcon className="w-6 h-6" aria-hidden />
               </button>
             </div>
             <dl className="space-y-3 text-sm">
@@ -339,8 +393,10 @@ export const Instructores = () => {
               <div>
                 <dt className="font-medium text-gray-500 dark:text-gray-400">Estado</dt>
                 <dd className="mt-0.5">
-                  <span className={`px-2 py-1 text-xs rounded ${modalView.estado !== false ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
-                    {modalView.estado !== false ? 'Activo' : 'Inactivo'}
+                  <span
+                    className={`px-2 py-1 text-xs rounded ${instructorEstadoBadgeClass(instructorEstaActivo(modalView.estado))}`}
+                  >
+                    {instructorEstaActivo(modalView.estado) ? 'Activo' : 'Inactivo'}
                   </span>
                 </dd>
               </div>
@@ -350,33 +406,51 @@ export const Instructores = () => {
                 Cerrar
               </button>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
 
       {modalEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-gray-200 dark:border-gray-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Cerrar modal"
+            onClick={() => setModalEdit(null)}
+          />
+          <dialog
+            open
+            aria-labelledby="inst-modal-edit-title"
+            className="relative z-10 m-0 max-h-[90vh] max-w-md w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          >
             <div className="flex justify-between items-start mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Editar instructor</h2>
+              <h2 id="inst-modal-edit-title" className="text-xl font-bold text-gray-900 dark:text-white">
+                Editar instructor
+              </h2>
               <button type="button" onClick={() => setModalEdit(null)} className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded">
-                <XMarkIcon className="w-6 h-6" />
+                <XMarkIcon className="w-6 h-6" aria-hidden />
               </button>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Instructor: {modalEdit.nombre}</p>
             <form onSubmit={handleUpdate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Regional</label>
+                <label htmlFor="inst-edit-regional" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Regional
+                </label>
                 <SelectSearch
+                  inputId="inst-edit-regional"
                   options={regionales.map((r) => ({ value: r.id, label: r.nombre }))}
                   value={editRegionalId === '' ? undefined : Number(editRegionalId)}
-                  onChange={(v) => setEditRegionalId(v != null ? String(v) : '')}
+                  onChange={(v) => setEditRegionalId(v == null ? '' : String(v))}
                   placeholder="-- Selecciona una regional --"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estado</label>
+                <label htmlFor="inst-edit-estado" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Estado
+                </label>
                 <select
+                  id="inst-edit-estado"
                   value={editEstado ? '1' : '0'}
                   onChange={(e) => setEditEstado(e.target.value === '1')}
                   className="input-field w-full"
@@ -394,14 +468,26 @@ export const Instructores = () => {
                 </button>
               </div>
             </form>
-          </div>
+          </dialog>
         </div>
       )}
 
       {modalDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setModalDelete(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-gray-200 dark:border-gray-600" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Eliminar instructor</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Cerrar modal"
+            onClick={() => setModalDelete(null)}
+          />
+          <dialog
+            open
+            aria-labelledby="inst-modal-delete-title"
+            className="relative z-10 m-0 max-h-[90vh] max-w-md w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          >
+            <h2 id="inst-modal-delete-title" className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Eliminar instructor
+            </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               ¿Está seguro de eliminar al instructor <strong>{modalDelete.nombre}</strong>? Esta acción no se puede deshacer.
             </p>
@@ -409,11 +495,16 @@ export const Instructores = () => {
               <button type="button" onClick={() => setModalDelete(null)} className="btn-secondary">
                 Cancelar
               </button>
-              <button type="button" onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50" disabled={saving}>
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                disabled={saving}
+              >
                 {saving ? 'Eliminando...' : 'Eliminar'}
               </button>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
     </div>

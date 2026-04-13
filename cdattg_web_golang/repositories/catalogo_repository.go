@@ -6,6 +6,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const catCondStatusActivo = "status = ?"
+
 // CatalogoRepository expone catálogos para formularios
 type CatalogoRepository interface {
 	FindSedes() ([]models.Sede, error)
@@ -35,7 +37,7 @@ func NewCatalogoRepository() CatalogoRepository {
 
 func (r *catalogoRepository) FindSedes() ([]models.Sede, error) {
 	var list []models.Sede
-	if err := r.db.Where("status = ?", true).Order("nombre").Find(&list).Error; err != nil {
+	if err := r.db.Where(catCondStatusActivo, true).Order("nombre").Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -43,7 +45,7 @@ func (r *catalogoRepository) FindSedes() ([]models.Sede, error) {
 
 func (r *catalogoRepository) FindAmbientes() ([]models.Ambiente, error) {
 	var list []models.Ambiente
-	if err := r.db.Where("status = ?", true).Preload("Piso").Order("nombre").Find(&list).Error; err != nil {
+	if err := r.db.Where(catCondStatusActivo, true).Preload("Piso").Order("nombre").Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -51,7 +53,7 @@ func (r *catalogoRepository) FindAmbientes() ([]models.Ambiente, error) {
 
 func (r *catalogoRepository) FindModalidadesFormacion() ([]models.ModalidadFormacion, error) {
 	var list []models.ModalidadFormacion
-	if err := r.db.Where("status = ?", true).Order("nombre").Find(&list).Error; err != nil {
+	if err := r.db.Where(catCondStatusActivo, true).Order("nombre").Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -75,7 +77,7 @@ func (r *catalogoRepository) FindJornadaByID(id uint) (*models.Jornada, error) {
 
 func (r *catalogoRepository) FindDiasFormacion() ([]models.DiasFormacion, error) {
 	var list []models.DiasFormacion
-	if err := r.db.Where("status = ?", true).Order("id").Find(&list).Error; err != nil {
+	if err := r.db.Where(catCondStatusActivo, true).Order("id").Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil

@@ -9,6 +9,8 @@ import (
 	"github.com/sena/cdattg-web-golang/repositories"
 )
 
+const errMsgAprendizNoEncontrado = "aprendiz no encontrado"
+
 type AprendizService interface {
 	FindAll(page, pageSize int, fichaID *uint, search string) ([]dto.AprendizResponse, int64, error)
 	FindByID(id uint) (*dto.AprendizResponse, error)
@@ -48,7 +50,7 @@ func (s *aprendizService) FindAll(page, pageSize int, fichaID *uint, search stri
 func (s *aprendizService) FindByID(id uint) (*dto.AprendizResponse, error) {
 	a, err := s.repo.FindByID(id)
 	if err != nil {
-		return nil, errors.New("aprendiz no encontrado")
+		return nil, errors.New(errMsgAprendizNoEncontrado)
 	}
 	fichaNum := ""
 	if a.FichaCaracterizacion != nil {
@@ -84,7 +86,7 @@ func (s *aprendizService) Create(req dto.AprendizRequest) (*dto.AprendizResponse
 func (s *aprendizService) Update(id uint, req dto.AprendizRequest) (*dto.AprendizResponse, error) {
 	a, err := s.repo.FindByID(id)
 	if err != nil {
-		return nil, errors.New("aprendiz no encontrado")
+		return nil, errors.New(errMsgAprendizNoEncontrado)
 	}
 	if req.Estado != nil {
 		a.Estado = *req.Estado
@@ -100,7 +102,7 @@ func (s *aprendizService) Update(id uint, req dto.AprendizRequest) (*dto.Aprendi
 
 func (s *aprendizService) Delete(id uint) error {
 	if _, err := s.repo.FindByID(id); err != nil {
-		return errors.New("aprendiz no encontrado")
+		return errors.New(errMsgAprendizNoEncontrado)
 	}
 	return s.repo.Delete(id)
 }

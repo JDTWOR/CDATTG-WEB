@@ -42,14 +42,11 @@ func (s *AlertaAsistenciaService) CheckAndNotify() {
 		return
 	}
 
-	loc, err := time.LoadLocation(config.AppConfig.Database.TimeZone)
-	if err != nil {
-		loc = time.Local
-	}
+	loc := alertaLoadLocation()
 	now := time.Now().In(loc)
 	hoy := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	fechaStr := hoy.Format(time.DateOnly)
 
-	// Emails de coordinadores
 	emails := s.emailsCoordinadores()
 	if len(emails) == 0 {
 		log.Println("Alerta asistencia: no hay coordinadores con correo para notificar")
@@ -62,47 +59,59 @@ func (s *AlertaAsistenciaService) CheckAndNotify() {
 		return
 	}
 
-	minutosDespues := cfgAlertas.MinutosDespuesInicioJornada
-	if minutosDespues <= 0 {
-		minutosDespues = 90
-	}
+	minutosDespues := minutosAlertaDesdeConfig(cfgAlertas.MinutosDespuesInicioJornada)
 
 	for i := range fichas {
-		f := &fichas[i]
-		if f.JornadaID == nil || f.Jornada == nil {
-			continue
-		}
-		limite := HoraInicioMasMinutos(f.Jornada, hoy, minutosDespues)
-		if now.Before(limite) {
-			continue
-		}
-		// Ya pasó el límite: verificar si hay sesión de asistencia hoy
-		fechaStr := hoy.Format("2006-01-02")
-		ids, errSes := s.asistenciaRepo.FindIDsByFichaIDAndFecha(f.ID, fechaStr)
-		if errSes != nil || len(ids) > 0 {
-			continue
-		}
-		// No hay sesión; verificar si ya enviamos alerta hoy
-		existe, errEx := s.alertaRepo.ExistsByFichaIDAndFecha(f.ID, hoy)
-		if errEx != nil || existe {
-			continue
-		}
-		// Enviar correo y registrar
-		nombreJornada := f.Jornada.Nombre
-		if nombreJornada == "" {
-			nombreJornada = "N/A"
-		}
-		asunto := fmt.Sprintf("[CDATTG] Ficha %s no ha iniciado toma de asistencia", f.Ficha)
-		cuerpo := fmt.Sprintf("Se informa que la ficha %s (jornada %s) no ha registrado inicio de toma de asistencia el día %s, pasados %d minutos desde el inicio de la jornada.\n\nFicha: %s\nJornada: %s\nFecha: %s",
-			f.Ficha, nombreJornada, fechaStr, minutosDespues, f.Ficha, nombreJornada, fechaStr)
-		if errSend := utils.SendMail(emails, asunto, cuerpo); errSend != nil {
-			log.Printf("Alerta asistencia: error enviando correo para ficha %s: %v", f.Ficha, errSend)
-			continue
-		}
-		log.Printf("Alerta asistencia: correo enviado a coordinadores por ficha %s (sin asistencia iniciada)", f.Ficha)
-		if errCreate := s.alertaRepo.Create(&models.AlertaAsistenciaLog{FichaID: f.ID, Fecha: hoy}); errCreate != nil {
-			log.Printf("Alerta asistencia: error registrando log para ficha %s: %v", f.Ficha, errCreate)
-		}
+		s.notifyFichaSiAplica(&fichas[i], now, hoy, fechaStr, minutosDespues, emails)
+	}
+}
+
+func alertaLoadLocation() *time.Location {
+	loc, err := time.LoadLocation(config.AppConfig.Database.TimeZone)
+	if err != nil {
+		return time.Local
+	}
+	return loc
+}
+
+func minutosAlertaDesdeConfig(m int) int {
+	if m <= 0 {
+		return 90
+	}
+	return m
+}
+
+// notifyFichaSiAplica envía correo y registra log si la ficha cumple condiciones de alerta.
+func (s *AlertaAsistenciaService) notifyFichaSiAplica(f *models.FichaCaracterizacion, now, hoy time.Time, fechaStr string, minutosDespues int, emails []string) {
+	if f.JornadaID == nil || f.Jornada == nil {
+		return
+	}
+	limite := HoraInicioMasMinutos(f.Jornada, hoy, minutosDespues)
+	if now.Before(limite) {
+		return
+	}
+	ids, errSes := s.asistenciaRepo.FindIDsByFichaIDAndFecha(f.ID, fechaStr)
+	if errSes != nil || len(ids) > 0 {
+		return
+	}
+	existe, errEx := s.alertaRepo.ExistsByFichaIDAndFecha(f.ID, hoy)
+	if errEx != nil || existe {
+		return
+	}
+	nombreJornada := f.Jornada.Nombre
+	if nombreJornada == "" {
+		nombreJornada = "N/A"
+	}
+	asunto := fmt.Sprintf("[CDATTG] Ficha %s no ha iniciado toma de asistencia", f.Ficha)
+	cuerpo := fmt.Sprintf("Se informa que la ficha %s (jornada %s) no ha registrado inicio de toma de asistencia el día %s, pasados %d minutos desde el inicio de la jornada.\n\nFicha: %s\nJornada: %s\nFecha: %s",
+		f.Ficha, nombreJornada, fechaStr, minutosDespues, f.Ficha, nombreJornada, fechaStr)
+	if errSend := utils.SendMail(emails, asunto, cuerpo); errSend != nil {
+		log.Printf("Alerta asistencia: error enviando correo para ficha %s: %v", f.Ficha, errSend)
+		return
+	}
+	log.Printf("Alerta asistencia: correo enviado a coordinadores por ficha %s (sin asistencia iniciada)", f.Ficha)
+	if errCreate := s.alertaRepo.Create(&models.AlertaAsistenciaLog{FichaID: f.ID, Fecha: hoy}); errCreate != nil {
+		log.Printf("Alerta asistencia: error registrando log para ficha %s: %v", f.Ficha, errCreate)
 	}
 }
 

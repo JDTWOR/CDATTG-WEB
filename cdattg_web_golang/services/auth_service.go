@@ -14,6 +14,8 @@ import (
 	"github.com/sena/cdattg-web-golang/utils"
 )
 
+const errMsgUsuarioNoEncontradoLogin = "Usuario no encontrado"
+
 type AuthService interface {
 	Login(req dto.LoginRequest) (*dto.LoginResponse, error)
 	GetCurrentUser(userID uint) (*dto.UserResponse, error)
@@ -47,48 +49,61 @@ func normalizeLogin(s string) string {
 func (s *authService) resolveUserFromLogin(login string) (*models.User, error) {
 	login = strings.TrimSpace(login)
 	if login == "" {
-		return nil, errors.New("Usuario no encontrado")
+		return nil, errors.New(errMsgUsuarioNoEncontradoLogin)
 	}
-	// Si contiene @, tratar como correo
 	if strings.Contains(login, "@") {
-		user, err := s.userRepo.FindActiveByEmail(login)
-		if err != nil || user == nil {
-			return nil, errors.New("Usuario no encontrado")
-		}
-		return user, nil
+		return s.userByEmailForLogin(login)
 	}
-	// Documento o celular: normalizar y buscar por Persona
 	normalized := normalizeLogin(login)
 	if normalized == "" {
-		return nil, errors.New("Usuario no encontrado")
+		return nil, errors.New(errMsgUsuarioNoEncontradoLogin)
 	}
-	// Intentar por número de documento (normalizado y valor original)
-	for _, doc := range []string{normalized, login} {
+	if u := s.tryUserByDocumentoOCelular(normalized, login); u != nil {
+		return u, nil
+	}
+	return nil, errors.New(errMsgUsuarioNoEncontradoLogin)
+}
+
+func (s *authService) userByEmailForLogin(login string) (*models.User, error) {
+	user, err := s.userRepo.FindActiveByEmail(login)
+	if err != nil || user == nil {
+		return nil, errors.New(errMsgUsuarioNoEncontradoLogin)
+	}
+	return user, nil
+}
+
+func (s *authService) userFromPersonaActiva(persona *models.Persona, err error) *models.User {
+	if err != nil || persona == nil {
+		return nil
+	}
+	user, errU := s.userRepo.FindByPersonaID(persona.ID)
+	if errU != nil || user == nil || !user.Status {
+		return nil
+	}
+	return user
+}
+
+func (s *authService) tryUserByDocumentoOCelular(normalized, login string) *models.User {
+	candidates := []string{normalized, login}
+	for _, doc := range candidates {
 		if doc == "" {
 			continue
 		}
 		persona, err := s.personaRepo.FindByNumeroDocumento(doc)
-		if err == nil && persona != nil {
-			user, errU := s.userRepo.FindByPersonaID(persona.ID)
-			if errU == nil && user != nil && user.Status {
-				return user, nil
-			}
+		if u := s.userFromPersonaActiva(persona, err); u != nil {
+			return u
 		}
 	}
-	// Intentar por celular (normalizado y valor original)
-	for _, cel := range []string{normalized, login} {
+	for _, cel := range candidates {
 		if cel == "" {
 			continue
 		}
 		persona, err := s.personaRepo.FindByCelular(cel)
-		if err == nil && persona != nil {
-			user, errU := s.userRepo.FindByPersonaID(persona.ID)
-			if errU == nil && user != nil && user.Status {
-				return user, nil
-			}
+		if u := s.userFromPersonaActiva(persona, err); u != nil {
+			return u
 		}
 	}
-	return nil, errors.New("Usuario no encontrado")
+	return nil
 }
 
 func (s *authService) Login(req dto.LoginRequest) (*dto.LoginResponse, error) {

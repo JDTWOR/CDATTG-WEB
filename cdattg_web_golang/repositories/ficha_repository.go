@@ -104,7 +104,7 @@ func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instruct
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	findQ := r.db.Preload("ProgramaFormacion").Preload("Instructor").Preload("Ambiente").Preload("Sede").Preload("ModalidadFormacion").Preload("Jornada")
+	findQ := r.db.Preload("ProgramaFormacion").Preload("Instructor").Preload("Ambiente").Preload("Sede").Preload("ModalidadFormacion").Preload("Jornada").Preload("FichaDiasFormacion")
 	if programaID != nil && *programaID > 0 {
 		findQ = findQ.Where("programa_formacion_id = ?", *programaID)
 	}

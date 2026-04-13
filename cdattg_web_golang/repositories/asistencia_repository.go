@@ -9,6 +9,13 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	asistPreloadInstructorFichaFicha        = "InstructorFicha.Ficha"
+	asistPreloadInstructorFichaFichaJornada = "InstructorFicha.Ficha.Jornada"
+	asistPreloadAAAprendizPersona           = "AsistenciaAprendices.Aprendiz.Persona"
+	asistCondFichaID                        = "ficha_id = ?"
+)
+
 type AsistenciaRepository interface {
 	Create(a *models.Asistencia) error
 	FindByID(id uint) (*models.Asistencia, error)
@@ -77,7 +84,7 @@ func (r *asistenciaRepository) Create(a *models.Asistencia) error {
 
 func (r *asistenciaRepository) FindByID(id uint) (*models.Asistencia, error) {
 	var m models.Asistencia
-	if err := r.db.Preload("InstructorFicha").Preload("InstructorFicha.Ficha").Preload("AsistenciaAprendices.Aprendiz.Persona").
+	if err := r.db.Preload("InstructorFicha").Preload(asistPreloadInstructorFichaFicha).Preload(asistPreloadAAAprendizPersona).
 		First(&m, id).Error; err != nil {
 		return nil, err
 	}
@@ -87,7 +94,7 @@ func (r *asistenciaRepository) FindByID(id uint) (*models.Asistencia, error) {
 func (r *asistenciaRepository) FindByInstructorFichaID(instructorFichaID uint) ([]models.Asistencia, error) {
 	var list []models.Asistencia
 	if err := r.db.Where("instructor_ficha_id = ?", instructorFichaID).
-		Preload("AsistenciaAprendices.Aprendiz.Persona").
+		Preload(asistPreloadAAAprendizPersona).
 		Order("fecha DESC, hora_inicio DESC").Find(&list).Error; err != nil {
 		return nil, err
 	}
@@ -105,7 +112,7 @@ func (r *asistenciaRepository) FindActivaByInstructorFichaID(instructorFichaID u
 // FindActivaByFichaID devuelve una sesión activa para la ficha (una sola por ficha según reglas de negocio)
 func (r *asistenciaRepository) FindActivaByFichaID(fichaID uint) (*models.Asistencia, error) {
 	var ids []uint
-	r.db.Model(&models.InstructorFichaCaracterizacion{}).Where("ficha_id = ?", fichaID).Pluck("id", &ids)
+	r.db.Model(&models.InstructorFichaCaracterizacion{}).Where(asistCondFichaID, fichaID).Pluck("id", &ids)
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -118,13 +125,13 @@ func (r *asistenciaRepository) FindActivaByFichaID(fichaID uint) (*models.Asiste
 
 func (r *asistenciaRepository) FindByFichaIDAndFechas(fichaID uint, fechaInicio, fechaFin string) ([]models.Asistencia, error) {
 	var ids []uint
-	r.db.Model(&models.InstructorFichaCaracterizacion{}).Where("ficha_id = ?", fichaID).Pluck("id", &ids)
+	r.db.Model(&models.InstructorFichaCaracterizacion{}).Where(asistCondFichaID, fichaID).Pluck("id", &ids)
 	if len(ids) == 0 {
 		return nil, nil
 	}
 	var list []models.Asistencia
 	if err := r.db.Where("instructor_ficha_id IN ? AND fecha >= ? AND fecha <= ?", ids, fechaInicio, fechaFin).
-		Preload("InstructorFicha").Preload("InstructorFicha.Ficha").Preload("AsistenciaAprendices.Aprendiz.Persona").
+		Preload("InstructorFicha").Preload(asistPreloadInstructorFichaFicha).Preload(asistPreloadAAAprendizPersona).
 		Order("fecha DESC, hora_inicio DESC").Find(&list).Error; err != nil {
 		return nil, err
 	}
@@ -134,7 +141,7 @@ func (r *asistenciaRepository) FindByFichaIDAndFechas(fichaID uint, fechaInicio,
 // FindIDsByFichaIDAndFecha devuelve los IDs de sesiones de la ficha en la fecha dada (para regla "una entrada sin salida por día").
 func (r *asistenciaRepository) FindIDsByFichaIDAndFecha(fichaID uint, fecha string) ([]uint, error) {
 	var ids []uint
-	r.db.Model(&models.InstructorFichaCaracterizacion{}).Where("ficha_id = ?", fichaID).Pluck("id", &ids)
+	r.db.Model(&models.InstructorFichaCaracterizacion{}).Where(asistCondFichaID, fichaID).Pluck("id", &ids)
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -159,8 +166,8 @@ func (r *asistenciaRepository) Update(a *models.Asistencia) error {
 // GetDashboardResumen devuelve total de aprendices en formación en la fecha y desglose por ficha (opcional por sede).
 // Usa rango de fechas (fecha inicio y fin de día) para evitar problemas de zona horaria con DATE().
 func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (totalAprendices int, porFicha []DashboardFichaRow, err error) {
-	// Rango del día en UTC (igual que Go guarda con time.Parse("2006-01-02"))
-	tInicio, err := time.Parse("2006-01-02", fecha)
+	// Rango del día en UTC (igual que Go guarda con time.DateOnly)
+	tInicio, err := time.Parse(time.DateOnly, fecha)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -194,13 +201,13 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 
 	// Por ficha: ficha_id, ficha_numero, programa_nombre, jornada_nombre, sede_nombre, count(aa.id)
 	type row struct {
-		FichaID        uint   `gorm:"column:ficha_id"`
-		FichaNumero    string `gorm:"column:ficha_numero"`
-		ProgramaNombre string `gorm:"column:programa_nombre"`
-		JornadaNombre  string `gorm:"column:jornada_nombre"`
-		SedeNombre     string `gorm:"column:sede_nombre"`
-		Cantidad       int    `gorm:"column:cantidad"`
-		TotalAprendices int   `gorm:"column:total_aprendices"`
+		FichaID         uint   `gorm:"column:ficha_id"`
+		FichaNumero     string `gorm:"column:ficha_numero"`
+		ProgramaNombre  string `gorm:"column:programa_nombre"`
+		JornadaNombre   string `gorm:"column:jornada_nombre"`
+		SedeNombre      string `gorm:"column:sede_nombre"`
+		Cantidad        int    `gorm:"column:cantidad"`
+		TotalAprendices int    `gorm:"column:total_aprendices"`
 	}
 	var rows []row
 	raw := `
@@ -229,12 +236,12 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 	porFicha = make([]DashboardFichaRow, len(rows))
 	for i := range rows {
 		porFicha[i] = DashboardFichaRow{
-			FichaID:        rows[i].FichaID,
-			FichaNumero:    rows[i].FichaNumero,
-			ProgramaNombre: rows[i].ProgramaNombre,
-			JornadaNombre:  rows[i].JornadaNombre,
-			SedeNombre:     rows[i].SedeNombre,
-			Cantidad:       rows[i].Cantidad,
+			FichaID:         rows[i].FichaID,
+			FichaNumero:     rows[i].FichaNumero,
+			ProgramaNombre:  rows[i].ProgramaNombre,
+			JornadaNombre:   rows[i].JornadaNombre,
+			SedeNombre:      rows[i].SedeNombre,
+			Cantidad:        rows[i].Cantidad,
 			TotalAprendices: rows[i].TotalAprendices,
 		}
 	}
@@ -243,7 +250,7 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 
 // CountPendientesRevisionByFecha cuenta registros de asistencia del día con requiere_revision = true (opcional por sede).
 func (r *asistenciaRepository) CountPendientesRevisionByFecha(sedeID *uint, fecha string) (int, error) {
-	tInicio, err := time.Parse("2006-01-02", fecha)
+	tInicio, err := time.Parse(time.DateOnly, fecha)
 	if err != nil {
 		return 0, err
 	}
@@ -266,11 +273,11 @@ func (r *asistenciaRepository) CountPendientesRevisionByFecha(sedeID *uint, fech
 // GetCasosBienestar devuelve aprendices con inasistencias >= minFallas en el rango de fechas (para oficina de bienestar).
 // Considera "asistió" si tiene hora_ingreso y estado no es ABANDONO_JORNADA.
 func (r *asistenciaRepository) GetCasosBienestar(sedeID *uint, fechaInicio, fechaFin string, minFallas int) ([]CasosBienestarRow, error) {
-	tInicio, err := time.Parse("2006-01-02", fechaInicio)
+	tInicio, err := time.Parse(time.DateOnly, fechaInicio)
 	if err != nil {
 		return nil, err
 	}
-	tFin, err := time.Parse("2006-01-02", fechaFin)
+	tFin, err := time.Parse(time.DateOnly, fechaFin)
 	if err != nil {
 		return nil, err
 	}
@@ -361,11 +368,11 @@ ORDER BY inasistencias DESC, ap.id
 }
 
 func (r *asistenciaRepository) GetDetalleInasistenciasAprendiz(fichaNumero string, aprendizID uint, fechaInicio, fechaFin string, sedeNombre string) ([]InasistenciaDetalleRow, error) {
-	tInicio, err := time.Parse("2006-01-02", fechaInicio)
+	tInicio, err := time.Parse(time.DateOnly, fechaInicio)
 	if err != nil {
 		return nil, err
 	}
-	tFin, err := time.Parse("2006-01-02", fechaFin)
+	tFin, err := time.Parse(time.DateOnly, fechaFin)
 	if err != nil {
 		return nil, err
 	}
@@ -440,11 +447,11 @@ ORDER BY fecha
 // con registros de asistencia marcados como requiere_revision=true (por corregir) por instructor.
 // Opcionalmente se puede filtrar por sede.
 func (r *asistenciaRepository) GetPendientesRevisionPorInstructor(sedeID *uint, fechaInicio, fechaFin string) ([]PendienteInstructorRow, error) {
-	tInicio, err := time.Parse("2006-01-02", fechaInicio)
+	tInicio, err := time.Parse(time.DateOnly, fechaInicio)
 	if err != nil {
 		return nil, err
 	}
-	tFin, err := time.Parse("2006-01-02", fechaFin)
+	tFin, err := time.Parse(time.DateOnly, fechaFin)
 	if err != nil {
 		return nil, err
 	}
@@ -518,13 +525,13 @@ func (r *asistenciaRepository) FindSesionesNoFinalizadasDesde(fechaDesde string)
 	var list []models.Asistencia
 	err := r.db.Where("is_finished = ? AND fecha >= ?", false, fechaDesde).
 		Preload("InstructorFicha").
-		Preload("InstructorFicha.Ficha").
-		Preload("InstructorFicha.Ficha.Jornada").
+		Preload(asistPreloadInstructorFichaFicha).
+		Preload(asistPreloadInstructorFichaFichaJornada).
 		Find(&list).Error
 	return list, err
 }
 
 // ParseDate parses YYYY-MM-DD to time.Time
 func ParseDate(s string) (time.Time, error) {
-	return time.Parse("2006-01-02", s)
+	return time.Parse(time.DateOnly, s)
 }

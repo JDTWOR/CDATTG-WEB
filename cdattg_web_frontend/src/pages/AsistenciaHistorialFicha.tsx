@@ -3,12 +3,15 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeftIcon, ArrowDownTrayIcon, CalendarDaysIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import ExcelJS from 'exceljs';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import type {
   FichaCaracterizacionResponse,
   AprendizResponse,
   AsistenciaResponse,
   AsistenciaAprendizResponse,
 } from '../types';
+
+type BadgeColorAsistencia = 'green' | 'yellow' | 'gray';
 
 type FilaHistorial = {
   aprendiz: AprendizResponse;
@@ -18,13 +21,116 @@ type FilaHistorial = {
   observaciones: string;
   tiposObservacion: string[];
   estado?: string;
-  badgeColor: 'green' | 'yellow' | 'gray';
+  badgeColor: BadgeColorAsistencia;
   badgeText: string;
 };
 
+const TOLERANCIA_MINUTOS_TARDE = 15;
+const UMBRAL_POCAS_HORAS = 0.8;
+
+/** Menor de dos fechas ISO YYYY-MM-DD (orden lexicográfico válido para ese formato). */
+function minIsoDateString(a: string, b: string): string {
+  return a <= b ? a : b;
+}
+
+function formatoFechaColumna(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function intervaloSolapadoIngresoSalida(
+  ingreso: Date,
+  salida: Date,
+  inicioSesion: Date,
+  finSesion: Date,
+): { desde: Date; hasta: Date } {
+  return {
+    desde: new Date(Math.max(ingreso.getTime(), inicioSesion.getTime())),
+    hasta: new Date(Math.min(salida.getTime(), finSesion.getTime())),
+  };
+}
+
+function minutosEfectivosYTardePorRegistro(
+  aa: AsistenciaAprendizResponse,
+  inicioSesion: Date,
+  finSesion: Date,
+): { efectivos: number; tarde: number } {
+  const parseHora = (iso?: string | null) => (iso ? new Date(iso) : null);
+  const diffMinutos = (a: Date, b: Date) => Math.max(0, Math.round((b.getTime() - a.getTime()) / 60000));
+  const ingreso = parseHora(aa.hora_ingreso);
+  const salida = parseHora(aa.hora_salida);
+  if (!ingreso || !salida) return { efectivos: 0, tarde: 0 };
+  const { desde, hasta } = intervaloSolapadoIngresoSalida(ingreso, salida, inicioSesion, finSesion);
+  const efectivos = hasta > desde ? diffMinutos(desde, hasta) : 0;
+  const limiteTarde = new Date(inicioSesion.getTime() + TOLERANCIA_MINUTOS_TARDE * 60000);
+  const tarde = ingreso > limiteTarde ? diffMinutos(limiteTarde, ingreso) : 0;
+  return { efectivos, tarde };
+}
+
+function mergeNombresTiposObservacion(
+  prev: string[] | undefined,
+  tipos: AsistenciaAprendizResponse['tipos_observacion'],
+): string[] {
+  const acc = new Set<string>(prev ?? []);
+  for (const tipo of tipos ?? []) {
+    if (tipo?.nombre) acc.add(tipo.nombre);
+  }
+  return Array.from(acc);
+}
+
+function calcularMinutosSesionYAsistencia(
+  sesionesDia: AsistenciaResponse[],
+  registros: AsistenciaAprendizResponse[],
+): { minutosSesion: number; minutosEfectivos: number; minutosTarde: number } {
+  const diffMinutos = (a: Date, b: Date) => Math.max(0, Math.round((b.getTime() - a.getTime()) / 60000));
+
+  let minutosSesion = 0;
+  let minutosEfectivos = 0;
+  let minutosTarde = 0;
+
+  for (const sesion of sesionesDia) {
+    const inicioSesion = sesion.hora_inicio ? new Date(sesion.hora_inicio) : null;
+    const finSesion = sesion.hora_fin ? new Date(sesion.hora_fin) : null;
+    if (!inicioSesion || !finSesion) continue;
+
+    minutosSesion += diffMinutos(inicioSesion, finSesion);
+
+    const registrosSesion = registros.filter((aa) => aa.asistencia_id === sesion.id);
+    for (const aa of registrosSesion) {
+      const { efectivos, tarde } = minutosEfectivosYTardePorRegistro(aa, inicioSesion, finSesion);
+      minutosEfectivos += efectivos;
+      minutosTarde += tarde;
+    }
+  }
+
+  return { minutosSesion, minutosEfectivos, minutosTarde };
+}
+
+const HISTORIAL_FECHA_INPUT_ID = 'asistencia-historial-ficha-fecha';
+const MODAL_SEMANA_TITLE_ID = 'modal-semana-title';
+const MODAL_MES_SEMANA_ID = 'modal-semana-mes';
+const MODAL_SEMANA_SELECT_ID = 'modal-semana-numero';
+
+function claseBadgeAsistencia(color: BadgeColorAsistencia): string {
+  if (color === 'green') {
+    return 'inline-flex items-center rounded-full bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700 px-2 py-0.5 text-xs font-medium';
+  }
+  if (color === 'yellow') {
+    return 'inline-flex items-center rounded-full bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700 px-2 py-0.5 text-xs font-medium';
+  }
+  return 'inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 px-2 py-0.5 text-xs font-medium';
+}
+
+/** Color de celda Excel (ARGB) según badge de asistencia. */
+function argbColorBadgeExcel(badgeColor: BadgeColorAsistencia | undefined): string {
+  if (badgeColor === 'green') return 'FF15803D';
+  if (badgeColor === 'yellow') return 'FF92400E';
+  return 'FF6B7280';
+}
+
 export const AsistenciaHistorialFicha = () => {
   const { fichaId: fichaIdParam } = useParams<{ fichaId: string }>();
-  const fichaId = fichaIdParam ? parseInt(fichaIdParam, 10) : null;
+  const fichaId = fichaIdParam ? Number.parseInt(fichaIdParam, 10) : null;
 
   const [ficha, setFicha] = useState<FichaCaracterizacionResponse | null>(null);
   const [fecha, setFecha] = useState(() => {
@@ -93,8 +199,7 @@ export const AsistenciaHistorialFicha = () => {
         if (!cancelled) setAprendicesPorSesion(map);
       } catch (e: unknown) {
         if (!cancelled) {
-          const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al cargar el historial.';
-          setError(msg);
+          setError(axiosErrorMessage(e, 'Error al cargar el historial.'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -105,9 +210,6 @@ export const AsistenciaHistorialFicha = () => {
       cancelled = true;
     };
   }, [fichaId, fecha, fechaValida]);
-
-  const TOLERANCIA_MINUTOS_TARDE = 15;
-  const UMBRAL_POCAS_HORAS = 0.8; // 80 % de la sesión
 
   const filas: FilaHistorial[] = useMemo(() => {
     type Reg = {
@@ -153,16 +255,18 @@ export const AsistenciaHistorialFicha = () => {
         let minutosTarde = 0;
 
         if (inicioSesion && finSesion && ingresoDate && salidaDate) {
-          const inicio = inicioSesion;
-          const fin = finSesion;
-          const desde = ingresoDate > inicio ? ingresoDate : inicio;
-          const hasta = salidaDate < fin ? salidaDate : fin;
+          const { desde, hasta } = intervaloSolapadoIngresoSalida(
+            ingresoDate,
+            salidaDate,
+            inicioSesion,
+            finSesion,
+          );
           if (hasta > desde) {
-            minutosSesion = diffMinutos(inicio, fin);
+            minutosSesion = diffMinutos(inicioSesion, finSesion);
             minutosEfectivos = diffMinutos(desde, hasta);
           }
 
-          const limiteTarde = new Date(inicio.getTime() + TOLERANCIA_MINUTOS_TARDE * 60000);
+          const limiteTarde = new Date(inicioSesion.getTime() + TOLERANCIA_MINUTOS_TARDE * 60000);
           if (ingresoDate > limiteTarde) {
             minutosTarde = diffMinutos(limiteTarde, ingresoDate);
           }
@@ -172,16 +276,12 @@ export const AsistenciaHistorialFicha = () => {
         const acumuladoSesion = existing?.minutosSesion ?? 0;
         const acumuladoEfectivos = existing?.minutosEfectivos ?? 0;
         const acumuladoTarde = existing?.minutosTarde ?? 0;
-        const tiposObservacionSet = new Set<string>(existing?.tiposObservacion ?? []);
-        (aa.tipos_observacion ?? []).forEach((tipo) => {
-          if (tipo?.nombre) tiposObservacionSet.add(tipo.nombre);
-        });
 
         const reg: Reg = {
           horaIngreso: ing ?? existing?.horaIngreso ?? null,
           horaSalida: sal ?? existing?.horaSalida ?? null,
           observaciones: existing ? `${existing.observaciones} ${aa.observaciones ?? ''}`.trim() : aa.observaciones ?? '',
-          tiposObservacion: Array.from(tiposObservacionSet),
+          tiposObservacion: mergeNombresTiposObservacion(existing?.tiposObservacion, aa.tipos_observacion),
           estado: aa.estado || existing?.estado,
           hasIngreso: existing ? existing.hasIngreso || hasIngreso : hasIngreso,
           minutosSesion: acumuladoSesion + minutosSesion,
@@ -199,7 +299,7 @@ export const AsistenciaHistorialFicha = () => {
       const minutosTarde = reg?.minutosTarde ?? 0;
       const ratio = minutosSesion > 0 ? minutosEfectivos / minutosSesion : 0;
 
-      let badgeColor: 'green' | 'yellow' | 'gray' = 'gray';
+      let badgeColor: BadgeColorAsistencia = 'gray';
       let badgeText = 'No';
 
       if (reg?.hasIngreso) {
@@ -233,10 +333,11 @@ export const AsistenciaHistorialFicha = () => {
     if (Number.isNaN(base.getTime())) return;
     base.setDate(base.getDate() + dias);
     const nueva = base.toISOString().slice(0, 10);
-    setFecha(nueva > fechaMaxHoy ? fechaMaxHoy : nueva);
+    setFecha(minIsoDateString(nueva, fechaMaxHoy));
   };
 
   const descargarExcel = async () => {
+    try {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Asistencia', { views: [{ state: 'frozen', ySplit: 1 }] });
 
@@ -306,6 +407,9 @@ export const AsistenciaHistorialFicha = () => {
     a.download = `asistencia_${codigo}_${nombreArchivoFechaDia(fecha)}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setError(axiosErrorMessage(e, 'Error al generar el Excel.'));
+    }
   };
 
   const MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -320,7 +424,7 @@ export const AsistenciaHistorialFicha = () => {
         codigo = '';
       }
     }
-    const saneado = codigo.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
+    const saneado = codigo.replaceAll(/\s+/g, '_').replaceAll(/[^a-zA-Z0-9_-]/g, '');
     return saneado || 'ficha';
   }
 
@@ -340,55 +444,14 @@ export const AsistenciaHistorialFicha = () => {
   function rangoFechasPorSemanaDelMes(anioMes: string, semana: number): { inicio: string; fin: string } {
     const [anio, mes] = anioMes.split('-').map(Number);
     const ultimoDia = new Date(anio, mes, 0).getDate();
-    const inicioDia = semana === 1 ? 1 : semana === 2 ? 8 : semana === 3 ? 15 : semana === 4 ? 22 : 29;
-    const finDia = semana === 1 ? 7 : semana === 2 ? 14 : semana === 3 ? 21 : semana === 4 ? 28 : ultimoDia;
+    const iniciosSemana = [1, 8, 15, 22, 29];
+    const finesSemana = [7, 14, 21, 28];
+    const idx = Math.min(Math.max(semana - 1, 0), 4);
+    const inicioDia = iniciosSemana[idx];
+    const finDia = semana === 5 ? ultimoDia : finesSemana[idx];
     const inicio = `${anioMes}-${String(Math.min(inicioDia, ultimoDia)).padStart(2, '0')}`;
     const fin = `${anioMes}-${String(Math.min(finDia, ultimoDia)).padStart(2, '0')}`;
     return { inicio, fin };
-  }
-
-  function formatoFechaColumna(iso: string): string {
-    const [y, m, d] = iso.split('-');
-    return `${d}/${m}/${y}`;
-  }
-
-  function calcularMinutosSesionYAsistencia(
-    sesionesDia: AsistenciaResponse[],
-    registros: AsistenciaAprendizResponse[],
-  ): { minutosSesion: number; minutosEfectivos: number; minutosTarde: number } {
-    const parseHora = (iso?: string | null) => (iso ? new Date(iso) : null);
-    const diffMinutos = (a: Date, b: Date) => Math.max(0, Math.round((b.getTime() - a.getTime()) / 60000));
-
-    let minutosSesion = 0;
-    let minutosEfectivos = 0;
-    let minutosTarde = 0;
-
-    sesionesDia.forEach((sesion) => {
-      const inicioSesion = sesion.hora_inicio ? new Date(sesion.hora_inicio) : null;
-      const finSesion = sesion.hora_fin ? new Date(sesion.hora_fin) : null;
-      if (!inicioSesion || !finSesion) return;
-
-      minutosSesion += diffMinutos(inicioSesion, finSesion);
-
-      registros
-        .filter((aa) => aa.asistencia_id === sesion.id)
-        .forEach((aa) => {
-          const ingreso = parseHora(aa.hora_ingreso);
-          const salida = parseHora(aa.hora_salida);
-          if (!ingreso || !salida) return;
-          const desde = ingreso > inicioSesion ? ingreso : inicioSesion;
-          const hasta = salida < finSesion ? salida : finSesion;
-          if (hasta > desde) {
-            minutosEfectivos += diffMinutos(desde, hasta);
-          }
-          const limiteTarde = new Date(inicioSesion.getTime() + TOLERANCIA_MINUTOS_TARDE * 60000);
-          if (ingreso > limiteTarde) {
-            minutosTarde += diffMinutos(limiteTarde, ingreso);
-          }
-        });
-    });
-
-    return { minutosSesion, minutosEfectivos, minutosTarde };
   }
 
   const descargarExcelSemana = async () => {
@@ -410,14 +473,14 @@ export const AsistenciaHistorialFicha = () => {
         sesionesPorFecha.get(fechaStr)!.push(s);
       });
       const fechasEnRango: string[] = [];
-      let d = new Date(inicio);
+      const d = new Date(inicio);
       const finDate = new Date(fin);
       while (d <= finDate) {
         const ds = d.toISOString().slice(0, 10);
         if (ds <= hoyStr) fechasEnRango.push(ds);
         d.setDate(d.getDate() + 1);
       }
-      const asistenciaPorAprendizYFecha = new Map<number, Map<string, { badgeText: string; badgeColor: 'green' | 'yellow' | 'gray' }>>();
+      const asistenciaPorAprendizYFecha = new Map<number, Map<string, { badgeText: string; badgeColor: BadgeColorAsistencia }>>();
       for (const fechaStr of fechasEnRango) {
         const sesionesDelDia = sesionesPorFecha.get(fechaStr) ?? [];
         const registrosDia: AsistenciaAprendizResponse[] = [];
@@ -432,7 +495,7 @@ export const AsistenciaHistorialFicha = () => {
             registrosAprendiz,
           );
           const ratio = minutosSesion > 0 ? minutosEfectivos / minutosSesion : 0;
-          let badgeColor: 'green' | 'yellow' | 'gray' = 'gray';
+          let badgeColor: BadgeColorAsistencia = 'gray';
           let badgeText = 'No';
           if (registrosAprendiz.length > 0 && minutosEfectivos > 0) {
             if (ratio >= UMBRAL_POCAS_HORAS && minutosTarde === 0) {
@@ -480,13 +543,7 @@ export const AsistenciaHistorialFicha = () => {
           cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
           if (colNumber >= 3) {
             const info = porFecha?.get(fechasEnRango[colNumber - 3]);
-            const color =
-              info?.badgeColor === 'green'
-                ? 'FF15803D'
-                : info?.badgeColor === 'yellow'
-                ? 'FF92400E'
-                : 'FF6B7280';
-            cell.font = { color: { argb: color } };
+            cell.font = { color: { argb: argbColorBadgeExcel(info?.badgeColor) } };
           }
         });
       });
@@ -500,6 +557,8 @@ export const AsistenciaHistorialFicha = () => {
       a.click();
       URL.revokeObjectURL(url);
       setModalSemanaAbierto(false);
+    } catch (e: unknown) {
+      setError(axiosErrorMessage(e, 'Error al generar el Excel semanal.'));
     } finally {
       setDescargandoSemana(false);
     }
@@ -509,7 +568,7 @@ export const AsistenciaHistorialFicha = () => {
     return (
       <div className="space-y-4">
         <Link to="/asistencia/historial" className="inline-flex items-center gap-2 text-primary-600 dark:text-primary-400">
-          <ArrowLeftIcon className="w-5 h-5" />
+          <ArrowLeftIcon className="w-5 h-5" aria-hidden />
           Volver al historial
         </Link>
         <p className="text-gray-600 dark:text-gray-400">Ficha no válida.</p>
@@ -525,7 +584,7 @@ export const AsistenciaHistorialFicha = () => {
             to="/asistencia/historial"
             className="inline-flex items-center gap-2 text-primary-600 dark:text-primary-400 mb-2"
           >
-            <ArrowLeftIcon className="w-5 h-5" />
+            <ArrowLeftIcon className="w-5 h-5" aria-hidden />
             Volver al historial
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -538,23 +597,26 @@ export const AsistenciaHistorialFicha = () => {
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Fecha:</span>
+        <div className="flex items-center gap-2">
+          <label htmlFor={HISTORIAL_FECHA_INPUT_ID} className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Fecha:
+          </label>
           <button
             type="button"
             onClick={() => moverFecha(-1)}
             className="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 p-2 hover:bg-gray-50 dark:hover:bg-gray-700"
             aria-label="Día anterior"
           >
-            <ChevronLeftIcon className="w-5 h-5" />
+            <ChevronLeftIcon className="w-5 h-5" aria-hidden />
           </button>
           <input
+            id={HISTORIAL_FECHA_INPUT_ID}
             type="date"
             value={fecha}
             max={fechaMaxHoy}
             onChange={(e) => {
               const v = e.target.value;
-              setFecha(v > fechaMaxHoy ? fechaMaxHoy : v);
+              setFecha(minIsoDateString(v, fechaMaxHoy));
             }}
             className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
           />
@@ -565,18 +627,20 @@ export const AsistenciaHistorialFicha = () => {
             className="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
             aria-label="Día siguiente"
           >
-            <ChevronRightIcon className="w-5 h-5" />
+            <ChevronRightIcon className="w-5 h-5" aria-hidden />
           </button>
-        </label>
+        </div>
         {!loading && (
           <>
             {filas.length > 0 && (
               <button
                 type="button"
-                onClick={descargarExcel}
+                onClick={() => {
+                  void descargarExcel();
+                }}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
               >
-                <ArrowDownTrayIcon className="w-5 h-5" />
+                <ArrowDownTrayIcon className="w-5 h-5" aria-hidden />
                 Descargar Excel
               </button>
             )}
@@ -585,24 +649,28 @@ export const AsistenciaHistorialFicha = () => {
               onClick={() => setModalSemanaAbierto(true)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700"
             >
-              <CalendarDaysIcon className="w-5 h-5" />
+              <CalendarDaysIcon className="w-5 h-5" aria-hidden />
               Descargar por semana
             </button>
           </>
         )}
       </div>
 
-      {/* Modal selección semana del mes */}
       {modalSemanaAbierto && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-semana-title"
-        >
-          <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 shadow-xl p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Cerrar diálogo"
+            onClick={() => !descargandoSemana && setModalSemanaAbierto(false)}
+          />
+          <dialog
+            open
+            className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 shadow-xl"
+            aria-labelledby={MODAL_SEMANA_TITLE_ID}
+          >
             <div className="flex items-center justify-between mb-4">
-              <h2 id="modal-semana-title" className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 id={MODAL_SEMANA_TITLE_ID} className="text-lg font-semibold text-gray-900 dark:text-white">
                 Descargar asistencia por semana del mes
               </h2>
               <button
@@ -611,26 +679,32 @@ export const AsistenciaHistorialFicha = () => {
                 className="p-1 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
                 aria-label="Cerrar"
               >
-                <XMarkIcon className="w-5 h-5" />
+                <XMarkIcon className="w-5 h-5" aria-hidden />
               </button>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Elija el mes y la semana. Se generará un Excel con todos los días de esa semana (solo hasta la fecha actual).
             </p>
             <div className="space-y-4">
-              <label className="block">
-                <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mes</span>
+              <div>
+                <label htmlFor={MODAL_MES_SEMANA_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Mes
+                </label>
                 <input
+                  id={MODAL_MES_SEMANA_ID}
                   type="month"
                   value={mesSemana}
                   max={new Date().toISOString().slice(0, 7)}
                   onChange={(e) => setMesSemana(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
                 />
-              </label>
-              <label className="block">
-                <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Semana del mes</span>
+              </div>
+              <div>
+                <label htmlFor={MODAL_SEMANA_SELECT_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Semana del mes
+                </label>
                 <select
+                  id={MODAL_SEMANA_SELECT_ID}
                   value={semanaDelMes}
                   onChange={(e) => setSemanaDelMes(Number(e.target.value))}
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
@@ -641,9 +715,10 @@ export const AsistenciaHistorialFicha = () => {
                   <option value={4}>Semana 4 (días 22-28)</option>
                   <option value={5}>Semana 5 (días 29-fin)</option>
                 </select>
-              </label>
+              </div>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Rango: {rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).inicio} al {rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).fin}
+                Rango: {rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).inicio} al{' '}
+                {rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).fin}
               </p>
             </div>
             <div className="flex justify-end gap-2 mt-6">
@@ -657,29 +732,43 @@ export const AsistenciaHistorialFicha = () => {
               </button>
               <button
                 type="button"
-                onClick={descargarExcelSemana}
-                disabled={descargandoSemana || rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).inicio > new Date().toISOString().slice(0, 10)}
+                onClick={() => {
+                  void descargarExcelSemana();
+                }}
+                disabled={
+                  descargandoSemana ||
+                  rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).inicio > new Date().toISOString().slice(0, 10)
+                }
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 {descargandoSemana ? 'Generando…' : 'Descargar Excel'}
               </button>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+        <div
+          role="alert"
+          className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg"
+        >
           {error}
         </div>
       )}
 
-      {loading ? (
-        <div className="text-center py-12 text-gray-500 dark:text-gray-400">Cargando…</div>
-      ) : (
+      {loading && (
+        <div className="text-center py-12 text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
+          Cargando…
+        </div>
+      )}
+      {!loading && (
         <div className="card overflow-hidden p-0">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
+              <caption className="sr-only">
+                Asistencia del día por aprendiz para la ficha seleccionada
+              </caption>
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-800 text-left">
                   <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">
@@ -722,17 +811,7 @@ export const AsistenciaHistorialFicha = () => {
                         {fila.aprendiz.persona_nombre ?? '–'}
                       </td>
                       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-                        <span
-                          className={
-                            fila.badgeColor === 'green'
-                              ? 'inline-flex items-center rounded-full bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700 px-2 py-0.5 text-xs font-medium'
-                              : fila.badgeColor === 'yellow'
-                              ? 'inline-flex items-center rounded-full bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700 px-2 py-0.5 text-xs font-medium'
-                              : 'inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 px-2 py-0.5 text-xs font-medium'
-                          }
-                        >
-                          {fila.badgeText}
-                        </span>
+                        <span className={claseBadgeAsistencia(fila.badgeColor)}>{fila.badgeText}</span>
                       </td>
                       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
                         {fila.horaIngreso ?? '–'}

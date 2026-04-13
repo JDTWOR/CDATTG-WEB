@@ -1,4 +1,4 @@
-import { type ReactNode, useState, useEffect } from 'react';
+import { type ReactNode, type ComponentProps, useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   HomeIcon,
@@ -127,7 +127,7 @@ const ICONS: Record<string, ReactNode> = {
 };
 
 export const Layout = ({ children }: LayoutProps) => {
-  const { user, logout, hasPermission, permissions, roles } = useAuth();
+  const { user, logout, hasPermission, roles } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -157,10 +157,6 @@ export const Layout = ({ children }: LayoutProps) => {
     return item.permission === null || hasPermission(item.permission);
   });
   const sections = Array.from(new Set(visibleItems.map((i) => i.section)));
-  // #region agent log
-  const hasVerAsistencia = hasPermission('VER ASISTENCIA');
-  fetch('http://127.0.0.1:7880/ingest/64fbceb3-b0b0-4487-afc9-1084e1fd5a3f', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c9d35e' }, body: JSON.stringify({ sessionId: 'c9d35e', location: 'Layout.tsx:sidebar', message: 'sidebar permissions and VER ASISTENCIA', data: { permissionsLength: permissions.length, permissions: permissions, hasVerAsistencia, visiblePaths: visibleItems.map((i) => i.path) }, hypothesisId: 'H2-H5', timestamp: Date.now() }) }).catch(() => {});
-  // #endregion
 
   const handleLogout = () => {
     logout();
@@ -182,8 +178,7 @@ export const Layout = ({ children }: LayoutProps) => {
     setChangePasswordSuccess('');
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitChangePassword = async () => {
     setChangePasswordError('');
     setChangePasswordSuccess('');
     if (passwordNueva.length < 6) {
@@ -213,6 +208,11 @@ export const Layout = ({ children }: LayoutProps) => {
     } finally {
       setChangePasswordLoading(false);
     }
+  };
+
+  const handleChangePassword: NonNullable<ComponentProps<'form'>['onSubmit']> = (e) => {
+    e.preventDefault();
+    void submitChangePassword();
   };
 
   return (
@@ -293,13 +293,23 @@ export const Layout = ({ children }: LayoutProps) => {
 
       {/* Modal cambiar contraseña */}
       {changePasswordOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeChangePassword}>
-          <div
-            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-gray-200 dark:border-gray-600"
-            onClick={(e) => e.stopPropagation()}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Cerrar ventana de cambio de contraseña"
+            onClick={closeChangePassword}
+          />
+          <dialog
+            open
+            className="relative z-10 m-0 flex w-full max-w-md flex-col rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+            aria-labelledby="change-password-title"
           >
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <h2
+                id="change-password-title"
+                className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"
+              >
                 <KeyIcon className="w-6 h-6" />
                 Cambiar contraseña
               </h2>
@@ -376,15 +386,16 @@ export const Layout = ({ children }: LayoutProps) => {
                 </button>
               </div>
             </form>
-          </div>
+          </dialog>
         </div>
       )}
 
       {/* Backdrop del drawer (solo móvil) */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          aria-hidden
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          aria-label="Cerrar menú"
           onClick={() => setSidebarOpen(false)}
         />
       )}

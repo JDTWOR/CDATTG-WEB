@@ -12,6 +12,18 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	estadoAprobacionRechazada = "RECHAZADA"
+	estadoAprobacionAprobada  = "APROBADA"
+	errMsgOrdenNoEncontrada   = "ORDEN NO ENCONTRADA"
+	errMsgNoDetallesEnEspera  = "NO HAY DETALLES EN ESPERA PARA ESTA ORDEN"
+	errMsgDetalleNoEncontrado = "DETALLE DE ORDEN NO ENCONTRADO"
+	errMsgDetalleNoPerteneceOrden = "EL DETALLE NO PERTENECE A LA ORDEN"
+	errMsgDetalleNoEnEspera = "EL DETALLE NO ESTÁ EN ESPERA DE APROBACIÓN"
+	errMsgDetalleYaTieneAprobacion = "EL DETALLE YA TIENE UN REGISTRO DE APROBACIÓN"
+	errMsgStockInsuficiente = "STOCK INSUFICIENTE"
+)
+
 type AprobacionService interface {
 	AprobarRechazar(req dto.AprobarRechazarRequest, userID uint) error
 }
@@ -37,49 +49,64 @@ func NewAprobacionService() AprobacionService {
 func (s *aprobacionService) AprobarRechazar(req dto.AprobarRechazarRequest, userID uint) error {
 	orden, err := s.ordenRepo.FindByID(req.OrdenID)
 	if err != nil || orden == nil {
-		return errors.New("orden no encontrada")
+		return errors.New(errMsgOrdenNoEncontrada)
 	}
-	estadoAprobacion := "RECHAZADA"
+	estadoAprobacion := estadoAprobacionRechazada
 	if req.Aprobar {
-		estadoAprobacion = "APROBADA"
+		estadoAprobacion = estadoAprobacionAprobada
 	}
 
 	db := database.GetDB()
 	txErr := db.Transaction(func(tx *gorm.DB) error {
-		if req.DetalleOrdenID != nil {
-			return s.aprobarRechazarDetalle(tx, *req.DetalleOrdenID, req.OrdenID, req.Aprobar, req.Observaciones, userID, estadoAprobacion)
-		}
-		detalles, err := s.detalleRepo.FindEnEsperaByOrdenID(req.OrdenID)
-		if err != nil {
-			return err
-		}
-		if len(detalles) == 0 {
-			return errors.New("no hay detalles en espera para esta orden")
-		}
-		if req.Aprobar {
-			for i := range detalles {
-				prod, _ := s.productoRepo.FindByID(detalles[i].ProductoID)
-				disp := 0
-				if prod != nil && prod.Cantidad != nil {
-					disp = *prod.Cantidad
-				}
-				if detalles[i].Cantidad > disp {
-					return fmt.Errorf("stock insuficiente para producto del detalle %d", detalles[i].ID)
-				}
-			}
-		}
-		for i := range detalles {
-			if err := s.aprobarRechazarDetalleTx(tx, detalles[i].ID, req.OrdenID, req.Aprobar, req.Observaciones, userID, estadoAprobacion); err != nil {
-				return err
-			}
-		}
-		return nil
+		return s.ejecutarTxAprobacion(tx, req, userID, estadoAprobacion)
 	})
 	if txErr != nil {
 		return txErr
 	}
 	if orden.UserCreateID != nil {
 		s.notifSvc.NotificarOrdenAprobadaRechazada(req.OrdenID, req.Aprobar, req.Observaciones, *orden.UserCreateID)
+	}
+	return nil
+}
+
+func (s *aprobacionService) ejecutarTxAprobacion(tx *gorm.DB, req dto.AprobarRechazarRequest, userID uint, estadoAprobacion string) error {
+	if req.DetalleOrdenID != nil {
+		return s.aprobarRechazarDetalle(tx, *req.DetalleOrdenID, req.OrdenID, req.Aprobar, req.Observaciones, userID, estadoAprobacion)
+	}
+	return s.aprobarTodosDetallesEnEspera(tx, req, userID, estadoAprobacion)
+}
+
+func (s *aprobacionService) aprobarTodosDetallesEnEspera(tx *gorm.DB, req dto.AprobarRechazarRequest, userID uint, estadoAprobacion string) error {
+	detalles, err := s.detalleRepo.FindEnEsperaByOrdenID(req.OrdenID)
+	if err != nil {
+		return err
+	}
+	if len(detalles) == 0 {
+		return errors.New(errMsgNoDetallesEnEspera)
+	}
+	if req.Aprobar {
+		if err := s.validarStockParaAprobarDetalles(detalles); err != nil {
+			return err
+		}
+	}
+	for i := range detalles {
+		if err := s.aprobarRechazarDetalleTx(tx, detalles[i].ID, req.OrdenID, req.Aprobar, req.Observaciones, userID, estadoAprobacion); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *aprobacionService) validarStockParaAprobarDetalles(detalles []inventario.DetalleOrden) error {
+	for i := range detalles {
+		prod, _ := s.productoRepo.FindByID(detalles[i].ProductoID)
+		disp := 0
+		if prod != nil && prod.Cantidad != nil {
+			disp = *prod.Cantidad
+		}
+		if detalles[i].Cantidad > disp {
+			return fmt.Errorf("stock insuficiente para producto del detalle %d", detalles[i].ID)
+		}
 	}
 	return nil
 }

@@ -3,12 +3,16 @@ package services
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
+)
+
+const (
+	msgFichaNoEncontrada      = "ficha no encontrada"
+	errFmtSyncInstructorLider = "error al sincronizar instructor líder: %w"
 )
 
 type FichaService interface {
@@ -38,11 +42,62 @@ type fichaService struct {
 func NewFichaService() FichaService {
 	return &fichaService{
 		fichaRepo:     repositories.NewFichaRepository(),
-		progRepo:     repositories.NewProgramaFormacionRepository(),
+		progRepo:      repositories.NewProgramaFormacionRepository(),
 		instFichaRepo: repositories.NewInstructorFichaRepository(),
 		aprendizRepo:  repositories.NewAprendizRepository(),
 		fichaDiasRepo: repositories.NewFichaDiasRepository(),
 	}
+}
+
+// conteosAprendicesActivosPorFicha agrupa COUNT por ficha (errores de consulta → mapa vacío, mismo criterio que antes).
+func conteosAprendicesActivosPorFicha(ids []uint) map[uint]int {
+	out := make(map[uint]int)
+	if len(ids) == 0 {
+		return out
+	}
+	var rows []struct {
+		FichaID uint
+		Count   int64
+	}
+	if err := database.GetDB().Model(&models.Aprendiz{}).
+		Where("ficha_caracterizacion_id IN ? AND estado = ?", ids, true).
+		Group("ficha_caracterizacion_id").
+		Select("ficha_caracterizacion_id as ficha_id, COUNT(*) as count").
+		Scan(&rows).Error; err != nil {
+		return out
+	}
+	for _, r := range rows {
+		out[r.FichaID] = int(r.Count)
+	}
+	return out
+}
+
+// diaFormacionIDsPorFichaIDs carga pivote ficha_dias_formacion (consulta explícita; evita fallos de Scan con Model+Select en algunos drivers).
+func diaFormacionIDsPorFichaIDs(ids []uint) (map[uint][]uint, error) {
+	out := make(map[uint][]uint)
+	if len(ids) == 0 {
+		return out, nil
+	}
+	type diaListRow struct {
+		FichaID        int64 `gorm:"column:ficha_id"`
+		DiaFormacionID int64 `gorm:"column:dia_formacion_id"`
+	}
+	var diaRows []diaListRow
+	if err := database.GetDB().Table("ficha_dias_formacion").
+		Select("ficha_id, dia_formacion_id").
+		Where("ficha_id IN ?", ids).
+		Where("deleted_at IS NULL").
+		Scan(&diaRows).Error; err != nil {
+		return nil, fmt.Errorf("error al cargar días de formación del listado: %w", err)
+	}
+	for _, dr := range diaRows {
+		if dr.FichaID <= 0 || dr.DiaFormacionID <= 0 {
+			continue
+		}
+		fid := uint(dr.FichaID)
+		out[fid] = append(out[fid], uint(dr.DiaFormacionID))
+	}
+	return out, nil
 }
 
 func (s *fichaService) FindAll(page, pageSize int, programaID *uint, instructorID *uint, search string) ([]dto.FichaCaracterizacionResponse, int64, error) {
@@ -50,31 +105,21 @@ func (s *fichaService) FindAll(page, pageSize int, programaID *uint, instructorI
 	if err != nil {
 		return nil, 0, err
 	}
-	// Contar aprendices activos por ficha para las cards
-	counts := make(map[uint]int)
-	if len(list) > 0 {
-		var ids []uint
-		for i := range list {
-			ids = append(ids, list[i].ID)
-		}
-		var rows []struct {
-			FichaID uint
-			Count   int64
-		}
-		if err := database.GetDB().Model(&models.Aprendiz{}).
-			Where("ficha_caracterizacion_id IN ? AND estado = ?", ids, true).
-			Group("ficha_caracterizacion_id").
-			Select("ficha_caracterizacion_id as ficha_id, COUNT(*) as count").
-			Scan(&rows).Error; err == nil {
-			for _, r := range rows {
-				counts[r.FichaID] = int(r.Count)
-			}
-		}
+	ids := make([]uint, len(list))
+	for i := range list {
+		ids[i] = list[i].ID
+	}
+	counts := conteosAprendicesActivosPorFicha(ids)
+	diaIDsByFicha, err := diaFormacionIDsPorFichaIDs(ids)
+	if err != nil {
+		return nil, 0, err
 	}
 	resp := make([]dto.FichaCaracterizacionResponse, len(list))
 	for i := range list {
-		c := counts[list[i].ID]
-		resp[i] = s.fichaToResponse(list[i], c)
+		resp[i] = s.fichaToResponse(list[i], counts[list[i].ID])
+		if d := diaIDsByFicha[list[i].ID]; len(d) > 0 {
+			resp[i].DiasFormacionIDs = d
+		}
 	}
 	return resp, total, nil
 }
@@ -82,7 +127,7 @@ func (s *fichaService) FindAll(page, pageSize int, programaID *uint, instructorI
 func (s *fichaService) FindByID(id uint) (*dto.FichaCaracterizacionResponse, error) {
 	f, err := s.fichaRepo.FindByID(id)
 	if err != nil {
-		return nil, errors.New("ficha no encontrada")
+		return nil, errors.New(msgFichaNoEncontrada)
 	}
 	var count int64
 	database.GetDB().Model(&models.Aprendiz{}).Where("ficha_caracterizacion_id = ?", id).Count(&count)
@@ -93,7 +138,7 @@ func (s *fichaService) FindByID(id uint) (*dto.FichaCaracterizacionResponse, err
 func (s *fichaService) FindByIDWithDetail(id uint) (*dto.FichaCaracterizacionResponse, error) {
 	f, err := s.fichaRepo.FindByIDWithInstructoresAndAprendices(id)
 	if err != nil {
-		return nil, errors.New("ficha no encontrada")
+		return nil, errors.New(msgFichaNoEncontrada)
 	}
 	r := s.fichaToResponse(*f, len(f.Aprendices))
 	return &r, nil
@@ -102,7 +147,7 @@ func (s *fichaService) FindByIDWithDetail(id uint) (*dto.FichaCaracterizacionRes
 func (s *fichaService) GetCodigo(id uint) (string, error) {
 	f, err := s.fichaRepo.FindByID(id)
 	if err != nil {
-		return "", errors.New("ficha no encontrada")
+		return "", errors.New(msgFichaNoEncontrada)
 	}
 	return f.Ficha, nil
 }
@@ -134,10 +179,12 @@ func (s *fichaService) Create(req dto.FichaCaracterizacionRequest) (*dto.FichaCa
 		return nil, err
 	}
 	if err := SincronizarInstructorLiderEnPivote(&f, s.instFichaRepo); err != nil {
-		return nil, fmt.Errorf("error al sincronizar instructor líder: %w", err)
+		return nil, fmt.Errorf(errFmtSyncInstructorLider, err)
 	}
-	if len(req.DiasFormacionIDs) > 0 {
-		_ = s.fichaDiasRepo.ReplaceByFichaID(f.ID, req.DiasFormacionIDs)
+	if req.DiasFormacionIDs != nil {
+		if err := s.fichaDiasRepo.ReplaceByFichaID(f.ID, req.DiasFormacionIDs); err != nil {
+			return nil, fmt.Errorf("error al guardar días de formación: %w", err)
+		}
 	}
 	return s.FindByID(f.ID)
 }
@@ -145,20 +192,11 @@ func (s *fichaService) Create(req dto.FichaCaracterizacionRequest) (*dto.FichaCa
 func (s *fichaService) Update(id uint, req dto.FichaCaracterizacionRequest) (*dto.FichaCaracterizacionResponse, error) {
 	f, err := s.fichaRepo.FindByID(id)
 	if err != nil {
-		return nil, errors.New("ficha no encontrada")
+		return nil, errors.New(msgFichaNoEncontrada)
 	}
 	if s.fichaRepo.ExistsByFichaExcludingID(req.Ficha, id) {
 		return nil, errors.New("ya existe otra ficha con ese número")
 	}
-	var reqJIDVal interface{}
-	if req.JornadaID != nil {
-		reqJIDVal = *req.JornadaID
-	}
-	var fJIDBefore interface{}
-	if f.JornadaID != nil {
-		fJIDBefore = *f.JornadaID
-	}
-	log.Printf("DEBUG FichaService.Update: id=%d req.JornadaID=%v (valor=%v) antes de asignar (f.JornadaID actual=%v valor=%v)", id, req.JornadaID, reqJIDVal, f.JornadaID, fJIDBefore)
 	f.ProgramaFormacionID = req.ProgramaFormacionID
 	f.Ficha = req.Ficha
 	f.InstructorID = req.InstructorID
@@ -174,11 +212,8 @@ func (s *fichaService) Update(id uint, req dto.FichaCaracterizacionRequest) (*dt
 	f.ModalidadFormacion = nil
 	f.Sede = nil
 	f.Instructor = nil
-	var fJIDAfter interface{}
-	if f.JornadaID != nil {
-		fJIDAfter = *f.JornadaID
-	}
-	log.Printf("DEBUG FichaService.Update: id=%d después de asignar JornadaID, f.JornadaID=%v valor=%v", id, f.JornadaID, fJIDAfter)
+	// Evitar que Save intente sincronizar la relación HasMany ya cargada (puede interferir con Replace posterior).
+	f.FichaDiasFormacion = nil
 	f.TotalHoras = req.TotalHoras
 	if req.Status != nil {
 		f.Status = *req.Status
@@ -187,17 +222,19 @@ func (s *fichaService) Update(id uint, req dto.FichaCaracterizacionRequest) (*dt
 		return nil, fmt.Errorf("error al actualizar ficha: %w", err)
 	}
 	if err := SincronizarInstructorLiderEnPivote(f, s.instFichaRepo); err != nil {
-		return nil, fmt.Errorf("error al sincronizar instructor líder: %w", err)
+		return nil, fmt.Errorf(errFmtSyncInstructorLider, err)
 	}
-	if len(req.DiasFormacionIDs) > 0 {
-		_ = s.fichaDiasRepo.ReplaceByFichaID(id, req.DiasFormacionIDs)
+	if req.DiasFormacionIDs != nil {
+		if err := s.fichaDiasRepo.ReplaceByFichaID(id, req.DiasFormacionIDs); err != nil {
+			return nil, fmt.Errorf("error al guardar días de formación: %w", err)
+		}
 	}
 	return s.FindByID(id)
 }
 
 func (s *fichaService) Delete(id uint) error {
 	if _, err := s.fichaRepo.FindByID(id); err != nil {
-		return errors.New("ficha no encontrada")
+		return errors.New(msgFichaNoEncontrada)
 	}
 	return s.fichaRepo.Delete(id)
 }
@@ -217,7 +254,7 @@ func (s *fichaService) ListInstructores(fichaID uint) ([]dto.InstructorFichaResp
 func (s *fichaService) AsignarInstructores(fichaID uint, req dto.AsignarInstructoresRequest) error {
 	f, err := s.fichaRepo.FindByID(fichaID)
 	if err != nil {
-		return errors.New("ficha no encontrada")
+		return errors.New(msgFichaNoEncontrada)
 	}
 	instRepo := repositories.NewInstructorRepository()
 	// Validar cada instructor según reglas de negocio antes de asignar
@@ -233,7 +270,7 @@ func (s *fichaService) AsignarInstructores(fichaID uint, req dto.AsignarInstruct
 		return err
 	}
 	if err := SincronizarInstructorLiderEnPivote(f, s.instFichaRepo); err != nil {
-		return fmt.Errorf("error al sincronizar instructor líder: %w", err)
+		return fmt.Errorf(errFmtSyncInstructorLider, err)
 	}
 	// Crear o actualizar asignaciones
 	for _, it := range req.Instructores {
@@ -249,12 +286,12 @@ func (s *fichaService) AsignarInstructores(fichaID uint, req dto.AsignarInstruct
 			continue
 		}
 		m := models.InstructorFichaCaracterizacion{
-			InstructorID:          it.InstructorID,
-			FichaID:                fichaID,
-			CompetenciaID:          it.CompetenciaID,
-			FechaInicio:            &fechaInicio,
-			FechaFin:               &fechaFin,
-			TotalHorasInstructor:   it.TotalHorasInstructor,
+			InstructorID:         it.InstructorID,
+			FichaID:              fichaID,
+			CompetenciaID:        it.CompetenciaID,
+			FechaInicio:          &fechaInicio,
+			FechaFin:             &fechaFin,
+			TotalHorasInstructor: it.TotalHorasInstructor,
 		}
 		if err := s.instFichaRepo.Create(&m); err != nil {
 			return fmt.Errorf("error al asignar instructor: %w", err)
@@ -281,7 +318,7 @@ func (s *fichaService) ListAprendices(fichaID uint) ([]dto.AprendizResponse, err
 
 func (s *fichaService) AsignarAprendices(fichaID uint, personas []uint) error {
 	if _, err := s.fichaRepo.FindByID(fichaID); err != nil {
-		return errors.New("ficha no encontrada")
+		return errors.New(msgFichaNoEncontrada)
 	}
 	for _, personaID := range personas {
 		a, err := s.aprendizRepo.FindByPersonaIDAndFichaID(personaID, fichaID)
@@ -291,9 +328,9 @@ func (s *fichaService) AsignarAprendices(fichaID uint, personas []uint) error {
 			continue
 		}
 		a = &models.Aprendiz{
-			PersonaID:             personaID,
+			PersonaID:              personaID,
 			FichaCaracterizacionID: fichaID,
-			Estado:                true,
+			Estado:                 true,
 		}
 		if err := s.aprendizRepo.Create(a); err != nil {
 			return fmt.Errorf("error al asignar aprendiz: %w", err)
@@ -316,19 +353,20 @@ func (s *fichaService) DesasignarAprendices(fichaID uint, personas []uint) error
 
 func (s *fichaService) fichaToResponse(f models.FichaCaracterizacion, cantidadAprendices int) dto.FichaCaracterizacionResponse {
 	r := dto.FichaCaracterizacionResponse{
-		ID:                    f.ID,
-		ProgramaFormacionID:   f.ProgramaFormacionID,
-		Ficha:                 f.Ficha,
-		InstructorID:          f.InstructorID,
-		FechaInicio:           f.FechaInicio,
-		FechaFin:              f.FechaFin,
-		AmbienteID:            f.AmbienteID,
-		SedeID:                f.SedeID,
-		ModalidadFormacionID:  f.ModalidadFormacionID,
-		JornadaID:             f.JornadaID,
-		TotalHoras:            f.TotalHoras,
-		Status:                f.Status,
-		CantidadAprendices:    cantidadAprendices,
+		ID:                   f.ID,
+		ProgramaFormacionID:  f.ProgramaFormacionID,
+		Ficha:                f.Ficha,
+		InstructorID:         f.InstructorID,
+		FechaInicio:          f.FechaInicio,
+		FechaFin:             f.FechaFin,
+		AmbienteID:           f.AmbienteID,
+		SedeID:               f.SedeID,
+		ModalidadFormacionID: f.ModalidadFormacionID,
+		JornadaID:            f.JornadaID,
+		TotalHoras:           f.TotalHoras,
+		Status:               f.Status,
+		CantidadAprendices:   cantidadAprendices,
+		DiasFormacionIDs:     []uint{},
 	}
 	if f.ProgramaFormacion != nil {
 		r.ProgramaFormacionNombre = f.ProgramaFormacion.Nombre

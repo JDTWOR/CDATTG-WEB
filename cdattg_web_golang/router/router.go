@@ -6,6 +6,19 @@ import (
 	"github.com/sena/cdattg-web-golang/middleware"
 )
 
+// Literales Casbin y segmentos de ruta reutilizados (Sonar: evitar duplicación).
+const (
+	routeImport       = "/import"
+	routeIDAprendices = "/:id/aprendices"
+
+	permVerPersonas     = "VER PERSONAS"
+	permCrearPersona    = "CREAR PERSONA"
+	permVerFichas       = "VER FICHAS"
+	permCrearInstructor = "CREAR INSTRUCTOR"
+	permTomarAsistencia = "TOMAR ASISTENCIA"
+	permVerAsistencia   = "VER ASISTENCIA"
+)
+
 func SetupRouter() *gin.Engine {
 	if gin.Mode() == "" {
 		gin.SetMode(gin.ReleaseMode)
@@ -61,12 +74,12 @@ func SetupRouter() *gin.Engine {
 		{
 			personas := protected.Group("/personas")
 			{
-				personas.GET("", middleware.RequirePermission("persona", "VER PERSONAS"), personaHandler.GetAll)
-				personas.GET("/import/template", middleware.RequirePermission("persona", "CREAR PERSONA"), personaHandler.DownloadPersonaImportTemplate)
-				personas.GET("/imports", middleware.RequirePermission("persona", "VER PERSONAS"), personaHandler.ListPersonaImports)
-				personas.POST("/import", middleware.RequirePermission("persona", "CREAR PERSONA"), personaHandler.ImportPersonas)
+				personas.GET("", middleware.RequirePermission("persona", permVerPersonas), personaHandler.GetAll)
+				personas.GET("/import/template", middleware.RequirePermission("persona", permCrearPersona), personaHandler.DownloadPersonaImportTemplate)
+				personas.GET("/imports", middleware.RequirePermission("persona", permVerPersonas), personaHandler.ListPersonaImports)
+				personas.POST(routeImport, middleware.RequirePermission("persona", permCrearPersona), personaHandler.ImportPersonas)
 				personas.GET("/:id", middleware.RequirePermission("persona", "VER PERSONA"), personaHandler.GetByID)
-				personas.POST("", middleware.RequirePermission("persona", "CREAR PERSONA"), personaHandler.Create)
+				personas.POST("", middleware.RequirePermission("persona", permCrearPersona), personaHandler.Create)
 				personas.PUT("/:id", middleware.RequirePermission("persona", "EDITAR PERSONA"), personaHandler.Update)
 				personas.DELETE("/:id", middleware.RequirePermission("persona", "ELIMINAR PERSONA"), personaHandler.Delete)
 				personas.POST("/:id/reset-password", middleware.RequirePermission("persona", "EDITAR PERSONA"), personaHandler.ResetPassword)
@@ -75,7 +88,7 @@ func SetupRouter() *gin.Engine {
 			programas := protected.Group("/programas-formacion")
 			{
 				programas.GET("", middleware.RequirePermission("programa", "VER PROGRAMAS"), programaHandler.GetAll)
-				programas.POST("/import", middleware.RequirePermission("programa", "CREAR PROGRAMA"), programaHandler.ImportProgramas)
+				programas.POST(routeImport, middleware.RequirePermission("programa", "CREAR PROGRAMA"), programaHandler.ImportProgramas)
 				programas.GET("/:id", middleware.RequirePermission("programa", "VER PROGRAMA"), programaHandler.GetByID)
 				programas.POST("", middleware.RequirePermission("programa", "CREAR PROGRAMA"), programaHandler.Create)
 				programas.PUT("/:id", middleware.RequirePermission("programa", "EDITAR PROGRAMA"), programaHandler.Update)
@@ -83,7 +96,7 @@ func SetupRouter() *gin.Engine {
 			}
 
 			catalogos := protected.Group("/catalogos")
-			catalogos.Use(middleware.RequirePermission("ficha", "VER FICHAS"))
+			catalogos.Use(middleware.RequirePermissionCatalogosFicha())
 			{
 				catalogos.GET("/sedes", catalogoHandler.GetSedes)
 				catalogos.GET("/ambientes", catalogoHandler.GetAmbientes)
@@ -92,7 +105,7 @@ func SetupRouter() *gin.Engine {
 				catalogos.GET("/dias-formacion", catalogoHandler.GetDiasFormacion)
 			}
 			catalogosPersona := protected.Group("/catalogos")
-			catalogosPersona.Use(middleware.RequirePermission("persona", "VER PERSONAS"))
+			catalogosPersona.Use(middleware.RequirePermission("persona", permVerPersonas))
 			{
 				catalogosPersona.GET("/paises", catalogoHandler.GetPaises)
 				catalogosPersona.GET("/departamentos", catalogoHandler.GetDepartamentos)
@@ -108,26 +121,26 @@ func SetupRouter() *gin.Engine {
 				fichas.GET("", middleware.RequirePermissionFichasOrMisFichas(), fichaHandler.GetAll)
 				fichas.GET("/:id/detalle", middleware.RequirePermission("ficha", "VER FICHA"), fichaHandler.GetByIDWithDetail)
 				fichas.GET("/:id/codigo", middleware.RequirePermissionVerFichaOrInstructorDeFicha(), fichaHandler.GetCodigo)
-				fichas.GET("/:id", middleware.RequirePermission("ficha", "VER FICHA"), fichaHandler.GetByID)
-				fichas.POST("/import", middleware.RequirePermission("ficha", "CREAR FICHA"), fichaHandler.ImportFichas)
-				fichas.GET("/export/all", middleware.RequirePermission("ficha", "VER FICHAS"), fichaHandler.ExportAllExcel)
+				fichas.GET("/:id", middleware.RequirePermissionLeerFichaIndividual(), fichaHandler.GetByID)
+				fichas.POST(routeImport, middleware.RequirePermission("ficha", "CREAR FICHA"), fichaHandler.ImportFichas)
+				fichas.GET("/export/all", middleware.RequirePermission("ficha", permVerFichas), fichaHandler.ExportAllExcel)
 				fichas.POST("", middleware.RequirePermission("ficha", "CREAR FICHA"), fichaHandler.Create)
 				fichas.PUT("/:id", middleware.RequirePermission("ficha", "EDITAR FICHA"), fichaHandler.Update)
 				fichas.DELETE("/:id", middleware.RequirePermission("ficha", "ELIMINAR FICHA"), fichaHandler.Delete)
 				fichas.GET("/:id/instructores", middleware.RequirePermissionListInstructoresFicha(), fichaHandler.ListInstructores)
 				fichas.POST("/:id/instructores", middleware.RequirePermission("ficha", "GESTIONAR INSTRUCTORES FICHA"), fichaHandler.AsignarInstructores)
 				fichas.DELETE("/:id/instructores/:instructorId", middleware.RequirePermission("ficha", "GESTIONAR INSTRUCTORES FICHA"), fichaHandler.DesasignarInstructor)
-				fichas.GET("/:id/aprendices", middleware.RequirePermissionListAprendicesFicha(), fichaHandler.ListAprendices)
-				fichas.POST("/:id/aprendices", middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.AsignarAprendices)
-				fichas.POST("/:id/aprendices/desasignar", middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.DesasignarAprendices)
+				fichas.GET(routeIDAprendices, middleware.RequirePermissionListAprendicesFicha(), fichaHandler.ListAprendices)
+				fichas.POST(routeIDAprendices, middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.AsignarAprendices)
+				fichas.POST(routeIDAprendices+"/desasignar", middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.DesasignarAprendices)
 			}
 
 			instructores := protected.Group("/instructores")
-			instructores.GET("", middleware.RequirePermission("ficha", "VER FICHAS"), instructorHandler.GetAll)
-			instructores.GET("/imports", middleware.RequirePermission("instructor", "CREAR INSTRUCTOR"), instructorHandler.ListInstructorImports)
-			instructores.POST("/import", middleware.RequirePermission("instructor", "CREAR INSTRUCTOR"), instructorHandler.ImportInstructores)
-			instructores.GET("/:id", middleware.RequirePermission("ficha", "VER FICHAS"), instructorHandler.GetByID)
-			instructores.POST("", middleware.RequirePermission("instructor", "CREAR INSTRUCTOR"), instructorHandler.CreateFromPersona)
+			instructores.GET("", middleware.RequirePermission("ficha", permVerFichas), instructorHandler.GetAll)
+			instructores.GET("/imports", middleware.RequirePermission("instructor", permCrearInstructor), instructorHandler.ListInstructorImports)
+			instructores.POST(routeImport, middleware.RequirePermission("instructor", permCrearInstructor), instructorHandler.ImportInstructores)
+			instructores.GET("/:id", middleware.RequirePermission("ficha", permVerFichas), instructorHandler.GetByID)
+			instructores.POST("", middleware.RequirePermission("instructor", permCrearInstructor), instructorHandler.CreateFromPersona)
 			instructores.PUT("/:id", middleware.RequirePermission("instructor", "EDITAR INSTRUCTOR"), instructorHandler.Update)
 			instructores.DELETE("/:id", middleware.RequirePermission("instructor", "ELIMINAR INSTRUCTOR"), instructorHandler.Delete)
 
@@ -139,27 +152,27 @@ func SetupRouter() *gin.Engine {
 			asistencias.GET("/dashboard/pendientes-revision-instructor", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.ListPendientesRevisionAdmin)
 			// Entrar a tomar asistencia: solo requiere estar autenticado; el servicio valida que el usuario sea instructor asignado a la ficha.
 			asistencias.POST("/entrar-tomar-asistencia", asistenciaHandler.EntrarTomarAsistencia)
-			asistencias.POST("", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.CreateSesion)
-			asistencias.GET("/instructor-ficha/:instructorFichaId", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.ListByInstructorFicha)
+			asistencias.POST("", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.CreateSesion)
+			asistencias.GET("/instructor-ficha/:instructorFichaId", middleware.RequirePermission("asistencia", permVerAsistencia), asistenciaHandler.ListByInstructorFicha)
 			asistencias.GET("/ficha/:fichaId", middleware.RequirePermissionListAsistenciasPorFicha(), asistenciaHandler.ListByFichaAndFechas)
 			// Pendientes de revisión:
 			// ya se valida dentro del handler que el usuario autenticado
 			// esté vinculado como instructor. No se requiere permiso Casbin adicional.
 			asistencias.GET("/pendientes-revision", asistenciaHandler.ListPendientesRevision)
-			asistencias.POST("/ingreso", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.RegistrarIngreso)
-			asistencias.POST("/ingreso-por-documento", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.RegistrarIngresoPorDocumento)
-			asistencias.PUT("/aprendiz/:asistenciaAprendizId/salida", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.RegistrarSalida)
-			asistencias.PUT("/aprendiz/:asistenciaAprendizId/observaciones", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.ActualizarObservaciones)
-			asistencias.PUT("/aprendiz/:asistenciaAprendizId/estado", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.AjustarEstadoAprendiz)
+			asistencias.POST("/ingreso", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.RegistrarIngreso)
+			asistencias.POST("/ingreso-por-documento", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.RegistrarIngresoPorDocumento)
+			asistencias.PUT("/aprendiz/:asistenciaAprendizId/salida", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.RegistrarSalida)
+			asistencias.PUT("/aprendiz/:asistenciaAprendizId/observaciones", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.ActualizarObservaciones)
+			asistencias.PUT("/aprendiz/:asistenciaAprendizId/estado", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.AjustarEstadoAprendiz)
 			// Catálogo de tipos de observación: solo requiere estar autenticado (no hay id de sesión para fallback de instructor)
 			asistencias.GET("/tipos-observacion", asistenciaHandler.ListTiposObservacionAsistencia)
 			asistencias.POST("/tipos-observacion", middleware.RequireSuperAdmin(), asistenciaHandler.CrearTipoObservacionAsistencia)
-			asistencias.GET("/:id/aprendices", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.ListAprendicesEnSesion)
-			asistencias.PUT("/:id/aprendiz/:aprendizId/observaciones", middleware.RequirePermission("asistencia", "TOMAR ASISTENCIA"), asistenciaHandler.CrearOActualizarObservaciones)
-			asistencias.GET("/:id", middleware.RequirePermission("asistencia", "VER ASISTENCIA"), asistenciaHandler.GetByID)
+			asistencias.GET(routeIDAprendices, middleware.RequirePermission("asistencia", permVerAsistencia), asistenciaHandler.ListAprendicesEnSesion)
+			asistencias.PUT("/:id/aprendiz/:aprendizId/observaciones", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.CrearOActualizarObservaciones)
+			asistencias.GET("/:id", middleware.RequirePermission("asistencia", permVerAsistencia), asistenciaHandler.GetByID)
 
 			admin := protected.Group("/admin")
-			admin.POST("/sync-instructor-roles", middleware.RequirePermission("ficha", "VER FICHAS"), adminHandler.SyncInstructorRoles)
+			admin.POST("/sync-instructor-roles", middleware.RequirePermission("ficha", permVerFichas), adminHandler.SyncInstructorRoles)
 			// sync-inventario-permissions desactivado (módulo inventario no en uso)
 
 			// Gestión de permisos y roles (ASIGNAR PERMISOS o SUPER ADMIN para roles)

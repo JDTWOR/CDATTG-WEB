@@ -23,16 +23,16 @@ type PersonaSeed struct {
 }
 
 var personaSeeds = []PersonaSeed{
-	{1, "111111111", "BOT", "", "AUTOMATICO", "", "3001111111", "bot@dataguaviare.com", "CALLE 11 #11-11", "2000-01-01"},
-	{2, "987654321", "SUPER", "", "ADMINISTRADOR", "", "3000000000", "superadmin@dataguaviare.com", "CALLE 10 #10-10", "1980-01-01"},
-	{3, "654321123", "ADMINISTRADOR", "DEMO", "CDATTG", "ADMIN", "3010000000", "admin@dataguaviare.com", "CARRERA 8 #12-34", "1990-06-15"},
-	{4, "555125555", "COORDINADOR", "DEMO", "CDATTG", "PRUEBAS", "3021255555", "coordinador@dataguaviare.com", "CALLE 12 #13-56", "1985-04-10"},
-	{5, "555555555", "INSTRUCTOR", "DEMO", "CDATTG", "PRUEBAS", "3025555555", "instructor@dataguaviare.com", "CALLE 12 #13-56", "1985-04-10"},
-	{6, "444444444", "APRENDIZ", "UNO", "CDATTG", "PRUEBAS", "3034444444", "aprendiz1@dataguaviare.com", "AVENIDA 5 #22-10", "2002-03-20"},
-	{7, "333333333", "APRENDIZ", "DOS", "CDATTG", "PRUEBAS", "3043333333", "aprendiz2@dataguaviare.com", "AVENIDA 6 #18-20", "2003-07-05"},
-	{8, "222222222", "PROVEEDOR", "DEMO", "CDATTG", "PRUEBAS", "3052222222", "proveedor@dataguaviare.com", "CALLE 7 #14-25", "1988-05-15"},
+	{1, "111111111", "BOT", "", "AUTOMATICO", "", "3001111111", "bot@dataguaviare.com.co", "CALLE 11 #11-11", "2000-01-01"},
+	{2, "987654321", "SUPER", "", "ADMINISTRADOR", "", "3000000000", "superadmin@dataguaviare.com.co", "CALLE 10 #10-10", "1980-01-01"},
+	{3, "654321123", "ADMINISTRADOR", "DEMO", "CDATTG", "ADMIN", "3010000000", "admin@dataguaviare.com.co", "CARRERA 8 #12-34", "1990-06-15"},
+	{4, "555125555", "COORDINADOR", "DEMO", "CDATTG", "PRUEBAS", "3021255555", "coordinador@dataguaviare.com.co", "CALLE 12 #13-56", "1985-04-10"},
+	{5, "555555555", "INSTRUCTOR", "DEMO", "CDATTG", "PRUEBAS", "3025555555", "instructor@dataguaviare.com.co", "CALLE 12 #13-56", "1985-04-10"},
+	{6, "444444444", "APRENDIZ", "UNO", "CDATTG", "PRUEBAS", "3034444444", "aprendiz1@dataguaviare.com.co", "AVENIDA 5 #22-10", "2002-03-20"},
+	{7, "333333333", "APRENDIZ", "DOS", "CDATTG", "PRUEBAS", "3043333333", "aprendiz2@dataguaviare.com.co", "AVENIDA 6 #18-20", "2003-07-05"},
+	{8, "222222222", "PROVEEDOR", "DEMO", "CDATTG", "PRUEBAS", "3052222222", "proveedor@dataguaviare.com.co", "CALLE 7 #14-25", "1988-05-15"},
 	// Persona para rol "BIENESTAR AL APRENDIZ"
-	{9, "999999999", "BIENESTAR", "AL", "APRENDIZ", "", "3069999999", "bienestar@dataguaviare.com", "CALLE 9 #19-99", "1988-01-01"},
+	{9, "999999999", "BIENESTAR", "AL", "APRENDIZ", "", "3069999999", "bienestar@dataguaviare.com.co", "CALLE 9 #19-99", "1988-01-01"},
 }
 
 // RunPersonaSeeder crea las personas de prueba (IDs 1-8) igual que cdattg_web.

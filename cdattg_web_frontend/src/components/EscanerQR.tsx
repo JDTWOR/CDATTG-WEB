@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 const QR_READER_ID_DEFAULT = 'asistencia-qr-reader';
@@ -11,11 +11,54 @@ interface EscanerQRProps {
   readerId?: string;
 }
 
+function pickCameraId(cameras: { id: string; label?: string }[]): string {
+  const rear = cameras.find((cam) =>
+    /back|rear|environment|posterior|trasera/i.test(cam.label || ''),
+  );
+  return rear?.id ?? cameras[0].id;
+}
+
+async function stopScannerAndClearRef(
+  html5Qr: Html5Qrcode,
+  scannerRef: { current: Html5Qrcode | null },
+): Promise<void> {
+  try {
+    await html5Qr.stop();
+  } catch {
+    // Ignorar si el navegador ya detuvo el stream.
+  } finally {
+    scannerRef.current = null;
+  }
+}
+
+function createDecodedHandler(
+  html5Qr: Html5Qrcode,
+  scannerRef: { current: Html5Qrcode | null },
+  onEscaneadoRef: { current: (numeroDocumento: string) => void },
+  isCancelled: () => boolean,
+  setCamaraActiva: Dispatch<SetStateAction<boolean>>,
+): (decodedText: string) => void {
+  return (decodedText: string) => {
+    const doc = String(decodedText || '').trim();
+    if (!doc || isCancelled()) {
+      return;
+    }
+    onEscaneadoRef.current(doc);
+    setCamaraActiva(false);
+    void stopScannerAndClearRef(html5Qr, scannerRef);
+  };
+}
+
 /**
  * Componente que muestra la cámara y escanea códigos QR.
  * El QR debe contener únicamente el número de documento del aprendiz.
  */
-function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_READER_ID_DEFAULT }: EscanerQRProps) {
+function EscanerQRInner({
+  onEscaneado,
+  activo,
+  className = '',
+  readerId = QR_READER_ID_DEFAULT,
+}: Readonly<EscanerQRProps>) {
   const [error, setError] = useState<string | null>(null);
   const [permisos, setPermisos] = useState<boolean | null>(null);
   const [camaraActiva, setCamaraActiva] = useState(false);
@@ -26,9 +69,7 @@ function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_REA
 
   // Si el componente deja de estar activo (se cierra la sesión), apagar la cámara.
   useEffect(() => {
-    console.log('[EscanerQR] Cambio en prop "activo"', { activo });
     if (!activo) {
-      console.log('[EscanerQR] Desactivando cámara y reseteando estado');
       setCamaraActiva(false);
       setError(null);
       setPermisos(null);
@@ -36,103 +77,88 @@ function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_REA
   }, [activo]);
 
   useEffect(() => {
-    console.log('[EscanerQR] useEffect escaneo', { activo, camaraActiva, readerId });
     if (!activo || !camaraActiva) {
-      console.log('[EscanerQR] Efecto de escaneo no se ejecuta porque no está activo o cámara apagada');
       return;
     }
 
     setError(null);
     setPermisos(null);
 
-    // Retrasar la creación del escáner hasta que el div esté en el DOM (evita pantalla en blanco tras permisos).
-    let cancelado = false;
-    const t = setTimeout(() => {
-      console.log('[EscanerQR] Intentando inicializar Html5Qrcode', { readerId });
+    let cancelled = false;
+
+    async function initScanner(): Promise<void> {
       const container = readerContainerRef.current;
       if (!container) {
-        console.error('[EscanerQR] Contenedor del escáner no encontrado en el DOM', { readerId });
         setError('Contenedor del escáner no disponible');
         return;
       }
-      // Usamos el id del contenedor (string) para respetar la firma de tipos de Html5Qrcode,
-      // pero validamos la existencia del nodo mediante la referencia de React.
+
       const html5Qr = new Html5Qrcode(readerId);
       scannerRef.current = html5Qr;
 
-      Html5Qrcode.getCameras()
-        .then((cameras) => {
-          if (!cameras || cameras.length === 0) {
-            console.error('[EscanerQR] No se encontraron cámaras disponibles');
-            setError('No se encontró ninguna cámara');
-            return;
-          }
-          console.log('[EscanerQR] Cámaras detectadas', cameras.map((c) => ({ id: c.id, label: c.label })));
-          setPermisos(true);
-          // Preferir cámara trasera (environment) cuando exista, ideal para uso en celular.
-          const cameraId =
-            cameras.find((cam) =>
-              /back|rear|environment|posterior|trasera/i.test(cam.label || '')
-            )?.id ?? cameras[0].id;
-          console.log('[EscanerQR] Usando cámara', { cameraId });
-          return html5Qr
-            .start(
-              cameraId,
-              { fps: 8, qrbox: { width: 220, height: 220 } },
-              (decodedText) => {
-                console.log('[EscanerQR] Texto decodificado bruto', { decodedText, cancelado });
-                const doc = String(decodedText || '').trim();
-                if (doc && !cancelado) {
-                  console.log('[EscanerQR] Documento escaneado válido, se notificará al padre y se detendrá la cámara', { doc });
-                  onEscaneadoRef.current(doc);
-                  // Tras un escaneo válido, detener la cámara para evitar estados inconsistentes en móviles.
-                  setCamaraActiva(false);
-                  html5Qr
-                    .stop()
-                    .catch(() => {
-                      // Ignorar errores al detener si ya fue detenida por el navegador.
-                      console.warn('[EscanerQR] Error al detener la cámara (probablemente ya estaba detenida)');
-                    })
-                    .finally(() => {
-                      console.log('[EscanerQR] Cámara detenida, limpiando referencia interna');
-                      scannerRef.current = null;
-                    });
-                }
-              },
-              () => {}
-            )
-            .catch((err: Error) => {
-              console.error('[EscanerQR] Error al iniciar la cámara', err);
-              setError(err?.message || 'Error al iniciar la cámara');
-            });
-        })
-        .catch((err: Error) => {
-          console.error('[EscanerQR] Error al obtener cámaras o permisos de cámara', err);
-          setError(err?.message || 'Error al solicitar permisos de cámara');
-          setPermisos(false);
-        });
+      let cameras: { id: string; label?: string }[];
+      try {
+        cameras = await Html5Qrcode.getCameras();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Error al solicitar permisos de cámara';
+        setError(msg);
+        setPermisos(false);
+        return;
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      if (!cameras?.length) {
+        setError('No se encontró ninguna cámara');
+        return;
+      }
+
+      setPermisos(true);
+      const cameraId = pickCameraId(cameras);
+
+      const onDecodedSuccess = createDecodedHandler(
+        html5Qr,
+        scannerRef,
+        onEscaneadoRef,
+        () => cancelled,
+        setCamaraActiva,
+      );
+
+      const onScanFailure = (): void => {};
+
+      try {
+        await html5Qr.start(
+          cameraId,
+          { fps: 8, qrbox: { width: 220, height: 220 } },
+          onDecodedSuccess,
+          onScanFailure,
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Error al iniciar la cámara';
+        setError(msg);
+      }
+    }
+
+    const timer = globalThis.setTimeout(() => {
+      void initScanner();
     }, 150);
 
     return () => {
-      console.log('[EscanerQR] Cleanup efecto escaneo', { cancelado: true, readerId });
-      cancelado = true;
-      clearTimeout(t);
+      cancelled = true;
+      globalThis.clearTimeout(timer);
       const currentScanner = scannerRef.current;
       if (currentScanner) {
-        currentScanner
-          .stop()
-          .then(() => {
-            console.log('[EscanerQR] Cámara detenida correctamente en cleanup');
-          })
-          .catch(() => {
-            console.warn('[EscanerQR] Error al detener cámara en cleanup (probablemente ya estaba detenida)');
-          });
+        void currentScanner.stop().catch(() => {});
       }
       scannerRef.current = null;
     };
   }, [activo, camaraActiva, readerId]);
 
-  if (!activo) return null;
+  if (!activo) {
+    return null;
+  }
 
   return (
     <div className={className}>
@@ -141,23 +167,7 @@ function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_REA
           <h3 className="font-semibold text-gray-900">Escanear QR</h3>
           <span className="rounded bg-primary-600 px-2 py-0.5 text-xs font-medium text-white">Registro en tiempo real</span>
         </div>
-        {!camaraActiva ? (
-          <>
-            <p className="mb-3 text-sm text-gray-600">
-              La cámara se activará solo cuando presione el botón de abajo. Puede usar el registro manual si lo prefiere.
-            </p>
-            {error && (
-              <div className="mb-3 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>
-            )}
-            <button
-              type="button"
-              onClick={() => setCamaraActiva(true)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-            >
-              Activar cámara
-            </button>
-          </>
-        ) : (
+        {camaraActiva ? (
           <>
             <p className="mb-3 text-sm text-gray-600">Posicione el código QR en el recuadro</p>
             {error && (
@@ -175,6 +185,22 @@ function EscanerQRInner({ onEscaneado, activo, className = '', readerId = QR_REA
               className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Desactivar cámara
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mb-3 text-sm text-gray-600">
+              La cámara se activará solo cuando presione el botón de abajo. Puede usar el registro manual si lo prefiere.
+            </p>
+            {error && (
+              <div className="mb-3 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>
+            )}
+            <button
+              type="button"
+              onClick={() => setCamaraActiva(true)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+            >
+              Activar cámara
             </button>
           </>
         )}

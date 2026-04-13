@@ -13,6 +13,8 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+const errMsgPersonaNoEncontrada = "Persona no encontrada"
+
 type PersonaHandler struct {
 	personaService   services.PersonaService
 	personaImportSvc services.PersonaImportService
@@ -36,8 +38,14 @@ func NewPersonaHandlerWithServices(personaService services.PersonaService, perso
 
 // GetAll obtiene todas las personas con paginación y búsqueda por nombre o documento
 func (h *PersonaHandler) GetAll(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if err != nil || pageSize < 1 {
+		pageSize = 20
+	}
 	search := strings.TrimSpace(c.DefaultQuery("search", ""))
 
 	personas, total, err := h.personaService.FindAll(page, pageSize, search)
@@ -58,13 +66,13 @@ func (h *PersonaHandler) GetAll(c *gin.Context) {
 func (h *PersonaHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 
 	persona, err := h.personaService.FindByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Persona no encontrada"})
+		c.JSON(http.StatusNotFound, gin.H{"error": errMsgPersonaNoEncontrada})
 		return
 	}
 
@@ -75,7 +83,7 @@ func (h *PersonaHandler) GetByID(c *gin.Context) {
 func (h *PersonaHandler) Create(c *gin.Context) {
 	var req dto.PersonaRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 
@@ -92,13 +100,13 @@ func (h *PersonaHandler) Create(c *gin.Context) {
 func (h *PersonaHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 
 	var req dto.PersonaRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 
@@ -115,12 +123,12 @@ func (h *PersonaHandler) Update(c *gin.Context) {
 func (h *PersonaHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 
 	if err := h.personaService.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Persona no encontrada"})
+		c.JSON(http.StatusNotFound, gin.H{"error": errMsgPersonaNoEncontrada})
 		return
 	}
 
@@ -131,7 +139,7 @@ func (h *PersonaHandler) Delete(c *gin.Context) {
 func (h *PersonaHandler) ResetPassword(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 
@@ -223,7 +231,10 @@ func (h *PersonaHandler) importPersonasStream(c *gin.Context, buf []byte, filena
 
 // ListPersonaImports devuelve el historial de importaciones.
 func (h *PersonaHandler) ListPersonaImports(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if err != nil || limit < 1 {
+		limit = 50
+	}
 	list, err := h.personaImportSvc.ListImports(limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

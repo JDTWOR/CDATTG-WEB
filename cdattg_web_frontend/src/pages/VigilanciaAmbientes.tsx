@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import { SelectSearch, type SelectOption } from '../components/SelectSearch';
 import { InstructorSelectAsync } from '../components/InstructorSelectAsync';
+
+const VIGILANCIA_AMBIENTE_ID = 'vigilancia-ambiente-select';
+const VIGILANCIA_INSTRUCTOR_ID = 'vigilancia-instructor-select';
 
 export const VigilanciaAmbientes = () => {
   const [ambientesOptions, setAmbientesOptions] = useState<SelectOption[]>([]);
@@ -27,18 +31,17 @@ export const VigilanciaAmbientes = () => {
             label: a.nombre,
           }))
         );
-      } catch (e: any) {
-        const msg = e.response?.data?.error || 'No se pudieron cargar los ambientes.';
-        setAmbientesError(msg);
+      } catch (e: unknown) {
+        setAmbientesError(axiosErrorMessage(e, 'No se pudieron cargar los ambientes.'));
         setAmbientesOptions([]);
       } finally {
         setAmbientesLoading(false);
       }
     };
-    loadAmbientes();
+    void loadAmbientes();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit: ComponentProps<'form'>['onSubmit'] = (e) => {
     e.preventDefault();
     setErrorRegistro('');
     setMensajeRegistro('');
@@ -48,22 +51,25 @@ export const VigilanciaAmbientes = () => {
       return;
     }
 
-    setRegistrando(true);
-    try {
-      await apiService.registrarEntradaAmbiente({
-        ambiente_id: ambienteId,
-        instructor_id: instructorId,
-      });
-      setMensajeRegistro('Entrada registrada correctamente en el ambiente.');
-    } catch (e: any) {
-      const msg =
-        e.response?.data?.error ||
-        e.message ||
-        'No se pudo registrar la entrada en el ambiente.';
-      setErrorRegistro(msg);
-    } finally {
-      setRegistrando(false);
-    }
+    void (async () => {
+      setRegistrando(true);
+      try {
+        await apiService.registrarEntradaAmbiente({
+          ambiente_id: ambienteId,
+          instructor_id: instructorId,
+        });
+        setMensajeRegistro('Entrada registrada correctamente en el ambiente.');
+      } catch (err: unknown) {
+        setErrorRegistro(
+          axiosErrorMessage(
+            err,
+            err instanceof Error ? err.message : 'No se pudo registrar la entrada en el ambiente.',
+          ),
+        );
+      } finally {
+        setRegistrando(false);
+      }
+    })();
   };
 
   return (
@@ -84,34 +90,45 @@ export const VigilanciaAmbientes = () => {
         </h2>
 
         {ambientesError && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div
+            role="alert"
+            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
+          >
             {ambientesError}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label
+              htmlFor={VIGILANCIA_AMBIENTE_ID}
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
               Ambiente *
             </label>
             <SelectSearch
+              inputId={VIGILANCIA_AMBIENTE_ID}
               options={ambientesOptions}
               value={ambienteId}
               onChange={setAmbienteId}
               isDisabled={ambientesLoading || ambientesOptions.length === 0}
               isRequired
               placeholder={
-                ambientesLoading ? 'Cargando ambientes...' : 'Seleccione un ambiente'
+                ambientesLoading ? 'Cargando ambientes…' : 'Seleccione un ambiente'
               }
               ariaLabel="Seleccionar ambiente"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label
+              htmlFor={VIGILANCIA_INSTRUCTOR_ID}
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
               Instructor *
             </label>
             <InstructorSelectAsync
+              inputId={VIGILANCIA_INSTRUCTOR_ID}
               value={instructorId}
               onChange={setInstructorId}
               isRequired
@@ -120,12 +137,14 @@ export const VigilanciaAmbientes = () => {
           </div>
 
           {errorRegistro && (
-            <p className="text-sm text-red-600 dark:text-red-400">{errorRegistro}</p>
+            <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              {errorRegistro}
+            </p>
           )}
           {mensajeRegistro && (
-            <p className="text-sm text-green-700 dark:text-green-400 font-medium">
+            <output className="block text-sm text-green-700 dark:text-green-400 font-medium">
               {mensajeRegistro}
-            </p>
+            </output>
           )}
 
           <div className="pt-2">
@@ -134,7 +153,7 @@ export const VigilanciaAmbientes = () => {
               disabled={registrando || !ambienteId || !instructorId}
               className="btn-primary min-w-[180px]"
             >
-              {registrando ? 'Registrando...' : 'Registrar entrada'}
+              {registrando ? 'Registrando…' : 'Registrar entrada'}
             </button>
           </div>
         </form>

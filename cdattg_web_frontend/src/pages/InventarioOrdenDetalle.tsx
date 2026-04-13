@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import type { OrdenResponse } from '../types';
 
 export const InventarioOrdenDetalle = () => {
@@ -10,20 +11,39 @@ export const InventarioOrdenDetalle = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!id) return;
-    apiService
-      .getOrdenById(parseInt(id, 10))
-      .then(setOrden)
-      .catch(() => setError('Orden no encontrada'))
-      .finally(() => setLoading(false));
+    if (!id) {
+      setLoading(false);
+      setError('ID de orden no válido.');
+      setOrden(null);
+      return;
+    }
+    const run = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const o = await apiService.getOrdenById(Number.parseInt(id, 10));
+        setOrden(o);
+      } catch (e: unknown) {
+        setError(axiosErrorMessage(e, 'Orden no encontrada'));
+        setOrden(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void run();
   }, [id]);
 
   if (loading) return <div className="p-8 text-center text-gray-500 dark:text-gray-400">Cargando...</div>;
   if (error || !orden) {
     return (
-      <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-red-700 dark:text-red-300">
+      <div
+        role="alert"
+        className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-red-700 dark:text-red-300"
+      >
         {error || 'Orden no encontrada'}
-        <Link to="/inventario/ordenes" className="ml-2 underline">Volver a órdenes</Link>
+        <Link to="/inventario/ordenes" className="ml-2 underline">
+          Volver a órdenes
+        </Link>
       </div>
     );
   }
@@ -32,7 +52,7 @@ export const InventarioOrdenDetalle = () => {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link to="/inventario/ordenes" className="text-primary-600 dark:text-primary-400 hover:underline">
-          ← Órdenes
+          <span aria-hidden>←</span> Órdenes
         </Link>
       </div>
       <div>

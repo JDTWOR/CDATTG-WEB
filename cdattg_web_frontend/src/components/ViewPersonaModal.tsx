@@ -6,6 +6,8 @@ interface ViewPersonaModalProps {
   onClose: () => void;
 }
 
+const TITLE_ID = 'view-persona-modal-title';
+
 const field = (label: string, value: string | number | undefined) => (
   <div>
     <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</dt>
@@ -13,27 +15,36 @@ const field = (label: string, value: string | number | undefined) => (
   </div>
 );
 
-export const ViewPersonaModal = ({ persona, onClose }: ViewPersonaModalProps) => {
+export const ViewPersonaModal = ({ persona, onClose }: Readonly<ViewPersonaModalProps>) => {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-      <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-600"
-        onClick={(e) => e.stopPropagation()}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 z-0 bg-black/50"
+        aria-label="Cerrar vista de persona"
+        onClick={onClose}
+      />
+      <dialog
+        open
+        className="relative z-10 m-0 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-y-auto rounded-lg border border-gray-200 bg-white p-0 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+        aria-labelledby={TITLE_ID}
       >
-        <div className="p-6 border-b border-gray-200 dark:border-gray-600 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Ver persona</h2>
+        <div className="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-600">
+          <h2 id={TITLE_ID} className="text-xl font-bold text-gray-900 dark:text-white">
+            Ver persona
+          </h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1"
+            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             aria-label="Cerrar"
           >
-            <XMarkIcon className="w-6 h-6" />
+            <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
-        <div className="p-6 space-y-6">
+        <div className="space-y-6 p-6">
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Datos personales</h3>
+            <h3 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Datos personales</h3>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-4">
               {field('Documento', persona.numero_documento)}
               {field('Nombre completo', persona.full_name)}
@@ -45,7 +56,7 @@ export const ViewPersonaModal = ({ persona, onClose }: ViewPersonaModalProps) =>
             </dl>
           </section>
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Contacto</h3>
+            <h3 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Contacto</h3>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-4">
               {field('Email', persona.email)}
               {field('Teléfono', persona.telefono)}
@@ -54,13 +65,13 @@ export const ViewPersonaModal = ({ persona, onClose }: ViewPersonaModalProps) =>
             </dl>
           </section>
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Estado</h3>
+            <h3 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Estado</h3>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-4">
               {field('Estado', persona.status ? 'Activo' : 'Inactivo')}
             </dl>
           </section>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 };

@@ -9,6 +9,18 @@ import (
 	"github.com/sena/cdattg-web-golang/services"
 )
 
+func parseInventarioMaestroPagination(c *gin.Context) (page, pageSize int) {
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	pageSize, err = strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if err != nil || pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	return page, pageSize
+}
+
 // ProveedorHandler CRUD proveedores
 type ProveedorHandler struct {
 	svc services.ProveedorService
@@ -19,14 +31,7 @@ func NewProveedorHandler() *ProveedorHandler {
 }
 
 func (h *ProveedorHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
+	page, pageSize := parseInventarioMaestroPagination(c)
 	offset := (page - 1) * pageSize
 	list, total, err := h.svc.List(pageSize, offset)
 	if err != nil {
@@ -39,7 +44,7 @@ func (h *ProveedorHandler) List(c *gin.Context) {
 func (h *ProveedorHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	resp, err := h.svc.GetByID(uint(id))
@@ -53,7 +58,7 @@ func (h *ProveedorHandler) GetByID(c *gin.Context) {
 func (h *ProveedorHandler) Create(c *gin.Context) {
 	var req dto.ProveedorCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	resp, err := h.svc.Create(req)
@@ -67,12 +72,12 @@ func (h *ProveedorHandler) Create(c *gin.Context) {
 func (h *ProveedorHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	var req dto.ProveedorUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	resp, err := h.svc.Update(uint(id), req)
@@ -86,7 +91,7 @@ func (h *ProveedorHandler) Update(c *gin.Context) {
 func (h *ProveedorHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	if err := h.svc.Delete(uint(id)); err != nil {
@@ -117,7 +122,7 @@ func (h *CategoriaHandler) List(c *gin.Context) {
 func (h *CategoriaHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	resp, err := h.svc.GetByID(uint(id))
@@ -131,7 +136,7 @@ func (h *CategoriaHandler) GetByID(c *gin.Context) {
 func (h *CategoriaHandler) Create(c *gin.Context) {
 	var req dto.CategoriaCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	resp, err := h.svc.Create(req)
@@ -145,12 +150,12 @@ func (h *CategoriaHandler) Create(c *gin.Context) {
 func (h *CategoriaHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	var req dto.CategoriaUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	resp, err := h.svc.Update(uint(id), req)
@@ -164,7 +169,7 @@ func (h *CategoriaHandler) Update(c *gin.Context) {
 func (h *CategoriaHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	if err := h.svc.Delete(uint(id)); err != nil {
@@ -195,7 +200,7 @@ func (h *MarcaHandler) List(c *gin.Context) {
 func (h *MarcaHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	resp, err := h.svc.GetByID(uint(id))
@@ -209,7 +214,7 @@ func (h *MarcaHandler) GetByID(c *gin.Context) {
 func (h *MarcaHandler) Create(c *gin.Context) {
 	var req dto.MarcaCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	resp, err := h.svc.Create(req)
@@ -223,12 +228,12 @@ func (h *MarcaHandler) Create(c *gin.Context) {
 func (h *MarcaHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	var req dto.MarcaUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	resp, err := h.svc.Update(uint(id), req)
@@ -242,7 +247,7 @@ func (h *MarcaHandler) Update(c *gin.Context) {
 func (h *MarcaHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	if err := h.svc.Delete(uint(id)); err != nil {
@@ -262,14 +267,7 @@ func NewContratoConvenioHandler() *ContratoConvenioHandler {
 }
 
 func (h *ContratoConvenioHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
+	page, pageSize := parseInventarioMaestroPagination(c)
 	offset := (page - 1) * pageSize
 	list, total, err := h.svc.List(pageSize, offset)
 	if err != nil {
@@ -282,7 +280,7 @@ func (h *ContratoConvenioHandler) List(c *gin.Context) {
 func (h *ContratoConvenioHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	resp, err := h.svc.GetByID(uint(id))
@@ -296,7 +294,7 @@ func (h *ContratoConvenioHandler) GetByID(c *gin.Context) {
 func (h *ContratoConvenioHandler) Create(c *gin.Context) {
 	var req dto.ContratoConvenioCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	resp, err := h.svc.Create(req)
@@ -310,12 +308,12 @@ func (h *ContratoConvenioHandler) Create(c *gin.Context) {
 func (h *ContratoConvenioHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	var req dto.ContratoConvenioUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	resp, err := h.svc.Update(uint(id), req)
@@ -329,7 +327,7 @@ func (h *ContratoConvenioHandler) Update(c *gin.Context) {
 func (h *ContratoConvenioHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	if err := h.svc.Delete(uint(id)); err != nil {

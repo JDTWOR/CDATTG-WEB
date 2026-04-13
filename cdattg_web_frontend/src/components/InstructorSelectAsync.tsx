@@ -77,6 +77,8 @@ interface InstructorSelectAsyncProps {
   isRequired?: boolean;
   /** Etiqueta a mostrar cuando value está definido (ej. al editar) y aún no se ha cargado la opción */
   defaultLabel?: string;
+  /** Para asociar <label htmlFor="..."> al input interno de react-select */
+  inputId?: string;
 }
 
 /**
@@ -90,7 +92,8 @@ export function InstructorSelectAsync({
   isDisabled = false,
   isRequired = false,
   defaultLabel,
-}: InstructorSelectAsyncProps) {
+  inputId,
+}: Readonly<InstructorSelectAsyncProps>) {
   const [selectedOption, setSelectedOption] = useState<SelectOption | null>(null);
 
   useEffect(() => {
@@ -113,6 +116,7 @@ export function InstructorSelectAsync({
   return (
     <div className="react-select-wrapper w-full">
       <AsyncSelect<SelectOption, false>
+        inputId={inputId}
         loadOptions={loadOptions}
         defaultOptions={false}
         value={selectedOption}

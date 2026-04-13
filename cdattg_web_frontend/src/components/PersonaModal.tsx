@@ -1,7 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent, type ComponentProps } from 'react';
 import { apiService } from '../services/api';
-import type { PersonaResponse, PersonaRequest } from '../types';
-import type { ParametroItem, PaisItem, DepartamentoItem, MunicipioItem } from '../types';
+import type {
+  PersonaResponse,
+  PersonaRequest,
+  ParametroItem,
+  PaisItem,
+  DepartamentoItem,
+  MunicipioItem,
+} from '../types';
 import { SelectSearch } from './SelectSearch';
 
 interface PersonaModalProps {
@@ -12,7 +18,24 @@ interface PersonaModalProps {
 
 const MIN_AGE = 14;
 
-export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) => {
+const F = {
+  tipoDoc: 'persona-modal-tipo-documento',
+  numDoc: 'persona-modal-numero-documento',
+  primerNombre: 'persona-modal-primer-nombre',
+  segundoNombre: 'persona-modal-segundo-nombre',
+  primerApellido: 'persona-modal-primer-apellido',
+  segundoApellido: 'persona-modal-segundo-apellido',
+  fechaNac: 'persona-modal-fecha-nacimiento',
+  genero: 'persona-modal-genero',
+  celular: 'persona-modal-celular',
+  telefono: 'persona-modal-telefono',
+  email: 'persona-modal-email',
+  pais: 'persona-modal-pais',
+  departamento: 'persona-modal-departamento',
+  municipio: 'persona-modal-municipio',
+} as const;
+
+export const PersonaModal = ({ persona, onClose, onSave }: Readonly<PersonaModalProps>) => {
   const [formData, setFormData] = useState<PersonaRequest>({
     numero_documento: '',
     primer_nombre: '',
@@ -51,12 +74,12 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
         // permisos o red
       }
     };
-    load();
+    void load();
   }, []);
 
   useEffect(() => {
     if (formData.pais_id) {
-      apiService.getCatalogosDepartamentos(formData.pais_id).then(setDepartamentos);
+      void apiService.getCatalogosDepartamentos(formData.pais_id).then(setDepartamentos);
     } else {
       setDepartamentos([]);
       setFormData((f) => ({ ...f, departamento_id: undefined, municipio_id: undefined }));
@@ -65,7 +88,7 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
 
   useEffect(() => {
     if (formData.departamento_id) {
-      apiService.getCatalogosMunicipios(formData.departamento_id).then(setMunicipios);
+      void apiService.getCatalogosMunicipios(formData.departamento_id).then(setMunicipios);
     } else {
       setMunicipios([]);
       setFormData((f) => ({ ...f, municipio_id: undefined }));
@@ -93,28 +116,33 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
         status: persona.status,
         parametro_id: persona.parametro_id,
       });
-      if (persona.parametro_id) setCaracterizacionIds([persona.parametro_id]);
+      if (persona.parametro_id) {
+        setCaracterizacionIds([persona.parametro_id]);
+      }
     }
   }, [persona]);
 
   const validateBirthDate = (value: string | undefined): boolean => {
-    if (!value) return true;
+    if (!value) {
+      return true;
+    }
     const birth = new Date(value);
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
     const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
     return age >= MIN_AGE;
   };
 
-  const handleBirthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBirthChange = (e: ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;
     setFormData((f) => ({ ...f, fecha_nacimiento: v || undefined }));
     setDateError(v && !validateBirthDate(v) ? `Debe tener al menos ${MIN_AGE} años para registrarse.` : '');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitPersona = (): void => {
     if (formData.fecha_nacimiento && !validateBirthDate(formData.fecha_nacimiento)) {
       setDateError(`Debe tener al menos ${MIN_AGE} años para registrarse.`);
       return;
@@ -123,28 +151,46 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
     onSave({ ...formData, parametro_id: parametroId });
   };
 
-  const toggleCaracterizacion = (id: number) => {
-    setCaracterizacionIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+  const handleSubmit: NonNullable<ComponentProps<'form'>['onSubmit']> = (e) => {
+    e.preventDefault();
+    submitPersona();
   };
 
+  const toggleCaracterizacion = (id: number) => {
+    setCaracterizacionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const modalTitleId = 'persona-modal-title';
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-600">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 z-0 bg-black/50"
+        aria-label="Cerrar formulario de persona"
+        onClick={onClose}
+      />
+      <dialog
+        open
+        className="relative z-10 m-0 flex max-h-[90vh] w-full max-w-3xl flex-col overflow-y-auto rounded-lg border border-gray-200 bg-white p-0 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+        aria-labelledby={modalTitleId}
+      >
+        <div className="border-b border-gray-200 p-6 dark:border-gray-600">
+          <h2 id={modalTitleId} className="text-2xl font-bold text-gray-900 dark:text-white">
             {persona ? 'Editar Persona' : 'Registro de Persona'}
           </h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 p-6">
           {/* Datos personales */}
           <section>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">Datos personales</h3>
+            <h3 className="mb-3 text-lg font-semibold text-gray-800 dark:text-gray-200">Datos personales</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo de documento *</label>
+                <label htmlFor={F.tipoDoc} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tipo de documento *
+                </label>
                 <SelectSearch
+                  inputId={F.tipoDoc}
                   options={tiposDocumento.map((t) => ({ value: t.id, label: t.name }))}
                   value={formData.tipo_documento}
                   onChange={(v) => setFormData({ ...formData, tipo_documento: v })}
@@ -154,8 +200,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Número de documento *</label>
+                <label htmlFor={F.numDoc} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Número de documento *
+                </label>
                 <input
+                  id={F.numDoc}
                   type="text"
                   required
                   value={formData.numero_documento}
@@ -164,8 +213,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Primer nombre *</label>
+                <label htmlFor={F.primerNombre} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Primer nombre *
+                </label>
                 <input
+                  id={F.primerNombre}
                   type="text"
                   required
                   value={formData.primer_nombre}
@@ -174,8 +226,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Segundo nombre</label>
+                <label htmlFor={F.segundoNombre} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Segundo nombre
+                </label>
                 <input
+                  id={F.segundoNombre}
                   type="text"
                   value={formData.segundo_nombre ?? ''}
                   onChange={(e) => setFormData({ ...formData, segundo_nombre: e.target.value })}
@@ -183,8 +238,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Primer apellido *</label>
+                <label htmlFor={F.primerApellido} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Primer apellido *
+                </label>
                 <input
+                  id={F.primerApellido}
                   type="text"
                   required
                   value={formData.primer_apellido}
@@ -193,8 +251,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Segundo apellido</label>
+                <label htmlFor={F.segundoApellido} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Segundo apellido
+                </label>
                 <input
+                  id={F.segundoApellido}
                   type="text"
                   value={formData.segundo_apellido ?? ''}
                   onChange={(e) => setFormData({ ...formData, segundo_apellido: e.target.value })}
@@ -202,8 +263,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Fecha de nacimiento *</label>
+                <label htmlFor={F.fechaNac} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Fecha de nacimiento *
+                </label>
                 <input
+                  id={F.fechaNac}
                   type="date"
                   required
                   value={formData.fecha_nacimiento ? formData.fecha_nacimiento.slice(0, 10) : ''}
@@ -213,8 +277,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 {dateError && <p className="mt-1 text-sm text-red-600">{dateError}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Género *</label>
+                <label htmlFor={F.genero} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Género *
+                </label>
                 <SelectSearch
+                  inputId={F.genero}
                   options={generos.map((g) => ({ value: g.id, label: g.name }))}
                   value={formData.genero}
                   onChange={(v) => setFormData({ ...formData, genero: v })}
@@ -228,11 +295,14 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
 
           {/* Contacto */}
           <section>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">Contacto</h3>
+            <h3 className="mb-3 text-lg font-semibold text-gray-800 dark:text-gray-200">Contacto</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Celular</label>
+                <label htmlFor={F.celular} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Celular
+                </label>
                 <input
+                  id={F.celular}
                   type="text"
                   value={formData.celular ?? ''}
                   onChange={(e) => setFormData({ ...formData, celular: e.target.value })}
@@ -240,8 +310,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Teléfono</label>
+                <label htmlFor={F.telefono} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Teléfono
+                </label>
                 <input
+                  id={F.telefono}
                   type="text"
                   value={formData.telefono ?? ''}
                   onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
@@ -249,8 +322,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Correo electrónico</label>
+                <label htmlFor={F.email} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Correo electrónico
+                </label>
                 <input
+                  id={F.email}
                   type="email"
                   value={formData.email ?? ''}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -262,11 +338,14 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
 
           {/* Ubicación */}
           <section>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">Ubicación</h3>
+            <h3 className="mb-3 text-lg font-semibold text-gray-800 dark:text-gray-200">Ubicación</h3>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">País *</label>
+                <label htmlFor={F.pais} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  País *
+                </label>
                 <SelectSearch
+                  inputId={F.pais}
                   options={paises.map((p) => ({ value: p.id, label: p.nombre }))}
                   value={formData.pais_id}
                   onChange={(v) => setFormData({ ...formData, pais_id: v })}
@@ -276,8 +355,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Departamento *</label>
+                <label htmlFor={F.departamento} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Departamento *
+                </label>
                 <SelectSearch
+                  inputId={F.departamento}
                   options={departamentos.map((d) => ({ value: d.id, label: d.nombre }))}
                   value={formData.departamento_id}
                   onChange={(v) => setFormData({ ...formData, departamento_id: v })}
@@ -288,8 +370,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Municipio *</label>
+                <label htmlFor={F.municipio} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Municipio *
+                </label>
                 <SelectSearch
+                  inputId={F.municipio}
                   options={municipios.map((m) => ({ value: m.id, label: m.nombre }))}
                   value={formData.municipio_id}
                   onChange={(v) => setFormData({ ...formData, municipio_id: v })}
@@ -300,25 +385,25 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
                 />
               </div>
             </div>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 p-3 rounded">
+            <p className="mt-2 rounded bg-gray-100 p-3 text-sm text-gray-500 dark:bg-gray-700 dark:text-gray-400">
               Dirección deshabilitada temporalmente. Por lineamientos internos no se está capturando la dirección residencial en este formulario.
             </p>
           </section>
 
           {/* Caracterización */}
           <section>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">Caracterización</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            <h3 className="mb-2 text-lg font-semibold text-gray-800 dark:text-gray-200">Caracterización</h3>
+            <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
               Marca una o varias categorías que describan la caracterización de la persona.
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded p-3">
+            <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto rounded border border-gray-200 p-3 sm:grid-cols-3 dark:border-gray-600">
               {caracterizacion.map((c) => (
-                <label key={c.id} className="flex items-center gap-2 cursor-pointer">
+                <label key={c.id} className="flex cursor-pointer items-center gap-2">
                   <input
                     type="checkbox"
                     checked={caracterizacionIds.includes(c.id)}
                     onChange={() => toggleCaracterizacion(c.id)}
-                    className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600"
                   />
                   <span className="text-sm">{c.name}</span>
                 </label>
@@ -329,20 +414,26 @@ export const PersonaModal = ({ persona, onClose, onSave }: PersonaModalProps) =>
           <div className="flex items-center">
             <input
               type="checkbox"
-              id="status"
+              id="persona-modal-status"
               checked={formData.status ?? true}
               onChange={(e) => setFormData({ ...formData, status: e.target.checked })}
-              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
             />
-            <label htmlFor="status" className="ml-2 block text-sm text-gray-900 dark:text-gray-200">Activo</label>
+            <label htmlFor="persona-modal-status" className="ml-2 block text-sm text-gray-900 dark:text-gray-200">
+              Activo
+            </label>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-600">
-            <button type="button" onClick={onClose} className="btn-secondary">Cancelar</button>
-            <button type="submit" className="btn-primary">{persona ? 'Actualizar' : 'Crear'}</button>
+          <div className="flex justify-end space-x-3 border-t border-gray-200 pt-4 dark:border-gray-600">
+            <button type="button" onClick={onClose} className="btn-secondary">
+              Cancelar
+            </button>
+            <button type="submit" className="btn-primary">
+              {persona ? 'Actualizar' : 'Crear'}
+            </button>
           </div>
         </form>
-      </div>
+      </dialog>
     </div>
   );
 };

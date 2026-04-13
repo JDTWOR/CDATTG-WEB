@@ -9,6 +9,8 @@ import (
 	"github.com/sena/cdattg-web-golang/services"
 )
 
+const errMsgDatosInvalidos = "Datos inválidos"
+
 type AmbienteHandler struct {
 	svc services.AmbienteService
 }
@@ -23,7 +25,7 @@ func NewAmbienteHandler() *AmbienteHandler {
 func (h *AmbienteHandler) Create(c *gin.Context) {
 	var req dto.AmbienteCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	res, err := h.svc.Create(req)
@@ -48,7 +50,7 @@ func NewSedeHandler() *SedeHandler {
 func (h *SedeHandler) Create(c *gin.Context) {
 	var req dto.SedeCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	res, err := h.svc.Create(req)
@@ -73,7 +75,7 @@ func NewPisoHandler() *PisoHandler {
 func (h *PisoHandler) Create(c *gin.Context) {
 	var req dto.PisoCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	res, err := h.svc.Create(req)
@@ -156,7 +158,7 @@ func NewBloqueHandler() *BloqueHandler {
 func (h *BloqueHandler) Create(c *gin.Context) {
 	var req dto.BloqueCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	res, err := h.svc.Create(req)

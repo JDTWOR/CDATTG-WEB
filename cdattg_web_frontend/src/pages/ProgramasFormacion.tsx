@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { PencilSquareIcon, TrashIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import type { ProgramaFormacionResponse, ProgramaFormacionRequest } from '../types';
 
 export const ProgramasFormacion = () => {
@@ -20,22 +21,22 @@ export const ProgramasFormacion = () => {
     status: true,
   });
 
-  const fetchList = async () => {
+  const fetchList = useCallback(async () => {
     try {
       setLoading(true);
       const response = await apiService.getProgramasFormacion(page, pageSize, search);
       setList(response.data);
       setTotal(response.total);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al cargar programas');
+    } catch (err: unknown) {
+      setError(axiosErrorMessage(err, 'Error al cargar programas'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, search]);
 
   useEffect(() => {
-    fetchList();
-  }, [page, search]);
+    void fetchList();
+  }, [fetchList]);
 
   const openCreate = () => {
     setEditing(null);
@@ -68,8 +69,8 @@ export const ProgramasFormacion = () => {
       }
       setIsModalOpen(false);
       fetchList();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al guardar');
+    } catch (err: unknown) {
+      alert(axiosErrorMessage(err, 'Error al guardar'));
     }
   };
 
@@ -78,8 +79,8 @@ export const ProgramasFormacion = () => {
     try {
       await apiService.deleteProgramaFormacion(id);
       fetchList();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al eliminar');
+    } catch (err: unknown) {
+      alert(axiosErrorMessage(err, 'Error al eliminar'));
     }
   };
 
@@ -94,17 +95,25 @@ export const ProgramasFormacion = () => {
         </div>
         <div className="flex gap-2">
           <Link to="/programas/importar" className="btn-secondary">
-            <ArrowUpTrayIcon className="w-5 h-5 inline mr-2" />
+            <ArrowUpTrayIcon className="w-5 h-5 inline mr-2" aria-hidden />
             Importar programas
           </Link>
-          <button onClick={openCreate} className="btn-primary">
-            <span className="mr-2">+</span> Nuevo programa
+          <button type="button" onClick={openCreate} className="btn-primary">
+            <span className="mr-2" aria-hidden>
+              +
+            </span>{' '}
+            Nuevo programa
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">{error}</div>
+        <div
+          role="alert"
+          className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg"
+        >
+          {error}
+        </div>
       )}
 
       <div className="flex gap-4">
@@ -124,6 +133,7 @@ export const ProgramasFormacion = () => {
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                <caption className="sr-only">Listado de programas de formación</caption>
                 <thead className="bg-gray-50 dark:bg-gray-700/50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Código</th>
@@ -156,18 +166,20 @@ export const ProgramasFormacion = () => {
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button
+                              type="button"
                               onClick={() => openEdit(item)}
                               className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
                               title="Editar"
                             >
-                              <PencilSquareIcon className="w-5 h-5" />
+                              <PencilSquareIcon className="w-5 h-5" aria-hidden />
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleDelete(item.id)}
                               className="p-2 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                               title="Eliminar"
                             >
-                              <TrashIcon className="w-5 h-5" />
+                              <TrashIcon className="w-5 h-5" aria-hidden />
                             </button>
                           </div>
                         </td>
@@ -178,12 +190,13 @@ export const ProgramasFormacion = () => {
               </table>
             </div>
             {totalPages > 1 && (
-              <div className="mt-4 flex justify-between items-center">
+                <div className="mt-4 flex justify-between items-center">
                 <span className="text-sm text-gray-700 dark:text-gray-300">
                   Página {page} de {totalPages} ({total} total)
                 </span>
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
                     className="btn-secondary disabled:opacity-50"
@@ -191,6 +204,7 @@ export const ProgramasFormacion = () => {
                     Anterior
                   </button>
                   <button
+                    type="button"
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
                     className="btn-secondary disabled:opacity-50"
@@ -210,38 +224,49 @@ export const ProgramasFormacion = () => {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{editing ? 'Editar programa' : 'Nuevo programa'}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Código</label>
+                <label htmlFor="programa-form-codigo" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Código
+                </label>
                 <input
+                  id="programa-form-codigo"
                   type="text"
                   value={form.codigo}
                   onChange={(e) => setForm((f) => ({ ...f, codigo: e.target.value }))}
                   className="input-field mt-1 w-full"
+                  autoComplete="off"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre</label>
+                <label htmlFor="programa-form-nombre" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Nombre
+                </label>
                 <input
+                  id="programa-form-nombre"
                   type="text"
                   value={form.nombre}
                   onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
                   className="input-field mt-1 w-full"
+                  autoComplete="off"
                 />
               </div>
               <div className="flex items-center">
                 <input
+                  id="programa-form-activo"
                   type="checkbox"
                   checked={form.status ?? true}
                   onChange={(e) => setForm((f) => ({ ...f, status: e.target.checked }))}
                   className="rounded"
                 />
-                <label className="ml-2 text-sm text-gray-700">Activo</label>
+                <label htmlFor="programa-form-activo" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                  Activo
+                </label>
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-2">
-              <button onClick={() => setIsModalOpen(false)} className="btn-secondary">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="btn-secondary">
                 Cancelar
               </button>
-              <button onClick={handleSave} className="btn-primary">
+              <button type="button" onClick={handleSave} className="btn-primary">
                 Guardar
               </button>
             </div>

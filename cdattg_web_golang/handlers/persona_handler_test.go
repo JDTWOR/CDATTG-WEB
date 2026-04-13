@@ -13,13 +13,15 @@ import (
 	"github.com/sena/cdattg-web-golang/testutil"
 )
 
+const testPathPersonasAPI = "/api/personas"
+
 type mockPersonaService struct {
-	findAllFunc    func(int, int, string) ([]dto.PersonaResponse, int64, error)
-	findByIDFunc   func(uint) (*dto.PersonaResponse, error)
-	createFunc     func(dto.PersonaRequest) (*dto.PersonaResponse, error)
-	updateFunc     func(uint, dto.PersonaRequest) (*dto.PersonaResponse, error)
-	deleteFunc     func(uint) error
-	resetPassword  func(uint) error
+	findAllFunc   func(int, int, string) ([]dto.PersonaResponse, int64, error)
+	findByIDFunc  func(uint) (*dto.PersonaResponse, error)
+	createFunc    func(dto.PersonaRequest) (*dto.PersonaResponse, error)
+	updateFunc    func(uint, dto.PersonaRequest) (*dto.PersonaResponse, error)
+	deleteFunc    func(uint) error
+	resetPassword func(uint) error
 }
 
 func (m *mockPersonaService) FindAll(page, pageSize int, search string) ([]dto.PersonaResponse, int64, error) {
@@ -43,6 +45,14 @@ func (m *mockPersonaService) Create(req dto.PersonaRequest) (*dto.PersonaRespons
 		return m.createFunc(req)
 	}
 	return nil, nil
+}
+
+func (m *mockPersonaService) CreateWithoutUser(req dto.PersonaRequest) (*dto.PersonaResponse, error) {
+	return m.Create(req)
+}
+
+func (m *mockPersonaService) EnsureUsersForPersonas([]uint) error {
+	return nil
 }
 
 func (m *mockPersonaService) Update(id uint, req dto.PersonaRequest) (*dto.PersonaResponse, error) {
@@ -85,7 +95,7 @@ func (m *mockPersonaImportService) ListImports(limit int) ([]services.ImportLogI
 	return nil, nil
 }
 
-func TestPersonaHandler_GetByID(t *testing.T) {
+func TestPersonaHandlerGetByID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	tests := []struct {
 		name           string
@@ -98,11 +108,11 @@ func TestPersonaHandler_GetByID(t *testing.T) {
 			name:           "id_invalido_retorna_400",
 			idParam:        "abc",
 			wantStatus:     http.StatusBadRequest,
-			wantErrMessage: "ID inválido",
+			wantErrMessage: errMsgIDInvalido,
 		},
 		{
-			name:       "persona_no_encontrada_retorna_404",
-			idParam:    "999",
+			name:    "persona_no_encontrada_retorna_404",
+			idParam: "999",
 			mockFindByID: func(uint) (*dto.PersonaResponse, error) {
 				return nil, errors.New("persona no encontrada")
 			},
@@ -110,8 +120,8 @@ func TestPersonaHandler_GetByID(t *testing.T) {
 			wantErrMessage: "Persona no encontrada",
 		},
 		{
-			name:     "exito_retorna_200",
-			idParam:  "1",
+			name:    "exito_retorna_200",
+			idParam: "1",
 			mockFindByID: func(uint) (*dto.PersonaResponse, error) {
 				return &dto.PersonaResponse{ID: 1, NumeroDocumento: "123", PrimerNombre: "Test", PrimerApellido: "User", FullName: "Test User"}, nil
 			},
@@ -126,22 +136,18 @@ func TestPersonaHandler_GetByID(t *testing.T) {
 			h := NewPersonaHandlerWithServices(mockSvc, mockImport)
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest(http.MethodGet, "/api/personas/"+tt.idParam, nil)
+			c.Request = httptest.NewRequest(http.MethodGet, testPathPersonasAPI+"/"+tt.idParam, nil)
 			c.Params = gin.Params{{Key: "id", Value: tt.idParam}}
 			h.GetByID(c)
 			testutil.AssertStatus(t, w, tt.wantStatus)
 			if tt.wantErrMessage != "" {
-				var m map[string]interface{}
-				_ = json.NewDecoder(w.Body).Decode(&m)
-				if errMsg, ok := m["error"].(string); !ok || errMsg != tt.wantErrMessage {
-					t.Errorf("error message: got %v, want %q", m["error"], tt.wantErrMessage)
-				}
+				assertResponseErrorEquals(t, w, tt.wantErrMessage)
 			}
 		})
 	}
 }
 
-func TestPersonaHandler_GetAll(t *testing.T) {
+func TestPersonaHandlerGetAll(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	mockSvc := &mockPersonaService{
 		findAllFunc: func(page, pageSize int, search string) ([]dto.PersonaResponse, int64, error) {
@@ -151,7 +157,7 @@ func TestPersonaHandler_GetAll(t *testing.T) {
 		},
 	}
 	h := NewPersonaHandlerWithServices(mockSvc, &mockPersonaImportService{})
-	w, c := testutil.RecorderAndContext(http.MethodGet, "/api/personas?page=1&page_size=10", nil)
+	w, c := testutil.RecorderAndContext(http.MethodGet, testPathPersonasAPI+"?page=1&page_size=10", nil)
 	c.Request.URL.RawQuery = "page=1&page_size=10"
 	h.GetAll(c)
 	testutil.AssertStatus(t, w, http.StatusOK)
@@ -165,7 +171,7 @@ func TestPersonaHandler_GetAll(t *testing.T) {
 	}
 }
 
-func TestPersonaHandler_Create(t *testing.T) {
+func TestPersonaHandlerCreate(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	tests := []struct {
 		name           string
@@ -202,21 +208,17 @@ func TestPersonaHandler_Create(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSvc := &mockPersonaService{createFunc: tt.mockCreate}
 			h := NewPersonaHandlerWithServices(mockSvc, &mockPersonaImportService{})
-			w, c := testutil.RecorderAndContext(http.MethodPost, "/api/personas", tt.body)
+			w, c := testutil.RecorderAndContext(http.MethodPost, testPathPersonasAPI, tt.body)
 			h.Create(c)
 			testutil.AssertStatus(t, w, tt.wantStatus)
 			if tt.wantErrMessage != "" {
-				var m map[string]interface{}
-				_ = json.NewDecoder(w.Body).Decode(&m)
-				if errMsg, ok := m["error"].(string); !ok || errMsg != tt.wantErrMessage {
-					t.Errorf("error message: got %v, want %q", m["error"], tt.wantErrMessage)
-				}
+				assertResponseErrorEquals(t, w, tt.wantErrMessage)
 			}
 		})
 	}
 }
 
-func TestPersonaHandler_Update(t *testing.T) {
+func TestPersonaHandlerUpdate(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	tests := []struct {
 		name           string
@@ -231,12 +233,12 @@ func TestPersonaHandler_Update(t *testing.T) {
 			idParam:        "x",
 			body:           dto.PersonaRequest{NumeroDocumento: "123", PrimerNombre: "A", PrimerApellido: "B"},
 			wantStatus:     http.StatusBadRequest,
-			wantErrMessage: "ID inválido",
+			wantErrMessage: errMsgIDInvalido,
 		},
 		{
-			name:     "exito_retorna_200",
-			idParam:  "1",
-			body:     dto.PersonaRequest{NumeroDocumento: "123", PrimerNombre: "A", PrimerApellido: "B"},
+			name:    "exito_retorna_200",
+			idParam: "1",
+			body:    dto.PersonaRequest{NumeroDocumento: "123", PrimerNombre: "A", PrimerApellido: "B"},
 			mockUpdate: func(id uint, req dto.PersonaRequest) (*dto.PersonaResponse, error) {
 				return &dto.PersonaResponse{ID: id, FullName: "A B"}, nil
 			},
@@ -248,22 +250,18 @@ func TestPersonaHandler_Update(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSvc := &mockPersonaService{updateFunc: tt.mockUpdate}
 			h := NewPersonaHandlerWithServices(mockSvc, &mockPersonaImportService{})
-			w, c := testutil.RecorderAndContext(http.MethodPut, "/api/personas/"+tt.idParam, tt.body)
+			w, c := testutil.RecorderAndContext(http.MethodPut, testPathPersonasAPI+"/"+tt.idParam, tt.body)
 			c.Params = gin.Params{{Key: "id", Value: tt.idParam}}
 			h.Update(c)
 			testutil.AssertStatus(t, w, tt.wantStatus)
 			if tt.wantErrMessage != "" {
-				var m map[string]interface{}
-				_ = json.NewDecoder(w.Body).Decode(&m)
-				if errMsg, ok := m["error"].(string); !ok || errMsg != tt.wantErrMessage {
-					t.Errorf("error message: got %v, want %q", m["error"], tt.wantErrMessage)
-				}
+				assertResponseErrorEquals(t, w, tt.wantErrMessage)
 			}
 		})
 	}
 }
 
-func TestPersonaHandler_Delete(t *testing.T) {
+func TestPersonaHandlerDelete(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	tests := []struct {
 		name           string
@@ -276,13 +274,13 @@ func TestPersonaHandler_Delete(t *testing.T) {
 			name:           "id_invalido_retorna_400",
 			idParam:        "n",
 			wantStatus:     http.StatusBadRequest,
-			wantErrMessage: "ID inválido",
+			wantErrMessage: errMsgIDInvalido,
 		},
 		{
 			name:       "persona_no_encontrada_retorna_404",
 			idParam:    "999",
 			mockDelete: func(uint) error { return errors.New("not found") },
-			wantStatus:     http.StatusNotFound,
+			wantStatus: http.StatusNotFound,
 			wantErrMessage: "Persona no encontrada",
 		},
 		{
@@ -299,22 +297,18 @@ func TestPersonaHandler_Delete(t *testing.T) {
 			h := NewPersonaHandlerWithServices(mockSvc, &mockPersonaImportService{})
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest(http.MethodDelete, "/api/personas/"+tt.idParam, nil)
+			c.Request = httptest.NewRequest(http.MethodDelete, testPathPersonasAPI+"/"+tt.idParam, nil)
 			c.Params = gin.Params{{Key: "id", Value: tt.idParam}}
 			h.Delete(c)
 			testutil.AssertStatus(t, w, tt.wantStatus)
 			if tt.wantErrMessage != "" {
-				var m map[string]interface{}
-				_ = json.NewDecoder(w.Body).Decode(&m)
-				if errMsg, ok := m["error"].(string); !ok || errMsg != tt.wantErrMessage {
-					t.Errorf("error message: got %v, want %q", m["error"], tt.wantErrMessage)
-				}
+				assertResponseErrorEquals(t, w, tt.wantErrMessage)
 			}
 		})
 	}
 }
 
-func TestPersonaHandler_ListPersonaImports(t *testing.T) {
+func TestPersonaHandlerListPersonaImports(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	mockImport := &mockPersonaImportService{
 		listImportsFunc: func(limit int) ([]services.ImportLogItem, error) {
@@ -326,7 +320,7 @@ func TestPersonaHandler_ListPersonaImports(t *testing.T) {
 	h := NewPersonaHandlerWithServices(&mockPersonaService{}, mockImport)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/personas/imports?limit=50", nil)
+	c.Request = httptest.NewRequest(http.MethodGet, testPathPersonasAPI+"/imports?limit=50", nil)
 	c.Request.URL.RawQuery = "limit=50"
 	h.ListPersonaImports(c)
 	testutil.AssertStatus(t, w, http.StatusOK)
@@ -337,12 +331,12 @@ func TestPersonaHandler_ListPersonaImports(t *testing.T) {
 	}
 }
 
-func TestPersonaHandler_DownloadPersonaImportTemplate(t *testing.T) {
+func TestPersonaHandlerDownloadPersonaImportTemplate(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := NewPersonaHandlerWithServices(&mockPersonaService{}, &mockPersonaImportService{})
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/personas/import/template", nil)
+	c.Request = httptest.NewRequest(http.MethodGet, testPathPersonasAPI+"/import/template", nil)
 	h.DownloadPersonaImportTemplate(c)
 	testutil.AssertStatus(t, w, http.StatusOK)
 	if w.Header().Get("Content-Type") != "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" {

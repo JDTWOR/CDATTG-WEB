@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import type { OrdenResponse, AprobarRechazarRequest } from '../types';
 
 export const InventarioPendientesAprobacion = () => {
@@ -13,22 +14,22 @@ export const InventarioPendientesAprobacion = () => {
   const [rechazoModal, setRechazoModal] = useState<{ ordenId: number; detalleId?: number } | null>(null);
   const [motivoRechazo, setMotivoRechazo] = useState('');
 
-  const fetchList = async () => {
+  const fetchList = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiService.getOrdenesPendientesAprobacion(page, pageSize);
       setList(res.data);
       setTotal(res.total);
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al cargar pendientes');
+      setError(axiosErrorMessage(err, 'Error al cargar pendientes'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize]);
 
   useEffect(() => {
-    fetchList();
-  }, [page]);
+    void fetchList();
+  }, [fetchList]);
 
   const handleAprobarRechazar = async (req: AprobarRechazarRequest) => {
     try {
@@ -38,7 +39,7 @@ export const InventarioPendientesAprobacion = () => {
       setMotivoRechazo('');
       fetchList();
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al procesar');
+      alert(axiosErrorMessage(err, 'Error al procesar'));
     } finally {
       setProcessing(null);
     }
@@ -54,20 +55,26 @@ export const InventarioPendientesAprobacion = () => {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-red-700 dark:text-red-300">
+        <div
+          role="alert"
+          className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-red-700 dark:text-red-300"
+        >
           {error}
         </div>
       )}
 
       <div className="card overflow-hidden">
-        {loading ? (
+        {loading && (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">Cargando...</div>
-        ) : list.length === 0 ? (
+        )}
+        {!loading && list.length === 0 && (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">No hay órdenes pendientes de aprobación.</div>
-        ) : (
+        )}
+        {!loading && list.length > 0 && (
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <caption className="sr-only">Órdenes pendientes de aprobación</caption>
                 <thead className="bg-gray-50 dark:bg-gray-800">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Número</th>
@@ -88,13 +95,15 @@ export const InventarioPendientesAprobacion = () => {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
-                          onClick={() => handleAprobarRechazar({ orden_id: o.id, aprobar: true })}
+                          type="button"
+                          onClick={() => void handleAprobarRechazar({ orden_id: o.id, aprobar: true })}
                           disabled={processing !== null}
                           className="mr-2 px-3 py-1.5 text-sm rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
                         >
                           Aprobar toda
                         </button>
                         <button
+                          type="button"
                           onClick={() => setRechazoModal({ ordenId: o.id })}
                           disabled={processing !== null}
                           className="px-3 py-1.5 text-sm rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
@@ -113,10 +122,20 @@ export const InventarioPendientesAprobacion = () => {
                   Página {page} de {totalPages} ({total} registros)
                 </span>
                 <div className="flex gap-2">
-                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="btn-secondary text-sm">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="btn-secondary text-sm"
+                  >
                     Anterior
                   </button>
-                  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="btn-secondary text-sm">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="btn-secondary text-sm"
+                  >
                     Siguiente
                   </button>
                 </div>
@@ -127,11 +146,30 @@ export const InventarioPendientesAprobacion = () => {
       </div>
 
       {rechazoModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => { setRechazoModal(null); setMotivoRechazo(''); }}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Rechazar orden</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Cerrar modal"
+            onClick={() => {
+              setRechazoModal(null);
+              setMotivoRechazo('');
+            }}
+          />
+          <dialog
+            open
+            aria-labelledby="inv-pend-rechazo-title"
+            className="relative z-10 m-0 max-h-[90vh] max-w-md w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          >
+            <h2 id="inv-pend-rechazo-title" className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              Rechazar orden
+            </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Opcional: indique el motivo del rechazo.</p>
+            <label htmlFor="inv-pend-rechazo-motivo" className="sr-only">
+              Motivo del rechazo (opcional)
+            </label>
             <textarea
+              id="inv-pend-rechazo-motivo"
               value={motivoRechazo}
               onChange={(e) => setMotivoRechazo(e.target.value)}
               className="input-field w-full mb-4"
@@ -139,13 +177,20 @@ export const InventarioPendientesAprobacion = () => {
               placeholder="Motivo..."
             />
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => { setRechazoModal(null); setMotivoRechazo(''); }} className="btn-secondary">
+              <button
+                type="button"
+                onClick={() => {
+                  setRechazoModal(null);
+                  setMotivoRechazo('');
+                }}
+                className="btn-secondary"
+              >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={() =>
-                  handleAprobarRechazar({
+                  void handleAprobarRechazar({
                     orden_id: rechazoModal.ordenId,
                     detalle_orden_id: rechazoModal.detalleId,
                     aprobar: false,
@@ -157,7 +202,7 @@ export const InventarioPendientesAprobacion = () => {
                 Rechazar
               </button>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
     </div>

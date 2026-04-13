@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import type { PersonaResponse } from '../types';
 
 export const Perfil = () => {
@@ -23,9 +24,8 @@ export const Perfil = () => {
         setError('');
         const p = await apiService.getPersonaById(user.persona_id);
         setPersona(p);
-      } catch (e: any) {
-        const msg = e?.response?.data?.error ?? 'No se pudo cargar la información de la persona.';
-        setError(typeof msg === 'string' ? msg : 'No se pudo cargar la información de la persona.');
+      } catch (e: unknown) {
+        setError(axiosErrorMessage(e, 'No se pudo cargar la información de la persona.'));
       } finally {
         setLoading(false);
       }

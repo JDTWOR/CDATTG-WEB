@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeftIcon, ExclamationTriangleIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { axiosErrorMessage } from '../utils/httpError';
 import type {
   CasosBienestarResponse,
   CasoBienestarItem,
@@ -47,28 +48,28 @@ export const CasosBienestarFichaDetalle = () => {
         const res = await apiService.getCasosBienestar({ dias, min_fallas: minFallas });
         setData(res);
       } catch (e: unknown) {
-        const err = e as { response?: { status?: number; data?: { error?: string } } };
-        if (err.response?.status === 403) {
+        const status = (e as { response?: { status?: number } }).response?.status;
+        if (status === 403) {
           setError('Solo el superadministrador puede ver los casos de bienestar.');
         } else {
-          setError(err.response?.data?.error || 'Error al cargar los casos.');
+          setError(axiosErrorMessage(e, 'Error al cargar los casos.'));
         }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    void fetchData();
   }, [canViewBienestar, fichaNumero, dias, minFallas]);
 
   if (!canViewBienestar) {
     return (
       <div className="space-y-6">
-        <p className="text-red-600 dark:text-red-400">
+        <p role="alert" className="text-red-600 dark:text-red-400">
           No tiene permiso para acceder a los casos de bienestar (requiere rol de Superadministrador o Bienestar al Aprendiz).
         </p>
         <Link to="/asistencia/dashboard/casos-bienestar" className="btn-secondary inline-flex items-center gap-2">
-          <ArrowLeftIcon className="w-5 h-5" />
+          <ArrowLeftIcon className="w-5 h-5" aria-hidden />
           Volver a Casos de Bienestar
         </Link>
       </div>
@@ -101,8 +102,7 @@ export const CasosBienestarFichaDetalle = () => {
       });
       setDetalleInasistencias(res.inasistencias ?? []);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } } };
-      setDetalleError(err.response?.data?.error || 'No se pudo cargar el detalle de inasistencias.');
+      setDetalleError(axiosErrorMessage(e, 'No se pudo cargar el detalle de inasistencias.'));
     } finally {
       setDetalleLoading(false);
     }
@@ -141,7 +141,7 @@ export const CasosBienestarFichaDetalle = () => {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <ExclamationTriangleIcon className="w-8 h-8 text-amber-500" />
+            <ExclamationTriangleIcon className="w-8 h-8 text-amber-500" aria-hidden />
             Ficha {fichaNumero} - Casos de bienestar
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
@@ -160,13 +160,16 @@ export const CasosBienestarFichaDetalle = () => {
           to="/asistencia/dashboard/casos-bienestar"
           className="btn-secondary inline-flex items-center gap-2"
         >
-          <ArrowLeftIcon className="w-5 h-5" />
+          <ArrowLeftIcon className="w-5 h-5" aria-hidden />
           Volver a Casos de Bienestar
         </Link>
       </div>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+        <div
+          role="alert"
+          className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg"
+        >
           {error}
         </div>
       )}
@@ -180,7 +183,7 @@ export const CasosBienestarFichaDetalle = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="card flex items-center gap-4 p-4">
               <div className="w-12 h-12 rounded-lg bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
-                <UserGroupIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                <UserGroupIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" aria-hidden />
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -196,7 +199,7 @@ export const CasosBienestarFichaDetalle = () => {
             </div>
             <div className="card flex items-center gap-4 p-4">
               <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                <ExclamationTriangleIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                <ExclamationTriangleIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" aria-hidden />
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -228,6 +231,9 @@ export const CasosBienestarFichaDetalle = () => {
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                  <caption className="sr-only">
+                    Aprendices de la ficha {fichaNumero} con indicadores de riesgo
+                  </caption>
                   <thead className="bg-gray-50 dark:bg-gray-700/50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -280,7 +286,7 @@ export const CasosBienestarFichaDetalle = () => {
                         <td className="px-4 py-3 text-sm text-right">
                           <button
                             type="button"
-                            onClick={() => abrirDetalleAprendiz(c)}
+                            onClick={() => void abrirDetalleAprendiz(c)}
                             className="btn-secondary text-xs"
                           >
                             Ver detalle
@@ -297,11 +303,21 @@ export const CasosBienestarFichaDetalle = () => {
       )}
 
       {aprendizDetalle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Cerrar modal"
+            onClick={() => setAprendizDetalle(null)}
+          />
+          <dialog
+            open
+            aria-labelledby="casos-bienestar-inas-title"
+            className="relative z-10 m-0 w-full max-w-2xl overflow-hidden rounded-xl border border-gray-200 bg-white p-0 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+          >
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 id="casos-bienestar-inas-title" className="text-lg font-semibold text-gray-900 dark:text-white">
                   Inasistencias por fecha
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -318,19 +334,25 @@ export const CasosBienestarFichaDetalle = () => {
             </div>
             <div className="p-5">
               {detalleError && (
-                <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+                <div
+                  role="alert"
+                  className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg"
+                >
                   {detalleError}
                 </div>
               )}
-              {detalleLoading ? (
+              {detalleLoading && (
                 <p className="text-gray-500 dark:text-gray-400">Cargando detalle...</p>
-              ) : detalleInasistencias.length === 0 ? (
+              )}
+              {!detalleLoading && !detalleError && detalleInasistencias.length === 0 && (
                 <p className="text-gray-500 dark:text-gray-400">
                   No se encontraron fechas de inasistencia para este aprendiz en el período.
                 </p>
-              ) : (
+              )}
+              {!detalleLoading && detalleInasistencias.length > 0 && (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                    <caption className="sr-only">Inasistencias por fecha del aprendiz</caption>
                     <thead className="bg-gray-50 dark:bg-gray-700/50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -353,7 +375,7 @@ export const CasosBienestarFichaDetalle = () => {
                 </div>
               )}
             </div>
-          </div>
+          </dialog>
         </div>
       )}
     </div>

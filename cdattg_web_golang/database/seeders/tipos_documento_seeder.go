@@ -10,6 +10,7 @@ import (
 var tiposDocumentoNombres = []string{
 	"CÉDULA DE CIUDADANÍA", "CÉDULA DE EXTRANJERÍA", "PASAPORTE",
 	"TARJETA DE IDENTIDAD", "REGISTRO CIVIL", "SIN IDENTIFICACIÓN",
+	"PERMISO DE PROTECCIÓN TEMPORAL", "PERMISO DE PROTECCIÓN ESPECIAL",
 }
 
 func RunTiposDocumentoSeeder(db *gorm.DB) error {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DocumentTextIcon,
@@ -18,8 +18,10 @@ import {
   TrashIcon,
   ArrowUpTrayIcon,
   ArrowDownTrayIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import { useAuth } from '../context/AuthContext';
 import { SelectSearch } from '../components/SelectSearch';
 import { InstructorSelectAsync } from '../components/InstructorSelectAsync';
@@ -36,6 +38,432 @@ import type {
   DiaFormacionItem,
 } from '../types';
 
+/** API puede devolver ISO (RFC3339); input type=date exige yyyy-MM-DD */
+function toDateInputString(iso?: string | null): string | undefined {
+  if (iso == null || iso === '') return undefined;
+  const s = String(iso).trim();
+  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  return undefined;
+}
+
+/** IDs de día como número (evita que includes falle si API devuelve string o mezcla). */
+function normalizeDiaIds(ids?: (number | string)[] | null): number[] {
+  if (!ids?.length) return [];
+  return [...new Set(ids.map(Number).filter((n) => !Number.isNaN(n) && n > 0))];
+}
+
+/** Extrae IDs de días del ítem del listado (por si el JSON llega con otra clave o tipo). */
+function diasIdsFromListItem(item: FichaCaracterizacionResponse): number[] {
+  const anyItem = item as unknown as Record<string, unknown>;
+  const raw =
+    item.dias_formacion_ids ??
+    anyItem.dias_formacion_ids ??
+    anyItem.DiasFormacionIDs ??
+    anyItem.diasFormacionIds;
+  if (Array.isArray(raw)) return normalizeDiaIds(raw as (number | string)[]);
+  return [];
+}
+
+function formatDiasEnTabla(item: FichaCaracterizacionResponse, diasFormacion: DiaFormacionItem[]): string {
+  const ids = diasIdsFromListItem(item);
+  if (!ids.length) return '—';
+  return ids
+    .map((id) => diasFormacion.find((d) => Number(d.id) === id)?.nombre ?? String(id))
+    .join(', ');
+}
+
+function formStateFromFicha(item: FichaCaracterizacionResponse): FichaCaracterizacionRequest {
+  return {
+    programa_formacion_id: item.programa_formacion_id,
+    ficha: item.ficha,
+    instructor_id: item.instructor_id,
+    fecha_inicio: toDateInputString(item.fecha_inicio),
+    fecha_fin: toDateInputString(item.fecha_fin),
+    sede_id: item.sede_id,
+    modalidad_formacion_id: item.modalidad_formacion_id,
+    ambiente_id: item.ambiente_id,
+    jornada_id: item.jornada_id,
+    total_horas: item.total_horas,
+    status: item.status,
+    dias_formacion_ids: normalizeDiaIds(item.dias_formacion_ids),
+  };
+}
+
+function labelBotonGuardarFicha(saving: boolean, editing: FichaCaracterizacionResponse | null): string {
+  if (saving) return 'Guardando…';
+  if (editing !== null) return 'Guardar';
+  return 'Crear Ficha';
+}
+
+function validarFormFicha(
+  form: FichaCaracterizacionRequest,
+  editing: FichaCaracterizacionResponse | null
+): string | null {
+  if (!editing && (!form.instructor_id || form.instructor_id === 0)) {
+    return 'El instructor líder es obligatorio.';
+  }
+  if (!form.ficha?.trim()) {
+    return 'El número de ficha es obligatorio.';
+  }
+  return null;
+}
+
+const EXT_EXCEL_IMPORT = new Set(['.xlsx', '.xls']);
+
+function esExtensionExcelImportValida(file: File): boolean {
+  const nameLower = file.name.toLowerCase();
+  const dot = nameLower.lastIndexOf('.');
+  const ext = dot >= 0 ? nameLower.slice(dot) : '';
+  return EXT_EXCEL_IMPORT.has(ext);
+}
+
+function descargarExcelDesdeBase64(base64: string, nombreArchivo: string): void {
+  try {
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i += 1) {
+      bytes[i] = binary.codePointAt(i) ?? 0;
+    }
+    const blob = new Blob([bytes], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    // Reintento manual posible vía nueva importación
+  }
+}
+
+function construirPayloadFicha(
+  form: FichaCaracterizacionRequest,
+  editing: FichaCaracterizacionResponse | null,
+  programas: ProgramaFormacionResponse[]
+): FichaCaracterizacionRequest {
+  const diasNorm = normalizeDiaIds(form.dias_formacion_ids as (number | string)[] | undefined);
+  const fechaInicio =
+    (form.fecha_inicio?.trim() && toDateInputString(form.fecha_inicio.trim())) ||
+    (editing ? toDateInputString(editing.fecha_inicio) : undefined);
+  const fechaFin =
+    (form.fecha_fin?.trim() && toDateInputString(form.fecha_fin.trim())) ||
+    (editing ? toDateInputString(editing.fecha_fin) : undefined);
+  const programaFormacionId = form.programa_formacion_id || programas[0]?.id || 0;
+  return {
+    programa_formacion_id: programaFormacionId,
+    ficha: form.ficha.trim(),
+    instructor_id: form.instructor_id ?? null,
+    fecha_inicio: fechaInicio,
+    fecha_fin: fechaFin,
+    sede_id: form.sede_id ?? null,
+    modalidad_formacion_id: form.modalidad_formacion_id ?? null,
+    ambiente_id: form.ambiente_id ?? null,
+    jornada_id: form.jornada_id ?? null,
+    total_horas: form.total_horas,
+    status: form.status,
+    dias_formacion_ids: diasNorm,
+  };
+}
+
+function mergeListAfterSave(
+  prev: FichaCaracterizacionResponse[],
+  saved: FichaCaracterizacionResponse,
+  editing: FichaCaracterizacionResponse | null
+): FichaCaracterizacionResponse[] {
+  if (editing) {
+    return prev.map((row) => (row.id === saved.id ? { ...row, ...saved } : row));
+  }
+  return [saved, ...prev];
+}
+
+type GuardarFichaParams = Readonly<{
+  form: FichaCaracterizacionRequest;
+  editing: FichaCaracterizacionResponse | null;
+  programas: ProgramaFormacionResponse[];
+  setSaving: (v: boolean) => void;
+  setFormError: (msg: string) => void;
+  setList: Dispatch<SetStateAction<FichaCaracterizacionResponse[]>>;
+  setIsModalOpen: (v: boolean) => void;
+  setSaveBanner: (v: string) => void;
+  fetchList: () => void | Promise<void>;
+}>;
+
+function filtrarListaFichasInstructor(
+  list: FichaCaracterizacionResponse[],
+  esInstructor: boolean,
+  searchQuery: string
+): FichaCaracterizacionResponse[] {
+  if (!esInstructor || !searchQuery.trim()) return list;
+  const q = searchQuery.toLowerCase();
+  return list.filter(
+    (f) =>
+      (f.programa_formacion_nombre?.toLowerCase().includes(q) ?? false) || f.ficha.toLowerCase().includes(q)
+  );
+}
+
+function actualizarDiasFormacionEnForm(
+  setForm: Dispatch<SetStateAction<FichaCaracterizacionRequest>>,
+  diaId: number,
+  checked: boolean
+): void {
+  const idNum = Number(diaId);
+  setForm((f) => {
+    const cur = normalizeDiaIds(f.dias_formacion_ids as (number | string)[] | undefined);
+    if (checked) {
+      if (cur.includes(idNum)) return f;
+      return { ...f, dias_formacion_ids: [...cur, idNum] };
+    }
+    return { ...f, dias_formacion_ids: cur.filter((x) => x !== idNum) };
+  });
+}
+
+async function exportarBlobExcelFichas(setExportLoading: (v: boolean) => void): Promise<void> {
+  try {
+    setExportLoading(true);
+    const blob = await apiService.exportAllFichasExcel();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'fichas_aprendices.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err: unknown) {
+    alert(axiosErrorMessage(err, 'Error al exportar fichas'));
+  } finally {
+    setExportLoading(false);
+  }
+}
+
+type ImportFichasParams = Readonly<{
+  importFile: File | null;
+  setImportError: (msg: string) => void;
+  setImportResult: (r: FichaImportResult | null) => void;
+  setImportLoading: (v: boolean) => void;
+  fetchList: () => void | Promise<void>;
+}>;
+
+async function ejecutarImportFichasExcel(p: ImportFichasParams): Promise<void> {
+  const { importFile, setImportError, setImportResult, setImportLoading, fetchList } = p;
+  if (!importFile) {
+    setImportError('Seleccione un archivo Excel.');
+    return;
+  }
+  if (!esExtensionExcelImportValida(importFile)) {
+    setImportError('Solo se permiten archivos XLSX o XLS.');
+    return;
+  }
+  setImportError('');
+  setImportResult(null);
+  setImportLoading(true);
+  try {
+    const result = await apiService.uploadFichasImport(importFile);
+    setImportResult(result);
+    await fetchList();
+  } catch (err: unknown) {
+    setImportError(axiosErrorMessage(err, 'Error al importar'));
+  } finally {
+    setImportLoading(false);
+  }
+}
+
+async function ejecutarGuardadoFicha(params: GuardarFichaParams): Promise<void> {
+  const { form, editing, programas, setSaving, setFormError, setList, setIsModalOpen, setSaveBanner, fetchList } = params;
+  const err = validarFormFicha(form, editing);
+  if (err) {
+    setFormError(err);
+    return;
+  }
+  setFormError('');
+  const payload = construirPayloadFicha(form, editing, programas);
+  try {
+    setSaving(true);
+    const saved = editing
+      ? await apiService.updateFichaCaracterizacion(editing.id, payload)
+      : await apiService.createFichaCaracterizacion(payload);
+    setList((prev) => mergeListAfterSave(prev, saved, editing));
+    setIsModalOpen(false);
+    setSaveBanner(
+      'Ficha guardada. Los días de formación quedan en la columna «Días» de la tabla y al volver a editar.'
+    );
+    globalThis.setTimeout(() => setSaveBanner(''), 10000);
+    await fetchList();
+  } catch (err: unknown) {
+    setFormError(axiosErrorMessage(err, 'Error al guardar'));
+  } finally {
+    setSaving(false);
+  }
+}
+
+function FichasInstructorSinFichas() {
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+            <DocumentTextIcon className="w-6 h-6 text-primary-600" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Fichas de formación</h1>
+            <p className="mt-1 text-gray-600 dark:text-gray-400">Gestión de fichas de formación</p>
+          </div>
+        </div>
+        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+          <Link to="/dashboard" className="flex items-center gap-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+            <HomeIcon className="w-4 h-4" />
+            Inicio
+          </Link>
+          <span className="text-gray-400">/</span>
+          <span className="text-gray-700 dark:text-gray-300">Fichas de formación</span>
+        </nav>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 p-8 md:p-12 text-center max-w-xl mx-auto">
+        <div className="flex justify-center mb-4">
+          <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+            <ExclamationTriangleIcon className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+          </div>
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No tienes fichas asignadas</h2>
+        <p className="text-gray-600 dark:text-gray-400 mb-2">No se encontraron fichas de formación asignadas a tu cuenta.</p>
+        <p className="text-gray-600 dark:text-gray-400 mb-6">Contacta al administrador para que te asigne las fichas correspondientes.</p>
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors"
+        >
+          <ArrowLeftIcon className="w-5 h-5" />
+          Volver al inicio
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+type FichasInstructorConFichasProps = Readonly<{
+  filteredList: FichaCaracterizacionResponse[];
+  searchQuery: string;
+  setSearchQuery: Dispatch<SetStateAction<string>>;
+}>;
+
+function FichasInstructorConFichas({ filteredList, searchQuery, setSearchQuery }: FichasInstructorConFichasProps) {
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+            <DocumentTextIcon className="w-6 h-6 text-primary-600" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Fichas de formación</h1>
+            <p className="mt-1 text-gray-600 dark:text-gray-400">Gestión de fichas de formación</p>
+          </div>
+        </div>
+        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+          <Link to="/dashboard" className="flex items-center gap-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+            <HomeIcon className="w-4 h-4" />
+            Inicio
+          </Link>
+          <span className="text-gray-400">/</span>
+          <span className="text-gray-700 dark:text-gray-300">Fichas de formación</span>
+        </nav>
+      </div>
+
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
+          <MagnifyingGlassIcon className="w-5 h-5" />
+        </span>
+        <input
+          id="fichas-instructor-search"
+          type="text"
+          placeholder="Buscar por programa o número"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="input-field w-full pl-10"
+        />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filteredList.map((item) => (
+          <div key={item.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm overflow-hidden">
+            <div className="p-5">
+              <div className="flex justify-between items-start gap-2 mb-3">
+                <h3 className="font-bold text-gray-900 dark:text-white uppercase text-sm leading-tight">
+                  {item.programa_formacion_nombre || 'Sin programa'}
+                </h3>
+                {item.modalidad_formacion_nombre && (
+                  <span className="shrink-0 px-2.5 py-1 bg-primary-600 text-white text-xs font-medium rounded">
+                    {item.modalidad_formacion_nombre}
+                  </span>
+                )}
+              </div>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">Ficha {item.ficha}</p>
+
+              <div className="space-y-3 mb-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase flex items-center gap-2 mb-1">
+                    <AcademicCapIcon className="w-4 h-4 text-gray-400" />
+                    Información académica
+                  </p>
+                  <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <Cog6ToothIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span>Jornada: {item.jornada_nombre || '-'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 mt-1">
+                    <MapPinIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span>Sede / Ambiente: {[item.sede_nombre, item.ambiente_nombre].filter(Boolean).join(' / ') || '-'}</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase flex items-center gap-2 mb-1">
+                    <ComputerDesktopIcon className="w-4 h-4 text-gray-400" />
+                    Instructor líder
+                  </p>
+                  <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <UserIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    {item.instructor_nombre || '-'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <span className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                  <UsersIcon className="w-4 h-4 text-gray-400" />
+                  {item.cantidad_aprendices} Aprendices
+                </span>
+                <div className="flex flex-wrap gap-2 justify-end">
+                  <Link
+                    to={`/fichas/${item.id}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  >
+                    <EyeIcon className="w-4 h-4" />
+                    Ver ficha
+                  </Link>
+                  <Link
+                    to={`/asistencia?ficha=${item.id}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
+                  >
+                    <CalendarDaysIcon className="w-4 h-4" />
+                    Tomar Asistencia
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {filteredList.length === 0 && searchQuery.trim() && (
+        <p className="text-center text-gray-500 py-8">No hay fichas que coincidan con la búsqueda.</p>
+      )}
+    </div>
+  );
+}
+
 export const FichasCaracterizacion = () => {
   const { roles } = useAuth();
   const [list, setList] = useState<FichaCaracterizacionResponse[]>([]);
@@ -48,6 +476,9 @@ export const FichasCaracterizacion = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
+  const [saveBanner, setSaveBanner] = useState('');
+  const [catalogError, setCatalogError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(20);
@@ -83,11 +514,14 @@ export const FichasCaracterizacion = () => {
     try {
       const res = await apiService.getProgramasFormacion(1, 200);
       setProgramas(res.data);
-    } catch (_) {}
+    } catch {
+      setProgramas([]);
+    }
   };
 
   const fetchCatalogos = async () => {
     try {
+      setCatalogError('');
       const [s, a, m, j, d] = await Promise.all([
         apiService.getCatalogosSedes(),
         apiService.getCatalogosAmbientes(),
@@ -100,10 +534,15 @@ export const FichasCaracterizacion = () => {
       setModalidades(m);
       setJornadas(j);
       setDiasFormacion(d);
-    } catch (_) {}
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        'No se pudieron cargar los catálogos (sedes, días de formación, etc.).';
+      setCatalogError(msg);
+    }
   };
 
-  const fetchList = async () => {
+  const fetchList = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -112,11 +551,11 @@ export const FichasCaracterizacion = () => {
       setList(response.data);
       setTotal(response.total);
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al cargar fichas');
+      setError(axiosErrorMessage(err, 'Error al cargar fichas'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, programaId, esInstructor, searchQuery]);
 
   useEffect(() => {
     fetchProgramas();
@@ -129,16 +568,17 @@ export const FichasCaracterizacion = () => {
     // pero de momento simplificamos llamando directamente o con un debounce simple.
     // Para no romper la dependencia directa de useEffect:
     const timer = setTimeout(() => {
-      fetchList();
+      void fetchList();
     }, 300);
     return () => clearTimeout(timer);
-  }, [page, programaId, esInstructor, searchQuery]);
+  }, [page, programaId, esInstructor, searchQuery, fetchList]);
 
   const openCreate = () => {
     setEditing(null);
     setFormError('');
+    setSaveBanner('');
     setForm({
-      programa_formacion_id: (programas[0]?.id as number) || 0,
+      programa_formacion_id: programas[0]?.id ?? 0,
       ficha: '',
       instructor_id: undefined,
       fecha_inicio: undefined,
@@ -154,66 +594,34 @@ export const FichasCaracterizacion = () => {
     setIsModalOpen(true);
   };
 
-  const openEdit = (item: FichaCaracterizacionResponse) => {
-    setEditing(item);
+  const openEdit = async (item: FichaCaracterizacionResponse) => {
     setFormError('');
-    setForm({
-      programa_formacion_id: item.programa_formacion_id,
-      ficha: item.ficha,
-      instructor_id: item.instructor_id,
-      fecha_inicio: item.fecha_inicio,
-      fecha_fin: item.fecha_fin,
-      sede_id: item.sede_id,
-      modalidad_formacion_id: item.modalidad_formacion_id,
-      ambiente_id: item.ambiente_id,
-      jornada_id: item.jornada_id,
-      total_horas: item.total_horas,
-      status: item.status,
-      dias_formacion_ids: item.dias_formacion_ids ?? [],
-    });
+    setSaveBanner('');
+    try {
+      const fresh = await apiService.getFichaCaracterizacionById(item.id);
+      setEditing(fresh);
+      setForm(formStateFromFicha(fresh));
+    } catch {
+      setEditing(item);
+      setForm(formStateFromFicha(item));
+    }
     setIsModalOpen(true);
   };
 
-  const handleSave = async () => {
-    if (!editing && (!form.instructor_id || form.instructor_id === 0)) {
-      setFormError('El instructor líder es obligatorio.');
-      return;
-    }
-    if (!form.ficha?.trim()) {
-      setFormError('El número de ficha es obligatorio.');
-      return;
-    }
-    setFormError('');
-    const payload: FichaCaracterizacionRequest = {
-      ...form,
-      programa_formacion_id: form.programa_formacion_id || (programas[0]?.id as number),
-      dias_formacion_ids: form.dias_formacion_ids?.length ? form.dias_formacion_ids : undefined,
-      // Incluir siempre para que el backend persista (undefined se omite en JSON; null sí se envía)
-      modalidad_formacion_id: form.modalidad_formacion_id ?? null,
-      ambiente_id: form.ambiente_id ?? null,
-      sede_id: form.sede_id ?? null,
-      instructor_id: form.instructor_id ?? null,
-      jornada_id: form.jornada_id ?? null,
-    };
-    try {
-      if (editing) {
-        await apiService.updateFichaCaracterizacion(editing.id, payload);
-      } else {
-        await apiService.createFichaCaracterizacion(payload);
-      }
-      setIsModalOpen(false);
-      fetchList();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al guardar';
-      setFormError(msg);
-    }
-  };
+  const handleSave = () =>
+    ejecutarGuardadoFicha({
+      form,
+      editing,
+      programas,
+      setSaving,
+      setFormError,
+      setList,
+      setIsModalOpen,
+      setSaveBanner,
+      fetchList,
+    });
 
-  const toggleDia = (diaId: number) => {
-    const ids = form.dias_formacion_ids ?? [];
-    const next = ids.includes(diaId) ? ids.filter((id) => id !== diaId) : [...ids, diaId];
-    setForm((f) => ({ ...f, dias_formacion_ids: next }));
-  };
+  const setDiaChecked = (diaId: number, checked: boolean) => actualizarDiasFormacionEnForm(setForm, diaId, checked);
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Eliminar esta ficha?')) return;
@@ -221,7 +629,7 @@ export const FichasCaracterizacion = () => {
       await apiService.deleteFichaCaracterizacion(id);
       fetchList();
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al eliminar');
+      alert(axiosErrorMessage(err, 'Error al eliminar'));
     }
   };
 
@@ -232,231 +640,37 @@ export const FichasCaracterizacion = () => {
     setIsImportModalOpen(true);
   };
 
-  const handleImportSubmit = async () => {
-    if (!importFile) {
-      setImportError('Seleccione un archivo Excel.');
-      return;
-    }
-    const ext = importFile.name.toLowerCase().slice(-5);
-    if (!ext.includes('xlsx') && !ext.includes('xls')) {
-      setImportError('Solo se permiten archivos XLSX o XLS.');
-      return;
-    }
-    setImportError('');
-    setImportResult(null);
-    setImportLoading(true);
-    try {
-      const result = await apiService.uploadFichasImport(importFile);
-      setImportResult(result);
-      fetchList();
-    } catch (err: unknown) {
-      setImportError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al importar');
-    } finally {
-      setImportLoading(false);
-    }
-  };
+  const handleImportSubmit = () =>
+    ejecutarImportFichasExcel({
+      importFile,
+      setImportError,
+      setImportResult,
+      setImportLoading,
+      fetchList,
+    });
 
   const handleDownloadIncidencias = () => {
     if (!importResult?.incident_report_base64) return;
-    try {
-      const binary = atob(importResult.incident_report_base64);
-      const len = binary.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i += 1) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'reporte_incidencias_ficha.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch {
-      // Silenciar errores de descarga en UI; el usuario puede reintentar la importación si es necesario.
-    }
+    descargarExcelDesdeBase64(importResult.incident_report_base64, 'reporte_incidencias_ficha.xlsx');
   };
 
-  const handleExportAllFichas = async () => {
-    try {
-      setExportLoading(true);
-      const blob = await apiService.exportAllFichasExcel();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'fichas_aprendices.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err: unknown) {
-      alert((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Error al exportar fichas');
-    } finally {
-      setExportLoading(false);
-    }
-  };
+  const handleExportAllFichas = () => exportarBlobExcelFichas(setExportLoading);
 
   const totalPages = Math.ceil(total / pageSize);
 
-  const filteredList =
-    esInstructor && searchQuery.trim()
-      ? list.filter(
-          (f) =>
-            (f.programa_formacion_nombre?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
-            f.ficha.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      : list;
+  const filteredList = filtrarListaFichasInstructor(list, esInstructor, searchQuery);
 
-  // Vista instructor sin fichas asignadas
   if (esInstructor && !loading && list.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
-              <DocumentTextIcon className="w-6 h-6 text-primary-600" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Fichas de formación</h1>
-              <p className="mt-1 text-gray-600 dark:text-gray-400">Gestión de fichas de formación</p>
-            </div>
-          </div>
-          <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-            <Link to="/dashboard" className="flex items-center gap-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-              <HomeIcon className="w-4 h-4" />
-              Inicio
-            </Link>
-            <span className="text-gray-400">/</span>
-            <span className="text-gray-700 dark:text-gray-300">Fichas de formación</span>
-          </nav>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 p-8 md:p-12 text-center max-w-xl mx-auto">
-          <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
-              <ExclamationTriangleIcon className="w-8 h-8 text-amber-600 dark:text-amber-400" />
-            </div>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No tienes fichas asignadas</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-2">No se encontraron fichas de formación asignadas a tu cuenta.</p>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">Contacta al administrador para que te asigne las fichas correspondientes.</p>
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            <ArrowLeftIcon className="w-5 h-5" />
-            Volver al inicio
-          </Link>
-        </div>
-      </div>
-    );
+    return <FichasInstructorSinFichas />;
   }
 
-  // Vista instructor con fichas: tarjetas y búsqueda
   if (esInstructor && !loading && list.length > 0) {
     return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
-              <DocumentTextIcon className="w-6 h-6 text-primary-600" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Fichas de formación</h1>
-              <p className="mt-1 text-gray-600 dark:text-gray-400">Gestión de fichas de formación</p>
-            </div>
-          </div>
-          <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-            <Link to="/dashboard" className="flex items-center gap-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-              <HomeIcon className="w-4 h-4" />
-              Inicio
-            </Link>
-            <span className="text-gray-400">/</span>
-            <span className="text-gray-700 dark:text-gray-300">Fichas de formación</span>
-          </nav>
-        </div>
-
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
-            <MagnifyingGlassIcon className="w-5 h-5" />
-          </span>
-          <input
-            type="text"
-            placeholder="Buscar por programa o número"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="input-field w-full pl-10"
-          />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredList.map((item) => (
-            <div key={item.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm overflow-hidden">
-              <div className="p-5">
-                <div className="flex justify-between items-start gap-2 mb-3">
-                  <h3 className="font-bold text-gray-900 dark:text-white uppercase text-sm leading-tight">
-                    {item.programa_formacion_nombre || 'Sin programa'}
-                  </h3>
-                  {item.modalidad_formacion_nombre && (
-                    <span className="shrink-0 px-2.5 py-1 bg-primary-600 text-white text-xs font-medium rounded">
-                      {item.modalidad_formacion_nombre}
-                    </span>
-                  )}
-                </div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">Ficha {item.ficha}</p>
-
-                <div className="space-y-3 mb-4">
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase flex items-center gap-2 mb-1">
-                      <AcademicCapIcon className="w-4 h-4 text-gray-400" />
-                      Información académica
-                    </p>
-                    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                      <Cog6ToothIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                      <span>Jornada: {item.jornada_nombre || '-'}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 mt-1">
-                      <MapPinIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                      <span>Sede / Ambiente: {[item.sede_nombre, item.ambiente_nombre].filter(Boolean).join(' / ') || '-'}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase flex items-center gap-2 mb-1">
-                      <ComputerDesktopIcon className="w-4 h-4 text-gray-400" />
-                      Instructor líder
-                    </p>
-                    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                      <UserIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                      {item.instructor_nombre || '-'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
-                  <span className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-                    <UsersIcon className="w-4 h-4 text-gray-400" />
-                    {item.cantidad_aprendices} Aprendices
-                  </span>
-                  <Link
-                    to={`/asistencia?ficha=${item.id}`}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
-                  >
-                    <CalendarDaysIcon className="w-4 h-4" />
-                    Tomar Asistencia
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        {filteredList.length === 0 && searchQuery.trim() && (
-          <p className="text-center text-gray-500 py-8">No hay fichas que coincidan con la búsqueda.</p>
-        )}
-      </div>
+      <FichasInstructorConFichas
+        filteredList={filteredList}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+      />
     );
   }
 
@@ -487,15 +701,24 @@ export const FichasCaracterizacion = () => {
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">{error}</div>
       )}
+      {saveBanner && (
+        <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100 px-4 py-3 rounded-lg text-sm">
+          {saveBanner}
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-4 items-end sm:items-center bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600">
         <div className="w-full sm:w-auto flex-1 min-w-[250px]">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="fichas-admin-search"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Buscar ficha
           </label>
           <div className="relative">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
+              id="fichas-admin-search"
               type="text"
               placeholder="Buscar por código de ficha o programa..."
               value={searchQuery}
@@ -508,10 +731,14 @@ export const FichasCaracterizacion = () => {
           </div>
         </div>
         <div className="w-full sm:w-auto min-w-[250px]">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="fichas-admin-programa"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Filtrar por Programa
           </label>
           <SelectSearch
+            inputId="fichas-admin-programa"
             options={[
               { value: 0, label: 'Todos los programas' },
               ...programas.map((p) => ({
@@ -542,6 +769,9 @@ export const FichasCaracterizacion = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Programa</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Instructor principal</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sede</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase max-w-[220px]">
+                      Días de formación
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ambiente</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Aprendices</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estado</th>
@@ -551,7 +781,7 @@ export const FichasCaracterizacion = () => {
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
                   {list.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                         No hay fichas registradas
                       </td>
                     </tr>
@@ -562,6 +792,9 @@ export const FichasCaracterizacion = () => {
                         <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{item.programa_formacion_nombre || '-'}</td>
                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{item.instructor_nombre || '-'}</td>
                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{item.sede_nombre ?? '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 max-w-[220px] whitespace-normal break-words">
+                          {formatDiasEnTabla(item, diasFormacion)}
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{item.ambiente_nombre ?? '-'}</td>
                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{item.cantidad_aprendices}</td>
                         <td className="px-6 py-4">
@@ -575,6 +808,13 @@ export const FichasCaracterizacion = () => {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Link
+                              to={`/fichas/${item.id}`}
+                              className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
+                              title="Ver ficha"
+                            >
+                              <EyeIcon className="w-5 h-5" />
+                            </Link>
                             <button
                               type="button"
                               onClick={() => setModalAsignar({ ficha: item, tipo: 'instructores' })}
@@ -649,11 +889,19 @@ export const FichasCaracterizacion = () => {
                 {formError}
               </div>
             )}
+            {catalogError && (
+              <div className="mb-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100 px-4 py-3 rounded-lg text-sm">
+                {catalogError} Recargue la página o contacte al administrador si el problema continúa.
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Número de Ficha *</label>
+                <label htmlFor="fichas-modal-ficha" className="block text-sm font-medium text-gray-700">
+                  Número de Ficha *
+                </label>
                 <input
+                  id="fichas-modal-ficha"
                   type="text"
                   placeholder="Ej: 123456"
                   value={form.ficha}
@@ -662,9 +910,15 @@ export const FichasCaracterizacion = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Programa de Formación *</label>
+                <label
+                  htmlFor="fichas-modal-programa"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Programa de Formación *
+                </label>
                 <div className="mt-1">
                   <SelectSearch
+                    inputId="fichas-modal-programa"
                     options={programas.map((p) => ({ value: p.id, label: `${p.codigo} - ${p.nombre}` }))}
                     value={form.programa_formacion_id === 0 ? undefined : form.programa_formacion_id}
                     onChange={(v) => setForm((f) => ({ ...f, programa_formacion_id: v ?? 0 }))}
@@ -675,8 +929,11 @@ export const FichasCaracterizacion = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Fecha de Inicio *</label>
+                <label htmlFor="fichas-modal-fecha-inicio" className="block text-sm font-medium text-gray-700">
+                  Fecha de Inicio *
+                </label>
                 <input
+                  id="fichas-modal-fecha-inicio"
                   type="date"
                   value={form.fecha_inicio ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, fecha_inicio: e.target.value || undefined }))}
@@ -684,8 +941,11 @@ export const FichasCaracterizacion = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Fecha de Fin *</label>
+                <label htmlFor="fichas-modal-fecha-fin" className="block text-sm font-medium text-gray-700">
+                  Fecha de Fin *
+                </label>
                 <input
+                  id="fichas-modal-fecha-fin"
                   type="date"
                   value={form.fecha_fin ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, fecha_fin: e.target.value || undefined }))}
@@ -694,9 +954,12 @@ export const FichasCaracterizacion = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Sede *</label>
+                <label htmlFor="fichas-modal-sede" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Sede *
+                </label>
                 <div className="mt-1">
                   <SelectSearch
+                    inputId="fichas-modal-sede"
                     options={sedes.map((s) => ({ value: s.id, label: s.nombre }))}
                     value={form.sede_id}
                     onChange={(v) => setForm((f) => ({ ...f, sede_id: v }))}
@@ -706,9 +969,15 @@ export const FichasCaracterizacion = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Instructor Líder *</label>
+                <label
+                  htmlFor="fichas-modal-instructor"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Instructor Líder *
+                </label>
                 <div className="mt-1">
                   <InstructorSelectAsync
+                    inputId="fichas-modal-instructor"
                     value={form.instructor_id ?? undefined}
                     onChange={(v) => setForm((f) => ({ ...f, instructor_id: v }))}
                     placeholder="Buscar por nombre o documento..."
@@ -724,9 +993,15 @@ export const FichasCaracterizacion = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Modalidad de Formación *</label>
+                <label
+                  htmlFor="fichas-modal-modalidad"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Modalidad de Formación *
+                </label>
                 <div className="mt-1">
                   <SelectSearch
+                    inputId="fichas-modal-modalidad"
                     options={modalidades.map((m) => ({ value: m.id, label: m.nombre }))}
                     value={form.modalidad_formacion_id}
                     onChange={(v) => setForm((f) => ({ ...f, modalidad_formacion_id: v }))}
@@ -736,9 +1011,15 @@ export const FichasCaracterizacion = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Jornada de Formación *</label>
+                <label
+                  htmlFor="fichas-modal-jornada"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Jornada de Formación *
+                </label>
                 <div className="mt-1">
                   <SelectSearch
+                    inputId="fichas-modal-jornada"
                     options={jornadas.map((j) => ({ value: j.id, label: j.nombre }))}
                     value={form.jornada_id}
                     onChange={(v) => setForm((f) => ({ ...f, jornada_id: v }))}
@@ -749,9 +1030,12 @@ export const FichasCaracterizacion = () => {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ambiente *</label>
+                <label htmlFor="fichas-modal-ambiente" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Ambiente *
+                </label>
                 <div className="mt-1">
                   <SelectSearch
+                    inputId="fichas-modal-ambiente"
                     options={ambientes.map((a) => ({ value: a.id, label: a.nombre }))}
                     value={form.ambiente_id}
                     onChange={(v) => setForm((f) => ({ ...f, ambiente_id: v }))}
@@ -762,15 +1046,18 @@ export const FichasCaracterizacion = () => {
               </div>
             </div>
 
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Días de Formación *</label>
+            <fieldset className="mt-4 border-0 p-0">
+              <legend className="block text-sm font-medium text-gray-700 mb-2">Días de Formación *</legend>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                Marque los días en que hay formación y pulse Guardar. Los seleccionados aparecen en la columna «Días de formación» del listado principal.
+              </p>
               <div className="flex flex-wrap gap-4">
                 {diasFormacion.map((d) => (
                   <label key={d.id} className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={(form.dias_formacion_ids ?? []).includes(d.id)}
-                      onChange={() => toggleDia(d.id)}
+                      checked={normalizeDiaIds(form.dias_formacion_ids as (number | string)[] | undefined).includes(Number(d.id))}
+                      onChange={(e) => setDiaChecked(Number(d.id), e.currentTarget.checked)}
                       className="rounded border-gray-300"
                     />
                     <span className="text-sm">{d.nombre}</span>
@@ -780,11 +1067,14 @@ export const FichasCaracterizacion = () => {
                   <span className="text-sm text-gray-500">No hay días cargados o cargando...</span>
                 )}
               </div>
-            </div>
+            </fieldset>
 
             <div className="mt-4 flex items-center gap-2">
-              <label className="block text-sm font-medium text-gray-700">Ficha Activa *</label>
+              <label htmlFor="fichas-modal-status" className="block text-sm font-medium text-gray-700">
+                Ficha Activa *
+              </label>
               <button
+                id="fichas-modal-status"
                 type="button"
                 role="switch"
                 aria-checked={form.status ?? true}
@@ -803,11 +1093,11 @@ export const FichasCaracterizacion = () => {
             </div>
 
             <div className="mt-6 flex justify-center gap-3">
-              <button onClick={() => setIsModalOpen(false)} className="btn-secondary">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="btn-secondary" disabled={saving}>
                 Cancelar
               </button>
-              <button onClick={handleSave} className="btn-primary">
-                {editing ? 'Guardar' : 'Crear Ficha'}
+              <button type="button" onClick={handleSave} className="btn-primary" disabled={saving}>
+                {labelBotonGuardarFicha(saving, editing)}
               </button>
             </div>
           </div>

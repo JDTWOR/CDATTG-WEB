@@ -8,6 +8,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	ordenPreloadDetalleProducto = "DetalleOrdenes.Producto"
+	ordenCondEstado             = "estado = ?"
+)
+
 type OrdenRepository interface {
 	Create(o *inventario.Orden) error
 	Update(o *inventario.Orden) error
@@ -47,7 +52,7 @@ func (r *ordenRepository) Update(o *inventario.Orden) error {
 
 func (r *ordenRepository) FindByID(id uint) (*inventario.Orden, error) {
 	var m inventario.Orden
-	if err := r.db.Preload("DetalleOrdenes").Preload("DetalleOrdenes.Producto").Preload("Persona").Preload("Ambiente").
+	if err := r.db.Preload("DetalleOrdenes").Preload(ordenPreloadDetalleProducto).Preload("Persona").Preload("Ambiente").
 		First(&m, id).Error; err != nil {
 		return nil, err
 	}
@@ -77,7 +82,7 @@ func (r *ordenRepository) FindAll(limit, offset int, userID *uint, verTodas bool
 			return db.Where("user_create_id = ?", *userID)
 		}
 		return db
-	}).Preload("DetalleOrdenes").Preload("DetalleOrdenes.Producto").Preload("Persona").
+	}).Preload("DetalleOrdenes").Preload(ordenPreloadDetalleProducto).Preload("Persona").
 		Limit(limit).Offset(offset).Order("fecha_orden DESC").Find(&list).Error; err != nil {
 		return nil, 0, err
 	}
@@ -86,13 +91,13 @@ func (r *ordenRepository) FindAll(limit, offset int, userID *uint, verTodas bool
 
 func (r *ordenRepository) FindPendientesAprobacion(limit, offset int) ([]inventario.Orden, int64, error) {
 	var total int64
-	if err := r.db.Model(&inventario.Orden{}).Where("estado = ?", inventario.OrdenEstadoEnEspera).Count(&total).Error; err != nil {
+	if err := r.db.Model(&inventario.Orden{}).Where(ordenCondEstado, inventario.OrdenEstadoEnEspera).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	var list []inventario.Orden
-	if err := r.db.Where("estado = ?", inventario.OrdenEstadoEnEspera).
-		Preload("DetalleOrdenes", "estado = ?", inventario.DetalleEstadoEnEspera).
-		Preload("DetalleOrdenes.Producto").Preload("Persona").
+	if err := r.db.Where(ordenCondEstado, inventario.OrdenEstadoEnEspera).
+		Preload("DetalleOrdenes", ordenCondEstado, inventario.DetalleEstadoEnEspera).
+		Preload(ordenPreloadDetalleProducto).Preload("Persona").
 		Limit(limit).Offset(offset).Order("fecha_orden ASC").Find(&list).Error; err != nil {
 		return nil, 0, err
 	}
@@ -113,7 +118,7 @@ func (r *ordenRepository) NextNumeroOrden() (string, error) {
 
 func (r *ordenRepository) CountEnEspera() (int64, error) {
 	var n int64
-	err := r.db.Model(&inventario.Orden{}).Where("estado = ?", inventario.OrdenEstadoEnEspera).Count(&n).Error
+	err := r.db.Model(&inventario.Orden{}).Where(ordenCondEstado, inventario.OrdenEstadoEnEspera).Count(&n).Error
 	return n, err
 }
 

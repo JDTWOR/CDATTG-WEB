@@ -1,10 +1,234 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeftIcon, UserGroupIcon, ChartBarIcon, SignalIcon, ExclamationTriangleIcon, DocumentMagnifyingGlassIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import { useAuth } from '../context/AuthContext';
 import { getAsistenciaDashboardWsUrl } from '../config/api';
-import type { AsistenciaDashboardResponse } from '../types';
+import type { AsistenciaDashboardPorFicha, AsistenciaDashboardResponse } from '../types';
+
+const DASH_SEARCH_ID = 'asistencia-dashboard-buscar-ficha';
+const DASH_JORNADA_ID = 'asistencia-dashboard-filtro-jornada';
+
+function textoResumenCasosBienestar(count: number): string {
+  if (count === 0) return 'Ningún caso detectado con el criterio actual.';
+  if (count === 1) return '1 caso detectado.';
+  return `${count} casos detectados.`;
+}
+
+type AsistenciaDashboardDataViewProps = Readonly<{
+  data: AsistenciaDashboardResponse;
+  casosBienestarCount: number | null;
+  searchQuery: string;
+  onSearchQueryChange: (value: string) => void;
+  jornadaFilter: string;
+  onJornadaFilterChange: (value: string) => void;
+  jornadasDisponibles: string[];
+  fichasFiltradas: AsistenciaDashboardPorFicha[];
+  paginatedRows: AsistenciaDashboardPorFicha[];
+  totalPages: number;
+  page: number;
+  setPage: Dispatch<SetStateAction<number>>;
+}>;
+
+function AsistenciaDashboardDataView({
+  data,
+  casosBienestarCount,
+  searchQuery,
+  onSearchQueryChange,
+  jornadaFilter,
+  onJornadaFilterChange,
+  jornadasDisponibles,
+  fichasFiltradas,
+  paginatedRows,
+  totalPages,
+  page,
+  setPage,
+}: AsistenciaDashboardDataViewProps) {
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fecha</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">{data.fecha}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Aprendices en formación hoy</p>
+              <p className="text-3xl font-bold text-primary-600 dark:text-primary-400 mt-1">
+                {data.total_aprendices_en_formacion}
+              </p>
+            </div>
+            <div className="w-14 h-14 bg-primary-100 dark:bg-primary-900/50 rounded-lg flex items-center justify-center">
+              <UserGroupIcon className="w-7 h-7 text-primary-600 dark:text-primary-400" aria-hidden />
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fichas con sesión hoy</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{data.por_ficha.length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pendientes de revisión (hoy)</p>
+              <p className="text-3xl font-bold text-amber-600 dark:text-amber-400 mt-1">
+                {data.pendientes_revision ?? 0}
+              </p>
+            </div>
+            <div className="w-14 h-14 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center">
+              <DocumentMagnifyingGlassIcon className="w-7 h-7 text-amber-600 dark:text-amber-400" aria-hidden />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+              <ExclamationTriangleIcon className="w-8 h-8 text-amber-600 dark:text-amber-400" aria-hidden />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Casos a tener en cuenta (Bienestar al Aprendiz)
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Aprendices con 3 o más inasistencias en los últimos 30 días para seguimiento y prevención de deserción.
+              </p>
+              {casosBienestarCount !== null && (
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-300 mt-2">
+                  {textoResumenCasosBienestar(casosBienestarCount)}
+                </p>
+              )}
+            </div>
+          </div>
+          <Link
+            to="/asistencia/dashboard/casos-bienestar"
+            className="btn-primary inline-flex items-center justify-center gap-2 shrink-0"
+          >
+            <ExclamationTriangleIcon className="w-5 h-5" aria-hidden />
+            Ver casos a tener en cuenta
+          </Link>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Por ficha (vinieron a formación hoy)</h2>
+        <div className="flex flex-col sm:flex-row gap-4 items-end sm:items-center bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600 mb-4">
+          <div className="w-full sm:w-auto flex-1 min-w-[250px]">
+            <label htmlFor={DASH_SEARCH_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Buscar ficha
+            </label>
+            <div className="relative">
+              <MagnifyingGlassIcon
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none"
+                aria-hidden
+              />
+              <input
+                id={DASH_SEARCH_ID}
+                type="search"
+                autoComplete="off"
+                placeholder="Buscar por código de ficha o programa..."
+                value={searchQuery}
+                onChange={(e) => onSearchQueryChange(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-shadow"
+              />
+            </div>
+          </div>
+          <div className="w-full sm:w-auto min-w-[250px]">
+            <label htmlFor={DASH_JORNADA_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Filtrar por jornada
+            </label>
+            <select
+              id={DASH_JORNADA_ID}
+              value={jornadaFilter}
+              onChange={(e) => onJornadaFilterChange(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-shadow"
+            >
+              <option value="">Todas las jornadas</option>
+              {jornadasDisponibles.map((jornada) => (
+                <option key={jornada} value={jornada}>
+                  {jornada}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {fichasFiltradas.length === 0 ? (
+          <p className="text-gray-500 dark:text-gray-400">No hay fichas registradas</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+              <caption className="sr-only">
+                Fichas con aprendices que vinieron a formación hoy, con filtros aplicados
+              </caption>
+              <thead className="bg-gray-50 dark:bg-gray-700/50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ficha</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nombre</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Jornada</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sede</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vinieron hoy</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                {paginatedRows.map((row) => (
+                  <tr key={row.ficha_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{row.ficha_numero}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{row.programa_nombre || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{row.jornada_nombre || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{row.sede_nombre || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600 dark:text-primary-400">
+                      {row.cantidad_vinieron} / {row.total_aprendices ?? 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {totalPages > 1 && (
+          <div className="mt-4 flex justify-between items-center">
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Página {page} de {totalPages} ({fichasFiltradas.length} total)
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="btn-secondary disabled:opacity-50"
+                aria-label="Ir a la página anterior"
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="btn-secondary disabled:opacity-50"
+                aria-label="Ir a la página siguiente"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
 
 export const AsistenciaDashboard = () => {
   const { token, roles } = useAuth();
@@ -22,7 +246,7 @@ export const AsistenciaDashboard = () => {
 
   const canViewBienestar = roles.includes('SUPER ADMINISTRADOR') || roles.includes('BIENESTAR AL APRENDIZ');
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async () => {
     try {
       setError('');
       const [res, casosRes] = await Promise.all([
@@ -32,16 +256,16 @@ export const AsistenciaDashboard = () => {
       setData(res);
       setCasosBienestarCount(Array.isArray(casosRes?.casos) ? casosRes.casos.length : 0);
     } catch (e: unknown) {
-      const err = e as { response?: { status?: number; data?: { error?: string } } };
-      if (err.response?.status === 403) {
+      const status = (e as { response?: { status?: number } }).response?.status;
+      if (status === 403) {
         setError('Solo el superadministrador puede ver este dashboard.');
       } else {
-        setError(err.response?.data?.error || 'Error al cargar el dashboard.');
+        setError(axiosErrorMessage(e, 'Error al cargar el dashboard.'));
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!canViewBienestar) {
@@ -50,7 +274,7 @@ export const AsistenciaDashboard = () => {
       return;
     }
     fetchDashboard();
-  }, [canViewBienestar]);
+  }, [canViewBienestar, fetchDashboard]);
 
   // WebSocket para actualizaciones en tiempo real
   useEffect(() => {
@@ -88,7 +312,7 @@ export const AsistenciaDashboard = () => {
       wsRef.current = null;
       setWsConnected(false);
     };
-  }, [canViewBienestar, token]);
+  }, [canViewBienestar, token, fetchDashboard]);
 
   useEffect(() => {
     setPage(1);
@@ -127,7 +351,7 @@ export const AsistenciaDashboard = () => {
           No tiene permiso para acceder al dashboard de asistencia (requiere rol de Superadministrador o Bienestar al Aprendiz).
         </p>
         <Link to="/asistencia" className="btn-secondary inline-flex items-center gap-2">
-          <ArrowLeftIcon className="w-5 h-5" />
+          <ArrowLeftIcon className="w-5 h-5" aria-hidden />
           Volver a Asistencia
         </Link>
       </div>
@@ -136,7 +360,7 @@ export const AsistenciaDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <nav className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+      <nav className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400" aria-label="Miga de pan">
         <Link to="/dashboard" className="hover:text-primary-600 dark:hover:text-primary-400">Inicio</Link>
         <span>/</span>
         <Link to="/asistencia" className="hover:text-primary-600 dark:hover:text-primary-400">Asistencia</Link>
@@ -147,7 +371,7 @@ export const AsistenciaDashboard = () => {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <ChartBarIcon className="w-8 h-8 text-primary-600" />
+            <ChartBarIcon className="w-8 h-8 text-primary-600" aria-hidden />
             Dashboard de Asistencia
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
@@ -157,194 +381,47 @@ export const AsistenciaDashboard = () => {
         <div className="flex items-center gap-2">
           {wsConnected && (
             <span className="inline-flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
-              <SignalIcon className="w-4 h-4" />
+              <SignalIcon className="w-4 h-4" aria-hidden />
               En vivo
             </span>
           )}
           <Link to="/asistencia" className="btn-secondary inline-flex items-center gap-2">
-            <ArrowLeftIcon className="w-5 h-5" />
+            <ArrowLeftIcon className="w-5 h-5" aria-hidden />
             Tomar asistencia
           </Link>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+        <div
+          role="alert"
+          className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg"
+        >
           {error}
         </div>
       )}
 
-      {loading ? (
-        <div className="card p-8 text-center text-gray-500 dark:text-gray-400">Cargando...</div>
-      ) : data ? (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fecha</p>
-                  <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">{data.fecha}</p>
-                </div>
-              </div>
-            </div>
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Aprendices en formación hoy</p>
-                  <p className="text-3xl font-bold text-primary-600 dark:text-primary-400 mt-1">{data.total_aprendices_en_formacion}</p>
-                </div>
-                <div className="w-14 h-14 bg-primary-100 dark:bg-primary-900/50 rounded-lg flex items-center justify-center">
-                  <UserGroupIcon className="w-7 h-7 text-primary-600 dark:text-primary-400" />
-                </div>
-              </div>
-            </div>
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fichas con sesión hoy</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{data.por_ficha.length}</p>
-                </div>
-              </div>
-            </div>
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pendientes de revisión (hoy)</p>
-                  <p className="text-3xl font-bold text-amber-600 dark:text-amber-400 mt-1">
-                    {data.pendientes_revision ?? 0}
-                  </p>
-                </div>
-                <div className="w-14 h-14 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center">
-                  <DocumentMagnifyingGlassIcon className="w-7 h-7 text-amber-600 dark:text-amber-400" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Casos a tener en cuenta (Bienestar) */}
-          <div className="card border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
-                  <ExclamationTriangleIcon className="w-8 h-8 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Casos a tener en cuenta (Bienestar al Aprendiz)</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Aprendices con 3 o más inasistencias en los últimos 30 días para seguimiento y prevención de deserción.
-                  </p>
-                  {casosBienestarCount !== null && (
-                    <p className="text-sm font-medium text-amber-700 dark:text-amber-300 mt-2">
-                      {casosBienestarCount === 0
-                        ? 'Ningún caso detectado con el criterio actual.'
-                        : `${casosBienestarCount} caso${casosBienestarCount !== 1 ? 's' : ''} detectado${casosBienestarCount !== 1 ? 's' : ''}.`}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <Link
-                to="/asistencia/dashboard/casos-bienestar"
-                className="btn-primary inline-flex items-center justify-center gap-2 shrink-0"
-              >
-                <ExclamationTriangleIcon className="w-5 h-5" />
-                Ver casos a tener en cuenta
-              </Link>
-            </div>
-          </div>
-
-          <div className="card">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Por ficha (vinieron a formación hoy)</h2>
-            <div className="flex flex-col sm:flex-row gap-4 items-end sm:items-center bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600 mb-4">
-              <div className="w-full sm:w-auto flex-1 min-w-[250px]">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Buscar ficha
-                </label>
-                <div className="relative">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por código de ficha o programa..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-shadow"
-                  />
-                </div>
-              </div>
-              <div className="w-full sm:w-auto min-w-[250px]">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Filtrar por jornada
-                </label>
-                <select
-                  value={jornadaFilter}
-                  onChange={(e) => setJornadaFilter(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-shadow"
-                >
-                  <option value="">Todas las jornadas</option>
-                  {jornadasDisponibles.map((jornada) => (
-                    <option key={jornada} value={jornada}>
-                      {jornada}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {fichasFiltradas.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400">No hay fichas registradas</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-                  <thead className="bg-gray-50 dark:bg-gray-700/50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ficha</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nombre</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Jornada</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sede</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vinieron hoy</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
-                    {paginatedRows.map((row) => (
-                      <tr key={row.ficha_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{row.ficha_numero}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{row.programa_nombre || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{row.jornada_nombre || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{row.sede_nombre || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600 dark:text-primary-400">
-                          {row.cantidad_vinieron} / {row.total_aprendices ?? 0}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {totalPages > 1 && (
-              <div className="mt-4 flex justify-between items-center">
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Pagina {page} de {totalPages} ({fichasFiltradas.length} total)
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="btn-secondary disabled:opacity-50"
-                  >
-                    Anterior
-                  </button>
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="btn-secondary disabled:opacity-50"
-                  >
-                    Siguiente
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      ) : null}
+      {loading && (
+        <div className="card p-8 text-center text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
+          Cargando…
+        </div>
+      )}
+      {!loading && data && (
+        <AsistenciaDashboardDataView
+          data={data}
+          casosBienestarCount={casosBienestarCount}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          jornadaFilter={jornadaFilter}
+          onJornadaFilterChange={setJornadaFilter}
+          jornadasDisponibles={jornadasDisponibles}
+          fichasFiltradas={fichasFiltradas}
+          paginatedRows={paginatedRows}
+          totalPages={totalPages}
+          page={page}
+          setPage={setPage}
+        />
+      )}
     </div>
   );
 };

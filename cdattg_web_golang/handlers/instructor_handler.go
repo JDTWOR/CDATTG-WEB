@@ -12,30 +12,30 @@ import (
 )
 
 type InstructorHandler struct {
-	repo               repositories.InstructorRepository
-	svc                services.InstructorService
+	repo                repositories.InstructorRepository
+	svc                 services.InstructorService
 	instructorImportSvc services.InstructorImportService
 }
 
 func NewInstructorHandler() *InstructorHandler {
 	return &InstructorHandler{
-		repo:               repositories.NewInstructorRepository(),
-		svc:                services.NewInstructorService(),
+		repo:                repositories.NewInstructorRepository(),
+		svc:                 services.NewInstructorService(),
 		instructorImportSvc: services.NewInstructorImportService(),
 	}
 }
 
 // GetAll devuelve lista de instructores (paginada; query: page, page_size, search)
 func (h *InstructorHandler) GetAll(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	search := c.Query("search")
-	if page < 1 {
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
 		page = 1
 	}
-	if pageSize < 1 || pageSize > 100 {
+	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if err != nil || pageSize < 1 || pageSize > 100 {
 		pageSize = 20
 	}
+	search := c.Query("search")
 	offset := (page - 1) * pageSize
 	list, total, err := h.repo.FindAllPaginated(offset, pageSize, search)
 	if err != nil {
@@ -53,7 +53,7 @@ func (h *InstructorHandler) GetAll(c *gin.Context) {
 func (h *InstructorHandler) GetByID(c *gin.Context) {
 	idNum, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	item, err := h.svc.GetByID(uint(idNum))
@@ -68,12 +68,12 @@ func (h *InstructorHandler) GetByID(c *gin.Context) {
 func (h *InstructorHandler) Update(c *gin.Context) {
 	idNum, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	var req dto.UpdateInstructorRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	item, err := h.svc.Update(uint(idNum), req)
@@ -88,7 +88,7 @@ func (h *InstructorHandler) Update(c *gin.Context) {
 func (h *InstructorHandler) Delete(c *gin.Context) {
 	idNum, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	if err := h.svc.Delete(uint(idNum)); err != nil {
@@ -102,7 +102,7 @@ func (h *InstructorHandler) Delete(c *gin.Context) {
 func (h *InstructorHandler) CreateFromPersona(c *gin.Context) {
 	var req dto.CreateInstructorRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	item, err := h.svc.CreateFromPersona(req)
@@ -166,7 +166,10 @@ func (h *InstructorHandler) ImportInstructores(c *gin.Context) {
 
 // ListInstructorImports devuelve el historial de importaciones de instructores.
 func (h *InstructorHandler) ListInstructorImports(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if err != nil || limit < 1 {
+		limit = 50
+	}
 	list, err := h.instructorImportSvc.ListImports(limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

@@ -13,6 +13,8 @@ interface SelectSearchProps {
   isDisabled?: boolean;
   isRequired?: boolean;
   ariaLabel?: string;
+  /** Para asociar un <label htmlFor="..."> al control nativo de react-select */
+  inputId?: string;
 }
 
 const selectTheme: ThemeConfig = (theme) => ({
@@ -126,21 +128,24 @@ const selectStyles: StylesConfig<SelectOption, false> = {
   }),
 };
 
-export function SelectSearch({
-  options,
-  value,
-  onChange,
-  placeholder = 'Buscar...',
-  isDisabled = false,
-  isRequired = false,
-  ariaLabel,
-}: SelectSearchProps) {
+export function SelectSearch(props: Readonly<SelectSearchProps>) {
+  const {
+    options,
+    value,
+    onChange,
+    placeholder = 'Buscar...',
+    isDisabled = false,
+    isRequired = false,
+    ariaLabel,
+    inputId,
+  } = props;
   const selectedOption =
     value !== undefined && value !== null ? options.find((o) => o.value === value) || null : null;
 
   return (
     <div className="react-select-wrapper w-full">
       <Select<SelectOption, false>
+        inputId={inputId}
         options={options}
         value={selectedOption}
         onChange={(opt) => onChange(opt?.value)}

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { PlusIcon, EyeIcon, PencilSquareIcon, KeyIcon, TrashIcon, ArrowUpTrayIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import type { PersonaResponse, PersonaRequest } from '../types';
 import { PersonaModal } from '../components/PersonaModal';
 import { ViewPersonaModal } from '../components/ViewPersonaModal';
@@ -18,22 +19,22 @@ export const Personas = () => {
   const [viewingPersona, setViewingPersona] = useState<PersonaResponse | null>(null);
   const [search, setSearch] = useState('');
 
-  const fetchPersonas = async () => {
+  const fetchPersonas = useCallback(async () => {
     try {
       setLoading(true);
       const response = await apiService.getPersonas(page, pageSize, search);
       setPersonas(response.data);
       setTotal(response.total);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al cargar personas');
+    } catch (err: unknown) {
+      setError(axiosErrorMessage(err, 'Error al cargar personas'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, search]);
 
   useEffect(() => {
-    fetchPersonas();
-  }, [page, search]);
+    void fetchPersonas();
+  }, [fetchPersonas]);
 
   const handleCreate = () => {
     setEditingPersona(null);
@@ -51,8 +52,8 @@ export const Personas = () => {
     try {
       await apiService.deletePersona(id);
       fetchPersonas();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al eliminar persona');
+    } catch (err: unknown) {
+      alert(axiosErrorMessage(err, 'Error al eliminar persona'));
     }
   };
 
@@ -62,8 +63,8 @@ export const Personas = () => {
       await apiService.resetPersonaPassword(persona.id);
       alert('Contraseña restablecida. La persona puede entrar con su email y número de documento.');
       fetchPersonas();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al restablecer contraseña');
+    } catch (err: unknown) {
+      alert(axiosErrorMessage(err, 'Error al restablecer contraseña'));
     }
   };
 
@@ -76,8 +77,8 @@ export const Personas = () => {
       }
       setIsModalOpen(false);
       fetchPersonas();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al guardar persona');
+    } catch (err: unknown) {
+      alert(axiosErrorMessage(err, 'Error al guardar persona'));
     }
   };
 

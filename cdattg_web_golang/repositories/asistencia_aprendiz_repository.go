@@ -8,6 +8,14 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	aaPreloadAprendizPersona                    = "Aprendiz.Persona"
+	aaPreloadInstructorIngresoInstructor        = "InstructorRegistroIngreso.Instructor"
+	aaPreloadInstructorIngresoInstructorPersona = "InstructorRegistroIngreso.Instructor.Persona"
+	aaPreloadInstructorSalidaInstructor         = "InstructorRegistroSalida.Instructor"
+	aaPreloadInstructorSalidaInstructorPersona  = "InstructorRegistroSalida.Instructor.Persona"
+)
+
 type AsistenciaAprendizRepository interface {
 	Create(a *models.AsistenciaAprendiz) error
 	FindByID(id uint) (*models.AsistenciaAprendiz, error)
@@ -38,11 +46,11 @@ func (r *asistenciaAprendizRepository) Create(a *models.AsistenciaAprendiz) erro
 
 func (r *asistenciaAprendizRepository) FindByID(id uint) (*models.AsistenciaAprendiz, error) {
 	var m models.AsistenciaAprendiz
-	if err := r.db.Preload("Aprendiz").Preload("Aprendiz.Persona").
+	if err := r.db.Preload("Aprendiz").Preload(aaPreloadAprendizPersona).
 		Preload("Asistencia").
 		Preload("Asistencia.InstructorFicha").Preload("Asistencia.InstructorFicha.Ficha").
-		Preload("InstructorRegistroIngreso").Preload("InstructorRegistroIngreso.Instructor").Preload("InstructorRegistroIngreso.Instructor.Persona").
-		Preload("InstructorRegistroSalida").Preload("InstructorRegistroSalida.Instructor").Preload("InstructorRegistroSalida.Instructor.Persona").
+		Preload("InstructorRegistroIngreso").Preload(aaPreloadInstructorIngresoInstructor).Preload(aaPreloadInstructorIngresoInstructorPersona).
+		Preload("InstructorRegistroSalida").Preload(aaPreloadInstructorSalidaInstructor).Preload(aaPreloadInstructorSalidaInstructorPersona).
 		Preload("TiposObservacion").
 		First(&m, id).Error; err != nil {
 		return nil, err
@@ -53,9 +61,9 @@ func (r *asistenciaAprendizRepository) FindByID(id uint) (*models.AsistenciaApre
 func (r *asistenciaAprendizRepository) FindByAsistenciaID(asistenciaID uint) ([]models.AsistenciaAprendiz, error) {
 	var list []models.AsistenciaAprendiz
 	if err := r.db.Where("asistencia_id = ?", asistenciaID).
-		Preload("Aprendiz").Preload("Aprendiz.Persona").
-		Preload("InstructorRegistroIngreso").Preload("InstructorRegistroIngreso.Instructor").Preload("InstructorRegistroIngreso.Instructor.Persona").
-		Preload("InstructorRegistroSalida").Preload("InstructorRegistroSalida.Instructor").Preload("InstructorRegistroSalida.Instructor.Persona").
+		Preload("Aprendiz").Preload(aaPreloadAprendizPersona).
+		Preload("InstructorRegistroIngreso").Preload(aaPreloadInstructorIngresoInstructor).Preload(aaPreloadInstructorIngresoInstructorPersona).
+		Preload("InstructorRegistroSalida").Preload(aaPreloadInstructorSalidaInstructor).Preload(aaPreloadInstructorSalidaInstructorPersona).
 		Preload("TiposObservacion").
 		Find(&list).Error; err != nil {
 		return nil, err
@@ -107,7 +115,7 @@ func (r *asistenciaAprendizRepository) FindEntryWithExitByAprendizIDAndAsistenci
 		return nil, gorm.ErrRecordNotFound
 	}
 	var m models.AsistenciaAprendiz
-	if err := r.db.Where("aprendiz_ficha_id = ? AND asistencia_id IN ? AND hora_ingreso IS NOT NULL AND hora_salida IS NOT NULL", aprendizID, asistenciaIDs).Preload("Aprendiz").Preload("Aprendiz.Persona").First(&m).Error; err != nil {
+	if err := r.db.Where("aprendiz_ficha_id = ? AND asistencia_id IN ? AND hora_ingreso IS NOT NULL AND hora_salida IS NOT NULL", aprendizID, asistenciaIDs).Preload("Aprendiz").Preload(aaPreloadAprendizPersona).First(&m).Error; err != nil {
 		return nil, err
 	}
 	return &m, nil
@@ -125,12 +133,12 @@ func (r *asistenciaAprendizRepository) FindPendientesRevisionByInstructorAndFech
 		Joins("INNER JOIN asistencias a ON a.id = asistencia_aprendices.asistencia_id").
 		Joins("INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id").
 		Where("ifc.instructor_id = ? AND asistencia_aprendices.requiere_revision = ?", instructorID, true).
-		Preload("Aprendiz").Preload("Aprendiz.Persona").
+		Preload("Aprendiz").Preload(aaPreloadAprendizPersona).
 		Preload("Asistencia").
 		Preload("Asistencia.InstructorFicha").
 		Preload("Asistencia.InstructorFicha.Ficha").
-		Preload("InstructorRegistroIngreso").Preload("InstructorRegistroIngreso.Instructor").Preload("InstructorRegistroIngreso.Instructor.Persona").
-		Preload("InstructorRegistroSalida").Preload("InstructorRegistroSalida.Instructor").Preload("InstructorRegistroSalida.Instructor.Persona")
+		Preload("InstructorRegistroIngreso").Preload(aaPreloadInstructorIngresoInstructor).Preload(aaPreloadInstructorIngresoInstructorPersona).
+		Preload("InstructorRegistroSalida").Preload(aaPreloadInstructorSalidaInstructor).Preload(aaPreloadInstructorSalidaInstructorPersona)
 
 	// Si viene fecha, filtrar por rango del día para evitar problemas de tipos/hora
 	if fecha != "" {

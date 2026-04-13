@@ -12,8 +12,8 @@ var municipiosSeed = []struct {
 	Nombre        string
 	DepartamentoID uint
 }{
-	{"El Retorno", 95}, {"Calamar", 95}, {"Miraflores", 95}, {"San José del Guaviare", 95},
-	{"Mapiripan", 50}, {"Puerto Concordia", 50}, {"Acacías", 50},
+	{"EL RETORNO", 95}, {"CALAMAR", 95}, {"MIRAFLORES", 95}, {"SAN JOSÉ DEL GUAVIARE", 95},
+	{"MAPIRIPAN", 50}, {"PUERTO CONCORDIA", 50}, {"ACACÍAS", 50},
 }
 
 func RunMunicipioSeeder(db *gorm.DB) error {

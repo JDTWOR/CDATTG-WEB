@@ -86,6 +86,71 @@ func NewInstructorImportService() InstructorImportService {
 	}
 }
 
+type instructorImportRowResult struct {
+	err          bool
+	duplicate    bool
+	processed    bool
+	newPersonaID uint
+}
+
+func isPersonaDuplicadaErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "ya está registrado") || strings.Contains(msg, "ya registrado")
+}
+
+// tryImportInstructorRow intenta crear/vincular instructor para una fila del Excel.
+func (s *instructorImportService) tryImportInstructorRow(row []string, colIndex map[string]int, tipoByKey, generoByKey map[string]uint, regionalIDDefault *uint) instructorImportRowResult {
+	var r instructorImportRowResult
+	req := s.rowToPersonaRequest(row, colIndex, tipoByKey, generoByKey)
+	if req == nil {
+		r.err = true
+		return r
+	}
+	numeroDoc := strings.TrimSpace(req.NumeroDocumento)
+	if numeroDoc == "" {
+		r.err = true
+		return r
+	}
+
+	persona, findErr := s.personaRepo.FindByNumeroDocumento(numeroDoc)
+	var personaID uint
+	if findErr != nil || persona == nil {
+		resp, createErr := s.personaService.CreateWithoutUser(*req)
+		if createErr != nil {
+			if isPersonaDuplicadaErr(createErr) {
+				r.duplicate = true
+			} else {
+				r.err = true
+			}
+			return r
+		}
+		personaID = resp.ID
+		r.newPersonaID = personaID
+	} else {
+		personaID = persona.ID
+	}
+
+	existingInst, _ := s.instructorRepo.FindByPersonaID(personaID)
+	if existingInst != nil {
+		r.duplicate = true
+		return r
+	}
+
+	_, createErr := s.instructorSvc.CreateFromPersona(dto.CreateInstructorRequest{
+		PersonaID:  personaID,
+		RegionalID: regionalIDDefault,
+	})
+	if createErr != nil {
+		r.err = true
+		return r
+	}
+	r.processed = true
+	return r
+}
+
 // ImportFromExcel procesa un archivo Excel y crea/vincula personas e instructores.
 // regionalIDDefault se asigna a cada instructor nuevo (ej. regional GUAVIARE); si es nil se deja null.
 func (s *instructorImportService) ImportFromExcel(fileBytes []byte, filename string, userID uint, regionalIDDefault *uint) (*ImportResult, error) {
@@ -123,53 +188,18 @@ func (s *instructorImportService) ImportFromExcel(fileBytes []byte, filename str
 	var createdPersonaIDs []uint
 
 	for i := 1; i < len(rows); i++ {
-		row := rows[i]
-		req := s.rowToPersonaRequest(row, colIndex, tipoByKey, generoByKey)
-		if req == nil {
+		res := s.tryImportInstructorRow(rows[i], colIndex, tipoByKey, generoByKey, regionalIDDefault)
+		switch {
+		case res.err:
 			errorsCount++
-			continue
-		}
-
-		numeroDoc := strings.TrimSpace(req.NumeroDocumento)
-		if numeroDoc == "" {
-			errorsCount++
-			continue
-		}
-
-		persona, findErr := s.personaRepo.FindByNumeroDocumento(numeroDoc)
-		var personaID uint
-		if findErr != nil || persona == nil {
-			// Crear persona nueva
-			resp, createErr := s.personaService.CreateWithoutUser(*req)
-			if createErr != nil {
-				if strings.Contains(createErr.Error(), "ya está registrado") || strings.Contains(createErr.Error(), "ya registrado") {
-					duplicates++
-				} else {
-					errorsCount++
-				}
-				continue
-			}
-			personaID = resp.ID
-			createdPersonaIDs = append(createdPersonaIDs, personaID)
-		} else {
-			personaID = persona.ID
-		}
-
-		existingInst, _ := s.instructorRepo.FindByPersonaID(personaID)
-		if existingInst != nil {
+		case res.duplicate:
 			duplicates++
-			continue
+		case res.processed:
+			processed++
 		}
-
-		_, createErr := s.instructorSvc.CreateFromPersona(dto.CreateInstructorRequest{
-			PersonaID:  personaID,
-			RegionalID:  regionalIDDefault,
-		})
-		if createErr != nil {
-			errorsCount++
-			continue
+		if res.newPersonaID != 0 {
+			createdPersonaIDs = append(createdPersonaIDs, res.newPersonaID)
 		}
-		processed++
 	}
 
 	if len(createdPersonaIDs) > 0 {
@@ -300,37 +330,48 @@ func (s *instructorImportService) rowToPersonaRequest(row []string, colIndex map
 		Status:          ptrBool(true),
 	}
 
-	if tipoStr := get("tipo_documento"); tipoStr != "" {
-		key := strings.TrimSpace(strings.ToLower(tipoStr))
-		if id, ok := tipoByKey[key]; ok {
-			req.TipoDocumento = &id
-		}
-		// Intentar también por nombre completo en BD
-		if req.TipoDocumento == nil {
-			if id, ok := tipoByKey[tipoStr]; ok {
-				req.TipoDocumento = &id
-			}
-		}
-	}
-
-	if genStr := get("genero"); genStr != "" {
-		key := strings.TrimSpace(strings.ToLower(genStr))
-		if id, ok := generoByKey[key]; ok {
-			req.Genero = &id
-		}
-	}
-
-	if fechaStr := get("fecha_nacimiento"); fechaStr != "" {
-		if t := parseFechaNacimiento(fechaStr); t != nil {
-			req.FechaNacimiento = dto.FromTime(t)
-		}
-	}
-
+	applyTipoDocumentoToPersonaRequest(req, get("tipo_documento"), tipoByKey)
+	applyGeneroToPersonaRequest(req, get("genero"), generoByKey)
+	applyFechaNacimientoToPersonaRequest(req, get("fecha_nacimiento"))
 	return req
 }
 
+func applyTipoDocumentoToPersonaRequest(req *dto.PersonaRequest, tipoStr string, tipoByKey map[string]uint) {
+	if tipoStr == "" {
+		return
+	}
+	key := strings.TrimSpace(strings.ToLower(tipoStr))
+	if id, ok := tipoByKey[key]; ok {
+		req.TipoDocumento = &id
+		return
+	}
+	// Mismo texto que en Excel (p. ej. clave de catálogo sin normalizar)
+	if id, ok := tipoByKey[tipoStr]; ok {
+		req.TipoDocumento = &id
+	}
+}
+
+func applyGeneroToPersonaRequest(req *dto.PersonaRequest, genStr string, generoByKey map[string]uint) {
+	if genStr == "" {
+		return
+	}
+	key := strings.TrimSpace(strings.ToLower(genStr))
+	if id, ok := generoByKey[key]; ok {
+		req.Genero = &id
+	}
+}
+
+func applyFechaNacimientoToPersonaRequest(req *dto.PersonaRequest, fechaStr string) {
+	if fechaStr == "" {
+		return
+	}
+	if t := parseFechaNacimiento(fechaStr); t != nil {
+		req.FechaNacimiento = dto.FromTime(t)
+	}
+}
+
 // splitNombreCompleto divide "NOMBRE1 NOMBRE2 APELLIDO1 APELLIDO2" en 4 campos.
-// Heurística: 4 palabras -> pn, sn, pa, sa; 3 -> pn, "", pa, sa; 2 -> pn, "", pa, ""; 1 -> todo en pn.
+// Reglas: 4 tokens -> pn, sn, pa, sa; 3 -> pn, vacío, pa, sa; 2 -> pn, vacío, pa, vacío; 1 -> único token en primer nombre.
 func splitNombreCompleto(full string) (primerNombre, segundoNombre, primerApellido, segundoApellido string) {
 	full = strings.TrimSpace(full)
 	if full == "" {
@@ -356,13 +397,13 @@ func splitNombreCompleto(full string) (primerNombre, segundoNombre, primerApelli
 	}
 }
 
-// parseFechaNacimiento intenta DD/MM/YYYY, DD-MM-YYYY o 2006-01-02.
+// parseFechaNacimiento intenta DD/MM/YYYY, DD-MM-YYYY o fecha ISO (YYYY-MM-DD).
 func parseFechaNacimiento(s string) *time.Time {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return nil
 	}
-	formats := []string{"02/01/2006", "02-01-2006", "2006-01-02", "02/01/06"}
+	formats := []string{"02/01/2006", "02-01-2006", time.DateOnly, "02/01/06"}
 	for _, layout := range formats {
 		t, err := time.Parse(layout, s)
 		if err == nil {

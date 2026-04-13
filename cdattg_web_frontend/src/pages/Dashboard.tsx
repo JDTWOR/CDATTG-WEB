@@ -11,7 +11,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
-import type { AsistenciaDashboardResponse, CasosBienestarResponse } from '../types';
+import { axiosErrorMessage } from '../utils/httpError';
+import type { AsistenciaDashboardResponse } from '../types';
 
 const DASHBOARD_ALLOWED_ROLES = ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'] as const;
 
@@ -59,22 +60,22 @@ export const Dashboard = () => {
         setAsistenciaDashboard(asistenciaRes);
         setAsistenciaHoy(asistenciaRes?.total_aprendices_en_formacion ?? null);
         setPendientesRevisionHoy(asistenciaRes?.pendientes_revision ?? null);
-        setCasosBienestar(Array.isArray((casosRes as CasosBienestarResponse | null)?.casos) ? (casosRes as CasosBienestarResponse).casos.length : null);
-      } catch (e: any) {
-        // Si alguna llamada falla, mostrar mensaje general pero no romper la vista
-        const msg = e?.response?.data?.error ?? 'No se pudo cargar el resumen general.';
-        setError(typeof msg === 'string' ? msg : 'No se pudo cargar el resumen general.');
+        setCasosBienestar(
+          casosRes != null && Array.isArray(casosRes.casos) ? casosRes.casos.length : null,
+        );
+      } catch (e: unknown) {
+        setError(axiosErrorMessage(e, 'No se pudo cargar el resumen general.'));
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    void fetchData();
   }, [hasPermission, hasRoleAccess, roles]);
 
   const renderValor = (valor: number | null, canSee: boolean) => {
     if (!canSee) return '—';
-    if (loading && valor === null) return '...';
+    if (loading && valor === null) return '…';
     if (valor === null) return '—';
     return valor.toLocaleString('es-CO');
   };
@@ -139,7 +140,7 @@ export const Dashboard = () => {
           Bienvenido, {user?.full_name}
         </p>
         {error && (
-          <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+          <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">
             {error}
           </p>
         )}
@@ -156,7 +157,7 @@ export const Dashboard = () => {
               </p>
             </div>
             <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/50 rounded-lg flex items-center justify-center">
-              <UsersIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+              <UsersIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" aria-hidden />
             </div>
           </div>
         </div>
@@ -170,7 +171,7 @@ export const Dashboard = () => {
               </p>
             </div>
             <div className="w-12 h-12 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center">
-              <AcademicCapIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
+              <AcademicCapIcon className="w-6 h-6 text-green-600 dark:text-green-400" aria-hidden />
             </div>
           </div>
         </div>
@@ -184,7 +185,7 @@ export const Dashboard = () => {
               </p>
             </div>
             <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center">
-              <UserGroupIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              <UserGroupIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" aria-hidden />
             </div>
           </div>
         </div>
@@ -198,7 +199,7 @@ export const Dashboard = () => {
               </p>
             </div>
             <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center">
-              <ChartBarIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+              <ChartBarIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" aria-hidden />
             </div>
           </div>
         </div>
@@ -215,7 +216,7 @@ export const Dashboard = () => {
               </p>
             </div>
             <div className="w-12 h-12 bg-red-100 dark:bg-red-900/40 rounded-lg flex items-center justify-center">
-              <ExclamationTriangleIcon className="w-6 h-6 text-red-600 dark:text-red-400" />
+              <ExclamationTriangleIcon className="w-6 h-6 text-red-600 dark:text-red-400" aria-hidden />
             </div>
           </div>
         </div>
@@ -228,7 +229,7 @@ export const Dashboard = () => {
               </p>
             </div>
             <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/40 rounded-lg flex items-center justify-center">
-              <ClipboardDocumentListIcon className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+              <ClipboardDocumentListIcon className="w-6 h-6 text-orange-600 dark:text-orange-400" aria-hidden />
             </div>
           </div>
         </div>
@@ -238,13 +239,10 @@ export const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Asistencia por sede</h2>
-          {!canSeeAsistencia ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sin permiso para ver asistencia.</p>
-          ) : filasPorSede.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sin datos para hoy.</p>
-          ) : (
+          {canSeeAsistencia && filasPorSede.length > 0 && (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
+                <caption className="sr-only">Asistencia agregada por sede para hoy</caption>
                 <thead>
                   <tr className="text-left text-gray-500 dark:text-gray-400">
                     <th className="pb-2">Sede</th>
@@ -264,16 +262,19 @@ export const Dashboard = () => {
               </table>
             </div>
           )}
+          {canSeeAsistencia && filasPorSede.length === 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sin datos para hoy.</p>
+          )}
+          {canSeeAsistencia ? null : (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sin permiso para ver asistencia.</p>
+          )}
         </div>
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Asistencia por jornada</h2>
-          {!canSeeAsistencia ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sin permiso para ver asistencia.</p>
-          ) : filasPorJornada.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sin datos para hoy.</p>
-          ) : (
+          {canSeeAsistencia && filasPorJornada.length > 0 && (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
+                <caption className="sr-only">Asistencia agregada por jornada para hoy</caption>
                 <thead>
                   <tr className="text-left text-gray-500 dark:text-gray-400">
                     <th className="pb-2">Jornada</th>
@@ -293,6 +294,12 @@ export const Dashboard = () => {
               </table>
             </div>
           )}
+          {canSeeAsistencia && filasPorJornada.length === 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sin datos para hoy.</p>
+          )}
+          {canSeeAsistencia ? null : (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sin permiso para ver asistencia.</p>
+          )}
         </div>
       </div>
 
@@ -304,7 +311,7 @@ export const Dashboard = () => {
             Tomar asistencia
           </Link>
           <Link to="/asistencia/historial" className="btn-secondary inline-flex items-center justify-center">
-            <CalendarDaysIcon className="w-5 h-5 mr-2" />
+            <CalendarDaysIcon className="w-5 h-5 mr-2" aria-hidden />
             Historial asistencias
           </Link>
           <Link to="/asistencia/dashboard" className="btn-secondary inline-flex items-center justify-center">

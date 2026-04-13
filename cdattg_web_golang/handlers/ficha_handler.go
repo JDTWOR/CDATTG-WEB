@@ -16,6 +16,14 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+const errMsgInstructorParamInvalido = "ID de instructor inválido"
+
+type fichaExportSheetState struct {
+	originalFirst string
+	idx           int
+	used          map[string]int
+}
+
 type FichaHandler struct {
 	svc       services.FichaService
 	importSvc services.FichaImportService
@@ -30,26 +38,52 @@ func NewFichaHandler() *FichaHandler {
 	}
 }
 
-func (h *FichaHandler) GetAll(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	var programaID *uint
-	if pid := c.Query("programa_id"); pid != "" {
-		if v, err := strconv.ParseUint(pid, 10, 32); err == nil {
+func parseUintQuery(c *gin.Context, key string) *uint {
+	if q := c.Query(key); q != "" {
+		if v, err := strconv.ParseUint(q, 10, 32); err == nil {
 			u := uint(v)
-			programaID = &u
+			return &u
 		}
 	}
+	return nil
+}
+
+func parseFichaPagination(c *gin.Context) (page, pageSize int) {
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	pageSize, err = strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if err != nil || pageSize < 1 {
+		pageSize = 20
+	}
+	return page, pageSize
+}
+
+// instructorIDForMisFichas resuelve el instructor del usuario en contexto, o nil si no aplica.
+func (h *FichaHandler) instructorIDForMisFichas(c *gin.Context) *uint {
+	u, ok := c.Get("user")
+	if !ok {
+		return nil
+	}
+	user, _ := u.(*models.User)
+	if user == nil || user.PersonaID == nil {
+		return nil
+	}
+	inst, err := h.instRepo.FindByPersonaID(*user.PersonaID)
+	if err != nil {
+		return nil
+	}
+	return &inst.ID
+}
+
+func (h *FichaHandler) GetAll(c *gin.Context) {
+	page, pageSize := parseFichaPagination(c)
+	programaID := parseUintQuery(c, "programa_id")
 	search := c.Query("q")
 	var instructorID *uint
 	if c.Query("mis_fichas") == "1" {
-		if u, ok := c.Get("user"); ok {
-			if user, _ := u.(*models.User); user != nil && user.PersonaID != nil {
-				if inst, err := h.instRepo.FindByPersonaID(*user.PersonaID); err == nil {
-					instructorID = &inst.ID
-				}
-			}
-		}
+		instructorID = h.instructorIDForMisFichas(c)
 		// Si no hay instructor (ej. superadministrador), devolver lista vacía
 		if instructorID == nil {
 			c.JSON(http.StatusOK, gin.H{"data": []dto.FichaCaracterizacionResponse{}, "total": 0, "page": page, "page_size": pageSize})
@@ -67,7 +101,7 @@ func (h *FichaHandler) GetAll(c *gin.Context) {
 func (h *FichaHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	f, err := h.svc.FindByID(uint(id))
@@ -81,7 +115,7 @@ func (h *FichaHandler) GetByID(c *gin.Context) {
 func (h *FichaHandler) GetByIDWithDetail(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	f, err := h.svc.FindByIDWithDetail(uint(id))
@@ -97,7 +131,7 @@ func (h *FichaHandler) GetByIDWithDetail(c *gin.Context) {
 func (h *FichaHandler) GetCodigo(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	codigo, err := h.svc.GetCodigo(uint(id))
@@ -111,7 +145,7 @@ func (h *FichaHandler) GetCodigo(c *gin.Context) {
 func (h *FichaHandler) Create(c *gin.Context) {
 	var req dto.FichaCaracterizacionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	f, err := h.svc.Create(req)
@@ -125,12 +159,12 @@ func (h *FichaHandler) Create(c *gin.Context) {
 func (h *FichaHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	var req dto.FichaCaracterizacionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	f, err := h.svc.Update(uint(id), req)
@@ -144,7 +178,7 @@ func (h *FichaHandler) Update(c *gin.Context) {
 func (h *FichaHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	if err := h.svc.Delete(uint(id)); err != nil {
@@ -157,7 +191,7 @@ func (h *FichaHandler) Delete(c *gin.Context) {
 func (h *FichaHandler) ListInstructores(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	list, err := h.svc.ListInstructores(uint(id))
@@ -171,12 +205,12 @@ func (h *FichaHandler) ListInstructores(c *gin.Context) {
 func (h *FichaHandler) AsignarInstructores(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	var req dto.AsignarInstructoresRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	if err := h.svc.AsignarInstructores(uint(id), req); err != nil {
@@ -187,10 +221,14 @@ func (h *FichaHandler) AsignarInstructores(c *gin.Context) {
 }
 
 func (h *FichaHandler) DesasignarInstructor(c *gin.Context) {
-	fichaID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	fichaID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
 	instructorID, err := strconv.ParseUint(c.Param("instructorId"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de instructor inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgInstructorParamInvalido})
 		return
 	}
 	if err := h.svc.DesasignarInstructor(uint(fichaID), uint(instructorID)); err != nil {
@@ -203,7 +241,7 @@ func (h *FichaHandler) DesasignarInstructor(c *gin.Context) {
 func (h *FichaHandler) ListAprendices(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	list, err := h.svc.ListAprendices(uint(id))
@@ -217,12 +255,12 @@ func (h *FichaHandler) ListAprendices(c *gin.Context) {
 func (h *FichaHandler) AsignarAprendices(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	var req dto.AsignarAprendicesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	if err := h.svc.AsignarAprendices(uint(id), req.Personas); err != nil {
@@ -235,12 +273,12 @@ func (h *FichaHandler) AsignarAprendices(c *gin.Context) {
 func (h *FichaHandler) DesasignarAprendices(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	var req dto.DesasignarAprendicesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	if err := h.svc.DesasignarAprendices(uint(id), req.Personas); err != nil {
@@ -303,49 +341,12 @@ func (h *FichaHandler) ExportAllExcel(c *gin.Context) {
 	}
 
 	xlsx := excelize.NewFile()
-	firstSheet := xlsx.GetSheetName(0)
-	sheetIndex := 0
-	usedSheetNames := map[string]int{}
+	st := &fichaExportSheetState{
+		originalFirst: xlsx.GetSheetName(0),
+		used:          map[string]int{},
+	}
 	for _, ficha := range fichas {
-		baseSheetName := sanitizeSheetName(ficha.Ficha)
-		if baseSheetName == "" {
-			baseSheetName = "Ficha"
-		}
-		sheetName := uniqueSheetName(baseSheetName, usedSheetNames)
-		if sheetIndex == 0 {
-			xlsx.SetSheetName(firstSheet, sheetName)
-		} else {
-			xlsx.NewSheet(sheetName)
-		}
-		sheetIndex++
-
-		_ = xlsx.SetCellValue(sheetName, "A1", "Ficha")
-		_ = xlsx.SetCellValue(sheetName, "B1", ficha.Ficha)
-		_ = xlsx.SetCellValue(sheetName, "A2", "Programa de formación")
-		if ficha.ProgramaFormacion != nil {
-			_ = xlsx.SetCellValue(sheetName, "B2", ficha.ProgramaFormacion.Nombre)
-		} else {
-			_ = xlsx.SetCellValue(sheetName, "B2", "")
-		}
-
-		_ = xlsx.SetCellValue(sheetName, "A4", "Documento")
-		_ = xlsx.SetCellValue(sheetName, "B4", "Nombre completo")
-		_ = xlsx.SetCellValue(sheetName, "C4", "Correo")
-		_ = xlsx.SetCellValue(sheetName, "D4", "Celular")
-
-		row := 5
-		for _, aprendiz := range ficha.Aprendices {
-			if aprendiz.Persona == nil {
-				continue
-			}
-			_ = xlsx.SetCellValue(sheetName, "A"+strconv.Itoa(row), aprendiz.Persona.NumeroDocumento)
-			_ = xlsx.SetCellValue(sheetName, "B"+strconv.Itoa(row), aprendiz.Persona.GetFullName())
-			_ = xlsx.SetCellValue(sheetName, "C"+strconv.Itoa(row), aprendiz.Persona.Email)
-			_ = xlsx.SetCellValue(sheetName, "D"+strconv.Itoa(row), aprendiz.Persona.Celular)
-			row++
-		}
-
-		_ = xlsx.SetColWidth(sheetName, "A", "D", 28)
+		appendFichaSheetToExport(xlsx, ficha, st)
 	}
 
 	buffer, err := xlsx.WriteToBuffer()
@@ -357,6 +358,48 @@ func (h *FichaHandler) ExportAllExcel(c *gin.Context) {
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Header("Content-Disposition", `attachment; filename="fichas_aprendices.xlsx"`)
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer.Bytes())
+}
+
+func appendFichaSheetToExport(xlsx *excelize.File, ficha models.FichaCaracterizacion, st *fichaExportSheetState) {
+	baseSheetName := sanitizeSheetName(ficha.Ficha)
+	if baseSheetName == "" {
+		baseSheetName = "Ficha"
+	}
+	sheetName := uniqueSheetName(baseSheetName, st.used)
+	if st.idx == 0 {
+		xlsx.SetSheetName(st.originalFirst, sheetName)
+	} else {
+		xlsx.NewSheet(sheetName)
+	}
+	st.idx++
+
+	_ = xlsx.SetCellValue(sheetName, "A1", "Ficha")
+	_ = xlsx.SetCellValue(sheetName, "B1", ficha.Ficha)
+	_ = xlsx.SetCellValue(sheetName, "A2", "Programa de formación")
+	if ficha.ProgramaFormacion != nil {
+		_ = xlsx.SetCellValue(sheetName, "B2", ficha.ProgramaFormacion.Nombre)
+	} else {
+		_ = xlsx.SetCellValue(sheetName, "B2", "")
+	}
+
+	_ = xlsx.SetCellValue(sheetName, "A4", "Documento")
+	_ = xlsx.SetCellValue(sheetName, "B4", "Nombre completo")
+	_ = xlsx.SetCellValue(sheetName, "C4", "Correo")
+	_ = xlsx.SetCellValue(sheetName, "D4", "Celular")
+
+	row := 5
+	for _, aprendiz := range ficha.Aprendices {
+		if aprendiz.Persona == nil {
+			continue
+		}
+		_ = xlsx.SetCellValue(sheetName, "A"+strconv.Itoa(row), aprendiz.Persona.NumeroDocumento)
+		_ = xlsx.SetCellValue(sheetName, "B"+strconv.Itoa(row), aprendiz.Persona.GetFullName())
+		_ = xlsx.SetCellValue(sheetName, "C"+strconv.Itoa(row), aprendiz.Persona.Email)
+		_ = xlsx.SetCellValue(sheetName, "D"+strconv.Itoa(row), aprendiz.Persona.Celular)
+		row++
+	}
+
+	_ = xlsx.SetColWidth(sheetName, "A", "D", 28)
 }
 
 func sanitizeSheetName(name string) string {

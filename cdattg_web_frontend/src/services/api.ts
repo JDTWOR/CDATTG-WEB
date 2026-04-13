@@ -74,8 +74,107 @@ import type {
   DefinicionesPermisosResponse,
 } from '../types';
 
+/** Payload parcial desde el stream NDJSON de importación de personas */
+type PersonaImportStreamJson = PersonaImportProgress & {
+  error?: string;
+  processed_count?: number;
+  duplicates_count?: number;
+  error_count?: number;
+  status?: string;
+  processed?: number;
+  duplicates?: number;
+  errors?: number;
+};
+
+function parsePersonaImportStreamLine(
+  trimmed: string,
+  onProgress: (p: PersonaImportProgress) => void
+): { streamError: string | null; finalResult: PersonaImportResult | null } {
+  if (!trimmed) {
+    return { streamError: null, finalResult: null };
+  }
+  try {
+    const data = JSON.parse(trimmed) as PersonaImportStreamJson;
+    if (data.type === 'error' && data.error) {
+      return { streamError: data.error, finalResult: null };
+    }
+    if (data.total !== undefined) {
+      onProgress(data as PersonaImportProgress);
+    }
+    if (data.type === 'done' || data.type === 'result') {
+      return {
+        streamError: null,
+        finalResult: {
+          processed_count: data.processed_count ?? data.processed ?? 0,
+          duplicates_count: data.duplicates_count ?? data.duplicates ?? 0,
+          error_count: data.error_count ?? data.errors ?? 0,
+          status: data.status ?? 'completado',
+        },
+      };
+    }
+  } catch {
+    // Ignorar líneas que no sean JSON válido (fragmentos de chunk)
+  }
+  return { streamError: null, finalResult: null };
+}
+
+async function consumePersonasImportNdjsonStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onProgress: (p: PersonaImportProgress) => void
+): Promise<PersonaImportResult> {
+  const dec = new TextDecoder();
+  let buffer = '';
+  let finalResult: PersonaImportResult | null = null;
+  let streamError: string | null = null;
+
+  outer: while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += dec.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const { streamError: err, finalResult: fr } = parsePersonaImportStreamLine(trimmed, onProgress);
+      if (err) {
+        streamError = err;
+        break outer;
+      }
+      if (fr) {
+        finalResult = fr;
+      }
+    }
+  }
+
+  if (streamError) throw new Error(streamError);
+  if (!finalResult) throw new Error('Importación sin resultado');
+  return finalResult;
+}
+
+async function openPersonasImportStreamReader(
+  url: string,
+  formData: FormData,
+  token: string | null
+): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'X-Stream-Progress': 'true',
+    },
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? res.statusText);
+  }
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No se pudo leer la respuesta');
+  return reader;
+}
+
 class ApiService {
-  private api: AxiosInstance;
+  private readonly api: AxiosInstance;
 
   constructor() {
     this.api = axios.create({
@@ -107,7 +206,7 @@ class ApiService {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             // Avisar a la app para cerrar sesión sin recargar la página (evita pantalla en blanco en móvil/PC).
-            window.dispatchEvent(new CustomEvent('auth:session-expired'));
+            globalThis.dispatchEvent(new CustomEvent('auth:session-expired'));
           }
         }
         return Promise.reject(error);
@@ -184,57 +283,8 @@ class ApiService {
     const url = `${baseURL}/personas/import`;
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        'X-Stream-Progress': 'true',
-      },
-      body: formData,
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || res.statusText);
-    }
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error('No se pudo leer la respuesta');
-    const dec = new TextDecoder();
-    let buffer = '';
-    let finalResult: PersonaImportResult | null = null;
-    let streamError: string | null = null;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += dec.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const data = JSON.parse(trimmed) as PersonaImportProgress & { error?: string; processed_count?: number; duplicates_count?: number; error_count?: number; status?: string };
-          if (data.type === 'error' && data.error) {
-            streamError = data.error;
-            break;
-          }
-          if (data.total !== undefined) onProgress(data as PersonaImportProgress);
-          if (data.type === 'done' || data.type === 'result') {
-            finalResult = {
-              processed_count: data.processed_count ?? data.processed,
-              duplicates_count: data.duplicates_count ?? data.duplicates,
-              error_count: data.error_count ?? data.errors,
-              status: data.status ?? 'completado',
-            };
-          }
-        } catch {
-          // Ignorar líneas que no sean JSON válido (fragmentos de chunk)
-        }
-      }
-      if (streamError) break;
-    }
-    if (streamError) throw new Error(streamError);
-    if (!finalResult) throw new Error('Importación sin resultado');
-    return finalResult;
+    const reader = await openPersonasImportStreamReader(url, formData, token);
+    return consumePersonasImportNdjsonStream(reader, onProgress);
   }
 
   async getPersonaImports(limit: number = 50): Promise<PersonaImportLogItem[]> {

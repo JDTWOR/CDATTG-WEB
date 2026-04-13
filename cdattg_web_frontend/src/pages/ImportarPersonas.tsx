@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
   HomeIcon,
@@ -11,9 +11,11 @@ import {
   ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import type { PersonaImportLogItem, PersonaImportResult, PersonaImportProgress } from '../types';
 
 const ACCEPTED_FORMATS = '.xlsx,.xls';
+const EXTENSIONES_PERMITIDAS = new Set(['xlsx', 'xls']);
 
 export const ImportarPersonas = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -26,7 +28,7 @@ export const ImportarPersonas = () => {
   const [progress, setProgress] = useState<PersonaImportProgress | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchImports = async () => {
+  const fetchImports = useCallback(async () => {
     try {
       setLoadingImports(true);
       const data = await apiService.getPersonaImports(50);
@@ -36,13 +38,13 @@ export const ImportarPersonas = () => {
     } finally {
       setLoadingImports(false);
     }
-  };
-
-  useEffect(() => {
-    fetchImports();
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    void fetchImports();
+  }, [fetchImports]);
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     setFile(f || null);
     setImportError('');
@@ -55,8 +57,9 @@ export const ImportarPersonas = () => {
       setImportError('Seleccione un archivo.');
       return;
     }
-    const ext = file.name.toLowerCase().slice(-5);
-    if (!ext.includes('xlsx') && !ext.includes('xls')) {
+    const dot = file.name.lastIndexOf('.');
+    const ext = dot >= 0 ? file.name.slice(dot + 1).toLowerCase() : '';
+    if (!EXTENSIONES_PERMITIDAS.has(ext)) {
       setImportError('Solo se permiten archivos XLSX o XLS.');
       return;
     }
@@ -71,8 +74,8 @@ export const ImportarPersonas = () => {
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       fetchImports();
-    } catch (err: any) {
-      setImportError(err?.message || err?.response?.data?.error || 'Error al importar.');
+    } catch (err: unknown) {
+      setImportError(axiosErrorMessage(err, 'Error al importar.'));
       setProgress(null);
     } finally {
       setImporting(false);
@@ -110,7 +113,7 @@ export const ImportarPersonas = () => {
       {/* Migas */}
       <nav className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
         <Link to="/dashboard" className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400">
-          <HomeIcon className="w-4 h-4" /> Inicio
+          <HomeIcon className="w-4 h-4" aria-hidden /> Inicio
         </Link>
         <span>/</span>
         <Link to="/personas" className="hover:text-primary-600 dark:hover:text-primary-400">Personas</Link>
@@ -130,11 +133,15 @@ export const ImportarPersonas = () => {
         <div className="lg:col-span-2 space-y-6">
           <div className="card">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <ArrowUpTrayIcon className="w-5 h-5" /> Cargar archivo
+              <ArrowUpTrayIcon className="w-5 h-5" aria-hidden /> Cargar archivo
             </h2>
             <div className="mt-4 space-y-3">
               <div className="flex flex-wrap items-center gap-2">
+                <label htmlFor="imp-per-archivo" className="sr-only">
+                  Archivo Excel (XLSX o XLS)
+                </label>
                 <input
+                  id="imp-per-archivo"
                   ref={fileInputRef}
                   type="file"
                   accept={ACCEPTED_FORMATS}
@@ -153,6 +160,7 @@ export const ImportarPersonas = () => {
                   readOnly
                   value={file ? file.name : 'Ningún archivo'}
                   className="input-field flex-1 min-w-[200px] max-w-md bg-gray-50 dark:bg-gray-700/50"
+                  aria-label="Nombre del archivo seleccionado"
                 />
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -160,38 +168,47 @@ export const ImportarPersonas = () => {
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
+                  type="button"
                   onClick={handleStartImport}
                   disabled={importing || !file}
                   className="btn-primary inline-flex items-center gap-2"
                 >
-                  <PlayIcon className="w-5 h-5" />
+                  <PlayIcon className="w-5 h-5" aria-hidden />
                   {importing ? 'Importando...' : 'Iniciar importación'}
                 </button>
                 <button
+                  type="button"
                   onClick={handleDownloadTemplate}
                   disabled={downloadingTemplate}
                   className="btn-secondary inline-flex items-center gap-2"
                 >
-                  <ArrowDownTrayIcon className="w-5 h-5" />
+                  <ArrowDownTrayIcon className="w-5 h-5" aria-hidden />
                   {downloadingTemplate ? 'Descargando...' : 'Descargar plantilla'}
                 </button>
               </div>
 
               {/* Barra de progreso y estadísticas durante la importación */}
               {importing && progress && (
-                <div className="mt-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-busy="true"
+                  className="mt-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600"
+                >
                   <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    <ChartBarIcon className="w-5 h-5 text-primary-600" />
+                    <ChartBarIcon className="w-5 h-5 text-primary-600" aria-hidden />
                     Progreso de la importación
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3 overflow-hidden">
-                    <div
-                      className="h-full bg-primary-600 transition-all duration-300 ease-out"
-                      style={{
-                        width: progress.total > 0 ? `${Math.min(100, (progress.current / progress.total) * 100)}%` : '0%',
-                      }}
-                    />
-                  </div>
+                  <progress
+                    className="w-full h-3 rounded-full overflow-hidden accent-primary-600"
+                    max={100}
+                    value={
+                      progress.total > 0
+                        ? Math.min(100, (progress.current / progress.total) * 100)
+                        : 0
+                    }
+                    aria-label="Avance del procesamiento de filas"
+                  />
                   <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     Fila {progress.current} de {progress.total} {progress.total > 0 ? `(${Math.round((progress.current / progress.total) * 100)}%)` : ''}
                   </p>
@@ -217,12 +234,18 @@ export const ImportarPersonas = () => {
               )}
             </div>
             {importError && (
-              <div className="mt-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">
+              <div
+                role="alert"
+                className="mt-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm"
+              >
                 {importError}
               </div>
             )}
             {lastResult && (
-              <div className="mt-3 p-4 rounded-lg bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
+              <output
+                aria-live="polite"
+                className="mt-3 block w-full p-4 rounded-lg bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800"
+              >
                 <p className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">Importación finalizada</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                   <div><span className="font-semibold text-green-800 dark:text-green-200">{lastResult.processed_count}</span> creados</div>
@@ -230,13 +253,13 @@ export const ImportarPersonas = () => {
                   <div><span className="font-semibold text-red-700 dark:text-red-300">{lastResult.error_count}</span> errores</div>
                   <div><span className="font-semibold text-green-700 dark:text-green-300">{lastResult.status}</span></div>
                 </div>
-              </div>
+              </output>
             )}
           </div>
 
           <div className="card">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <LightBulbIcon className="w-5 h-5 text-amber-500" /> Buenas prácticas
+              <LightBulbIcon className="w-5 h-5 text-amber-500" aria-hidden /> Buenas prácticas
             </h2>
             <ul className="mt-3 space-y-2 text-gray-600 dark:text-gray-400 text-sm list-disc list-inside">
               <li>La primera fila debe incluir los encabezados estándares.</li>
@@ -251,7 +274,7 @@ export const ImportarPersonas = () => {
         {/* Columna derecha: Incidencias recientes */}
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-            <ExclamationTriangleIcon className="w-5 h-5 text-amber-500" /> Incidencias recientes
+            <ExclamationTriangleIcon className="w-5 h-5 text-amber-500" aria-hidden /> Incidencias recientes
           </h2>
           <div className="mt-3 flex items-center gap-2">
             <button
@@ -260,17 +283,21 @@ export const ImportarPersonas = () => {
               disabled={loadingImports}
               className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
               title="Actualizar"
+              aria-label="Actualizar incidencias recientes"
             >
-              <ArrowPathIcon className={`w-5 h-5 ${loadingImports ? 'animate-spin' : ''}`} />
+              <ArrowPathIcon className={`w-5 h-5 ${loadingImports ? 'animate-spin' : ''}`} aria-hidden />
             </button>
           </div>
           <div className="mt-3 overflow-x-auto">
-            {loadingImports ? (
+            {loadingImports && (
               <div className="py-8 text-center text-gray-500 dark:text-gray-400">Cargando...</div>
-            ) : imports.length === 0 ? (
+            )}
+            {!loadingImports && imports.length === 0 && (
               <p className="py-8 text-center text-gray-500 dark:text-gray-400">Aún no hay importaciones registradas.</p>
-            ) : (
+            )}
+            {!loadingImports && imports.length > 0 && (
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600 text-sm">
+                <caption className="sr-only">Incidencias recientes de importación de personas</caption>
                 <thead className="bg-gray-50 dark:bg-gray-700/50">
                   <tr>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Archivo</th>

@@ -1,9 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, type ComponentProps } from 'react';
 import { PlusIcon, EyeIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
+import { axiosErrorMessage } from '../utils/httpError';
 import { SelectSearch } from '../components/SelectSearch';
 import { PersonaSelectAsync } from '../components/PersonaSelectAsync';
 import type { AprendizResponse, FichaCaracterizacionResponse } from '../types';
+
+function fichaSelectLabel(f: FichaCaracterizacionResponse): string {
+  const base = `Ficha ${f.ficha}`;
+  if (!f.programa_formacion_nombre) {
+    return base;
+  }
+  return `${base} - ${f.programa_formacion_nombre}`;
+}
+
+const IDS = {
+  createPersona: 'aprendices-create-persona',
+  createFicha: 'aprendices-create-ficha',
+  createEstado: 'aprendices-create-estado',
+  editFicha: 'aprendices-edit-ficha',
+  editEstado: 'aprendices-edit-estado',
+} as const;
+
+const TITLE = {
+  create: 'aprendices-modal-create-title',
+  view: 'aprendices-modal-view-title',
+  edit: 'aprendices-modal-edit-title',
+  delete: 'aprendices-modal-delete-title',
+} as const;
 
 export const Aprendices = () => {
   const [list, setList] = useState<AprendizResponse[]>([]);
@@ -25,27 +49,32 @@ export const Aprendices = () => {
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(20);
 
-  const fetchAprendices = async () => {
+  const fetchAprendices = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiService.getAprendices(page, pageSize, undefined, searchText.trim() || undefined);
       setList(res.data);
       setTotal(res.total);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al cargar aprendices');
+    } catch (err: unknown) {
+      setError(axiosErrorMessage(err, 'Error al cargar aprendices'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, searchText]);
 
   useEffect(() => {
-    const t = setTimeout(() => fetchAprendices(), 300);
-    return () => clearTimeout(t);
-  }, [page, searchText]);
+    const t = globalThis.setTimeout(() => {
+      void fetchAprendices();
+    }, 300);
+    return () => globalThis.clearTimeout(t);
+  }, [fetchAprendices]);
 
   useEffect(() => {
     if (modalOpen || modalEdit) {
-      apiService.getFichasCaracterizacion(1, 500).then((res) => setFichas(res.data)).catch(() => {});
+      void apiService
+        .getFichasCaracterizacion(1, 500)
+        .then((res) => setFichas(res.data))
+        .catch(() => {});
     }
   }, [modalOpen, modalEdit]);
 
@@ -56,16 +85,15 @@ export const Aprendices = () => {
     setModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitCreate = async (): Promise<void> => {
     const pid = personaId === '' ? undefined : personaId;
     const fid = fichaId === '' ? undefined : fichaId;
-    if (pid == null) {
-      alert('Seleccione una persona');
+    if (pid === undefined) {
+      globalThis.alert('Seleccione una persona');
       return;
     }
-    if (fid == null) {
-      alert('Seleccione una ficha de caracterización');
+    if (fid === undefined) {
+      globalThis.alert('Seleccione una ficha de caracterización');
       return;
     }
     setSaving(true);
@@ -76,12 +104,17 @@ export const Aprendices = () => {
         estado,
       });
       setModalOpen(false);
-      fetchAprendices();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al guardar aprendiz');
+      void fetchAprendices();
+    } catch (err: unknown) {
+      globalThis.alert(axiosErrorMessage(err, 'Error al guardar aprendiz'));
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSubmit: NonNullable<ComponentProps<'form'>['onSubmit']> = (e) => {
+    e.preventDefault();
+    void submitCreate();
   };
 
   const openEdit = (item: AprendizResponse) => {
@@ -90,11 +123,12 @@ export const Aprendices = () => {
     setEditEstado(item.estado);
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!modalEdit) return;
+  const submitUpdate = async (): Promise<void> => {
+    if (!modalEdit) {
+      return;
+    }
     if (editFichaId === '') {
-      alert('Seleccione una ficha');
+      globalThis.alert('Seleccione una ficha');
       return;
     }
     setSaving(true);
@@ -105,23 +139,30 @@ export const Aprendices = () => {
         estado: editEstado,
       });
       setModalEdit(null);
-      fetchAprendices();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al actualizar aprendiz');
+      void fetchAprendices();
+    } catch (err: unknown) {
+      globalThis.alert(axiosErrorMessage(err, 'Error al actualizar aprendiz'));
     } finally {
       setSaving(false);
     }
   };
 
+  const handleUpdate: NonNullable<ComponentProps<'form'>['onSubmit']> = (e) => {
+    e.preventDefault();
+    void submitUpdate();
+  };
+
   const handleDelete = async () => {
-    if (!modalDelete) return;
+    if (!modalDelete) {
+      return;
+    }
     setSaving(true);
     try {
       await apiService.deleteAprendiz(modalDelete.id);
       setModalDelete(null);
-      fetchAprendices();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al eliminar aprendiz');
+      void fetchAprendices();
+    } catch (err: unknown) {
+      globalThis.alert(axiosErrorMessage(err, 'Error al eliminar aprendiz'));
     } finally {
       setSaving(false);
     }
@@ -129,45 +170,48 @@ export const Aprendices = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Aprendices</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">Gestiona y administra los aprendices del SENA</p>
         </div>
-        <button onClick={handleCreate} className="btn-primary">
+        <button type="button" onClick={handleCreate} className="btn-primary">
           <span className="inline-flex items-center">
-            <PlusIcon className="w-5 h-5 mr-2" />
+            <PlusIcon className="mr-2 h-5 w-5" />
             Nuevo Aprendiz
           </span>
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">{error}</div>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+          {error}
+        </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-600 flex items-center gap-4">
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex items-center gap-4 border-b border-gray-200 px-4 py-3 dark:border-gray-600">
           <input
             type="search"
             placeholder="Buscar por nombre, documento, ficha o programa..."
-            className="input-field flex-1 max-w-md"
+            className="input-field max-w-md flex-1"
             value={searchText}
             onChange={(e) => {
               setSearchText(e.target.value);
               setPage(1);
             }}
+            aria-label="Buscar aprendices"
           />
-          <select className="input-field w-40">
+          <select className="input-field w-40" disabled aria-label="Filtro estado (próximamente)">
             <option>Todos los estados</option>
           </select>
-          <select className="input-field w-40">
+          <select className="input-field w-40" disabled aria-label="Filtro fichas (próximamente)">
             <option>Todas las fichas</option>
           </select>
-          <select className="input-field w-40">
+          <select className="input-field w-40" disabled aria-label="Filtro programas (próximamente)">
             <option>Todos los programas</option>
           </select>
-          <select className="input-field w-40">
+          <select className="input-field w-40" disabled aria-label="Filtro regionales (próximamente)">
             <option>Todas las regionales</option>
           </select>
         </div>
@@ -177,17 +221,19 @@ export const Aprendices = () => {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
             <thead className="bg-gray-50 dark:bg-gray-700/50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nombre completo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Documento</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ficha</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Programa</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Regional</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estado</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-28">Acciones</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">#</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+                  Nombre completo
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Documento</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ficha</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Programa</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Regional</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Estado</th>
+                <th className="w-28 px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Acciones</th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+            <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-600 dark:bg-gray-800">
               {list.map((item, idx) => (
                 <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{(page - 1) * pageSize + idx + 1}</td>
@@ -197,7 +243,13 @@ export const Aprendices = () => {
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.programa_nombre ?? '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.regional_nombre ?? '-'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs rounded ${item.estado ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
+                    <span
+                      className={`rounded px-2 py-1 text-xs ${
+                        item.estado
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                      }`}
+                    >
                       {item.estado ? 'ACTIVO' : 'INACTIVO'}
                     </span>
                   </td>
@@ -206,26 +258,26 @@ export const Aprendices = () => {
                       <button
                         type="button"
                         onClick={() => setModalView(item)}
-                        className="p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                         title="Ver"
                       >
-                        <EyeIcon className="w-5 h-5" />
+                        <EyeIcon className="h-5 w-5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => openEdit(item)}
-                        className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
+                        className="rounded-lg p-2 text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
                         title="Editar"
                       >
-                        <PencilSquareIcon className="w-5 h-5" />
+                        <PencilSquareIcon className="h-5 w-5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => setModalDelete(item)}
-                        className="p-2 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                         title="Eliminar"
                       >
-                        <TrashIcon className="w-5 h-5" />
+                        <TrashIcon className="h-5 w-5" />
                       </button>
                     </div>
                   </td>
@@ -240,7 +292,7 @@ export const Aprendices = () => {
         {!loading && total > 0 && (
           <div className="mt-4 flex items-center justify-between px-4 pb-4">
             <div className="text-sm text-gray-700 dark:text-gray-300">
-              Mostrando {((page - 1) * pageSize) + 1} a {Math.min(page * pageSize, total)} de {total} resultados
+              Mostrando {(page - 1) * pageSize + 1} a {Math.min(page * pageSize, total)} de {total} resultados
             </div>
             <div className="flex space-x-2">
               <button
@@ -265,14 +317,30 @@ export const Aprendices = () => {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-gray-200 dark:border-gray-600">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Crear Aprendiz</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Asignar aprendiz</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 z-0 bg-black/50"
+            aria-label="Cerrar formulario de nuevo aprendiz"
+            onClick={() => setModalOpen(false)}
+          />
+          <dialog
+            open
+            className="relative z-10 m-0 w-full max-w-md flex-col rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+            aria-labelledby={TITLE.create}
+          >
+            <h2 id={TITLE.create} className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
+              Crear Aprendiz
+            </h2>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Asignar aprendiz</p>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Persona *</label>
+                <label htmlFor={IDS.createPersona} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Persona *
+                </label>
                 <PersonaSelectAsync
+                  inputId={IDS.createPersona}
+                  ariaLabel="Persona"
                   value={personaId === '' ? undefined : personaId}
                   onChange={(v) => setPersonaId(v ?? '')}
                   placeholder="Buscar por nombre o documento..."
@@ -280,22 +348,31 @@ export const Aprendices = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ficha de Caracterización *</label>
+                <label htmlFor={IDS.createFicha} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Ficha de Caracterización *
+                </label>
                 <SelectSearch
+                  inputId={IDS.createFicha}
                   options={fichas.map((f) => ({
                     value: f.id,
-                    label: `Ficha ${f.ficha}${f.programa_formacion_nombre ? ` - ${f.programa_formacion_nombre}` : ''}`,
+                    label: fichaSelectLabel(f),
                   }))}
                   value={fichaId === '' ? undefined : fichaId}
                   onChange={(v) => setFichaId(v ?? '')}
                   placeholder="Seleccione una ficha"
                   isRequired
+                  ariaLabel="Ficha de caracterización"
                 />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Ficha de caracterización a la que pertenecerá el aprendiz</p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Ficha de caracterización a la que pertenecerá el aprendiz
+                </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estado</label>
+                <label htmlFor={IDS.createEstado} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Estado
+                </label>
                 <select
+                  id={IDS.createEstado}
                   value={estado ? '1' : '0'}
                   onChange={(e) => setEstado(e.target.value === '1')}
                   className="input-field w-full"
@@ -313,44 +390,67 @@ export const Aprendices = () => {
                 </button>
               </div>
             </form>
-          </div>
+          </dialog>
         </div>
       )}
 
       {modalView && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setModalView(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-gray-200 dark:border-gray-600" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detalle del aprendiz</h2>
-              <button type="button" onClick={() => setModalView(null)} className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded">
-                <XMarkIcon className="w-6 h-6" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 z-0 bg-black/50"
+            aria-label="Cerrar detalle del aprendiz"
+            onClick={() => setModalView(null)}
+          />
+          <dialog
+            open
+            className="relative z-10 m-0 w-full max-w-md flex-col rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+            aria-labelledby={TITLE.view}
+          >
+            <div className="mb-4 flex items-start justify-between">
+              <h2 id={TITLE.view} className="text-xl font-bold text-gray-900 dark:text-white">
+                Detalle del aprendiz
+              </h2>
+              <button
+                type="button"
+                onClick={() => setModalView(null)}
+                className="rounded p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                aria-label="Cerrar"
+              >
+                <XMarkIcon className="h-6 w-6" />
               </button>
             </div>
             <dl className="space-y-3 text-sm">
               <div>
                 <dt className="font-medium text-gray-500 dark:text-gray-400">Nombre completo</dt>
-                <dd className="text-gray-900 dark:text-white mt-0.5">{modalView.persona_nombre}</dd>
+                <dd className="mt-0.5 text-gray-900 dark:text-white">{modalView.persona_nombre}</dd>
               </div>
               <div>
                 <dt className="font-medium text-gray-500 dark:text-gray-400">Documento</dt>
-                <dd className="text-gray-900 dark:text-white mt-0.5">{modalView.persona_documento ?? '-'}</dd>
+                <dd className="mt-0.5 text-gray-900 dark:text-white">{modalView.persona_documento ?? '-'}</dd>
               </div>
               <div>
                 <dt className="font-medium text-gray-500 dark:text-gray-400">Ficha</dt>
-                <dd className="text-gray-900 dark:text-white mt-0.5">{modalView.ficha_numero ?? '-'}</dd>
+                <dd className="mt-0.5 text-gray-900 dark:text-white">{modalView.ficha_numero ?? '-'}</dd>
               </div>
               <div>
                 <dt className="font-medium text-gray-500 dark:text-gray-400">Programa</dt>
-                <dd className="text-gray-900 dark:text-white mt-0.5">{modalView.programa_nombre ?? '-'}</dd>
+                <dd className="mt-0.5 text-gray-900 dark:text-white">{modalView.programa_nombre ?? '-'}</dd>
               </div>
               <div>
                 <dt className="font-medium text-gray-500 dark:text-gray-400">Regional</dt>
-                <dd className="text-gray-900 dark:text-white mt-0.5">{modalView.regional_nombre ?? '-'}</dd>
+                <dd className="mt-0.5 text-gray-900 dark:text-white">{modalView.regional_nombre ?? '-'}</dd>
               </div>
               <div>
                 <dt className="font-medium text-gray-500 dark:text-gray-400">Estado</dt>
                 <dd className="mt-0.5">
-                  <span className={`px-2 py-1 text-xs rounded ${modalView.estado ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
+                  <span
+                    className={`rounded px-2 py-1 text-xs ${
+                      modalView.estado
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                    }`}
+                  >
                     {modalView.estado ? 'ACTIVO' : 'INACTIVO'}
                   </span>
                 </dd>
@@ -361,37 +461,61 @@ export const Aprendices = () => {
                 Cerrar
               </button>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
 
       {modalEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-gray-200 dark:border-gray-600">
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Editar aprendiz</h2>
-              <button type="button" onClick={() => setModalEdit(null)} className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded">
-                <XMarkIcon className="w-6 h-6" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 z-0 bg-black/50"
+            aria-label="Cerrar edición de aprendiz"
+            onClick={() => setModalEdit(null)}
+          />
+          <dialog
+            open
+            className="relative z-10 m-0 w-full max-w-md flex-col rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+            aria-labelledby={TITLE.edit}
+          >
+            <div className="mb-4 flex items-start justify-between">
+              <h2 id={TITLE.edit} className="text-xl font-bold text-gray-900 dark:text-white">
+                Editar aprendiz
+              </h2>
+              <button
+                type="button"
+                onClick={() => setModalEdit(null)}
+                className="rounded p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                aria-label="Cerrar"
+              >
+                <XMarkIcon className="h-6 w-6" />
               </button>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Aprendiz: {modalEdit.persona_nombre}</p>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Aprendiz: {modalEdit.persona_nombre}</p>
             <form onSubmit={handleUpdate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ficha de Caracterización *</label>
+                <label htmlFor={IDS.editFicha} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Ficha de Caracterización *
+                </label>
                 <SelectSearch
+                  inputId={IDS.editFicha}
                   options={fichas.map((f) => ({
                     value: f.id,
-                    label: `Ficha ${f.ficha}${f.programa_formacion_nombre ? ` - ${f.programa_formacion_nombre}` : ''}`,
+                    label: fichaSelectLabel(f),
                   }))}
                   value={editFichaId === '' ? undefined : Number(editFichaId)}
-                  onChange={(v) => setEditFichaId(v != null ? String(v) : '')}
+                  onChange={(v) => setEditFichaId(v === undefined || v === null ? '' : String(v))}
                   placeholder="Seleccione una ficha"
                   isRequired
+                  ariaLabel="Ficha de caracterización"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estado</label>
+                <label htmlFor={IDS.editEstado} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Estado
+                </label>
                 <select
+                  id={IDS.editEstado}
                   value={editEstado ? '1' : '0'}
                   onChange={(e) => setEditEstado(e.target.value === '1')}
                   className="input-field w-full"
@@ -409,26 +533,43 @@ export const Aprendices = () => {
                 </button>
               </div>
             </form>
-          </div>
+          </dialog>
         </div>
       )}
 
       {modalDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setModalDelete(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-gray-200 dark:border-gray-600" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Eliminar aprendiz</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 z-0 bg-black/50"
+            aria-label="Cancelar eliminación"
+            onClick={() => setModalDelete(null)}
+          />
+          <dialog
+            open
+            className="relative z-10 m-0 w-full max-w-md flex-col rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+            aria-labelledby={TITLE.delete}
+          >
+            <h2 id={TITLE.delete} className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
+              Eliminar aprendiz
+            </h2>
+            <p className="mb-4 text-gray-600 dark:text-gray-400">
               ¿Está seguro de eliminar al aprendiz <strong>{modalDelete.persona_nombre}</strong>? Esta acción no se puede deshacer.
             </p>
             <div className="flex justify-end gap-3">
               <button type="button" onClick={() => setModalDelete(null)} className="btn-secondary">
                 Cancelar
               </button>
-              <button type="button" onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50" disabled={saving}>
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50"
+                disabled={saving}
+              >
                 {saving ? 'Eliminando...' : 'Eliminar'}
               </button>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
     </div>

@@ -10,7 +10,7 @@ import (
 )
 
 type ProgramaFormacionHandler struct {
-	svc    services.ProgramaFormacionService
+	svc       services.ProgramaFormacionService
 	importSvc services.ProgramaFormacionImportService
 }
 
@@ -22,8 +22,14 @@ func NewProgramaFormacionHandler() *ProgramaFormacionHandler {
 }
 
 func (h *ProgramaFormacionHandler) GetAll(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if err != nil || pageSize < 1 {
+		pageSize = 20
+	}
 	search := c.DefaultQuery("search", "")
 
 	list, total, err := h.svc.FindAll(page, pageSize, search)
@@ -37,7 +43,7 @@ func (h *ProgramaFormacionHandler) GetAll(c *gin.Context) {
 func (h *ProgramaFormacionHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	p, err := h.svc.FindByID(uint(id))
@@ -51,7 +57,7 @@ func (h *ProgramaFormacionHandler) GetByID(c *gin.Context) {
 func (h *ProgramaFormacionHandler) Create(c *gin.Context) {
 	var req dto.ProgramaFormacionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	p, err := h.svc.Create(req)
@@ -65,12 +71,12 @@ func (h *ProgramaFormacionHandler) Create(c *gin.Context) {
 func (h *ProgramaFormacionHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	var req dto.ProgramaFormacionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
 		return
 	}
 	p, err := h.svc.Update(uint(id), req)
@@ -84,7 +90,7 @@ func (h *ProgramaFormacionHandler) Update(c *gin.Context) {
 func (h *ProgramaFormacionHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
 	if err := h.svc.Delete(uint(id)); err != nil {

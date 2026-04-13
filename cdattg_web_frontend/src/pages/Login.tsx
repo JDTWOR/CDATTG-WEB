@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MoonIcon, SunIcon } from '@heroicons/react/24/outline';
 import LogoSena from '../../logo-sena-verde-complementario-svg-2022.svg';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { axiosErrorMessage } from '../utils/httpError';
 
 export const Login = () => {
   const [loginId, setLoginId] = useState('');
@@ -14,20 +15,20 @@ export const Login = () => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit: NonNullable<ComponentProps<'form'>['onSubmit']> = (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
-
-    try {
-      await login({ email: loginId.trim(), password });
-      navigate('/perfil');
-    } catch (err: any) {
-      const msg = err.response?.data?.error ?? err.response?.data?.message ?? err.message;
-      setError(typeof msg === 'string' ? msg : 'Error al iniciar sesión');
-    } finally {
-      setLoading(false);
-    }
+    void (async () => {
+      setLoading(true);
+      try {
+        await login({ email: loginId.trim(), password });
+        navigate('/perfil');
+      } catch (err: unknown) {
+        setError(axiosErrorMessage(err, 'Error al iniciar sesión'));
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   return (
@@ -40,9 +41,9 @@ export const Login = () => {
         aria-label={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
       >
         {theme === 'light' ? (
-          <MoonIcon className="w-5 h-5 text-gray-700" />
+          <MoonIcon className="w-5 h-5 text-gray-700" aria-hidden />
         ) : (
-          <SunIcon className="w-5 h-5 text-yellow-300" />
+          <SunIcon className="w-5 h-5 text-yellow-300" aria-hidden />
         )}
       </button>
       <div className="max-w-md w-full space-y-8">
@@ -64,7 +65,10 @@ export const Login = () => {
         <div className="card">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+              <div
+                role="alert"
+                className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg"
+              >
                 {error}
               </div>
             )}

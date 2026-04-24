@@ -9,6 +9,7 @@ import type {
   AprendizResponse,
   AsistenciaResponse,
   AsistenciaAprendizResponse,
+  TipoObservacionAsistenciaItem,
 } from '../types';
 
 type BadgeColorAsistencia = 'green' | 'yellow' | 'gray';
@@ -110,6 +111,9 @@ const HISTORIAL_FECHA_INPUT_ID = 'asistencia-historial-ficha-fecha';
 const MODAL_SEMANA_TITLE_ID = 'modal-semana-title';
 const MODAL_MES_SEMANA_ID = 'modal-semana-mes';
 const MODAL_SEMANA_SELECT_ID = 'modal-semana-numero';
+const HISTORIAL_MODAL_TIPO_OBS_ID = 'historial-modal-tipo-observacion';
+const HISTORIAL_MODAL_OBS_ID = 'historial-modal-observacion';
+const PLAZO_EDICION_OBSERVACION_DIAS = 5;
 
 function claseBadgeAsistencia(color: BadgeColorAsistencia): string {
   if (color === 'green') {
@@ -149,6 +153,16 @@ export const AsistenciaHistorialFicha = () => {
   const [mesSemana, setMesSemana] = useState(() => new Date().toISOString().slice(0, 7));
   const [semanaDelMes, setSemanaDelMes] = useState<number>(1);
   const [descargandoSemana, setDescargandoSemana] = useState(false);
+  const [tiposObservacionCatalogo, setTiposObservacionCatalogo] = useState<TipoObservacionAsistenciaItem[]>([]);
+  const [observacionesModal, setObservacionesModal] = useState<{
+    asistenciaId: number;
+    aprendizId: number;
+    nombre: string;
+    observaciones: string;
+    tipoObservacionIds: number[];
+    editableHasta: string;
+  } | null>(null);
+  const [guardandoObservaciones, setGuardandoObservaciones] = useState(false);
 
   const fechaValida = useMemo(() => /^\d{4}-\d{2}-\d{2}$/.test(fecha), [fecha]);
 
@@ -210,6 +224,12 @@ export const AsistenciaHistorialFicha = () => {
       cancelled = true;
     };
   }, [fichaId, fecha, fechaValida]);
+
+  useEffect(() => {
+    apiService.getTiposObservacionAsistencia()
+      .then((data) => setTiposObservacionCatalogo(data))
+      .catch(() => setTiposObservacionCatalogo([]));
+  }, []);
 
   const filas: FilaHistorial[] = useMemo(() => {
     type Reg = {
@@ -331,6 +351,119 @@ export const AsistenciaHistorialFicha = () => {
     () => sesiones.filter((s) => (s.observaciones ?? '').trim().length > 0),
     [sesiones]
   );
+
+  const editableHastaPorSesionId = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const sesion of sesiones) {
+      const base = new Date(`${sesion.fecha.slice(0, 10)}T00:00:00`);
+      if (Number.isNaN(base.getTime())) continue;
+      base.setDate(base.getDate() + PLAZO_EDICION_OBSERVACION_DIAS);
+      map.set(sesion.id, base.toISOString().slice(0, 10));
+    }
+    return map;
+  }, [sesiones]);
+
+  const sesionEditablePorAprendizId = useMemo(() => {
+    const map = new Map<number, {
+      asistenciaId: number;
+      observaciones: string;
+      tipoObservacionIds: number[];
+      editableHasta: string;
+      puedeEditar: boolean;
+    }>();
+    const hoy = new Date().toISOString().slice(0, 10);
+    const sesionesOrdenadas = [...sesiones].sort((a, b) => {
+      const ta = a.hora_inicio ? new Date(a.hora_inicio).getTime() : a.id;
+      const tb = b.hora_inicio ? new Date(b.hora_inicio).getTime() : b.id;
+      return ta - tb;
+    });
+    const sesionBase = sesionesOrdenadas.at(-1);
+    if (sesionBase) {
+      const editableHastaBase = editableHastaPorSesionId.get(sesionBase.id);
+      if (editableHastaBase) {
+        const puedeEditarBase = hoy <= editableHastaBase;
+        for (const aprendiz of aprendices) {
+          map.set(aprendiz.id, {
+            asistenciaId: sesionBase.id,
+            observaciones: '',
+            tipoObservacionIds: [],
+            editableHasta: editableHastaBase,
+            puedeEditar: puedeEditarBase,
+          });
+        }
+      }
+    }
+    for (const sesion of sesionesOrdenadas) {
+      const editableHasta = editableHastaPorSesionId.get(sesion.id);
+      if (!editableHasta) continue;
+      const puedeEditar = hoy <= editableHasta;
+      const registros = aprendicesPorSesion.get(sesion.id) ?? [];
+      for (const reg of registros) {
+        map.set(reg.aprendiz_id, {
+          asistenciaId: sesion.id,
+          observaciones: reg.observaciones ?? '',
+          tipoObservacionIds: (reg.tipos_observacion ?? []).map((t) => t.id),
+          editableHasta,
+          puedeEditar,
+        });
+      }
+    }
+    return map;
+  }, [aprendices, aprendicesPorSesion, editableHastaPorSesionId, sesiones]);
+
+  const abrirModalObservaciones = (aprendiz: AprendizResponse) => {
+    const data = sesionEditablePorAprendizId.get(aprendiz.id);
+    if (!data) return;
+    if (!data.puedeEditar) {
+      setError(`El plazo para actualizar observaciones de ${aprendiz.persona_nombre ?? 'este aprendiz'} venció el ${data.editableHasta}.`);
+      return;
+    }
+    setObservacionesModal({
+      asistenciaId: data.asistenciaId,
+      aprendizId: aprendiz.id,
+      nombre: aprendiz.persona_nombre ?? 'Aprendiz',
+      observaciones: data.observaciones,
+      tipoObservacionIds: data.tipoObservacionIds,
+      editableHasta: data.editableHasta,
+    });
+  };
+
+  const guardarObservaciones = async () => {
+    if (!observacionesModal) return;
+    setGuardandoObservaciones(true);
+    setError('');
+    try {
+      await apiService.crearOActualizarObservacionesAsistencia(
+        observacionesModal.asistenciaId,
+        observacionesModal.aprendizId,
+        observacionesModal.observaciones,
+        observacionesModal.tipoObservacionIds
+      );
+      setObservacionesModal(null);
+      if (fichaId && Number.isFinite(fichaId) && fechaValida) {
+        setLoading(true);
+        const [aprendicesRes, sesionesRes] = await Promise.all([
+          apiService.getFichaAprendices(fichaId),
+          apiService.getAsistenciasByFichaAndFechas(fichaId, fecha, fecha),
+        ]);
+        setAprendices(aprendicesRes.filter((a) => a.estado));
+        setSesiones(sesionesRes);
+        const map = new Map<number, AsistenciaAprendizResponse[]>();
+        await Promise.all(
+          sesionesRes.map(async (sesion) => {
+            const list = await apiService.getAsistenciaAprendices(sesion.id);
+            map.set(sesion.id, list);
+          })
+        );
+        setAprendicesPorSesion(map);
+      }
+    } catch (e: unknown) {
+      setError(axiosErrorMessage(e, 'No se pudo guardar la observación del aprendiz.'));
+    } finally {
+      setGuardandoObservaciones(false);
+      setLoading(false);
+    }
+  };
 
   const moverFecha = (dias: number) => {
     const base = new Date(`${fecha}T00:00:00`);
@@ -781,6 +914,123 @@ export const AsistenciaHistorialFicha = () => {
         </div>
       )}
 
+      {observacionesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Cerrar edición de observación"
+            onClick={() => !guardandoObservaciones && setObservacionesModal(null)}
+          />
+          <dialog
+            open
+            className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 shadow-xl"
+            aria-labelledby="modal-observacion-title"
+          >
+            <h2 id="modal-observacion-title" className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Observación — {observacionesModal.nombre}
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Editable hasta: {observacionesModal.editableHasta}
+            </p>
+            <div className="mb-3">
+              <label htmlFor={HISTORIAL_MODAL_TIPO_OBS_ID} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Tipos de observación
+              </label>
+              <select
+                id={HISTORIAL_MODAL_TIPO_OBS_ID}
+                value=""
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  if (!id) return;
+                  e.target.value = '';
+                  if (observacionesModal.tipoObservacionIds.includes(id)) return;
+                  setObservacionesModal((prev) => (
+                    prev ? { ...prev, tipoObservacionIds: [...prev.tipoObservacionIds, id] } : null
+                  ));
+                }}
+                className="input-field w-full"
+                disabled={guardandoObservaciones}
+              >
+                <option value="">Agregar tipo…</option>
+                {tiposObservacionCatalogo
+                  .filter((t) => !observacionesModal.tipoObservacionIds.includes(t.id))
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nombre}
+                    </option>
+                  ))}
+              </select>
+              {observacionesModal.tipoObservacionIds.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {observacionesModal.tipoObservacionIds.map((id) => {
+                    const tipo = tiposObservacionCatalogo.find((t) => t.id === id);
+                    return (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-1 rounded bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs text-gray-700 dark:text-gray-300"
+                      >
+                        {tipo?.nombre ?? id}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setObservacionesModal((prev) =>
+                              prev ? { ...prev, tipoObservacionIds: prev.tipoObservacionIds.filter((x) => x !== id) } : null
+                            )
+                          }
+                          className="rounded px-1 hover:bg-gray-200 dark:hover:bg-gray-600"
+                          disabled={guardandoObservaciones}
+                          aria-label="Quitar tipo"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="mb-4">
+              <label htmlFor={HISTORIAL_MODAL_OBS_ID} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Observación libre
+              </label>
+              <textarea
+                id={HISTORIAL_MODAL_OBS_ID}
+                value={observacionesModal.observaciones}
+                onChange={(e) =>
+                  setObservacionesModal((prev) => (prev ? { ...prev, observaciones: e.target.value } : null))
+                }
+                rows={4}
+                className="input-field w-full resize-y"
+                placeholder="Ej: Entregó excusa dentro del plazo de 5 días."
+                disabled={guardandoObservaciones}
+                maxLength={1000}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setObservacionesModal(null)}
+                disabled={guardandoObservaciones}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void guardarObservaciones();
+                }}
+                disabled={guardandoObservaciones}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                {guardandoObservaciones ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </dialog>
+        </div>
+      )}
+
       {error && (
         <div
           role="alert"
@@ -822,12 +1072,15 @@ export const AsistenciaHistorialFicha = () => {
                   <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">
                     Observaciones
                   </th>
+                  <th className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-semibold text-gray-700 dark:text-gray-300">
+                    Acción
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filas.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="border border-gray-200 dark:border-gray-600 px-3 py-6 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={7} className="border border-gray-200 dark:border-gray-600 px-3 py-6 text-center text-gray-500 dark:text-gray-400">
                       No hay aprendices en la ficha o no se pudo cargar el listado.
                     </td>
                   </tr>
@@ -868,6 +1121,21 @@ export const AsistenciaHistorialFicha = () => {
                           )}
                           <span>{fila.observaciones || (fila.tiposObservacion.length === 0 ? '–' : '')}</span>
                         </div>
+                      </td>
+                      <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => abrirModalObservaciones(fila.aprendiz)}
+                          className="btn-secondary text-xs"
+                          disabled={!sesionEditablePorAprendizId.get(fila.aprendiz.id)?.puedeEditar}
+                          title={
+                            sesionEditablePorAprendizId.get(fila.aprendiz.id)?.puedeEditar
+                              ? 'Editar observación'
+                              : `Plazo vencido (${sesionEditablePorAprendizId.get(fila.aprendiz.id)?.editableHasta ?? 'sin fecha'})`
+                          }
+                        >
+                          Editar observación
+                        </button>
                       </td>
                     </tr>
                   ))

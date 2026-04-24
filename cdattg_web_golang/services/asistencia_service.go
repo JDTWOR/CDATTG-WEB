@@ -14,12 +14,15 @@ import (
 const (
 	errMsgSesionAsistenciaNoEncontrada   = "SESIÓN DE ASISTENCIA NO ENCONTRADA"
 	errMsgSesionYaFinalizada             = "LA SESIÓN YA ESTÁ FINALIZADA"
+	errMsgObservacionFueraDePlazo        = "LA OBSERVACIÓN SOLO SE PUEDE EDITAR HASTA 5 DÍAS DESPUÉS DE CERRAR LA SESIÓN"
 	errMsgRegistroAsistenciaNoEncontrado = "REGISTRO DE ASISTENCIA NO ENCONTRADO"
 	errMsgFechaInvalida                  = "FECHA INVÁLIDA, USE YYYY-MM-DD"
 	errMsgYaExisteSesionActiva           = "YA EXISTE UNA SESIÓN DE ASISTENCIA ACTIVA PARA ESTA FICHA. FINALÍCELA ANTES DE CREAR OTRA"
 	errMsgNoEstaCreadoComoInstructor     = "NO ESTÁ CREADO COMO INSTRUCTOR DE ESTA FICHA"
 	errMsgFueraDelHorarioJornada         = "FUERA DEL HORARIO DE LA JORNADA DE LA FICHA; SOLO SE PUEDE TOMAR ASISTENCIA EN EL HORARIO CONFIGURADO"
 )
+
+const plazoEdicionObservacionSesionDias = 5
 
 type AsistenciaService interface {
 	CreateSesion(req dto.AsistenciaRequest) (*dto.AsistenciaResponse, error)
@@ -63,6 +66,22 @@ func esSesionDeHoy(fecha time.Time) bool {
 	loc := now.Location()
 	local := fecha.In(loc)
 	return local.Year() == now.Year() && local.Month() == now.Month() && local.Day() == now.Day()
+}
+
+func sesionCerradaDentroDePlazoEdicion(fechaSesion time.Time, ahora time.Time, diasMax int) bool {
+	if diasMax < 0 {
+		return false
+	}
+	loc := ahora.Location()
+	inicioSesion := time.Date(
+		fechaSesion.In(loc).Year(),
+		fechaSesion.In(loc).Month(),
+		fechaSesion.In(loc).Day(),
+		0, 0, 0, 0, loc,
+	)
+	inicioHoy := time.Date(ahora.Year(), ahora.Month(), ahora.Day(), 0, 0, 0, 0, loc)
+	diffDias := int(inicioHoy.Sub(inicioSesion).Hours() / 24)
+	return diffDias >= 0 && diffDias <= diasMax
 }
 
 func NewAsistenciaService() AsistenciaService {
@@ -405,6 +424,9 @@ func (s *asistenciaService) ActualizarObservaciones(asistenciaAprendizID uint, o
 	if err != nil {
 		return nil, errors.New(errMsgRegistroAsistenciaNoEncontrado)
 	}
+	if aa.Asistencia != nil && aa.Asistencia.IsFinished && !sesionCerradaDentroDePlazoEdicion(aa.Asistencia.Fecha, time.Now(), plazoEdicionObservacionSesionDias) {
+		return nil, errors.New(errMsgObservacionFueraDePlazo)
+	}
 	aa.Observaciones = observaciones
 	if err := s.repoAA.Update(aa); err != nil {
 		return nil, err
@@ -417,8 +439,8 @@ func (s *asistenciaService) CrearOActualizarObservaciones(asistenciaID, aprendiz
 	if err != nil || asist == nil {
 		return nil, errors.New(errMsgSesionAsistenciaNoEncontrada)
 	}
-	if asist.IsFinished {
-		return nil, errors.New(errMsgSesionYaFinalizada)
+	if asist.IsFinished && !sesionCerradaDentroDePlazoEdicion(asist.Fecha, time.Now(), plazoEdicionObservacionSesionDias) {
+		return nil, errors.New(errMsgObservacionFueraDePlazo)
 	}
 	// Con múltiples tramos: actualizar observaciones en el tramo abierto o en el último registro.
 	aa, _ := s.repoAA.FindOpenByAsistenciaIDAndAprendizID(asistenciaID, aprendizID)

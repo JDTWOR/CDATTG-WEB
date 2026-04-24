@@ -239,6 +239,41 @@ func (h *AsistenciaHandler) RegistrarSalida(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *AsistenciaHandler) ActualizarObservacionesSesion(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	asist, err := h.asistenciaRepo.FindByID(uint(id))
+	if err != nil || asist == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "sesión no encontrada"})
+		return
+	}
+	var fichaID uint
+	if asist.InstructorFicha != nil {
+		fichaID = asist.InstructorFicha.FichaID
+	} else if ifc, _ := h.instFichaRepo.FindByID(asist.InstructorFichaID); ifc != nil {
+		fichaID = ifc.FichaID
+	}
+	instructorFichaID := h.getInstructorFichaIDForCurrentUser(c, fichaID)
+	if instructorFichaID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "no está autorizado para editar esta sesión"})
+		return
+	}
+	var req dto.AsistenciaObservacionesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgObservacionesInvalido})
+		return
+	}
+	resp, err := h.svc.ActualizarObservacionesSesion(uint(id), req.Observaciones, instructorFichaID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *AsistenciaHandler) ActualizarObservaciones(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("asistenciaAprendizId"), 10, 32)
 	if err != nil {

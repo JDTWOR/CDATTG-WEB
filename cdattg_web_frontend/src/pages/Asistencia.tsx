@@ -100,6 +100,7 @@ function buildRangoText(firstIngreso: string | null, lastSalida: string | null, 
 const ASIST_MODAL_IDS = {
   obsTipo: 'asistencia-modal-obs-tipo',
   obsLibre: 'asistencia-modal-obs-libre',
+  obsSesionLibre: 'asistencia-modal-obs-sesion-libre',
   estado: 'asistencia-modal-estado',
   estadoMotivo: 'asistencia-modal-estado-motivo',
 } as const;
@@ -459,6 +460,8 @@ export const Asistencia = () => {
   } | null>(null);
   const [tiposObservacionCatalog, setTiposObservacionCatalog] = useState<TipoObservacionAsistenciaItem[]>([]);
   const [observacionesGuardando, setObservacionesGuardando] = useState(false);
+  const [observacionesSesionModal, setObservacionesSesionModal] = useState<{ observaciones: string } | null>(null);
+  const [observacionesSesionGuardando, setObservacionesSesionGuardando] = useState(false);
   const [estadoModal, setEstadoModal] = useState<{ asistenciaAprendizId: number; nombre: string; estado: string; motivo: string } | null>(null);
   const [estadoGuardando, setEstadoGuardando] = useState(false);
   const [pendientesRevision, setPendientesRevision] = useState<AsistenciaAprendizResponse[]>([]);
@@ -727,6 +730,23 @@ export const Asistencia = () => {
     }
   };
 
+  const handleGuardarObservacionesSesion = async () => {
+    if (!sesionActual || !observacionesSesionModal) return;
+    setObservacionesSesionGuardando(true);
+    try {
+      const actualizada = await apiService.actualizarObservacionesSesionAsistencia(
+        sesionActual.id,
+        observacionesSesionModal.observaciones
+      );
+      setSesionActual(actualizada);
+      setObservacionesSesionModal(null);
+    } catch (e: unknown) {
+      globalThis.alert(axiosErrorMessage(e, 'Error al guardar observación de la sesión'));
+    } finally {
+      setObservacionesSesionGuardando(false);
+    }
+  };
+
   const quitarTipoObservacionEnModal = (tipoId: number) => {
     setObservacionesModal((prev) =>
       prev ? { ...prev, tipoObservacionIds: prev.tipoObservacionIds.filter((x) => x !== tipoId) } : null,
@@ -833,6 +853,10 @@ export const Asistencia = () => {
                     <span className="inline-block h-2 w-2 rounded-full bg-green-500" />{' '}
                     Asistencia: Activa
                   </p>
+                  <p className="mt-2 text-sm text-gray-600">
+                    <span className="font-medium text-gray-700">Observación de la sesión:</span>{' '}
+                    {sesionActual.observaciones?.trim() ? sesionActual.observaciones : 'Sin observación registrada'}
+                  </p>
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
@@ -840,6 +864,17 @@ export const Asistencia = () => {
                   {new Set(aprendicesEnSesion.map((aa) => aa.aprendiz_id)).size} de {aprendicesFicha.length} con registro en sesión
                 </span>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setObservacionesSesionModal({
+                        observaciones: sesionActual.observaciones ?? '',
+                      })
+                    }
+                    className="btn-secondary text-sm"
+                  >
+                    Observación de sesión
+                  </button>
                   <button
                     type="button"
                     onClick={handleVolverAFichas}
@@ -1086,6 +1121,62 @@ export const Asistencia = () => {
                   className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
                 >
                   {observacionesGuardando ? 'Guardando…' : 'Guardar'}
+                </button>
+              </div>
+            </dialog>
+          </div>
+        )}
+
+        {/* Modal observación de la sesión */}
+        {observacionesSesionModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <button
+              type="button"
+              className="absolute inset-0 z-0 bg-black/50"
+              aria-label="Cerrar observación de sesión"
+              onClick={() => setObservacionesSesionModal(null)}
+            />
+            <dialog
+              open
+              className="relative z-10 m-0 w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+              aria-labelledby="modal-observacion-sesion-title"
+            >
+              <h3 id="modal-observacion-sesion-title" className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">
+                Observación de la sesión
+              </h3>
+              <div className="mb-4">
+                <label htmlFor={ASIST_MODAL_IDS.obsSesionLibre} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Observación de la clase de hoy
+                </label>
+                <textarea
+                  id={ASIST_MODAL_IDS.obsSesionLibre}
+                  value={observacionesSesionModal.observaciones}
+                  onChange={(e) =>
+                    setObservacionesSesionModal((prev) => (prev ? { ...prev, observaciones: e.target.value } : null))
+                  }
+                  placeholder="Ej: Se realizó socialización de proyecto y hubo retraso por mantenimiento del ambiente."
+                  rows={4}
+                  className="input-field w-full resize-y"
+                  disabled={observacionesSesionGuardando}
+                  maxLength={1000}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setObservacionesSesionModal(null)}
+                  className="btn-secondary"
+                  disabled={observacionesSesionGuardando}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGuardarObservacionesSesion}
+                  disabled={observacionesSesionGuardando}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {observacionesSesionGuardando ? 'Guardando…' : 'Guardar'}
                 </button>
               </div>
             </dialog>

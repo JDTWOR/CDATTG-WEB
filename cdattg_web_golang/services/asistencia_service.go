@@ -25,6 +25,7 @@ type AsistenciaService interface {
 	CreateSesion(req dto.AsistenciaRequest) (*dto.AsistenciaResponse, error)
 	EntrarTomarAsistencia(instructorID uint, fichaID uint) (*dto.AsistenciaResponse, error)
 	GetByID(id uint) (*dto.AsistenciaResponse, error)
+	ActualizarObservacionesSesion(asistenciaID uint, observaciones string, instructorFichaIDEditor *uint) (*dto.AsistenciaResponse, error)
 	ListByInstructorFichaID(instructorFichaID uint) ([]dto.AsistenciaResponse, error)
 	ListByFichaIDAndFechas(fichaID uint, fechaInicio, fechaFin string) ([]dto.AsistenciaResponse, error)
 	Finalizar(id uint) (*dto.AsistenciaResponse, error)
@@ -161,6 +162,34 @@ func (s *asistenciaService) GetByID(id uint) (*dto.AsistenciaResponse, error) {
 		return nil, errors.New(errMsgSesionAsistenciaNoEncontrada)
 	}
 	return s.asistenciaToResponse(a), nil
+}
+
+func (s *asistenciaService) ActualizarObservacionesSesion(asistenciaID uint, observaciones string, instructorFichaIDEditor *uint) (*dto.AsistenciaResponse, error) {
+	a, err := s.repo.FindByID(asistenciaID)
+	if err != nil || a == nil {
+		return nil, errors.New(errMsgSesionAsistenciaNoEncontrada)
+	}
+	if instructorFichaIDEditor == nil {
+		return nil, errors.New(errMsgNoEstaCreadoComoInstructor)
+	}
+	if a.InstructorFicha == nil {
+		ifc, errIFC := s.instFichaRepo.FindByID(a.InstructorFichaID)
+		if errIFC != nil || ifc == nil {
+			return nil, errors.New("no se pudo validar instructor de la sesión")
+		}
+		a.InstructorFicha = ifc
+	}
+	if a.InstructorFicha != nil && *instructorFichaIDEditor != a.InstructorFichaID {
+		editorIfc, errEditor := s.instFichaRepo.FindByID(*instructorFichaIDEditor)
+		if errEditor != nil || editorIfc == nil || editorIfc.FichaID != a.InstructorFicha.FichaID {
+			return nil, errors.New("no está autorizado para editar esta sesión")
+		}
+	}
+	a.Observaciones = strings.TrimSpace(observaciones)
+	if err := s.repo.Update(a); err != nil {
+		return nil, err
+	}
+	return s.GetByID(asistenciaID)
 }
 
 func (s *asistenciaService) ListByInstructorFichaID(instructorFichaID uint) ([]dto.AsistenciaResponse, error) {

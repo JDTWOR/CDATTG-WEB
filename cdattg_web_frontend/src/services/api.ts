@@ -592,6 +592,14 @@ class ApiService {
     return response.data;
   }
 
+  async actualizarObservacionesSesionAsistencia(asistenciaId: number, observaciones: string): Promise<AsistenciaResponse> {
+    const response = await this.api.put<AsistenciaResponse>(
+      `/asistencias/${asistenciaId}/observaciones-sesion`,
+      { observaciones }
+    );
+    return response.data;
+  }
+
   /** Dashboard de asistencia (solo superadmin). Params opcionales: sede_id, fecha (YYYY-MM-DD). */
   async getAsistenciaDashboard(params?: { sede_id?: number; fecha?: string }): Promise<AsistenciaDashboardResponse> {
     const response = await this.api.get<AsistenciaDashboardResponse>('/asistencias/dashboard', { params });

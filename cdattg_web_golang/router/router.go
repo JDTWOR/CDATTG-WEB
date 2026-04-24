@@ -161,6 +161,7 @@ func SetupRouter() *gin.Engine {
 			asistencias.GET("/pendientes-revision", asistenciaHandler.ListPendientesRevision)
 			asistencias.POST("/ingreso", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.RegistrarIngreso)
 			asistencias.POST("/ingreso-por-documento", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.RegistrarIngresoPorDocumento)
+			asistencias.PUT("/:id/observaciones-sesion", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.ActualizarObservacionesSesion)
 			asistencias.PUT("/aprendiz/:asistenciaAprendizId/salida", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.RegistrarSalida)
 			asistencias.PUT("/aprendiz/:asistenciaAprendizId/observaciones", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.ActualizarObservaciones)
 			asistencias.PUT("/aprendiz/:asistenciaAprendizId/estado", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.AjustarEstadoAprendiz)

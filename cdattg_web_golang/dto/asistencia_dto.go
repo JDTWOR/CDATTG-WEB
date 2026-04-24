@@ -14,6 +14,11 @@ type AsistenciaRequest struct {
 	HoraInicio        *time.Time `json:"hora_inicio"`
 }
 
+// AsistenciaObservacionesRequest actualizar observaciones de una sesión de asistencia (clase del día).
+type AsistenciaObservacionesRequest struct {
+	Observaciones string `json:"observaciones"`
+}
+
 // AsistenciaResponse sesión de asistencia
 type AsistenciaResponse struct {
 	ID                 uint       `json:"id"`

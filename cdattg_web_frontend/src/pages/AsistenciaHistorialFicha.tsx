@@ -327,6 +327,10 @@ export const AsistenciaHistorialFicha = () => {
   }, [aprendices, aprendicesPorSesion, sesiones]);
 
   const fechaMaxHoy = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const sesionesConObservaciones = useMemo(
+    () => sesiones.filter((s) => (s.observaciones ?? '').trim().length > 0),
+    [sesiones]
+  );
 
   const moverFecha = (dias: number) => {
     const base = new Date(`${fecha}T00:00:00`);
@@ -655,6 +659,35 @@ export const AsistenciaHistorialFicha = () => {
           </>
         )}
       </div>
+
+      {!loading && (
+        <div className="card">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Observaciones de sesiones del día</h2>
+          {sesiones.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              No hubo sesiones de asistencia registradas para esta fecha.
+            </p>
+          ) : sesionesConObservaciones.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Las sesiones registradas este día no tienen observaciones.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {sesionesConObservaciones.map((sesion) => (
+                <li key={sesion.id} className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2">
+                  <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+                    Sesión #{sesion.id}
+                    {sesion.hora_inicio
+                      ? ` · ${new Date(sesion.hora_inicio).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`
+                      : ''}
+                  </p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{sesion.observaciones}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {modalSemanaAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

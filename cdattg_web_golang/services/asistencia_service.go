@@ -224,19 +224,19 @@ func (s *asistenciaService) Finalizar(id uint) (*dto.AsistenciaResponse, error) 
 	if a.IsFinished {
 		return nil, errors.New(errMsgSesionYaFinalizada)
 	}
-	// Marcar registros con ingreso y sin salida como "REGISTRO_POR_CORREGIR",
-	// para que el instructor pueda revisar si fue olvido de salida o abandono de jornada.
+	// Cierre automático de salidas: todo registro con ingreso y sin salida
+	// recibe salida al momento de finalizar la sesión.
+	now := time.Now()
 	for i := range a.AsistenciaAprendices {
 		aa := &a.AsistenciaAprendices[i]
-		if aa.HoraIngreso != nil && aa.HoraSalida == nil && aa.Estado == "" && !aa.RequiereRevision {
-			aa.Estado = "REGISTRO_POR_CORREGIR"
-			aa.RequiereRevision = true
-			aa.MotivoAjuste = "Entrada registrada sin salida al finalizar la sesión"
-			// No se asigna hora de salida: deberá decidirse en la revisión.
+		if aa.HoraIngreso != nil && aa.HoraSalida == nil {
+			aa.HoraSalida = &now
+			aa.Estado = "ASISTENCIA_COMPLETA"
+			aa.RequiereRevision = false
+			aa.MotivoAjuste = "Salida automática al finalizar la sesión"
 			_ = s.repoAA.Update(aa)
 		}
 	}
-	now := time.Now()
 	a.HoraFin = &now
 	a.IsFinished = true
 	if err := s.repo.Update(a); err != nil {

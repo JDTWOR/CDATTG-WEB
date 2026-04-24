@@ -502,7 +502,7 @@ export const Asistencia = () => {
     fetchFichas();
   }, []);
 
-  // Cargar pendientes de revisión (para instructor actual) al entrar a la pantalla
+  // Cargar pendientes de revisión (casos excepcionales) para instructor actual al entrar a la pantalla
   useEffect(() => {
     const loadPendientes = async () => {
       setPendientesLoading(true);
@@ -514,8 +514,8 @@ export const Asistencia = () => {
         const status = (e as { response?: { status?: number } }).response?.status;
         const msg =
           status === 403
-            ? 'Solo instructores con permiso de asistencia pueden ver pendientes de revisión.'
-            : axiosErrorMessage(e, 'No se pudo cargar la bandeja de pendientes de revisión.');
+            ? 'Solo instructores con permiso de asistencia pueden ver ajustes pendientes.'
+            : axiosErrorMessage(e, 'No se pudo cargar la bandeja de ajustes pendientes.');
         setPendientesError(msg);
         setPendientesRevision([]);
       } finally {
@@ -1201,7 +1201,7 @@ export const Asistencia = () => {
                 Estado de asistencia — {estadoModal.nombre}
               </h3>
               <p className="mb-2 text-sm text-gray-600">
-                Clasifique este registro cuando hubo entrada pero no quedó clara la salida (olvido del sistema o abandono de jornada).
+                Ajuste el estado del registro cuando necesite reclasificar la asistencia del aprendiz.
               </p>
               <div className="mb-4 space-y-2">
                 <label htmlFor={ASIST_MODAL_IDS.estado} className="mb-1 block text-sm font-medium text-gray-700">
@@ -1307,10 +1307,10 @@ export const Asistencia = () => {
         </span>
       )}
 
-      {/* Bandeja de pendientes de revisión */}
+      {/* Bandeja de ajustes pendientes (casos excepcionales) */}
       <div className="card">
         <div className="flex items-center justify-between gap-2 mb-3">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Pendientes de revisión de asistencia</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Ajustes pendientes de asistencia</h2>
           {pendientesLoading && <span className="text-xs text-gray-500">Cargando…</span>}
         </div>
         {pendientesError && (
@@ -1318,7 +1318,7 @@ export const Asistencia = () => {
         )}
         {!pendientesLoading && !pendientesError && pendientesRevision.length === 0 && (
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            No hay registros de asistencia pendientes de revisión para hoy.
+            No hay ajustes pendientes para hoy.
           </p>
         )}
         {!pendientesLoading && pendientesRevision.length > 0 && (
@@ -1460,7 +1460,7 @@ export const Asistencia = () => {
               Estado de asistencia — {estadoModal.nombre}
             </h3>
             <p className="mb-2 text-sm text-gray-600">
-              Clasifique este registro cuando hubo entrada pero no quedó clara la salida (olvido del sistema o abandono de jornada).
+                Ajuste el estado del registro cuando necesite reclasificar la asistencia del aprendiz.
             </p>
             <div className="mb-4 space-y-2">
               <label htmlFor={ASIST_MODAL_IDS_ROOT.estado} className="mb-1 block text-sm font-medium text-gray-700">

@@ -181,7 +181,7 @@ function TarjetaAprendizAsistencia({
       <button
         type="button"
         onClick={() => onRegistrarSalida(open.id)}
-        className="flex min-h-[44px] min-w-[120px] flex-1 items-center justify-center rounded-lg bg-primary-600 text-sm font-medium text-white hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
+        className="flex min-h-[44px] min-w-[120px] flex-1 items-center justify-center rounded-lg bg-red-600 text-sm font-medium text-white hover:bg-red-700 active:bg-red-800 touch-manipulation"
         aria-label="Registrar salida"
       >
         Salida
@@ -209,7 +209,7 @@ function TarjetaAprendizAsistencia({
       <button
         type="button"
         onClick={() => onRegistrarIngreso(aprendiz.id)}
-        className="flex min-h-[44px] min-w-[120px] flex-1 items-center justify-center rounded-lg bg-primary-600 text-sm font-medium text-white hover:bg-primary-700 active:bg-primary-800 touch-manipulation"
+        className="flex min-h-[44px] min-w-[120px] flex-1 items-center justify-center rounded-lg bg-green-600 text-sm font-medium text-white hover:bg-green-700 active:bg-green-800 touch-manipulation"
         aria-label="Registrar entrada"
       >
         Entrada

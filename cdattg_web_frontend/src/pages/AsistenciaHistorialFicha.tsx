@@ -26,7 +26,7 @@ type FilaHistorial = {
   badgeText: string;
 };
 
-const TOLERANCIA_MINUTOS_TARDE = 15;
+const TOLERANCIA_MINUTOS_TARDE = 60;
 const UMBRAL_POCAS_HORAS = 0.8;
 
 /** Menor de dos fechas ISO YYYY-MM-DD (orden lexicográfico válido para ese formato). */

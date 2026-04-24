@@ -11,7 +11,7 @@ var jornadasNombres = []string{"MAÑANA", "TARDE", "NOCHE", "FINES DE SEMANA", "
 
 // Horarios oficiales (hora_fin a veces se extiende en la práctica; ver minutos_extension_fin)
 var jornadaHorarios = map[string]struct{ inicio, fin string }{
-	"MAÑANA":           {"03:00", "13:00"}, // 1 PM oficial; a veces la clase termina a las 2 PM
+	"MAÑANA":           {"06:00", "13:00"}, // 1 PM oficial; a veces la clase termina a las 2 PM
 	"TARDE":            {"13:00", "18:10"},
 	"NOCHE":            {"17:50", "23:10"},
 	"FINES DE SEMANA":  {"06:00", "18:00"},

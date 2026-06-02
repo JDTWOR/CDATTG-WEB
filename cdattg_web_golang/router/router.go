@@ -11,6 +11,11 @@ const (
 	routeImport       = "/import"
 	routeIDAprendices = "/:id/aprendices"
 
+	routeSedes      = "/sedes"
+	routeAmbientes  = "/ambientes"
+	routeBloques    = "/bloques"
+	routePisos      = "/pisos"
+
 	permVerPersonas     = "VER PERSONAS"
 	permCrearPersona    = "CREAR PERSONA"
 	permVerFichas       = "VER FICHAS"
@@ -98,8 +103,8 @@ func SetupRouter() *gin.Engine {
 			catalogos := protected.Group("/catalogos")
 			catalogos.Use(middleware.RequirePermissionCatalogosFicha())
 			{
-				catalogos.GET("/sedes", catalogoHandler.GetSedes)
-				catalogos.GET("/ambientes", catalogoHandler.GetAmbientes)
+				catalogos.GET(routeSedes, catalogoHandler.GetSedes)
+				catalogos.GET(routeAmbientes, catalogoHandler.GetAmbientes)
 				catalogos.GET("/modalidades-formacion", catalogoHandler.GetModalidadesFormacion)
 				catalogos.GET("/jornadas", catalogoHandler.GetJornadas)
 				catalogos.GET("/dias-formacion", catalogoHandler.GetDiasFormacion)
@@ -210,16 +215,29 @@ func SetupRouter() *gin.Engine {
 				aprendices.DELETE("/:id", middleware.RequirePermission("aprendiz", "ELIMINAR APRENDIZ"), aprendizHandler.Delete)
 			}
 
-			// Infraestructura: creación de ambientes (sólo SUPER ADMINISTRADOR)
-			infra := protected.Group("/infra")
-			infra.Use(middleware.RequireSuperAdmin())
+			// Infraestructura: CRUD de sedes, bloques, pisos y ambientes (sólo SUPER ADMINISTRADOR)
+			infraestructura := protected.Group("/infraestructura")
+			infraestructura.Use(middleware.RequireSuperAdmin())
 			{
-				infra.GET("/bloques", handlers.ListBloques)
-				infra.GET("/pisos", handlers.ListPisos)
-				infra.POST("/bloques", bloqueInfraHandler.Create)
-				infra.POST("/sedes", sedeInfraHandler.Create)
-				infra.POST("/pisos", pisoInfraHandler.Create)
-				infra.POST("/ambientes", ambienteHandler.Create)
+				infraestructura.GET(routeSedes, sedeInfraHandler.List)
+				infraestructura.POST(routeSedes, sedeInfraHandler.Create)
+				infraestructura.PUT(routeSedes+"/:id", sedeInfraHandler.Update)
+				infraestructura.DELETE(routeSedes+"/:id", sedeInfraHandler.Delete)
+
+				infraestructura.GET(routeBloques, bloqueInfraHandler.List)
+				infraestructura.POST(routeBloques, bloqueInfraHandler.Create)
+				infraestructura.PUT(routeBloques+"/:id", bloqueInfraHandler.Update)
+				infraestructura.DELETE(routeBloques+"/:id", bloqueInfraHandler.Delete)
+
+				infraestructura.GET(routePisos, pisoInfraHandler.List)
+				infraestructura.POST(routePisos, pisoInfraHandler.Create)
+				infraestructura.PUT(routePisos+"/:id", pisoInfraHandler.Update)
+				infraestructura.DELETE(routePisos+"/:id", pisoInfraHandler.Delete)
+
+				infraestructura.GET(routeAmbientes, ambienteHandler.List)
+				infraestructura.POST(routeAmbientes, ambienteHandler.Create)
+				infraestructura.PUT(routeAmbientes+"/:id", ambienteHandler.Update)
+				infraestructura.DELETE(routeAmbientes+"/:id", ambienteHandler.Delete)
 			}
 		}
 	}

@@ -6,6 +6,12 @@ type BloqueCreateRequest struct {
 	SedeID uint   `json:"sede_id" binding:"required"`
 }
 
+// BloqueUpdateRequest request para actualizar un bloque.
+type BloqueUpdateRequest struct {
+	Nombre string `json:"nombre" binding:"required"`
+	SedeID uint   `json:"sede_id" binding:"required"`
+}
+
 // BloqueResponse respuesta básica de bloque.
 type BloqueResponse struct {
 	ID     uint   `json:"id"`

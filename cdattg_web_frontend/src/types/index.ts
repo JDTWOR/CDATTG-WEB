@@ -223,11 +223,27 @@ export interface SedeCreateRequest {
   regional_id: number;
 }
 
+export interface SedeUpdateRequest {
+  nombre: string;
+  direccion: string;
+  regional_id: number;
+  status?: boolean;
+}
+
 export interface SedeResponse {
   id: number;
   nombre: string;
   direccion: string;
   regional_id: number;
+  status: boolean;
+}
+
+export interface SedeListItem {
+  id: number;
+  nombre: string;
+  direccion: string;
+  regional_id: number;
+  regional_nombre: string;
   status: boolean;
 }
 
@@ -237,6 +253,12 @@ export interface AmbienteCreateRequest {
   piso_id: number;
 }
 
+export interface AmbienteUpdateRequest {
+  nombre: string;
+  piso_id: number;
+  status?: boolean;
+}
+
 export interface AmbienteResponse {
   id: number;
   nombre: string;
@@ -244,8 +266,23 @@ export interface AmbienteResponse {
   status: boolean;
 }
 
+export interface AmbienteListItem {
+  id: number;
+  nombre: string;
+  piso_id: number;
+  piso_nombre: string;
+  bloque_nombre: string;
+  sede_nombre: string;
+  status: boolean;
+}
+
 // Piso (infraestructura)
 export interface PisoCreateRequest {
+  nombre: string;
+  bloque_id: number;
+}
+
+export interface PisoUpdateRequest {
   nombre: string;
   bloque_id: number;
 }
@@ -257,19 +294,27 @@ export interface PisoResponse {
 }
 
 // Lookups infraestructura
-export interface BloqueInfraItem {
+export interface BloqueInfraestructuraItem {
   id: number;
   nombre: string;
+  sede_id: number;
   sede_nombre: string;
 }
 
-export interface PisoInfraItem {
+export interface PisoInfraestructuraItem {
   id: number;
   nombre: string;
+  bloque_id: number;
   bloque_nombre: string;
+  sede_nombre: string;
 }
 
 export interface BloqueCreateRequest {
+  nombre: string;
+  sede_id: number;
+}
+
+export interface BloqueUpdateRequest {
   nombre: string;
   sede_id: number;
 }

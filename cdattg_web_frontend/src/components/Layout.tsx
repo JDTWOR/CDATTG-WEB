@@ -95,8 +95,29 @@ const SIDEBAR_ITEMS: {
   },
   {
     section: 'Infraestructura',
-    path: '/infra/ambientes',
-    label: 'Ambientes',
+    path: '/infraestructura/sedes',
+    label: 'Sedes',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR'],
+  },
+  {
+    section: 'Infraestructura',
+    path: '/infraestructura/bloques',
+    label: 'Bloques',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR'],
+  },
+  {
+    section: 'Infraestructura',
+    path: '/infraestructura/pisos',
+    label: 'Pisos',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR'],
+  },
+  {
+    section: 'Infraestructura',
+    path: '/infraestructura/ambientes',
+    label: 'Ambientes de formación',
     permission: null,
     rolesRequired: ['SUPER ADMINISTRADOR'],
   },
@@ -131,7 +152,10 @@ const ICONS: Record<string, ReactNode> = {
   'inventario/ordenes/pendientes': <ClockIcon className="w-5 h-5" />,
   'inventario/devoluciones': <ArrowUturnLeftIcon className="w-5 h-5" />,
   permisos: <ShieldCheckIcon className="w-5 h-5" />,
-  'infra/ambientes': <BuildingOffice2Icon className="w-5 h-5" />,
+  'infraestructura/sedes': <BuildingOffice2Icon className="w-5 h-5" />,
+  'infraestructura/bloques': <BuildingOffice2Icon className="w-5 h-5" />,
+  'infraestructura/pisos': <BuildingOffice2Icon className="w-5 h-5" />,
+  'infraestructura/ambientes': <BuildingOffice2Icon className="w-5 h-5" />,
   'vigilancia/ambientes': <EyeIcon className="w-5 h-5" />,
 };
 

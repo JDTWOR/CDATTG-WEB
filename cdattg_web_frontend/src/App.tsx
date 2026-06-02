@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -31,7 +31,10 @@ import { InventarioDevoluciones } from './pages/InventarioDevoluciones';
 import { Permisos } from './pages/Permisos';
 import { Perfil } from './pages/Perfil';
 import { VigilanciaAmbientes } from './pages/VigilanciaAmbientes';
-import { InfraAmbientes } from './pages/InfraAmbientes';
+import { InfraestructuraSedesPage } from './pages/infraestructura/InfraestructuraSedesPage';
+import { InfraestructuraBloquesPage } from './pages/infraestructura/InfraestructuraBloquesPage';
+import { InfraestructuraPisosPage } from './pages/infraestructura/InfraestructuraPisosPage';
+import { InfraestructuraAmbientesPage } from './pages/infraestructura/InfraestructuraAmbientesPage';
 
 function App() {
   return (
@@ -291,15 +294,48 @@ function App() {
             }
           />
           <Route
-            path="/infra/ambientes"
+            path="/infraestructura/sedes"
             element={
               <ProtectedRoute>
                 <Layout>
-                  <InfraAmbientes />
+                  <InfraestructuraSedesPage />
                 </Layout>
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/infraestructura/bloques"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <InfraestructuraBloquesPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/infraestructura/pisos"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <InfraestructuraPisosPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/infraestructura/ambientes"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <InfraestructuraAmbientesPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/infraestructura" element={<Navigate to="/infraestructura/sedes" replace />} />
+          <Route path="/infra" element={<Navigate to="/infraestructura/sedes" replace />} />
+          <Route path="/infra/*" element={<Navigate to="/infraestructura/sedes" replace />} />
           <Route
             path="/permisos"
             element={

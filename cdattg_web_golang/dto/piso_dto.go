@@ -6,6 +6,12 @@ type PisoCreateRequest struct {
 	BloqueID uint   `json:"bloque_id" binding:"required"`
 }
 
+// PisoUpdateRequest request para actualizar un piso.
+type PisoUpdateRequest struct {
+	Nombre   string `json:"nombre" binding:"required"`
+	BloqueID uint   `json:"bloque_id" binding:"required"`
+}
+
 // PisoResponse respuesta básica de piso.
 type PisoResponse struct {
 	ID       uint   `json:"id"`

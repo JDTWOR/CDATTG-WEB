@@ -47,14 +47,20 @@ import type {
   ParametroItem,
   RegionalItem,
   SedeCreateRequest,
+  SedeUpdateRequest,
   SedeResponse,
+  SedeListItem,
   AmbienteCreateRequest,
+  AmbienteUpdateRequest,
   AmbienteResponse,
+  AmbienteListItem,
   PisoCreateRequest,
+  PisoUpdateRequest,
   PisoResponse,
-  BloqueInfraItem,
-  PisoInfraItem,
+  BloqueInfraestructuraItem,
+  PisoInfraestructuraItem,
   BloqueCreateRequest,
+  BloqueUpdateRequest,
   BloqueResponse,
   InventarioDashboardResponse,
   ProductoResponse,
@@ -388,35 +394,81 @@ class ApiService {
     return response.data.data;
   }
 
-  // Infraestructura - Ambientes
-  async createSedeInfra(data: SedeCreateRequest): Promise<SedeResponse> {
-    const response = await this.api.post<SedeResponse>('/infra/sedes', data);
-    return response.data;
-  }
-
-  async createBloqueInfra(data: BloqueCreateRequest): Promise<BloqueResponse> {
-    const response = await this.api.post<BloqueResponse>('/infra/bloques', data);
-    return response.data;
-  }
-
-  async createPisoInfra(data: PisoCreateRequest): Promise<PisoResponse> {
-    const response = await this.api.post<PisoResponse>('/infra/pisos', data);
-    return response.data;
-  }
-
-  async createAmbiente(data: AmbienteCreateRequest): Promise<AmbienteResponse> {
-    const response = await this.api.post<AmbienteResponse>('/infra/ambientes', data);
-    return response.data;
-  }
-
-  async getInfraBloques(): Promise<BloqueInfraItem[]> {
-    const response = await this.api.get<{ data: BloqueInfraItem[] }>('/infra/bloques');
+  // Infraestructura (sedes, bloques, pisos, ambientes)
+  async getInfraestructuraSedes(): Promise<SedeListItem[]> {
+    const response = await this.api.get<{ data: SedeListItem[] }>('/infraestructura/sedes');
     return response.data.data;
   }
 
-  async getInfraPisos(): Promise<PisoInfraItem[]> {
-    const response = await this.api.get<{ data: PisoInfraItem[] }>('/infra/pisos');
+  async createInfraestructuraSede(data: SedeCreateRequest): Promise<SedeResponse> {
+    const response = await this.api.post<SedeResponse>('/infraestructura/sedes', data);
+    return response.data;
+  }
+
+  async updateInfraestructuraSede(id: number, data: SedeUpdateRequest): Promise<SedeResponse> {
+    const response = await this.api.put<SedeResponse>(`/infraestructura/sedes/${id}`, data);
+    return response.data;
+  }
+
+  async deleteInfraestructuraSede(id: number): Promise<void> {
+    await this.api.delete(`/infraestructura/sedes/${id}`);
+  }
+
+  async getInfraestructuraBloques(): Promise<BloqueInfraestructuraItem[]> {
+    const response = await this.api.get<{ data: BloqueInfraestructuraItem[] }>('/infraestructura/bloques');
     return response.data.data;
+  }
+
+  async createInfraestructuraBloque(data: BloqueCreateRequest): Promise<BloqueResponse> {
+    const response = await this.api.post<BloqueResponse>('/infraestructura/bloques', data);
+    return response.data;
+  }
+
+  async updateInfraestructuraBloque(id: number, data: BloqueUpdateRequest): Promise<BloqueResponse> {
+    const response = await this.api.put<BloqueResponse>(`/infraestructura/bloques/${id}`, data);
+    return response.data;
+  }
+
+  async deleteInfraestructuraBloque(id: number): Promise<void> {
+    await this.api.delete(`/infraestructura/bloques/${id}`);
+  }
+
+  async getInfraestructuraPisos(): Promise<PisoInfraestructuraItem[]> {
+    const response = await this.api.get<{ data: PisoInfraestructuraItem[] }>('/infraestructura/pisos');
+    return response.data.data;
+  }
+
+  async createInfraestructuraPiso(data: PisoCreateRequest): Promise<PisoResponse> {
+    const response = await this.api.post<PisoResponse>('/infraestructura/pisos', data);
+    return response.data;
+  }
+
+  async updateInfraestructuraPiso(id: number, data: PisoUpdateRequest): Promise<PisoResponse> {
+    const response = await this.api.put<PisoResponse>(`/infraestructura/pisos/${id}`, data);
+    return response.data;
+  }
+
+  async deleteInfraestructuraPiso(id: number): Promise<void> {
+    await this.api.delete(`/infraestructura/pisos/${id}`);
+  }
+
+  async getInfraestructuraAmbientes(): Promise<AmbienteListItem[]> {
+    const response = await this.api.get<{ data: AmbienteListItem[] }>('/infraestructura/ambientes');
+    return response.data.data;
+  }
+
+  async createInfraestructuraAmbiente(data: AmbienteCreateRequest): Promise<AmbienteResponse> {
+    const response = await this.api.post<AmbienteResponse>('/infraestructura/ambientes', data);
+    return response.data;
+  }
+
+  async updateInfraestructuraAmbiente(id: number, data: AmbienteUpdateRequest): Promise<AmbienteResponse> {
+    const response = await this.api.put<AmbienteResponse>(`/infraestructura/ambientes/${id}`, data);
+    return response.data;
+  }
+
+  async deleteInfraestructuraAmbiente(id: number): Promise<void> {
+    await this.api.delete(`/infraestructura/ambientes/${id}`);
   }
 
   // Fichas de caracterización

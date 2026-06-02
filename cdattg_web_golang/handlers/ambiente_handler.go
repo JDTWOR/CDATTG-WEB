@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/services"
 )
@@ -21,7 +21,15 @@ func NewAmbienteHandler() *AmbienteHandler {
 	}
 }
 
-// Create crea un nuevo ambiente de formación (uso módulo infraestructura).
+func (h *AmbienteHandler) List(c *gin.Context) {
+	list, err := h.svc.List()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": list})
+}
+
 func (h *AmbienteHandler) Create(c *gin.Context) {
 	var req dto.AmbienteCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -36,6 +44,38 @@ func (h *AmbienteHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, res)
 }
 
+func (h *AmbienteHandler) Update(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	var req dto.AmbienteUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
+		return
+	}
+	res, err := h.svc.Update(id, req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func (h *AmbienteHandler) Delete(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	if err := h.svc.Delete(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusNoContent, nil)
+}
+
 type SedeHandler struct {
 	svc services.SedeService
 }
@@ -46,7 +86,15 @@ func NewSedeHandler() *SedeHandler {
 	}
 }
 
-// Create crea una nueva sede (infraestructura).
+func (h *SedeHandler) List(c *gin.Context) {
+	list, err := h.svc.List()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": list})
+}
+
 func (h *SedeHandler) Create(c *gin.Context) {
 	var req dto.SedeCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -61,6 +109,38 @@ func (h *SedeHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, res)
 }
 
+func (h *SedeHandler) Update(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	var req dto.SedeUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
+		return
+	}
+	res, err := h.svc.Update(id, req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func (h *SedeHandler) Delete(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	if err := h.svc.Delete(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusNoContent, nil)
+}
+
 type PisoHandler struct {
 	svc services.PisoService
 }
@@ -71,7 +151,15 @@ func NewPisoHandler() *PisoHandler {
 	}
 }
 
-// Create crea un nuevo piso (infraestructura).
+func (h *PisoHandler) List(c *gin.Context) {
+	list, err := h.svc.List()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": list})
+}
+
 func (h *PisoHandler) Create(c *gin.Context) {
 	var req dto.PisoCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -86,62 +174,36 @@ func (h *PisoHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, res)
 }
 
-// --- Lookups infra (bloques y pisos) ---
-
-// ListBloques devuelve todos los bloques con el nombre de la sede (para selects en infraestructura).
-func ListBloques(c *gin.Context) {
-	db := database.GetDB()
-	type row struct {
-		ID         uint
-		Nombre     string
-		SedeNombre string
-	}
-	var rows []row
-	if err := db.Table("bloques b").
-		Select("b.id, b.nombre, s.nombre as sede_nombre").
-		Joins("JOIN sedes s ON s.id = b.sede_id").
-		Order("s.nombre, b.nombre").
-		Scan(&rows).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "No se pudieron cargar los bloques"})
+func (h *PisoHandler) Update(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
-	resp := make([]dto.BloqueItemInfra, len(rows))
-	for i, r := range rows {
-		resp[i] = dto.BloqueItemInfra{
-			ID:         r.ID,
-			Nombre:     r.Nombre,
-			SedeNombre: r.SedeNombre,
-		}
+	var req dto.PisoUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
+		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": resp})
+	res, err := h.svc.Update(id, req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
 }
 
-// ListPisos devuelve todos los pisos con el nombre del bloque (para selects en infraestructura).
-func ListPisos(c *gin.Context) {
-	db := database.GetDB()
-	type row struct {
-		ID           uint
-		Nombre       string
-		BloqueNombre string
-	}
-	var rows []row
-	if err := db.Table("pisos p").
-		Select("p.id, p.nombre, b.nombre as bloque_nombre").
-		Joins("JOIN bloques b ON b.id = p.bloque_id").
-		Order("b.nombre, p.nombre").
-		Scan(&rows).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "No se pudieron cargar los pisos"})
+func (h *PisoHandler) Delete(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
 		return
 	}
-	resp := make([]dto.PisoItemInfra, len(rows))
-	for i, r := range rows {
-		resp[i] = dto.PisoItemInfra{
-			ID:           r.ID,
-			Nombre:       r.Nombre,
-			BloqueNombre: r.BloqueNombre,
-		}
+	if err := h.svc.Delete(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": resp})
+	c.JSON(http.StatusNoContent, nil)
 }
 
 type BloqueHandler struct {
@@ -154,7 +216,15 @@ func NewBloqueHandler() *BloqueHandler {
 	}
 }
 
-// Create crea un nuevo bloque (infraestructura).
+func (h *BloqueHandler) List(c *gin.Context) {
+	list, err := h.svc.List()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": list})
+}
+
 func (h *BloqueHandler) Create(c *gin.Context) {
 	var req dto.BloqueCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -169,3 +239,42 @@ func (h *BloqueHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, res)
 }
 
+func (h *BloqueHandler) Update(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	var req dto.BloqueUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
+		return
+	}
+	res, err := h.svc.Update(id, req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func (h *BloqueHandler) Delete(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	if err := h.svc.Delete(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusNoContent, nil)
+}
+
+func parseUintParam(c *gin.Context, name string) (uint, error) {
+	id64, err := strconv.ParseUint(c.Param(name), 10, 64)
+	if err != nil || id64 == 0 {
+		return 0, err
+	}
+	return uint(id64), nil
+}

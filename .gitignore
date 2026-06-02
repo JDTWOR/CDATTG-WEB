@@ -1,6 +1,8 @@
 # Environment
 .env
 .env.local
+# Runbook con credenciales reales (usar conexiones-externas.md.example como plantilla)
+docs/deployment/conexiones-externas.md
 *.log
 .cursor/
 

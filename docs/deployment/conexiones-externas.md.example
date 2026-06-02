@@ -1,0 +1,43 @@
+# Conexiones externas a PostgreSQL (plantilla interna)
+
+> Copie este archivo fuera del repositorio (wiki privada, gestor de secretos) y complete los valores reales.
+> **No commitear** la versión rellenada con datos de producción.
+
+## Power BI / cliente SQL
+
+| Campo | Valor (completar en entorno seguro) |
+|-------|--------------------------------------|
+| Servidor | `<IP_O_HOSTNAME_VPS>` |
+| Puerto | `<DB_PORT>` (definido en `.env` del servidor) |
+| Base de datos | `<DB_NAME>` |
+| Usuario | `<DB_USER>` |
+| Contraseña | `<DB_PASSWORD>` |
+| SSL | Según `DB_SSLMODE` en `.env` |
+
+## Verificación en el servidor
+
+```bash
+# Puerto publicado por el contenedor CDATTG
+ss -tlnp | grep docker-proxy
+
+# Estado del contenedor
+docker compose ps postgres
+```
+
+## Prueba desde estación autorizada
+
+```bash
+psql -h <IP_O_HOSTNAME_VPS> -p <DB_PORT> -U <DB_USER> -d <DB_NAME>
+```
+
+## Hardening recomendado
+
+1. Allowlist de IPs en `pg_hba.conf` (no `0.0.0.0/0` en producción).
+2. Regla de firewall del proveedor solo para `<IP_OFICINA>` / `<IP_POWERBI_GATEWAY>`.
+3. Contraseña fuerte y rotación periódica.
+4. Preferir VPN o túnel SSH si es posible.
+
+## Script de referencia en el repo
+
+`docker/postgres/01-allow-remote.sh` solo aplica en la **primera** inicialización del volumen.
+Si el volumen ya existía, ajuste `pg_hba.conf` manualmente y recargue la configuración.

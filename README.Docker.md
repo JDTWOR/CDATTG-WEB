@@ -1,35 +1,33 @@
 # Despliegue con Docker
 
-Proyecto CDATTG (backend Go + frontend React) con PostgreSQL. Nginx en el host hace de reverse proxy y SSL (Certbot); los contenedores exponen solo en localhost.
+Proyecto CDATTG (backend Go + frontend React) con PostgreSQL. Nginx en el host hace de reverse proxy y SSL (Certbot); la API y el frontend se publican solo vía Nginx (contenedores en localhost).
 
-## Subdominios (VPS Hostinger / Nginx)
+## Subdominios (producción)
 
-| Servicio | URL | Puerto interno |
-|----------|-----|----------------|
-| Frontend | https://cdattg.dataguaviare.com.co | 9080 |
-| API      | https://apicdattg.dataguaviare.com.co | 9081 |
+| Servicio | URL pública |
+|----------|-------------|
+| Frontend | `https://cdattg.dataguaviare.com.co` |
+| API      | `https://apicdattg.dataguaviare.com.co` |
+
+Los puertos internos del host (`9080`, `9081`) no deben exponerse a Internet; Nginx hace de proxy.
 
 ## Requisitos
 
 - Docker y Docker Compose en el servidor.
 - Nginx en el host (puertos 80 y 443) con Certbot para HTTPS.
-- DNS de `cdattg.dataguaviare.com.co` y `apicdattg.dataguaviare.com.co` apuntando a la IP del VPS.
+- DNS de los dominios anteriores apuntando al servidor.
 
 ## Configuración
 
-1. Copiar el archivo de entorno y definir contraseñas y secretos:
+1. Copiar el archivo de entorno y definir secretos **solo en el servidor** (nunca en Git):
 
    ```bash
    cp .env.example .env
    # Editar .env: DB_PASSWORD, JWT_SECRET (obligatorios)
-   # Ajustar CORS_ALLOWED_ORIGINS y VITE_API_BASE_URL si usas otros dominios.
+   # Ajustar CORS_ALLOWED_ORIGINS, VITE_API_BASE_URL y DB_PORT si aplica.
    ```
 
-2. (Opcional) Script de PostgreSQL para acceso remoto a la DB:
-
-   ```bash
-   chmod +x docker/postgres/01-allow-remote.sh
-   ```
+2. Si necesita acceso remoto a PostgreSQL (BI, reporting), revise `docs/deployment/conexiones-externas.md.example` y aplique restricción por IP en el servidor.
 
 ## Levantar el stack
 
@@ -39,15 +37,13 @@ docker compose up -d --build
 
 Servicios:
 
-- **postgres**: Puerto `5432` publicado; acepta conexiones remotas (usuario/contraseña según `.env`).
-- **backend**: API Go en `127.0.0.1:9081` (solo localhost).
-- **frontend**: React servido por nginx en el contenedor; expuesto en `127.0.0.1:9080` (solo localhost).
+- **postgres**: publicado en el host según `DB_PORT` del `.env` (ver `.env.example`).
+- **backend**: `127.0.0.1:9081` (solo localhost).
+- **frontend**: `127.0.0.1:9080` (solo localhost).
 
-Nginx en el host debe hacer proxy a esos puertos (ver plantillas en `docker/nginx/`).
+Nginx en el host debe hacer proxy a esos puertos (plantillas en `docker/nginx/`).
 
 ## Nginx en el VPS
-
-En el servidor, usar las plantillas que están en el repo:
 
 1. Copiar y habilitar los sitios:
 
@@ -65,28 +61,24 @@ En el servidor, usar las plantillas que están en el repo:
    sudo nginx -t && sudo systemctl reload nginx
    ```
 
-3. Obtener certificados SSL con Certbot (igual que en academica y el resto de sitios):
+3. Certificados SSL con Certbot:
 
    ```bash
    sudo certbot --nginx -d cdattg.dataguaviare.com.co -d apicdattg.dataguaviare.com.co
    ```
 
-Certbot modificará los archivos de sitio y añadirá `listen 443 ssl`, certificados y la redirección HTTP → HTTPS.
+## Acceso remoto a PostgreSQL (resumen)
 
-## Acceso remoto a PostgreSQL
+Solo habilítelo si hay necesidad real (p. ej. herramientas de reporting). Recomendaciones mínimas:
 
-Tras el primer `docker compose up`, la base de datos:
+- Definir `DB_PORT` en `.env` del servidor; en VPS con varios proyectos Docker, **no asuma el puerto 5432** sin verificar (`ss -tlnp | grep postgres`).
+- Restringir en firewall del proveedor **solo las IPs autorizadas**, no rangos abiertos.
+- Preferir VPN o túnel SSH antes de exponer PostgreSQL a Internet.
+- No versionar credenciales ni runbooks con IPs/usuarios reales.
 
-- Escucha en el puerto **5432** del host.
-- Acepta conexiones desde cualquier IP si usas `docker/postgres/01-allow-remote.sh`.
+Plantilla operativa (placeholders): `docs/deployment/conexiones-externas.md.example`.
 
-Ejemplo desde otro equipo:
-
-```bash
-psql -h IP_DEL_SERVIDOR -p 5432 -U cdattg -d cdattg_web
-```
-
-Usar `DB_USER`, `DB_PASSWORD` y `DB_NAME` definidos en `.env`.
+El backend dentro de Docker usa el hostname `postgres` y el puerto interno `5432`; es independiente de `DB_PORT` publicado en el host.
 
 ## Volúmenes
 
@@ -96,10 +88,7 @@ Usar `DB_USER`, `DB_PASSWORD` y `DB_NAME` definidos en `.env`.
 ## Comandos útiles
 
 ```bash
-# Ver logs
 docker compose logs -f
-
-# Reconstruir y levantar
 docker compose up -d --build
 ```
 
@@ -107,15 +96,15 @@ docker compose up -d --build
 
 | Comando | Descripción |
 |---------|-------------|
-| `make db-seed` | Ejecutar migraciones y seeders (stack ya levantado). |
-| `make db-fresh` | Dropear la base, recrearla y ejecutar migraciones + seed (rápido). |
-| `make db-reset` | Borrar volumen de Postgres, levantar de nuevo y ejecutar seed (reset completo). |
-| `make docker-up` | Levantar el stack. |
-| `make docker-down` | Parar y borrar el volumen de Postgres. |
+| `make db-seed` | Migraciones y seeders (stack levantado). |
+| `make db-fresh` | Recrea la base y ejecuta seed (**solo desarrollo**). |
+| `make db-reset` | Borra volumen de Postgres y seed (**solo desarrollo**). |
+| `make docker-up` | Levanta el stack. |
+| `make docker-down` | Detiene servicios (puede eliminar volumen según configuración). |
 
-El seed se ejecuta dentro del contenedor del backend; no hace falta tener Go instalado en el servidor. Ver también `make help` en la raíz y `make help` en `cdattg_web_golang`.
+> En **producción** no ejecute `db-fresh` ni `db-reset`. Ver `docs/deployment/production-safety.md`.
 
-## Notas HTTPS
+## Seguridad en documentación
 
-- SSL se gestiona con **Certbot** en Nginx (mismo esquema que academica, gibse, etc.).
-- Los dominios deben resolver a la IP del VPS antes de ejecutar `certbot --nginx`.
+- No subir `.env`, dumps de base ni runbooks con IPs, puertos reales o contraseñas.
+- Los dominios públicos en este archivo son inevitables para despliegue; el resto de datos sensibles debe vivir en gestión interna (vault, wiki privada, `.env` en servidor).

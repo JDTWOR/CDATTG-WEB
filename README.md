@@ -105,9 +105,16 @@ go run main.go
 
 ## Despliegue en VPS
 
-La guia completa de despliegue con Nginx, SSL (Certbot), subdominios y acceso remoto a PostgreSQL esta en:
+La guia de despliegue con Docker, Nginx y SSL esta en:
 
 - `README.Docker.md`
+- Seguridad en produccion: `docs/deployment/production-safety.md`
+- Plantilla interna para conexiones externas (BI): `docs/deployment/conexiones-externas.md.example` (no subir valores reales a Git)
+
+## Seguridad y secretos
+
+- Nunca versionar `.env`, contraseñas, tokens ni IPs internas de operacion.
+- `JWT_SECRET` y `DB_PASSWORD` solo en el servidor o gestor de secretos.
 
 ## Estado del proyecto
 

@@ -57,8 +57,9 @@ type PendienteInstructorRow struct {
 }
 
 type InasistenciaDetalleRow struct {
-	Fecha         string
-	Observaciones string
+	Fecha            string
+	InstructorNombre string
+	Observaciones    string
 }
 
 // DashboardFichaRow una fila del resumen por ficha para el dashboard
@@ -458,15 +459,26 @@ func (r *asistenciaRepository) GetDetalleInasistenciasAprendiz(fichaNumero strin
 	tFin = tFin.AddDate(0, 0, 1)
 
 	type row struct {
-		Fecha         string `gorm:"column:fecha"`
-		Observaciones string `gorm:"column:observaciones"`
+		Fecha            string `gorm:"column:fecha"`
+		InstructorNombre string `gorm:"column:instructor_nombre"`
+		Observaciones    string `gorm:"column:observaciones"`
 	}
 
 	raw := `
 WITH sesiones_rango AS (
-  SELECT a.id AS asistencia_id, a.fecha::date AS fecha
+  SELECT
+    a.id AS asistencia_id,
+    a.fecha::date AS fecha,
+    TRIM(
+      COALESCE(p.primer_nombre, '') || ' ' ||
+      COALESCE(p.segundo_nombre, '') || ' ' ||
+      COALESCE(p.primer_apellido, '') || ' ' ||
+      COALESCE(p.segundo_apellido, '')
+    ) AS instructor_nombre
   FROM asistencias a
   INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
+  INNER JOIN instructors i ON i.id = ifc.instructor_id
+  INNER JOIN personas p ON p.id = i.persona_id
   INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id
   LEFT JOIN sedes s ON s.id = fc.sede_id
   WHERE a.fecha >= ? AND a.fecha < ?
@@ -482,6 +494,10 @@ WITH sesiones_rango AS (
 resumen_por_sesion AS (
   SELECT
     sr.fecha,
+    COALESCE(
+      STRING_AGG(DISTINCT NULLIF(TRIM(COALESCE(sr.instructor_nombre, '')), ''), ' | '),
+      ''
+    ) AS instructor_nombre,
     COALESCE(
       BOOL_OR(
         aa.hora_ingreso IS NOT NULL
@@ -501,6 +517,7 @@ resumen_por_sesion AS (
 )
 SELECT
   TO_CHAR(fecha, 'YYYY-MM-DD') AS fecha,
+  instructor_nombre,
   observaciones
 FROM resumen_por_sesion
 WHERE asistio_efectivo = false
@@ -515,8 +532,9 @@ ORDER BY fecha
 	out := make([]InasistenciaDetalleRow, len(rows))
 	for i := range rows {
 		out[i] = InasistenciaDetalleRow{
-			Fecha:         rows[i].Fecha,
-			Observaciones: rows[i].Observaciones,
+			Fecha:            rows[i].Fecha,
+			InstructorNombre: rows[i].InstructorNombre,
+			Observaciones:    rows[i].Observaciones,
 		}
 	}
 	return out, nil

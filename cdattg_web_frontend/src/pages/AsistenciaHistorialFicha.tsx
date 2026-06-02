@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type ChangeEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeftIcon, ArrowDownTrayIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
@@ -85,6 +85,200 @@ function claseBadgeAsistencia(color: BadgeColorAsistencia): string {
   return 'inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 px-2 py-0.5 text-xs font-medium';
 }
 
+type ObservacionesModalState = {
+  asistenciaId: number;
+  aprendizId: number;
+  nombre: string;
+  observaciones: string;
+  tipoObservacionIds: number[];
+  editableHasta: string;
+};
+
+type ObservacionesSesionesDiaProps = Readonly<{
+  sesiones: AsistenciaResponse[];
+  sesionesConObservaciones: AsistenciaResponse[];
+}>;
+
+function ObservacionesSesionesDiaContenido({ sesiones, sesionesConObservaciones }: ObservacionesSesionesDiaProps) {
+  if (sesiones.length === 0) {
+    return (
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        No hubo sesiones de asistencia registradas para esta fecha.
+      </p>
+    );
+  }
+  if (sesionesConObservaciones.length === 0) {
+    return (
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        Las sesiones registradas este día no tienen observaciones.
+      </p>
+    );
+  }
+  return (
+    <ul className="space-y-2">
+      {sesionesConObservaciones.map((sesion) => (
+        <li key={sesion.id} className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2">
+          <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+            Sesión #{sesion.id}
+            {sesion.hora_inicio
+              ? ` · ${new Date(sesion.hora_inicio).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`
+              : ''}
+          </p>
+          <p className="text-sm text-gray-700 dark:text-gray-300">{sesion.observaciones}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+type TiposObservacionSeleccionadosProps = Readonly<{
+  ids: number[];
+  catalogo: TipoObservacionAsistenciaItem[];
+  disabled: boolean;
+  onQuitar: (tipoId: number) => void;
+}>;
+
+function TiposObservacionSeleccionados({ ids, catalogo, disabled, onQuitar }: TiposObservacionSeleccionadosProps) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-1">
+      {ids.map((id) => {
+        const tipo = catalogo.find((t) => t.id === id);
+        return (
+          <span
+            key={id}
+            className="inline-flex items-center gap-1 rounded bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs text-gray-700 dark:text-gray-300"
+          >
+            {tipo?.nombre ?? id}
+            <button
+              type="button"
+              onClick={() => onQuitar(id)}
+              className="rounded px-1 hover:bg-gray-200 dark:hover:bg-gray-600"
+              disabled={disabled}
+              aria-label="Quitar tipo"
+            >
+              ×
+            </button>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+type HistorialObservacionesModalProps = Readonly<{
+  modal: ObservacionesModalState;
+  catalogo: TipoObservacionAsistenciaItem[];
+  guardando: boolean;
+  onCerrar: () => void;
+  onGuardar: () => void;
+  onChangeObservaciones: (texto: string) => void;
+  onAgregarTipo: (tipoId: number) => void;
+  onQuitarTipo: (tipoId: number) => void;
+}>;
+
+function HistorialObservacionesModal({
+  modal,
+  catalogo,
+  guardando,
+  onCerrar,
+  onGuardar,
+  onChangeObservaciones,
+  onAgregarTipo,
+  onQuitarTipo,
+}: HistorialObservacionesModalProps) {
+  const handleSelectTipo = (e: ChangeEvent<HTMLSelectElement>) => {
+    const id = Number(e.target.value);
+    if (!id || modal.tipoObservacionIds.includes(id)) return;
+    e.target.value = '';
+    onAgregarTipo(id);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/50"
+        aria-label="Cerrar edición de observación"
+        onClick={() => !guardando && onCerrar()}
+      />
+      <dialog
+        open
+        className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 shadow-xl"
+        aria-labelledby="modal-observacion-title"
+      >
+        <h2 id="modal-observacion-title" className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          Observación — {modal.nombre}
+        </h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Editable hasta: {modal.editableHasta}
+        </p>
+        <div className="mb-3">
+          <label htmlFor={HISTORIAL_MODAL_TIPO_OBS_ID} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Tipos de observación
+          </label>
+          <select
+            id={HISTORIAL_MODAL_TIPO_OBS_ID}
+            value=""
+            onChange={handleSelectTipo}
+            className="input-field w-full"
+            disabled={guardando}
+          >
+            <option value="">Agregar tipo…</option>
+            {catalogo
+              .filter((t) => !modal.tipoObservacionIds.includes(t.id))
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nombre}
+                </option>
+              ))}
+          </select>
+          {modal.tipoObservacionIds.length > 0 && (
+            <TiposObservacionSeleccionados
+              ids={modal.tipoObservacionIds}
+              catalogo={catalogo}
+              disabled={guardando}
+              onQuitar={onQuitarTipo}
+            />
+          )}
+        </div>
+        <div className="mb-4">
+          <label htmlFor={HISTORIAL_MODAL_OBS_ID} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Observación libre
+          </label>
+          <textarea
+            id={HISTORIAL_MODAL_OBS_ID}
+            value={modal.observaciones}
+            onChange={(e) => onChangeObservaciones(e.target.value)}
+            rows={4}
+            className="input-field w-full resize-y"
+            placeholder="Ej: Entregó excusa dentro del plazo de 5 días."
+            disabled={guardando}
+            maxLength={1000}
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCerrar}
+            disabled={guardando}
+            className="btn-secondary"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onGuardar}
+            disabled={guardando}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+          >
+            {guardando ? 'Guardando…' : 'Guardar'}
+          </button>
+        </div>
+      </dialog>
+    </div>
+  );
+}
+
 export const AsistenciaHistorialFicha = () => {
   const { fichaId: fichaIdParam } = useParams<{ fichaId: string }>();
   const fichaId = fichaIdParam ? Number.parseInt(fichaIdParam, 10) : null;
@@ -110,14 +304,7 @@ export const AsistenciaHistorialFicha = () => {
   const [anioExport, setAnioExport] = useState(() => String(new Date().getFullYear()));
   const [descargandoExport, setDescargandoExport] = useState(false);
   const [tiposObservacionCatalogo, setTiposObservacionCatalogo] = useState<TipoObservacionAsistenciaItem[]>([]);
-  const [observacionesModal, setObservacionesModal] = useState<{
-    asistenciaId: number;
-    aprendizId: number;
-    nombre: string;
-    observaciones: string;
-    tipoObservacionIds: number[];
-    editableHasta: string;
-  } | null>(null);
+  const [observacionesModal, setObservacionesModal] = useState<ObservacionesModalState | null>(null);
   const [guardandoObservaciones, setGuardandoObservaciones] = useState(false);
 
   const fechaValida = useMemo(() => /^\d{4}-\d{2}-\d{2}$/.test(fecha), [fecha]);
@@ -384,6 +571,26 @@ export const AsistenciaHistorialFicha = () => {
     });
   };
 
+  const cerrarObservacionesModal = () => setObservacionesModal(null);
+
+  const agregarTipoObservacionModal = (tipoId: number) => {
+    setObservacionesModal((prev) =>
+      prev && !prev.tipoObservacionIds.includes(tipoId)
+        ? { ...prev, tipoObservacionIds: [...prev.tipoObservacionIds, tipoId] }
+        : prev,
+    );
+  };
+
+  const quitarTipoObservacionModal = (tipoId: number) => {
+    setObservacionesModal((prev) =>
+      prev ? { ...prev, tipoObservacionIds: prev.tipoObservacionIds.filter((x) => x !== tipoId) } : null,
+    );
+  };
+
+  const actualizarTextoObservacionModal = (texto: string) => {
+    setObservacionesModal((prev) => (prev ? { ...prev, observaciones: texto } : null));
+  };
+
   const guardarObservaciones = async () => {
     if (!observacionesModal) return;
     setGuardandoObservaciones(true);
@@ -617,29 +824,7 @@ export const AsistenciaHistorialFicha = () => {
       {!loading && (
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Observaciones de sesiones del día</h2>
-          {sesiones.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              No hubo sesiones de asistencia registradas para esta fecha.
-            </p>
-          ) : sesionesConObservaciones.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Las sesiones registradas este día no tienen observaciones.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {sesionesConObservaciones.map((sesion) => (
-                <li key={sesion.id} className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2">
-                  <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
-                    Sesión #{sesion.id}
-                    {sesion.hora_inicio
-                      ? ` · ${new Date(sesion.hora_inicio).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`
-                      : ''}
-                  </p>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">{sesion.observaciones}</p>
-                </li>
-              ))}
-            </ul>
-          )}
+          <ObservacionesSesionesDiaContenido sesiones={sesiones} sesionesConObservaciones={sesionesConObservaciones} />
         </div>
       )}
 
@@ -804,120 +989,18 @@ export const AsistenciaHistorialFicha = () => {
       )}
 
       {observacionesModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/50"
-            aria-label="Cerrar edición de observación"
-            onClick={() => !guardandoObservaciones && setObservacionesModal(null)}
-          />
-          <dialog
-            open
-            className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 shadow-xl"
-            aria-labelledby="modal-observacion-title"
-          >
-            <h2 id="modal-observacion-title" className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Observación — {observacionesModal.nombre}
-            </h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              Editable hasta: {observacionesModal.editableHasta}
-            </p>
-            <div className="mb-3">
-              <label htmlFor={HISTORIAL_MODAL_TIPO_OBS_ID} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Tipos de observación
-              </label>
-              <select
-                id={HISTORIAL_MODAL_TIPO_OBS_ID}
-                value=""
-                onChange={(e) => {
-                  const id = Number(e.target.value);
-                  if (!id) return;
-                  e.target.value = '';
-                  if (observacionesModal.tipoObservacionIds.includes(id)) return;
-                  setObservacionesModal((prev) => (
-                    prev ? { ...prev, tipoObservacionIds: [...prev.tipoObservacionIds, id] } : null
-                  ));
-                }}
-                className="input-field w-full"
-                disabled={guardandoObservaciones}
-              >
-                <option value="">Agregar tipo…</option>
-                {tiposObservacionCatalogo
-                  .filter((t) => !observacionesModal.tipoObservacionIds.includes(t.id))
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.nombre}
-                    </option>
-                  ))}
-              </select>
-              {observacionesModal.tipoObservacionIds.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {observacionesModal.tipoObservacionIds.map((id) => {
-                    const tipo = tiposObservacionCatalogo.find((t) => t.id === id);
-                    return (
-                      <span
-                        key={id}
-                        className="inline-flex items-center gap-1 rounded bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs text-gray-700 dark:text-gray-300"
-                      >
-                        {tipo?.nombre ?? id}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setObservacionesModal((prev) =>
-                              prev ? { ...prev, tipoObservacionIds: prev.tipoObservacionIds.filter((x) => x !== id) } : null
-                            )
-                          }
-                          className="rounded px-1 hover:bg-gray-200 dark:hover:bg-gray-600"
-                          disabled={guardandoObservaciones}
-                          aria-label="Quitar tipo"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="mb-4">
-              <label htmlFor={HISTORIAL_MODAL_OBS_ID} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Observación libre
-              </label>
-              <textarea
-                id={HISTORIAL_MODAL_OBS_ID}
-                value={observacionesModal.observaciones}
-                onChange={(e) =>
-                  setObservacionesModal((prev) => (prev ? { ...prev, observaciones: e.target.value } : null))
-                }
-                rows={4}
-                className="input-field w-full resize-y"
-                placeholder="Ej: Entregó excusa dentro del plazo de 5 días."
-                disabled={guardandoObservaciones}
-                maxLength={1000}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setObservacionesModal(null)}
-                disabled={guardandoObservaciones}
-                className="btn-secondary"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void guardarObservaciones();
-                }}
-                disabled={guardandoObservaciones}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-              >
-                {guardandoObservaciones ? 'Guardando…' : 'Guardar'}
-              </button>
-            </div>
-          </dialog>
-        </div>
+        <HistorialObservacionesModal
+          modal={observacionesModal}
+          catalogo={tiposObservacionCatalogo}
+          guardando={guardandoObservaciones}
+          onCerrar={cerrarObservacionesModal}
+          onGuardar={() => {
+            void guardarObservaciones();
+          }}
+          onChangeObservaciones={actualizarTextoObservacionModal}
+          onAgregarTipo={agregarTipoObservacionModal}
+          onQuitarTipo={quitarTipoObservacionModal}
+        />
       )}
 
       {error && (

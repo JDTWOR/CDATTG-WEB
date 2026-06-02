@@ -374,18 +374,19 @@ export async function exportarExcelAnio(
   await descargarWorkbook(workbook, `asistencia_${codigoFicha}_${nombreArchivoAnio(anio)}.xlsx`);
 }
 
+async function codigoFichaDesdeApi(fichaId: number): Promise<string> {
+  try {
+    return await apiService.getFichaCodigo(fichaId);
+  } catch {
+    return '';
+  }
+}
+
 export async function obtenerCodigoFichaParaArchivo(
   fichaId: number,
-  codigoDesdeFicha?: string,
+  codigoDesdeFicha = '',
 ): Promise<string> {
-  let codigo = codigoDesdeFicha ?? '';
-  if (!codigo) {
-    try {
-      codigo = await apiService.getFichaCodigo(fichaId);
-    } catch {
-      codigo = '';
-    }
-  }
+  const codigo = codigoDesdeFicha || (await codigoFichaDesdeApi(fichaId));
   const saneado = codigo.replaceAll(/\s+/g, '_').replaceAll(/[^a-zA-Z0-9_-]/g, '');
   return saneado || 'ficha';
 }

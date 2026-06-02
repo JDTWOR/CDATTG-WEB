@@ -99,7 +99,7 @@ function parsePersonaImportStreamLine(
       return { streamError: data.error, finalResult: null };
     }
     if (data.total !== undefined) {
-      onProgress(data as PersonaImportProgress);
+      onProgress(data);
     }
     if (data.type === 'done' || data.type === 'result') {
       return {

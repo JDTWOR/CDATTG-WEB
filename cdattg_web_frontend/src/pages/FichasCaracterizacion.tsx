@@ -24,89 +24,15 @@ import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
 import { useAuth } from '../context/AuthContext';
 import { SelectSearch } from '../components/SelectSearch';
-import { InstructorSelectAsync } from '../components/InstructorSelectAsync';
 import { ModalAsignarFicha } from '../components/ModalAsignarFicha';
+import { FichaFormModal } from '../components/FichaFormModal';
+import { formatDiasEnTabla, mergeListAfterSave } from '../utils/fichaCaracterizacionForm';
 import type {
   FichaCaracterizacionResponse,
-  FichaCaracterizacionRequest,
   FichaImportResult,
   ProgramaFormacionResponse,
-  SedeItem,
-  AmbienteItem,
-  ModalidadFormacionItem,
-  JornadaItem,
   DiaFormacionItem,
 } from '../types';
-
-/** API puede devolver ISO (RFC3339); input type=date exige yyyy-MM-DD */
-function toDateInputString(iso?: string | null): string | undefined {
-  if (iso == null || iso === '') return undefined;
-  const s = String(iso).trim();
-  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  return undefined;
-}
-
-/** IDs de día como número (evita que includes falle si API devuelve string o mezcla). */
-function normalizeDiaIds(ids?: (number | string)[] | null): number[] {
-  if (!ids?.length) return [];
-  return [...new Set(ids.map(Number).filter((n) => !Number.isNaN(n) && n > 0))];
-}
-
-/** Extrae IDs de días del ítem del listado (por si el JSON llega con otra clave o tipo). */
-function diasIdsFromListItem(item: FichaCaracterizacionResponse): number[] {
-  const anyItem = item as unknown as Record<string, unknown>;
-  const raw =
-    item.dias_formacion_ids ??
-    anyItem.dias_formacion_ids ??
-    anyItem.DiasFormacionIDs ??
-    anyItem.diasFormacionIds;
-  if (Array.isArray(raw)) return normalizeDiaIds(raw as (number | string)[]);
-  return [];
-}
-
-function formatDiasEnTabla(item: FichaCaracterizacionResponse, diasFormacion: DiaFormacionItem[]): string {
-  const ids = diasIdsFromListItem(item);
-  if (!ids.length) return '—';
-  return ids
-    .map((id) => diasFormacion.find((d) => Number(d.id) === id)?.nombre ?? String(id))
-    .join(', ');
-}
-
-function formStateFromFicha(item: FichaCaracterizacionResponse): FichaCaracterizacionRequest {
-  return {
-    programa_formacion_id: item.programa_formacion_id,
-    ficha: item.ficha,
-    instructor_id: item.instructor_id,
-    fecha_inicio: toDateInputString(item.fecha_inicio),
-    fecha_fin: toDateInputString(item.fecha_fin),
-    sede_id: item.sede_id,
-    modalidad_formacion_id: item.modalidad_formacion_id,
-    ambiente_id: item.ambiente_id,
-    jornada_id: item.jornada_id,
-    total_horas: item.total_horas,
-    status: item.status,
-    dias_formacion_ids: normalizeDiaIds(item.dias_formacion_ids),
-  };
-}
-
-function labelBotonGuardarFicha(saving: boolean, editing: FichaCaracterizacionResponse | null): string {
-  if (saving) return 'Guardando…';
-  if (editing !== null) return 'Guardar';
-  return 'Crear Ficha';
-}
-
-function validarFormFicha(
-  form: FichaCaracterizacionRequest,
-  editing: FichaCaracterizacionResponse | null
-): string | null {
-  if (!editing && (!form.instructor_id || form.instructor_id === 0)) {
-    return 'El instructor líder es obligatorio.';
-  }
-  if (!form.ficha?.trim()) {
-    return 'El número de ficha es obligatorio.';
-  }
-  return null;
-}
 
 const EXT_EXCEL_IMPORT = new Set(['.xlsx', '.xls']);
 
@@ -141,58 +67,6 @@ function descargarExcelDesdeBase64(base64: string, nombreArchivo: string): void 
   }
 }
 
-function construirPayloadFicha(
-  form: FichaCaracterizacionRequest,
-  editing: FichaCaracterizacionResponse | null,
-  programas: ProgramaFormacionResponse[]
-): FichaCaracterizacionRequest {
-  const diasNorm = normalizeDiaIds(form.dias_formacion_ids as (number | string)[] | undefined);
-  const fechaInicio =
-    (form.fecha_inicio?.trim() && toDateInputString(form.fecha_inicio.trim())) ||
-    (editing ? toDateInputString(editing.fecha_inicio) : undefined);
-  const fechaFin =
-    (form.fecha_fin?.trim() && toDateInputString(form.fecha_fin.trim())) ||
-    (editing ? toDateInputString(editing.fecha_fin) : undefined);
-  const programaFormacionId = form.programa_formacion_id || programas[0]?.id || 0;
-  return {
-    programa_formacion_id: programaFormacionId,
-    ficha: form.ficha.trim(),
-    instructor_id: form.instructor_id ?? null,
-    fecha_inicio: fechaInicio,
-    fecha_fin: fechaFin,
-    sede_id: form.sede_id ?? null,
-    modalidad_formacion_id: form.modalidad_formacion_id ?? null,
-    ambiente_id: form.ambiente_id ?? null,
-    jornada_id: form.jornada_id ?? null,
-    total_horas: form.total_horas,
-    status: form.status,
-    dias_formacion_ids: diasNorm,
-  };
-}
-
-function mergeListAfterSave(
-  prev: FichaCaracterizacionResponse[],
-  saved: FichaCaracterizacionResponse,
-  editing: FichaCaracterizacionResponse | null
-): FichaCaracterizacionResponse[] {
-  if (editing) {
-    return prev.map((row) => (row.id === saved.id ? { ...row, ...saved } : row));
-  }
-  return [saved, ...prev];
-}
-
-type GuardarFichaParams = Readonly<{
-  form: FichaCaracterizacionRequest;
-  editing: FichaCaracterizacionResponse | null;
-  programas: ProgramaFormacionResponse[];
-  setSaving: (v: boolean) => void;
-  setFormError: (msg: string) => void;
-  setList: Dispatch<SetStateAction<FichaCaracterizacionResponse[]>>;
-  setIsModalOpen: (v: boolean) => void;
-  setSaveBanner: (v: string) => void;
-  fetchList: () => void | Promise<void>;
-}>;
-
 function filtrarListaFichasInstructor(
   list: FichaCaracterizacionResponse[],
   esInstructor: boolean,
@@ -204,22 +78,6 @@ function filtrarListaFichasInstructor(
     (f) =>
       (f.programa_formacion_nombre?.toLowerCase().includes(q) ?? false) || f.ficha.toLowerCase().includes(q)
   );
-}
-
-function actualizarDiasFormacionEnForm(
-  setForm: Dispatch<SetStateAction<FichaCaracterizacionRequest>>,
-  diaId: number,
-  checked: boolean
-): void {
-  const idNum = Number(diaId);
-  setForm((f) => {
-    const cur = normalizeDiaIds(f.dias_formacion_ids as (number | string)[] | undefined);
-    if (checked) {
-      if (cur.includes(idNum)) return f;
-      return { ...f, dias_formacion_ids: [...cur, idNum] };
-    }
-    return { ...f, dias_formacion_ids: cur.filter((x) => x !== idNum) };
-  });
 }
 
 async function exportarBlobExcelFichas(setExportLoading: (v: boolean) => void): Promise<void> {
@@ -270,34 +128,6 @@ async function ejecutarImportFichasExcel(p: ImportFichasParams): Promise<void> {
     setImportError(axiosErrorMessage(err, 'Error al importar'));
   } finally {
     setImportLoading(false);
-  }
-}
-
-async function ejecutarGuardadoFicha(params: GuardarFichaParams): Promise<void> {
-  const { form, editing, programas, setSaving, setFormError, setList, setIsModalOpen, setSaveBanner, fetchList } = params;
-  const err = validarFormFicha(form, editing);
-  if (err) {
-    setFormError(err);
-    return;
-  }
-  setFormError('');
-  const payload = construirPayloadFicha(form, editing, programas);
-  try {
-    setSaving(true);
-    const saved = editing
-      ? await apiService.updateFichaCaracterizacion(editing.id, payload)
-      : await apiService.createFichaCaracterizacion(payload);
-    setList((prev) => mergeListAfterSave(prev, saved, editing));
-    setIsModalOpen(false);
-    setSaveBanner(
-      'Ficha guardada. Los días de formación quedan en la columna «Días» de la tabla y al volver a editar.'
-    );
-    globalThis.setTimeout(() => setSaveBanner(''), 10000);
-    await fetchList();
-  } catch (err: unknown) {
-    setFormError(axiosErrorMessage(err, 'Error al guardar'));
-  } finally {
-    setSaving(false);
   }
 }
 
@@ -468,17 +298,10 @@ export const FichasCaracterizacion = () => {
   const { roles } = useAuth();
   const [list, setList] = useState<FichaCaracterizacionResponse[]>([]);
   const [programas, setProgramas] = useState<ProgramaFormacionResponse[]>([]);
-  const [sedes, setSedes] = useState<SedeItem[]>([]);
-  const [ambientes, setAmbientes] = useState<AmbienteItem[]>([]);
-  const [modalidades, setModalidades] = useState<ModalidadFormacionItem[]>([]);
-  const [jornadas, setJornadas] = useState<JornadaItem[]>([]);
   const [diasFormacion, setDiasFormacion] = useState<DiaFormacionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [formError, setFormError] = useState('');
   const [saveBanner, setSaveBanner] = useState('');
-  const [catalogError, setCatalogError] = useState('');
-  const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(20);
@@ -493,20 +316,6 @@ export const FichasCaracterizacion = () => {
   const [importResult, setImportResult] = useState<FichaImportResult | null>(null);
   const [importError, setImportError] = useState('');
   const [modalAsignar, setModalAsignar] = useState<{ ficha: FichaCaracterizacionResponse; tipo: 'instructores' | 'aprendices' } | null>(null);
-  const [form, setForm] = useState<FichaCaracterizacionRequest>({
-    programa_formacion_id: 0,
-    ficha: '',
-    instructor_id: undefined,
-    fecha_inicio: undefined,
-    fecha_fin: undefined,
-    sede_id: undefined,
-    modalidad_formacion_id: undefined,
-    ambiente_id: undefined,
-    jornada_id: undefined,
-    total_horas: undefined,
-    status: true,
-    dias_formacion_ids: [],
-  });
 
   const esInstructor = roles.some((r) => r.toUpperCase() === 'INSTRUCTOR');
 
@@ -519,26 +328,12 @@ export const FichasCaracterizacion = () => {
     }
   };
 
-  const fetchCatalogos = async () => {
+  const fetchDiasFormacionCat = async () => {
     try {
-      setCatalogError('');
-      const [s, a, m, j, d] = await Promise.all([
-        apiService.getCatalogosSedes(),
-        apiService.getCatalogosAmbientes(),
-        apiService.getCatalogosModalidadesFormacion(),
-        apiService.getCatalogosJornadas(),
-        apiService.getCatalogosDiasFormacion(),
-      ]);
-      setSedes(s);
-      setAmbientes(a);
-      setModalidades(m);
-      setJornadas(j);
+      const d = await apiService.getCatalogosDiasFormacion();
       setDiasFormacion(d);
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        'No se pudieron cargar los catálogos (sedes, días de formación, etc.).';
-      setCatalogError(msg);
+    } catch {
+      setDiasFormacion([]);
     }
   };
 
@@ -559,7 +354,7 @@ export const FichasCaracterizacion = () => {
 
   useEffect(() => {
     fetchProgramas();
-    fetchCatalogos();
+    void fetchDiasFormacionCat();
   }, []);
 
   useEffect(() => {
@@ -575,53 +370,24 @@ export const FichasCaracterizacion = () => {
 
   const openCreate = () => {
     setEditing(null);
-    setFormError('');
     setSaveBanner('');
-    setForm({
-      programa_formacion_id: programas[0]?.id ?? 0,
-      ficha: '',
-      instructor_id: undefined,
-      fecha_inicio: undefined,
-      fecha_fin: undefined,
-      sede_id: undefined,
-      modalidad_formacion_id: undefined,
-      ambiente_id: undefined,
-      jornada_id: undefined,
-      total_horas: undefined,
-      status: true,
-      dias_formacion_ids: [],
-    });
     setIsModalOpen(true);
   };
 
-  const openEdit = async (item: FichaCaracterizacionResponse) => {
-    setFormError('');
+  const openEdit = (item: FichaCaracterizacionResponse) => {
     setSaveBanner('');
-    try {
-      const fresh = await apiService.getFichaCaracterizacionById(item.id);
-      setEditing(fresh);
-      setForm(formStateFromFicha(fresh));
-    } catch {
-      setEditing(item);
-      setForm(formStateFromFicha(item));
-    }
+    setEditing(item);
     setIsModalOpen(true);
   };
 
-  const handleSave = () =>
-    ejecutarGuardadoFicha({
-      form,
-      editing,
-      programas,
-      setSaving,
-      setFormError,
-      setList,
-      setIsModalOpen,
-      setSaveBanner,
-      fetchList,
-    });
-
-  const setDiaChecked = (diaId: number, checked: boolean) => actualizarDiasFormacionEnForm(setForm, diaId, checked);
+  const handleFichaSaved = (saved: FichaCaracterizacionResponse) => {
+    setList((prev) => mergeListAfterSave(prev, saved, editing));
+    setSaveBanner(
+      'Ficha guardada. Los días de formación quedan en la columna «Días» de la tabla y al volver a editar.'
+    );
+    globalThis.setTimeout(() => setSaveBanner(''), 10000);
+    void fetchList();
+  };
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Eliminar esta ficha?')) return;
@@ -880,229 +646,13 @@ export const FichasCaracterizacion = () => {
         )}
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full my-8 p-6 border border-gray-200 dark:border-gray-600">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{editing ? 'Editar ficha' : 'Crear Ficha'}</h2>
-            {formError && (
-              <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
-                {formError}
-              </div>
-            )}
-            {catalogError && (
-              <div className="mb-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100 px-4 py-3 rounded-lg text-sm">
-                {catalogError} Recargue la página o contacte al administrador si el problema continúa.
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="fichas-modal-ficha" className="block text-sm font-medium text-gray-700">
-                  Número de Ficha *
-                </label>
-                <input
-                  id="fichas-modal-ficha"
-                  type="text"
-                  placeholder="Ej: 123456"
-                  value={form.ficha}
-                  onChange={(e) => setForm((f) => ({ ...f, ficha: e.target.value }))}
-                  className="input-field mt-1 w-full"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="fichas-modal-programa"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Programa de Formación *
-                </label>
-                <div className="mt-1">
-                  <SelectSearch
-                    inputId="fichas-modal-programa"
-                    options={programas.map((p) => ({ value: p.id, label: `${p.codigo} - ${p.nombre}` }))}
-                    value={form.programa_formacion_id === 0 ? undefined : form.programa_formacion_id}
-                    onChange={(v) => setForm((f) => ({ ...f, programa_formacion_id: v ?? 0 }))}
-                    placeholder="Seleccione un programa..."
-                    isRequired
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="fichas-modal-fecha-inicio" className="block text-sm font-medium text-gray-700">
-                  Fecha de Inicio *
-                </label>
-                <input
-                  id="fichas-modal-fecha-inicio"
-                  type="date"
-                  value={form.fecha_inicio ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, fecha_inicio: e.target.value || undefined }))}
-                  className="input-field mt-1 w-full"
-                />
-              </div>
-              <div>
-                <label htmlFor="fichas-modal-fecha-fin" className="block text-sm font-medium text-gray-700">
-                  Fecha de Fin *
-                </label>
-                <input
-                  id="fichas-modal-fecha-fin"
-                  type="date"
-                  value={form.fecha_fin ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, fecha_fin: e.target.value || undefined }))}
-                  className="input-field mt-1 w-full"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="fichas-modal-sede" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Sede *
-                </label>
-                <div className="mt-1">
-                  <SelectSearch
-                    inputId="fichas-modal-sede"
-                    options={sedes.map((s) => ({ value: s.id, label: s.nombre }))}
-                    value={form.sede_id}
-                    onChange={(v) => setForm((f) => ({ ...f, sede_id: v }))}
-                    placeholder="Seleccione una sede..."
-                    isRequired
-                  />
-                </div>
-              </div>
-              <div>
-                <label
-                  htmlFor="fichas-modal-instructor"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Instructor Líder *
-                </label>
-                <div className="mt-1">
-                  <InstructorSelectAsync
-                    inputId="fichas-modal-instructor"
-                    value={form.instructor_id ?? undefined}
-                    onChange={(v) => setForm((f) => ({ ...f, instructor_id: v }))}
-                    placeholder="Buscar por nombre o documento..."
-                    isRequired
-                    defaultLabel={editing?.instructor_nombre}
-                  />
-                </div>
-                {!editing && (
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    La asignación del instructor líder se realiza en el momento de crear la ficha.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="fichas-modal-modalidad"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Modalidad de Formación *
-                </label>
-                <div className="mt-1">
-                  <SelectSearch
-                    inputId="fichas-modal-modalidad"
-                    options={modalidades.map((m) => ({ value: m.id, label: m.nombre }))}
-                    value={form.modalidad_formacion_id}
-                    onChange={(v) => setForm((f) => ({ ...f, modalidad_formacion_id: v }))}
-                    placeholder="Seleccione una modalidad..."
-                    isRequired
-                  />
-                </div>
-              </div>
-              <div>
-                <label
-                  htmlFor="fichas-modal-jornada"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Jornada de Formación *
-                </label>
-                <div className="mt-1">
-                  <SelectSearch
-                    inputId="fichas-modal-jornada"
-                    options={jornadas.map((j) => ({ value: j.id, label: j.nombre }))}
-                    value={form.jornada_id}
-                    onChange={(v) => setForm((f) => ({ ...f, jornada_id: v }))}
-                    placeholder="Seleccione una jornada..."
-                    isRequired
-                  />
-                </div>
-              </div>
-
-              <div className="md:col-span-2">
-                <label htmlFor="fichas-modal-ambiente" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Ambiente *
-                </label>
-                <div className="mt-1">
-                  <SelectSearch
-                    inputId="fichas-modal-ambiente"
-                    options={ambientes.map((a) => ({ value: a.id, label: a.nombre }))}
-                    value={form.ambiente_id}
-                    onChange={(v) => setForm((f) => ({ ...f, ambiente_id: v }))}
-                    placeholder="Seleccione un ambiente..."
-                    isRequired
-                  />
-                </div>
-              </div>
-            </div>
-
-            <fieldset className="mt-4 border-0 p-0">
-              <legend className="block text-sm font-medium text-gray-700 mb-2">Días de Formación *</legend>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                Marque los días en que hay formación y pulse Guardar. Los seleccionados aparecen en la columna «Días de formación» del listado principal.
-              </p>
-              <div className="flex flex-wrap gap-4">
-                {diasFormacion.map((d) => (
-                  <label key={d.id} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={normalizeDiaIds(form.dias_formacion_ids as (number | string)[] | undefined).includes(Number(d.id))}
-                      onChange={(e) => setDiaChecked(Number(d.id), e.currentTarget.checked)}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-sm">{d.nombre}</span>
-                  </label>
-                ))}
-                {diasFormacion.length === 0 && (
-                  <span className="text-sm text-gray-500">No hay días cargados o cargando...</span>
-                )}
-              </div>
-            </fieldset>
-
-            <div className="mt-4 flex items-center gap-2">
-              <label htmlFor="fichas-modal-status" className="block text-sm font-medium text-gray-700">
-                Ficha Activa *
-              </label>
-              <button
-                id="fichas-modal-status"
-                type="button"
-                role="switch"
-                aria-checked={form.status ?? true}
-                onClick={() => setForm((f) => ({ ...f, status: !(f.status ?? true) }))}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-                  form.status ?? true ? 'bg-primary-600' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
-                    form.status ?? true ? 'translate-x-5' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-              <span className="text-sm text-gray-600">{form.status ?? true ? 'Sí' : 'No'}</span>
-            </div>
-
-            <div className="mt-6 flex justify-center gap-3">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="btn-secondary" disabled={saving}>
-                Cancelar
-              </button>
-              <button type="button" onClick={handleSave} className="btn-primary" disabled={saving}>
-                {labelBotonGuardarFicha(saving, editing)}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <FichaFormModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        editing={editing}
+        onSaved={handleFichaSaved}
+        inputIdPrefix="fichas-list"
+      />
 
       {isImportModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">

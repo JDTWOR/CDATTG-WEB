@@ -12,13 +12,16 @@ import {
   BuildingOffice2Icon,
   ComputerDesktopIcon,
   ChartBarIcon,
+  PencilSquareIcon,
 } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { InstructorSelectAsync } from '../components/InstructorSelectAsync';
+import { FichaFormModal } from '../components/FichaFormModal';
+import { useAuth } from '../context/AuthContext';
 import { axiosErrorMessage } from '../utils/httpError';
+import { canManageFichas, normalizeDiaIds } from '../utils/fichaCaracterizacionForm';
 import type {
   FichaCaracterizacionResponse,
-  FichaCaracterizacionRequest,
   InstructorFichaResponse,
   InstructorItem,
   InstructorFichaItem,
@@ -42,19 +45,6 @@ function formatFechaVista(iso?: string | null): string {
   return s;
 }
 
-/** ISO / RFC3339 → yyyy-MM-dd para el API */
-function toDateInputString(iso?: string | null): string | undefined {
-  if (iso == null || iso === '') return undefined;
-  const s = String(iso).trim();
-  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  return undefined;
-}
-
-function normalizeDiaIds(ids?: (number | string)[] | null): number[] {
-  if (!ids?.length) return [];
-  return [...new Set(ids.map(Number).filter((n) => !Number.isNaN(n) && n > 0))];
-}
-
 function diasTexto(ficha: FichaCaracterizacionResponse, catalogo: DiaFormacionItem[]): string {
   const ids = normalizeDiaIds(ficha.dias_formacion_ids);
   if (!ids.length) return '—';
@@ -63,28 +53,11 @@ function diasTexto(ficha: FichaCaracterizacionResponse, catalogo: DiaFormacionIt
     .join(', ');
 }
 
-function buildFichaUpdatePayload(f: FichaCaracterizacionResponse, nuevoInstructorId: number): FichaCaracterizacionRequest {
-  return {
-    programa_formacion_id: f.programa_formacion_id,
-    ficha: f.ficha,
-    instructor_id: nuevoInstructorId,
-    fecha_inicio: toDateInputString(f.fecha_inicio),
-    fecha_fin: toDateInputString(f.fecha_fin),
-    sede_id: f.sede_id ?? null,
-    modalidad_formacion_id: f.modalidad_formacion_id ?? null,
-    ambiente_id: f.ambiente_id ?? null,
-    jornada_id: f.jornada_id ?? null,
-    total_horas: f.total_horas,
-    status: f.status,
-    dias_formacion_ids: normalizeDiaIds(f.dias_formacion_ids),
-  };
-}
-
 type FichaDetalleInstructoresTabProps = Readonly<{
   ficha: FichaCaracterizacionResponse;
   instructores: InstructorFichaResponse[];
-  savingInstructorPrincipal: boolean;
-  hacerPrincipalDesdeLista: (instructorId: number) => Promise<void>;
+  puedeEditarFicha: boolean;
+  onEditarFicha: () => void;
   handleDesasignarInstructor: (instructorId: number) => Promise<void>;
   showFormInstructores: boolean;
   setShowFormInstructores: Dispatch<SetStateAction<boolean>>;
@@ -105,8 +78,8 @@ function FichaDetalleInstructoresTab(props: FichaDetalleInstructoresTabProps) {
   const {
     ficha,
     instructores,
-    savingInstructorPrincipal,
-    hacerPrincipalDesdeLista,
+    puedeEditarFicha,
+    onEditarFicha,
     handleDesasignarInstructor,
     showFormInstructores,
     setShowFormInstructores,
@@ -155,12 +128,11 @@ function FichaDetalleInstructoresTab(props: FichaDetalleInstructoresTabProps) {
                   )}
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
-                  {esPrincipal ? null : (
+                  {!esPrincipal && puedeEditarFicha && (
                     <button
                       type="button"
-                      disabled={savingInstructorPrincipal}
-                      onClick={() => void hacerPrincipalDesdeLista(inst.instructor_id)}
-                      className="text-sm font-medium text-primary-600 hover:text-primary-800 disabled:opacity-50 dark:text-primary-400 dark:hover:text-primary-300"
+                      onClick={onEditarFicha}
+                      className="text-sm font-medium text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300"
                     >
                       Hacer principal
                     </button>
@@ -363,8 +335,10 @@ function FichaDetalleAprendicesTab(props: FichaDetalleAprendicesTabProps) {
 }
 
 export const FichaDetalle = () => {
+  const { roles } = useAuth();
   const { id } = useParams<{ id: string }>();
   const fichaId = id ? Number.parseInt(id, 10) : 0;
+  const puedeEditarFicha = canManageFichas(roles);
 
   const [ficha, setFicha] = useState<FichaCaracterizacionResponse | null>(null);
   const [diasFormacionCat, setDiasFormacionCat] = useState<DiaFormacionItem[]>([]);
@@ -385,10 +359,7 @@ export const FichaDetalle = () => {
   const [showFormAprendices, setShowFormAprendices] = useState(false);
   const [personasSeleccionadas, setPersonasSeleccionadas] = useState<number[]>([]);
 
-  const [editandoInstructorPrincipal, setEditandoInstructorPrincipal] = useState(false);
-  const [instructorPrincipalDraft, setInstructorPrincipalDraft] = useState(0);
-  const [savingInstructorPrincipal, setSavingInstructorPrincipal] = useState(false);
-  const [msgInstructorPrincipal, setMsgInstructorPrincipal] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const diasLabel = useMemo(
     () => (ficha ? diasTexto(ficha, diasFormacionCat) : '—'),
@@ -487,60 +458,6 @@ export const FichaDetalle = () => {
     if (tab === 'instructores') void loadInstructores();
     else void loadAprendices();
   }, [tab, fichaId, loadInstructores, loadAprendices]);
-
-  const abrirCambioInstructorPrincipal = () => {
-    if (!ficha) return;
-    setInstructorPrincipalDraft(ficha.instructor_id ?? 0);
-    setMsgInstructorPrincipal('');
-    setEditandoInstructorPrincipal(true);
-  };
-
-  const cancelarCambioInstructorPrincipal = () => {
-    setEditandoInstructorPrincipal(false);
-    setMsgInstructorPrincipal('');
-  };
-
-  const persistInstructorPrincipal = async (nuevoId: number, origin: 'resumen' | 'lista') => {
-    if (!ficha || !fichaId || !nuevoId) return;
-    if (nuevoId === ficha.instructor_id) return;
-    const payload = buildFichaUpdatePayload(ficha, nuevoId);
-    try {
-      setSavingInstructorPrincipal(true);
-      if (origin === 'resumen') setMsgInstructorPrincipal('');
-      const actualizada = await apiService.updateFichaCaracterizacion(fichaId, payload);
-      setFicha(actualizada);
-      setInstructorPrincipalId(actualizada.instructor_id ?? 0);
-      if (origin === 'resumen') setEditandoInstructorPrincipal(false);
-      void loadInstructores();
-    } catch (err: unknown) {
-      const msg = axiosErrorMessage(err, 'No se pudo actualizar el instructor.');
-      if (origin === 'resumen') setMsgInstructorPrincipal(msg);
-      else alert(msg);
-    } finally {
-      setSavingInstructorPrincipal(false);
-    }
-  };
-
-  const guardarInstructorPrincipal = async () => {
-    if (!ficha || !fichaId) return;
-    if (!instructorPrincipalDraft) {
-      setMsgInstructorPrincipal('Seleccione un instructor líder.');
-      return;
-    }
-    await persistInstructorPrincipal(instructorPrincipalDraft, 'resumen');
-  };
-
-  const hacerPrincipalDesdeLista = async (instructorId: number) => {
-    if (!ficha || instructorId === ficha.instructor_id) return;
-    if (
-      !globalThis.confirm(
-        '¿Establecer a este instructor como instructor principal de la ficha? El cambio quedará reflejado también en los datos de la ficha.'
-      )
-    ) {
-      return;
-    }
-    await persistInstructorPrincipal(instructorId, 'lista');
-  };
 
   const handleAsignarInstructores = async () => {
     if (instructoresSeleccionados.length === 0 || !instructorPrincipalId) {
@@ -685,6 +602,16 @@ export const FichaDetalle = () => {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {puedeEditarFicha && (
+            <button
+              type="button"
+              onClick={() => setShowEditModal(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-primary-300 dark:border-primary-600 bg-white dark:bg-gray-800 px-4 py-2.5 text-sm font-medium text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20"
+            >
+              <PencilSquareIcon className="h-5 w-5" />
+              Editar ficha
+            </button>
+          )}
           <Link
             to={`/asistencia?ficha=${ficha.id}`}
             className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700"
@@ -719,51 +646,11 @@ export const FichaDetalle = () => {
               <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 Instructor principal
               </dt>
-              {editandoInstructorPrincipal ? (
-                <dd className="mt-2 space-y-3">
-                  <div className="max-w-md">
-                    <InstructorSelectAsync
-                      inputId="detalle-ins-principal-resumen"
-                      value={instructorPrincipalDraft || undefined}
-                      onChange={(v) => setInstructorPrincipalDraft(v ?? 0)}
-                      placeholder="Buscar instructor por nombre o documento..."
-                      isRequired
-                      defaultLabel={ficha.instructor_nombre}
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={guardarInstructorPrincipal}
-                      disabled={savingInstructorPrincipal}
-                      className="btn-primary disabled:opacity-50"
-                    >
-                      {savingInstructorPrincipal ? 'Guardando…' : 'Guardar'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelarCambioInstructorPrincipal}
-                      disabled={savingInstructorPrincipal}
-                      className="btn-secondary disabled:opacity-50"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                  {msgInstructorPrincipal ? (
-                    <p className="text-sm text-red-600 dark:text-red-400">{msgInstructorPrincipal}</p>
-                  ) : null}
-                </dd>
-              ) : (
-                <dd className="mt-1 flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-gray-900 dark:text-gray-100">{ficha.instructor_nombre || '—'}</span>
-                  <button
-                    type="button"
-                    onClick={abrirCambioInstructorPrincipal}
-                    className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-                  >
-                    Cambiar
-                  </button>
-                </dd>
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{ficha.instructor_nombre || '—'}</dd>
+              {puedeEditarFicha && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Para cambiar el instructor líder u otros datos, use el botón «Editar ficha» en la parte superior.
+                </p>
               )}
             </div>
           </div>
@@ -882,8 +769,8 @@ export const FichaDetalle = () => {
         <FichaDetalleInstructoresTab
           ficha={ficha}
           instructores={instructores}
-          savingInstructorPrincipal={savingInstructorPrincipal}
-          hacerPrincipalDesdeLista={hacerPrincipalDesdeLista}
+          puedeEditarFicha={puedeEditarFicha}
+          onEditarFicha={() => setShowEditModal(true)}
           handleDesasignarInstructor={handleDesasignarInstructor}
           showFormInstructores={showFormInstructores}
           setShowFormInstructores={setShowFormInstructores}
@@ -911,6 +798,21 @@ export const FichaDetalle = () => {
           onPersonaCheckboxChange={onPersonaCheckboxChange}
           handleAsignarAprendices={handleAsignarAprendices}
           handleDesasignarAprendices={handleDesasignarAprendices}
+        />
+      )}
+
+      {puedeEditarFicha && ficha && (
+        <FichaFormModal
+          open={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          editing={ficha}
+          inputIdPrefix="ficha-detalle"
+          onSaved={(saved) => {
+            setFicha(saved);
+            setInstructorPrincipalId(saved.instructor_id ?? 0);
+            void loadInstructores();
+            void loadAprendices();
+          }}
         />
       )}
     </div>

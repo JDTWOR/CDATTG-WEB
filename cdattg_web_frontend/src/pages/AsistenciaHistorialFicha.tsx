@@ -1,10 +1,21 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeftIcon, ArrowDownTrayIcon, CalendarDaysIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon } from '@heroicons/react/24/outline';
-import ExcelJS from 'exceljs';
+import { ArrowLeftIcon, ArrowDownTrayIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
 import { FichaCaracterizacionCard } from '../components/FichaCaracterizacionCard';
+import {
+  exportarExcelAnio,
+  exportarExcelDetalleDia,
+  exportarExcelMatrizRango,
+  minIsoDateString,
+  nombreArchivoMes,
+  nombreArchivoSemana,
+  obtenerCodigoFichaParaArchivo,
+  rangoFechasPorMes,
+  rangoFechasPorSemanaDelMes,
+  type TipoExportHistorial,
+} from './asistencia/asistenciaHistorialExport';
 import type {
   FichaCaracterizacionResponse,
   AprendizResponse,
@@ -30,16 +41,6 @@ type FilaHistorial = {
 const TOLERANCIA_MINUTOS_TARDE = 60;
 const UMBRAL_POCAS_HORAS = 0.8;
 
-/** Menor de dos fechas ISO YYYY-MM-DD (orden lexicográfico válido para ese formato). */
-function minIsoDateString(a: string, b: string): string {
-  return a <= b ? a : b;
-}
-
-function formatoFechaColumna(iso: string): string {
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
-}
-
 function intervaloSolapadoIngresoSalida(
   ingreso: Date,
   salida: Date,
@@ -50,23 +51,6 @@ function intervaloSolapadoIngresoSalida(
     desde: new Date(Math.max(ingreso.getTime(), inicioSesion.getTime())),
     hasta: new Date(Math.min(salida.getTime(), finSesion.getTime())),
   };
-}
-
-function minutosEfectivosYTardePorRegistro(
-  aa: AsistenciaAprendizResponse,
-  inicioSesion: Date,
-  finSesion: Date,
-): { efectivos: number; tarde: number } {
-  const parseHora = (iso?: string | null) => (iso ? new Date(iso) : null);
-  const diffMinutos = (a: Date, b: Date) => Math.max(0, Math.round((b.getTime() - a.getTime()) / 60000));
-  const ingreso = parseHora(aa.hora_ingreso);
-  const salida = parseHora(aa.hora_salida);
-  if (!ingreso || !salida) return { efectivos: 0, tarde: 0 };
-  const { desde, hasta } = intervaloSolapadoIngresoSalida(ingreso, salida, inicioSesion, finSesion);
-  const efectivos = hasta > desde ? diffMinutos(desde, hasta) : 0;
-  const limiteTarde = new Date(inicioSesion.getTime() + TOLERANCIA_MINUTOS_TARDE * 60000);
-  const tarde = ingreso > limiteTarde ? diffMinutos(limiteTarde, ingreso) : 0;
-  return { efectivos, tarde };
 }
 
 function mergeNombresTiposObservacion(
@@ -80,38 +64,13 @@ function mergeNombresTiposObservacion(
   return Array.from(acc);
 }
 
-function calcularMinutosSesionYAsistencia(
-  sesionesDia: AsistenciaResponse[],
-  registros: AsistenciaAprendizResponse[],
-): { minutosSesion: number; minutosEfectivos: number; minutosTarde: number } {
-  const diffMinutos = (a: Date, b: Date) => Math.max(0, Math.round((b.getTime() - a.getTime()) / 60000));
-
-  let minutosSesion = 0;
-  let minutosEfectivos = 0;
-  let minutosTarde = 0;
-
-  for (const sesion of sesionesDia) {
-    const inicioSesion = sesion.hora_inicio ? new Date(sesion.hora_inicio) : null;
-    const finSesion = sesion.hora_fin ? new Date(sesion.hora_fin) : null;
-    if (!inicioSesion || !finSesion) continue;
-
-    minutosSesion += diffMinutos(inicioSesion, finSesion);
-
-    const registrosSesion = registros.filter((aa) => aa.asistencia_id === sesion.id);
-    for (const aa of registrosSesion) {
-      const { efectivos, tarde } = minutosEfectivosYTardePorRegistro(aa, inicioSesion, finSesion);
-      minutosEfectivos += efectivos;
-      minutosTarde += tarde;
-    }
-  }
-
-  return { minutosSesion, minutosEfectivos, minutosTarde };
-}
-
 const HISTORIAL_FECHA_INPUT_ID = 'asistencia-historial-ficha-fecha';
-const MODAL_SEMANA_TITLE_ID = 'modal-semana-title';
-const MODAL_MES_SEMANA_ID = 'modal-semana-mes';
-const MODAL_SEMANA_SELECT_ID = 'modal-semana-numero';
+const MODAL_EXPORT_TITLE_ID = 'modal-export-historial-title';
+const MODAL_EXPORT_TIPO_ID = 'modal-export-historial-tipo';
+const MODAL_MES_SEMANA_ID = 'modal-export-mes-semana';
+const MODAL_SEMANA_SELECT_ID = 'modal-export-semana-numero';
+const MODAL_EXPORT_MES_ID = 'modal-export-mes';
+const MODAL_EXPORT_ANIO_ID = 'modal-export-anio';
 const HISTORIAL_MODAL_TIPO_OBS_ID = 'historial-modal-tipo-observacion';
 const HISTORIAL_MODAL_OBS_ID = 'historial-modal-observacion';
 const PLAZO_EDICION_OBSERVACION_DIAS = 5;
@@ -124,13 +83,6 @@ function claseBadgeAsistencia(color: BadgeColorAsistencia): string {
     return 'inline-flex items-center rounded-full bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700 px-2 py-0.5 text-xs font-medium';
   }
   return 'inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 px-2 py-0.5 text-xs font-medium';
-}
-
-/** Color de celda Excel (ARGB) según badge de asistencia. */
-function argbColorBadgeExcel(badgeColor: BadgeColorAsistencia | undefined): string {
-  if (badgeColor === 'green') return 'FF15803D';
-  if (badgeColor === 'yellow') return 'FF92400E';
-  return 'FF6B7280';
 }
 
 export const AsistenciaHistorialFicha = () => {
@@ -150,10 +102,13 @@ export const AsistenciaHistorialFicha = () => {
   const [sesiones, setSesiones] = useState<AsistenciaResponse[]>([]);
   const [aprendicesPorSesion, setAprendicesPorSesion] = useState<Map<number, AsistenciaAprendizResponse[]>>(new Map());
 
-  const [modalSemanaAbierto, setModalSemanaAbierto] = useState(false);
+  const [modalExportAbierto, setModalExportAbierto] = useState(false);
+  const [tipoExport, setTipoExport] = useState<TipoExportHistorial>('mes');
   const [mesSemana, setMesSemana] = useState(() => new Date().toISOString().slice(0, 7));
   const [semanaDelMes, setSemanaDelMes] = useState<number>(1);
-  const [descargandoSemana, setDescargandoSemana] = useState(false);
+  const [mesExport, setMesExport] = useState(() => new Date().toISOString().slice(0, 7));
+  const [anioExport, setAnioExport] = useState(() => String(new Date().getFullYear()));
+  const [descargandoExport, setDescargandoExport] = useState(false);
   const [tiposObservacionCatalogo, setTiposObservacionCatalogo] = useState<TipoObservacionAsistenciaItem[]>([]);
   const [observacionesModal, setObservacionesModal] = useState<{
     asistenciaId: number;
@@ -474,233 +429,87 @@ export const AsistenciaHistorialFicha = () => {
     setFecha(minIsoDateString(nueva, fechaMaxHoy));
   };
 
-  const descargarExcel = async () => {
+  const ejecutarExportacion = async () => {
+    if (!fichaId || !Number.isFinite(fichaId)) return;
+    setDescargandoExport(true);
+    setError('');
     try {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Asistencia', { views: [{ state: 'frozen', ySplit: 1 }] });
+      const codigo = await obtenerCodigoFichaParaArchivo(fichaId, ficha?.ficha);
+      const hoyIso = fechaMaxHoy;
 
-    // Anchos de columna (más anchas para que se vean bien)
-    sheet.columns = [
-      { width: 20 }, // Documento
-      { width: 40 }, // Nombre
-      { width: 12 }, // ¿Asistió?
-      { width: 14 }, // Hora ingreso
-      { width: 14 }, // Hora salida
-      { width: 55 }, // Observaciones
-    ];
-
-    // Fila de encabezados con color y negrita
-    const headerRow = sheet.addRow(['Documento', 'Nombre', '¿Asistió?', 'Hora ingreso', 'Hora salida', 'Observaciones']);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
-    headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    headerRow.height = 22;
-    headerRow.eachCell((cell) => {
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' },
-      };
-    });
-
-    // Filas de datos con colores alternados y bordes
-    filas.forEach((f, index) => {
-      const row = sheet.addRow([
-        f.aprendiz.persona_documento ?? '',
-        f.aprendiz.persona_nombre ?? '',
-        f.asistio ? 'Sí' : 'No',
-        f.horaIngreso ?? '',
-        f.horaSalida ?? '',
-        f.observaciones ?? '',
-      ]);
-      const isPar = index % 2 === 0;
-      row.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: isPar ? 'FFF8FAFC' : 'FFFFFFFF' },
-      };
-      row.alignment = { vertical: 'middle', wrapText: true };
-      row.eachCell((cell, colNumber) => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
-        };
-        if (colNumber === 3) {
-          cell.font = { color: { argb: f.asistio ? 'FF15803D' : 'FF6B7280' } };
+      if (tipoExport === 'dia') {
+        await exportarExcelDetalleDia(
+          filas.map((f) => ({
+            aprendiz: f.aprendiz,
+            asistio: f.asistio,
+            horaIngreso: f.horaIngreso,
+            horaSalida: f.horaSalida,
+            observaciones: f.observaciones,
+            badgeColor: f.badgeColor,
+          })),
+          fecha,
+          codigo,
+        );
+      } else if (tipoExport === 'semana') {
+        const { inicio, fin } = rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes);
+        if (inicio > hoyIso) {
+          setError('La semana seleccionada aún no tiene fechas disponibles.');
+          return;
         }
-      });
-    });
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const codigo = await obtenerCodigoParaArchivo();
-    a.download = `asistencia_${codigo}_${nombreArchivoFechaDia(fecha)}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
+        await exportarExcelMatrizRango(
+          fichaId,
+          inicio,
+          minIsoDateString(fin, hoyIso),
+          codigo,
+          nombreArchivoSemana(mesSemana, semanaDelMes),
+          'Asistencia semana',
+          hoyIso,
+        );
+      } else if (tipoExport === 'mes') {
+        const { inicio, fin } = rangoFechasPorMes(mesExport);
+        if (inicio > hoyIso) {
+          setError('El mes seleccionado aún no tiene fechas disponibles.');
+          return;
+        }
+        await exportarExcelMatrizRango(
+          fichaId,
+          inicio,
+          minIsoDateString(fin, hoyIso),
+          codigo,
+          nombreArchivoMes(mesExport),
+          'Asistencia mes',
+          hoyIso,
+        );
+      } else {
+        const anio = Number.parseInt(anioExport, 10);
+        if (!Number.isFinite(anio)) {
+          setError('Año no válido.');
+          return;
+        }
+        await exportarExcelAnio(fichaId, anio, codigo, hoyIso);
+      }
+      setModalExportAbierto(false);
     } catch (e: unknown) {
       setError(axiosErrorMessage(e, 'Error al generar el Excel.'));
-    }
-  };
-
-  const MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  const SEMANAS_ORDINAL_ES = ['primera', 'segunda', 'tercera', 'cuarta', 'quinta'];
-
-  async function obtenerCodigoParaArchivo(): Promise<string> {
-    let codigo = ficha?.ficha ?? '';
-    if (!codigo && fichaId != null && Number.isFinite(fichaId)) {
-      try {
-        codigo = await apiService.getFichaCodigo(fichaId);
-      } catch {
-        codigo = '';
-      }
-    }
-    const saneado = codigo.replaceAll(/\s+/g, '_').replaceAll(/[^a-zA-Z0-9_-]/g, '');
-    return saneado || 'ficha';
-  }
-
-  function nombreArchivoFechaDia(fechaIso: string): string {
-    const [y, m, d] = fechaIso.split('-').map(Number);
-    const mes = MESES_ES[(m ?? 1) - 1] ?? 'enero';
-    return `${String(d).padStart(2, '0')}_${mes}_${y}`;
-  }
-
-  function nombreArchivoSemana(anioMes: string, semanaDelMes: number): string {
-    const [anio, mesStr] = anioMes.split('-').map(Number);
-    const mes = MESES_ES[(mesStr ?? 1) - 1] ?? 'enero';
-    const ordinal = SEMANAS_ORDINAL_ES[Math.min(semanaDelMes - 1, 4)] ?? 'quinta';
-    return `${ordinal}_semana_${mes}_${anio}`;
-  }
-
-  function rangoFechasPorSemanaDelMes(anioMes: string, semana: number): { inicio: string; fin: string } {
-    const [anio, mes] = anioMes.split('-').map(Number);
-    const ultimoDia = new Date(anio, mes, 0).getDate();
-    const iniciosSemana = [1, 8, 15, 22, 29];
-    const finesSemana = [7, 14, 21, 28];
-    const idx = Math.min(Math.max(semana - 1, 0), 4);
-    const inicioDia = iniciosSemana[idx];
-    const finDia = semana === 5 ? ultimoDia : finesSemana[idx];
-    const inicio = `${anioMes}-${String(Math.min(inicioDia, ultimoDia)).padStart(2, '0')}`;
-    const fin = `${anioMes}-${String(Math.min(finDia, ultimoDia)).padStart(2, '0')}`;
-    return { inicio, fin };
-  }
-
-  const descargarExcelSemana = async () => {
-    if (!fichaId || !Number.isFinite(fichaId)) return;
-    const { inicio, fin } = rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes);
-    const hoyStr = new Date().toISOString().slice(0, 10);
-    if (inicio > hoyStr) {
-      return;
-    }
-    setDescargandoSemana(true);
-    try {
-      const aprendicesRes = await apiService.getFichaAprendices(fichaId);
-      const aprendicesActivos = aprendicesRes.filter((a) => a.estado);
-      const sesionesRes = await apiService.getAsistenciasByFichaAndFechas(fichaId, inicio, fin);
-      const sesionesPorFecha = new Map<string, AsistenciaResponse[]>();
-      sesionesRes.forEach((s) => {
-        const fechaStr = s.fecha.slice(0, 10);
-        if (!sesionesPorFecha.has(fechaStr)) sesionesPorFecha.set(fechaStr, []);
-        sesionesPorFecha.get(fechaStr)!.push(s);
-      });
-      const fechasEnRango: string[] = [];
-      const d = new Date(inicio);
-      const finDate = new Date(fin);
-      while (d <= finDate) {
-        const ds = d.toISOString().slice(0, 10);
-        if (ds <= hoyStr) fechasEnRango.push(ds);
-        d.setDate(d.getDate() + 1);
-      }
-      const asistenciaPorAprendizYFecha = new Map<number, Map<string, { badgeText: string; badgeColor: BadgeColorAsistencia }>>();
-      for (const fechaStr of fechasEnRango) {
-        const sesionesDelDia = sesionesPorFecha.get(fechaStr) ?? [];
-        const registrosDia: AsistenciaAprendizResponse[] = [];
-        for (const sesion of sesionesDelDia) {
-          const list = await apiService.getAsistenciaAprendices(sesion.id);
-          registrosDia.push(...list);
-        }
-        aprendicesActivos.forEach((ap) => {
-          const registrosAprendiz = registrosDia.filter((aa) => aa.aprendiz_id === ap.id);
-          const { minutosSesion, minutosEfectivos, minutosTarde } = calcularMinutosSesionYAsistencia(
-            sesionesDelDia,
-            registrosAprendiz,
-          );
-          const ratio = minutosSesion > 0 ? minutosEfectivos / minutosSesion : 0;
-          let badgeColor: BadgeColorAsistencia = 'gray';
-          let badgeText = 'No';
-          if (registrosAprendiz.length > 0 && minutosEfectivos > 0) {
-            if (ratio >= UMBRAL_POCAS_HORAS && minutosTarde === 0) {
-              badgeColor = 'green';
-              badgeText = 'Sí';
-            } else {
-              badgeColor = 'yellow';
-              badgeText = ratio > 0 ? 'Pocas horas' : 'Tarde';
-            }
-          }
-          if (!asistenciaPorAprendizYFecha.has(ap.id)) {
-            asistenciaPorAprendizYFecha.set(ap.id, new Map());
-          }
-          asistenciaPorAprendizYFecha.get(ap.id)!.set(fechaStr, { badgeText, badgeColor });
-        });
-      }
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('Asistencia por semana', { views: [{ state: 'frozen', ySplit: 1 }] });
-      sheet.columns = [
-        { width: 20 },
-        { width: 40 },
-        ...fechasEnRango.map(() => ({ width: 12 })),
-      ];
-      const headerCells = ['Documento', 'Nombre', ...fechasEnRango.map((f) => formatoFechaColumna(f))];
-      const headerRow = sheet.addRow(headerCells);
-      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
-      headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      headerRow.height = 22;
-      headerRow.eachCell((cell) => {
-        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-      });
-      aprendicesActivos.forEach((ap, index) => {
-        const porFecha = asistenciaPorAprendizYFecha.get(ap.id);
-        const cells = [
-          ap.persona_documento ?? '',
-          ap.persona_nombre ?? '',
-          ...fechasEnRango.map((fechaStr) => porFecha?.get(fechaStr)?.badgeText ?? 'No'),
-        ];
-        const row = sheet.addRow(cells);
-        const isPar = index % 2 === 0;
-        row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isPar ? 'FFF8FAFC' : 'FFFFFFFF' } };
-        row.alignment = { vertical: 'middle', wrapText: true };
-        row.eachCell((cell, colNumber) => {
-          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-          if (colNumber >= 3) {
-            const info = porFecha?.get(fechasEnRango[colNumber - 3]);
-            cell.font = { color: { argb: argbColorBadgeExcel(info?.badgeColor) } };
-          }
-        });
-      });
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const codigo = await obtenerCodigoParaArchivo();
-      a.download = `asistencia_${codigo}_${nombreArchivoSemana(mesSemana, semanaDelMes)}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setModalSemanaAbierto(false);
-    } catch (e: unknown) {
-      setError(axiosErrorMessage(e, 'Error al generar el Excel semanal.'));
     } finally {
-      setDescargandoSemana(false);
+      setDescargandoExport(false);
     }
   };
+
+  const exportacionDeshabilitada = useMemo(() => {
+    if (descargandoExport) return true;
+    if (tipoExport === 'semana') {
+      return rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).inicio > fechaMaxHoy;
+    }
+    if (tipoExport === 'mes') {
+      return rangoFechasPorMes(mesExport).inicio > fechaMaxHoy;
+    }
+    if (tipoExport === 'anio') {
+      const anio = Number.parseInt(anioExport, 10);
+      return !Number.isFinite(anio) || anio > Number(fechaMaxHoy.slice(0, 4));
+    }
+    return false;
+  }, [descargandoExport, tipoExport, mesSemana, semanaDelMes, mesExport, anioExport, fechaMaxHoy]);
 
   if (fichaId == null || !Number.isFinite(fichaId)) {
     return (
@@ -794,28 +603,14 @@ export const AsistenciaHistorialFicha = () => {
           </button>
         </div>
         {!loading && (
-          <>
-            {filas.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  void descargarExcel();
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
-              >
-                <ArrowDownTrayIcon className="w-5 h-5" aria-hidden />
-                Descargar Excel
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setModalSemanaAbierto(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700"
-            >
-              <CalendarDaysIcon className="w-5 h-5" aria-hidden />
-              Descargar por semana
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => setModalExportAbierto(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+          >
+            <ArrowDownTrayIcon className="h-5 w-5" aria-hidden />
+            Exportar Excel
+          </button>
         )}
       </div>
 
@@ -848,92 +643,160 @@ export const AsistenciaHistorialFicha = () => {
         </div>
       )}
 
-      {modalSemanaAbierto && (
+      {modalExportAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
             type="button"
             className="absolute inset-0 bg-black/50"
             aria-label="Cerrar diálogo"
-            onClick={() => !descargandoSemana && setModalSemanaAbierto(false)}
+            onClick={() => !descargandoExport && setModalExportAbierto(false)}
           />
           <dialog
             open
-            className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 shadow-xl"
-            aria-labelledby={MODAL_SEMANA_TITLE_ID}
+            className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+            aria-labelledby={MODAL_EXPORT_TITLE_ID}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h2 id={MODAL_SEMANA_TITLE_ID} className="text-lg font-semibold text-gray-900 dark:text-white">
-                Descargar asistencia por semana del mes
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id={MODAL_EXPORT_TITLE_ID} className="text-lg font-semibold text-gray-900 dark:text-white">
+                Exportar asistencia
               </h2>
               <button
                 type="button"
-                onClick={() => !descargandoSemana && setModalSemanaAbierto(false)}
-                className="p-1 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                onClick={() => !descargandoExport && setModalExportAbierto(false)}
+                className="rounded-lg p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
                 aria-label="Cerrar"
               >
-                <XMarkIcon className="w-5 h-5" aria-hidden />
+                <XMarkIcon className="h-5 w-5" aria-hidden />
               </button>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Elija el mes y la semana. Se generará un Excel con todos los días de esa semana (solo hasta la fecha actual).
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              Elija el periodo del reporte. Semana, mes y año generan una matriz por día; el día incluye horas y observaciones.
             </p>
             <div className="space-y-4">
               <div>
-                <label htmlFor={MODAL_MES_SEMANA_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Mes
-                </label>
-                <input
-                  id={MODAL_MES_SEMANA_ID}
-                  type="month"
-                  value={mesSemana}
-                  max={new Date().toISOString().slice(0, 7)}
-                  onChange={(e) => setMesSemana(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor={MODAL_SEMANA_SELECT_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Semana del mes
+                <label htmlFor={MODAL_EXPORT_TIPO_ID} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Periodo
                 </label>
                 <select
-                  id={MODAL_SEMANA_SELECT_ID}
-                  value={semanaDelMes}
-                  onChange={(e) => setSemanaDelMes(Number(e.target.value))}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                  id={MODAL_EXPORT_TIPO_ID}
+                  value={tipoExport}
+                  onChange={(e) => setTipoExport(e.target.value as TipoExportHistorial)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  disabled={descargandoExport}
                 >
-                  <option value={1}>Semana 1 (días 1-7)</option>
-                  <option value={2}>Semana 2 (días 8-14)</option>
-                  <option value={3}>Semana 3 (días 15-21)</option>
-                  <option value={4}>Semana 4 (días 22-28)</option>
-                  <option value={5}>Semana 5 (días 29-fin)</option>
+                  <option value="dia">Día (fecha seleccionada arriba)</option>
+                  <option value="semana">Semana del mes</option>
+                  <option value="mes">Mes completo</option>
+                  <option value="anio">Año (una hoja por mes)</option>
                 </select>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Rango: {rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).inicio} al{' '}
-                {rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).fin}
-              </p>
+
+              {tipoExport === 'dia' ? (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Se exportará el día <strong>{fecha}</strong> con ingreso, salida y observaciones por aprendiz.
+                </p>
+              ) : null}
+
+              {tipoExport === 'semana' ? (
+                <>
+                  <div>
+                    <label htmlFor={MODAL_MES_SEMANA_ID} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Mes
+                    </label>
+                    <input
+                      id={MODAL_MES_SEMANA_ID}
+                      type="month"
+                      value={mesSemana}
+                      max={fechaMaxHoy.slice(0, 7)}
+                      onChange={(e) => setMesSemana(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                      disabled={descargandoExport}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor={MODAL_SEMANA_SELECT_ID} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Semana del mes
+                    </label>
+                    <select
+                      id={MODAL_SEMANA_SELECT_ID}
+                      value={semanaDelMes}
+                      onChange={(e) => setSemanaDelMes(Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                      disabled={descargandoExport}
+                    >
+                      <option value={1}>Semana 1 (días 1-7)</option>
+                      <option value={2}>Semana 2 (días 8-14)</option>
+                      <option value={3}>Semana 3 (días 15-21)</option>
+                      <option value={4}>Semana 4 (días 22-28)</option>
+                      <option value={5}>Semana 5 (días 29-fin)</option>
+                    </select>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Rango: {rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).inicio} al{' '}
+                    {minIsoDateString(rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).fin, fechaMaxHoy)}
+                  </p>
+                </>
+              ) : null}
+
+              {tipoExport === 'mes' ? (
+                <div>
+                  <label htmlFor={MODAL_EXPORT_MES_ID} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Mes
+                  </label>
+                  <input
+                    id={MODAL_EXPORT_MES_ID}
+                    type="month"
+                    value={mesExport}
+                    max={fechaMaxHoy.slice(0, 7)}
+                    onChange={(e) => setMesExport(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    disabled={descargandoExport}
+                  />
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Incluye todos los días del mes hasta hoy ({fechaMaxHoy}).
+                  </p>
+                </div>
+              ) : null}
+
+              {tipoExport === 'anio' ? (
+                <div>
+                  <label htmlFor={MODAL_EXPORT_ANIO_ID} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Año
+                  </label>
+                  <input
+                    id={MODAL_EXPORT_ANIO_ID}
+                    type="number"
+                    min={2020}
+                    max={Number(fechaMaxHoy.slice(0, 4))}
+                    value={anioExport}
+                    onChange={(e) => setAnioExport(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    disabled={descargandoExport}
+                  />
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Genera un archivo con una hoja por mes (enero a {fechaMaxHoy.slice(5, 7)}/{fechaMaxHoy.slice(0, 4)} si es el año en curso).
+                  </p>
+                </div>
+              ) : null}
             </div>
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setModalSemanaAbierto(false)}
-                disabled={descargandoSemana}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                onClick={() => setModalExportAbierto(false)}
+                disabled={descargandoExport}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  void descargarExcelSemana();
+                  void ejecutarExportacion();
                 }}
-                disabled={
-                  descargandoSemana ||
-                  rangoFechasPorSemanaDelMes(mesSemana, semanaDelMes).inicio > new Date().toISOString().slice(0, 10)
-                }
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                disabled={exportacionDeshabilitada}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
               >
-                {descargandoSemana ? 'Generando…' : 'Descargar Excel'}
+                {descargandoExport ? 'Generando…' : 'Descargar Excel'}
               </button>
             </div>
           </dialog>

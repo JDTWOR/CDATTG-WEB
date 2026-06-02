@@ -242,13 +242,17 @@ func RequirePermissionCatalogosFicha() gin.HandlerFunc {
 				return
 			}
 		}
+		if allowed, errEnf := authz.Enforce(e, sub, authz.ObjAsistencia, actVerAsistencia); errEnf == nil && allowed {
+			c.Next()
+			return
+		}
 		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene permiso para acceder a catálogos de fichas"})
 		c.Abort()
 	}
 }
 
-// RequirePermissionLeerFichaIndividual permite GET /fichas-caracterizacion/:id a quien pueda ver o editar fichas.
-// Sin EDITAR FICHA aquí, quien solo edita no puede refrescar la ficha (p. ej. días de formación) y el modal queda vacío.
+// RequirePermissionLeerFichaIndividual permite GET /fichas-caracterizacion/:id a quien pueda ver o editar fichas,
+// o a instructores asignados a esa ficha.
 func RequirePermissionLeerFichaIndividual() gin.HandlerFunc {
 	acts := []string{actVerFicha, actVerFichas, "EDITAR FICHA", "CREAR FICHA"}
 	return func(c *gin.Context) {
@@ -266,6 +270,10 @@ func RequirePermissionLeerFichaIndividual() gin.HandlerFunc {
 				c.Next()
 				return
 			}
+		}
+		if fichaID, ok := uintFromParam(c, "id"); ok && instructorTieneFichaAsignada(c, fichaID) {
+			c.Next()
+			return
 		}
 		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene permiso para ver esta ficha"})
 		c.Abort()

@@ -124,7 +124,7 @@ func SetupRouter() *gin.Engine {
 			fichas := protected.Group("/fichas-caracterizacion")
 			{
 				fichas.GET("", middleware.RequirePermissionFichasOrMisFichas(), fichaHandler.GetAll)
-				fichas.GET("/:id/detalle", middleware.RequirePermission("ficha", "VER FICHA"), fichaHandler.GetByIDWithDetail)
+				fichas.GET("/:id/detalle", middleware.RequirePermissionLeerFichaIndividual(), fichaHandler.GetByIDWithDetail)
 				fichas.GET("/:id/codigo", middleware.RequirePermissionVerFichaOrInstructorDeFicha(), fichaHandler.GetCodigo)
 				fichas.GET("/:id", middleware.RequirePermissionLeerFichaIndividual(), fichaHandler.GetByID)
 				fichas.POST(routeImport, middleware.RequirePermission("ficha", "CREAR FICHA"), fichaHandler.ImportFichas)

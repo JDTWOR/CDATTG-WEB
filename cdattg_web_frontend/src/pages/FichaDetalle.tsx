@@ -100,9 +100,11 @@ function FichaDetalleInstructoresTab(props: FichaDetalleInstructoresTabProps) {
     <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/80 p-6 shadow-sm">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Instructores asignados a esta ficha</h2>
-        <button type="button" onClick={() => setShowFormInstructores(true)} className="btn-primary">
-          Asignar instructores
-        </button>
+        {puedeEditarFicha && (
+          <button type="button" onClick={() => setShowFormInstructores(true)} className="btn-primary">
+            Asignar instructores
+          </button>
+        )}
       </div>
       <ul className="divide-y divide-gray-200 dark:divide-gray-600">
         {instructores.length === 0 ? (

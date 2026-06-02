@@ -303,79 +303,81 @@ export const CasosBienestarFichaDetalle = () => {
       )}
 
       {aprendizDetalle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50">
           <button
             type="button"
             className="absolute inset-0 bg-black/50"
             aria-label="Cerrar modal"
             onClick={() => setAprendizDetalle(null)}
           />
-          <dialog
-            open
-            aria-labelledby="casos-bienestar-inas-title"
-            className="relative z-10 m-0 w-full max-w-2xl overflow-hidden rounded-xl border border-gray-200 bg-white p-0 shadow-lg dark:border-gray-700 dark:bg-gray-800"
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
-              <div>
-                <h3 id="casos-bienestar-inas-title" className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Inasistencias por fecha
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {aprendizDetalle.persona_nombre} · {aprendizDetalle.numero_documento}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAprendizDetalle(null)}
-                className="btn-secondary text-xs"
-              >
-                Cerrar
-              </button>
-            </div>
-            <div className="p-5">
-              {detalleError && (
-                <div
-                  role="alert"
-                  className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg"
+          <div className="relative z-10 flex min-h-full items-center justify-center p-4 sm:p-6">
+            <dialog
+              open
+              aria-labelledby="casos-bienestar-inas-title"
+              className="relative z-10 m-0 flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-0 shadow-lg dark:border-gray-700 dark:bg-gray-800 sm:max-h-[calc(100vh-3rem)]"
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div>
+                  <h3 id="casos-bienestar-inas-title" className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Inasistencias por fecha
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {aprendizDetalle.persona_nombre} · {aprendizDetalle.numero_documento}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAprendizDetalle(null)}
+                  className="btn-secondary text-xs"
                 >
-                  {detalleError}
-                </div>
-              )}
-              {detalleLoading && (
-                <p className="text-gray-500 dark:text-gray-400">Cargando detalle...</p>
-              )}
-              {!detalleLoading && !detalleError && detalleInasistencias.length === 0 && (
-                <p className="text-gray-500 dark:text-gray-400">
-                  No se encontraron fechas de inasistencia para este aprendiz en el período.
-                </p>
-              )}
-              {!detalleLoading && detalleInasistencias.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-                    <caption className="sr-only">Inasistencias por fecha del aprendiz</caption>
-                    <thead className="bg-gray-50 dark:bg-gray-700/50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                          Fecha de inasistencia
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                          Observaciones
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
-                      {detalleInasistencias.map((item, idx) => (
-                        <tr key={`${item.fecha}-${idx}`}>
-                          <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{item.fecha}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.observaciones || '—'}</td>
+                  Cerrar
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-5">
+                {detalleError && (
+                  <div
+                    role="alert"
+                    className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg"
+                  >
+                    {detalleError}
+                  </div>
+                )}
+                {detalleLoading && (
+                  <p className="text-gray-500 dark:text-gray-400">Cargando detalle...</p>
+                )}
+                {!detalleLoading && !detalleError && detalleInasistencias.length === 0 && (
+                  <p className="text-gray-500 dark:text-gray-400">
+                    No se encontraron fechas de inasistencia para este aprendiz en el período.
+                  </p>
+                )}
+                {!detalleLoading && detalleInasistencias.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                      <caption className="sr-only">Inasistencias por fecha del aprendiz</caption>
+                      <thead className="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                            Fecha de inasistencia
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                            Observaciones
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </dialog>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                        {detalleInasistencias.map((item, idx) => (
+                          <tr key={`${item.fecha}-${idx}`}>
+                            <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{item.fecha}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.observaciones || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </dialog>
+          </div>
         </div>
       )}
     </div>

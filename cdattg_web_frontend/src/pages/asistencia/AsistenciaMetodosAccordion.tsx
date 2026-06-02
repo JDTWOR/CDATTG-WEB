@@ -13,7 +13,7 @@ type Props = Readonly<{
 
 /** Acordeón de métodos; `key={sesionId}` en el padre reinicia el panel abierto por sesión. */
 export function AsistenciaMetodosAccordion({ page, sesionId }: Props) {
-  const [metodoAbierto, setMetodoAbierto] = useState<AsistenciaMetodoRegistroId | null>('documento');
+  const [metodoAbierto, setMetodoAbierto] = useState<AsistenciaMetodoRegistroId | null>('qr');
 
   const toggleMetodo = useCallback((id: AsistenciaMetodoRegistroId) => {
     setMetodoAbierto((prev) => (prev === id ? null : id));
@@ -21,12 +21,12 @@ export function AsistenciaMetodosAccordion({ page, sesionId }: Props) {
 
   return (
     <section className="space-y-3" aria-label="Métodos de registro de asistencia" data-sesion-id={sesionId}>
+      <AsistenciaRegistroQrCard page={page} open={metodoAbierto === 'qr'} onToggle={() => toggleMetodo('qr')} />
       <AsistenciaRegistroDocumentoCard
         page={page}
         open={metodoAbierto === 'documento'}
         onToggle={() => toggleMetodo('documento')}
       />
-      <AsistenciaRegistroQrCard page={page} open={metodoAbierto === 'qr'} onToggle={() => toggleMetodo('qr')} />
       <AsistenciaRegistroIndividualCard
         page={page}
         open={metodoAbierto === 'individual'}

@@ -76,9 +76,6 @@ export function AsistenciaRegistroDocumentoCard({ page, open, onToggle }: Props)
         </button>
       </form>
       {page.errorRegistroManual ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{page.errorRegistroManual}</p> : null}
-      {page.mensajeRegistroManual ? (
-        <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">{page.mensajeRegistroManual}</p>
-      ) : null}
     </AsistenciaCollapsibleCard>
   );
 }

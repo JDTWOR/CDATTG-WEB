@@ -23,8 +23,10 @@ export function AsistenciaRegistroQrCard({ page, open, onToggle }: Props) {
       </p>
       <EscanerQR
         key={`qr-${sesionId}`}
-        activo
+        activo={open}
+        continuo
         embedded
+        registroEnCurso={page.registrandoManual}
         onEscaneado={page.handleRegistrarPorDocumento}
         readerId={`qr-sesion-${sesionId}`}
       />

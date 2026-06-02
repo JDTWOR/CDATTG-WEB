@@ -53,4 +53,18 @@
   .safe-bottom {
     padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
   }
+
+  /** Centra video/canvas inyectados por html5-qrcode. */
+  .qr-scanner-reader video,
+  .qr-scanner-reader img,
+  .qr-scanner-reader canvas {
+    display: block;
+    margin-inline: auto;
+  }
+
+  .qr-scanner-reader > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
 }

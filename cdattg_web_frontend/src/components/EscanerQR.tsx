@@ -2,10 +2,15 @@ import { memo, useEffect, useRef, useState, type Dispatch, type SetStateAction }
 import { Html5Qrcode } from 'html5-qrcode';
 
 const QR_READER_ID_DEFAULT = 'asistencia-qr-reader';
+const DEBOUNCE_MS = 2000;
 
 interface EscanerQRProps {
-  onEscaneado: (numeroDocumento: string) => void;
+  onEscaneado: (numeroDocumento: string) => void | Promise<void>;
   activo: boolean;
+  /** Si true, la cámara permanece activa tras cada lectura (escaneo continuo). */
+  continuo?: boolean;
+  /** Evita lecturas mientras hay un registro en curso (modo continuo). */
+  registroEnCurso?: boolean;
   className?: string;
   /** Sin borde/fondo propio cuando va dentro de otra tarjeta. */
   embedded?: boolean;
@@ -33,21 +38,43 @@ async function stopScannerAndClearRef(
   }
 }
 
-function createDecodedHandler(
-  html5Qr: Html5Qrcode,
-  scannerRef: { current: Html5Qrcode | null },
-  onEscaneadoRef: { current: (numeroDocumento: string) => void },
-  isCancelled: () => boolean,
-  setCamaraActiva: Dispatch<SetStateAction<boolean>>,
-): (decodedText: string) => void {
+interface DecodedHandlerContext {
+  html5Qr: Html5Qrcode;
+  scannerRef: { current: Html5Qrcode | null };
+  onEscaneadoRef: { current: (numeroDocumento: string) => void | Promise<void> };
+  isCancelled: () => boolean;
+  setCamaraActiva: Dispatch<SetStateAction<boolean>>;
+  continuo: boolean;
+  ultimoDocumentoRef: { current: { doc: string; at: number } | null };
+  registroEnCursoRef: { current: boolean };
+}
+
+function createDecodedHandler(ctx: DecodedHandlerContext): (decodedText: string) => void {
   return (decodedText: string) => {
     const doc = String(decodedText || '').trim();
-    if (!doc || isCancelled()) {
+    if (!doc || ctx.isCancelled()) {
       return;
     }
-    onEscaneadoRef.current(doc);
-    setCamaraActiva(false);
-    void stopScannerAndClearRef(html5Qr, scannerRef);
+
+    if (ctx.continuo) {
+      const now = Date.now();
+      const ultimo = ctx.ultimoDocumentoRef.current;
+      if (ultimo?.doc === doc && now - ultimo.at < DEBOUNCE_MS) {
+        return;
+      }
+      if (ctx.registroEnCursoRef.current) {
+        return;
+      }
+      ctx.ultimoDocumentoRef.current = { doc, at: now };
+      Promise.resolve(ctx.onEscaneadoRef.current(doc)).catch(() => {
+        /* errores manejados en el callback vía toast */
+      });
+      return;
+    }
+
+    ctx.onEscaneadoRef.current(doc);
+    ctx.setCamaraActiva(false);
+    void stopScannerAndClearRef(ctx.html5Qr, ctx.scannerRef);
   };
 }
 
@@ -58,6 +85,8 @@ function createDecodedHandler(
 function EscanerQRInner({
   onEscaneado,
   activo,
+  continuo = false,
+  registroEnCurso = false,
   className = '',
   embedded = false,
   readerId = QR_READER_ID_DEFAULT,
@@ -68,6 +97,9 @@ function EscanerQRInner({
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const readerContainerRef = useRef<HTMLDivElement | null>(null);
   const onEscaneadoRef = useRef(onEscaneado);
+  const ultimoDocumentoRef = useRef<{ doc: string; at: number } | null>(null);
+  const registroEnCursoRef = useRef(registroEnCurso);
+  registroEnCursoRef.current = registroEnCurso;
   onEscaneadoRef.current = onEscaneado;
 
   // Si el componente deja de estar activo (se cierra la sesión), apagar la cámara.
@@ -121,13 +153,16 @@ function EscanerQRInner({
       setPermisos(true);
       const cameraId = pickCameraId(cameras);
 
-      const onDecodedSuccess = createDecodedHandler(
+      const onDecodedSuccess = createDecodedHandler({
         html5Qr,
         scannerRef,
         onEscaneadoRef,
-        () => cancelled,
+        isCancelled: () => cancelled,
         setCamaraActiva,
-      );
+        continuo,
+        ultimoDocumentoRef,
+        registroEnCursoRef,
+      });
 
       const onScanFailure = (): void => {};
 
@@ -157,7 +192,7 @@ function EscanerQRInner({
       }
       scannerRef.current = null;
     };
-  }, [activo, camaraActiva, readerId]);
+  }, [activo, camaraActiva, continuo, readerId]);
 
   if (!activo) {
     return null;
@@ -185,7 +220,13 @@ function EscanerQRInner({
                 Permisos de cámara denegados. Use el registro manual por documento.
               </div>
             )}
-            <div ref={readerContainerRef} id={readerId} className="min-h-[240px] w-full max-w-sm overflow-hidden rounded-lg bg-gray-900" />
+            <div className="flex justify-center">
+              <div
+                ref={readerContainerRef}
+                id={readerId}
+                className="qr-scanner-reader mx-auto min-h-[240px] w-full max-w-sm overflow-hidden rounded-lg bg-gray-900"
+              />
+            </div>
             <button
               type="button"
               onClick={() => setCamaraActiva(false)}

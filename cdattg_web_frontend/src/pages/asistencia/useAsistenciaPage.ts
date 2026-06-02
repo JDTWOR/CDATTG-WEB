@@ -14,10 +14,10 @@ import {
   computeBulkCounts,
   groupRegistrosByAprendiz,
   inferirAccionPorDocumento,
-  mensajeRegistroPorTipo,
   sortAprendicesAz,
   summaryRegistros,
 } from './asistenciaUtils';
+import { mostrarToastErrorAsistencia, mostrarToastRegistroAsistencia } from './asistenciaToast';
 
 export function useAsistenciaPage() {
   const { roles } = useAuth();
@@ -73,6 +73,7 @@ export function useAsistenciaPage() {
   const [busquedaAprendiz, setBusquedaAprendiz] = useState('');
   const [busyAprendizIds, setBusyAprendizIds] = useState<Set<number>>(() => new Set());
   const [bulkProcesando, setBulkProcesando] = useState(false);
+  const registroDocumentoEnCurso = useRef(false);
 
   const upsertAsistenciaAprendizEnSesion = useCallback((actualizado: AsistenciaAprendizResponse) => {
     if (!actualizado) return;
@@ -360,22 +361,24 @@ export function useAsistenciaPage() {
   };
 
   const handleRegistrarPorDocumento = async (numeroDocumento: string) => {
-    if (!sesionActual || !numeroDocumento.trim()) return;
+    const doc = numeroDocumento.trim();
+    if (!sesionActual || !doc || registroDocumentoEnCurso.current) return;
+    registroDocumentoEnCurso.current = true;
     setErrorRegistroManual('');
     setMensajeRegistroManual('');
     setRegistrandoManual(true);
     try {
-      const data = await apiService.registrarIngresoAsistenciaPorDocumento(
-        sesionActual.id,
-        numeroDocumento.trim(),
-      );
+      const data = await apiService.registrarIngresoAsistenciaPorDocumento(sesionActual.id, doc);
       setDocumentoManual('');
       upsertAsistenciaAprendizEnSesion(data);
-      setMensajeRegistroManual(mensajeRegistroPorTipo(data));
+      mostrarToastRegistroAsistencia(data);
     } catch (e: unknown) {
-      setErrorRegistroManual(axiosErrorMessage(e, 'Error al registrar asistencia'));
+      const mensaje = axiosErrorMessage(e, 'Error al registrar asistencia');
+      setErrorRegistroManual(mensaje);
+      mostrarToastErrorAsistencia(mensaje);
     } finally {
       setRegistrandoManual(false);
+      registroDocumentoEnCurso.current = false;
     }
   };
 

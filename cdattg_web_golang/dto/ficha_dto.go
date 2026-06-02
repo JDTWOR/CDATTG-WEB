@@ -39,5 +39,6 @@ type FichaCaracterizacionResponse struct {
 	TotalHoras            *int       `json:"total_horas"`
 	Status                bool       `json:"status"`
 	DiasFormacionIDs      []uint     `json:"dias_formacion_ids"`
+	DiasFormacionNombres  []string   `json:"dias_formacion_nombres"`
 	CantidadAprendices    int        `json:"cantidad_aprendices"`
 }

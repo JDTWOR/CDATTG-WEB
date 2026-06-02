@@ -19,7 +19,7 @@ import { InstructorSelectAsync } from '../components/InstructorSelectAsync';
 import { FichaFormModal } from '../components/FichaFormModal';
 import { useAuth } from '../context/AuthContext';
 import { axiosErrorMessage } from '../utils/httpError';
-import { canManageFichas, normalizeDiaIds } from '../utils/fichaCaracterizacionForm';
+import { canManageFichas, formatDiasEnTabla } from '../utils/fichaCaracterizacionForm';
 import type {
   FichaCaracterizacionResponse,
   InstructorFichaResponse,
@@ -46,11 +46,7 @@ function formatFechaVista(iso?: string | null): string {
 }
 
 function diasTexto(ficha: FichaCaracterizacionResponse, catalogo: DiaFormacionItem[]): string {
-  const ids = normalizeDiaIds(ficha.dias_formacion_ids);
-  if (!ids.length) return '—';
-  return ids
-    .map((id) => catalogo.find((d) => Number(d.id) === id)?.nombre ?? String(id))
-    .join(', ');
+  return formatDiasEnTabla(ficha, catalogo);
 }
 
 type FichaDetalleInstructoresTabProps = Readonly<{

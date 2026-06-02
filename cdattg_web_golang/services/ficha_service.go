@@ -102,6 +102,34 @@ func diaFormacionIDsPorFichaIDs(ids []uint) (map[uint][]uint, error) {
 	return out, nil
 }
 
+func diaFormacionNombresPorIDs(ids []uint) []string {
+	if len(ids) == 0 {
+		return nil
+	}
+	var dias []models.DiasFormacion
+	if err := database.GetDB().Where("id IN ?", ids).Find(&dias).Error; err != nil {
+		return nil
+	}
+	byID := make(map[uint]string, len(dias))
+	for _, d := range dias {
+		byID[d.ID] = d.Nombre
+	}
+	names := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if n, ok := byID[id]; ok && n != "" {
+			names = append(names, n)
+		}
+	}
+	return names
+}
+
+func aplicarDiasFormacionARespuesta(r *dto.FichaCaracterizacionResponse, diaIDsByFicha map[uint][]uint) {
+	if ids := diaIDsByFicha[r.ID]; len(ids) > 0 {
+		r.DiasFormacionIDs = ids
+		r.DiasFormacionNombres = diaFormacionNombresPorIDs(ids)
+	}
+}
+
 func (s *fichaService) FindAll(page, pageSize int, programaID *uint, instructorID *uint, search string) ([]dto.FichaCaracterizacionResponse, int64, error) {
 	list, total, err := s.fichaRepo.FindAll(page, pageSize, programaID, instructorID, search)
 	if err != nil {
@@ -121,6 +149,7 @@ func (s *fichaService) FindAll(page, pageSize int, programaID *uint, instructorI
 		resp[i] = s.fichaToResponse(list[i], counts[list[i].ID])
 		if d := diaIDsByFicha[list[i].ID]; len(d) > 0 {
 			resp[i].DiasFormacionIDs = d
+			resp[i].DiasFormacionNombres = diaFormacionNombresPorIDs(d)
 		}
 	}
 	return resp, total, nil
@@ -134,6 +163,11 @@ func (s *fichaService) FindByID(id uint) (*dto.FichaCaracterizacionResponse, err
 	var count int64
 	database.GetDB().Model(&models.Aprendiz{}).Where("ficha_caracterizacion_id = ?", id).Count(&count)
 	r := s.fichaToResponse(*f, int(count))
+	diaIDsByFicha, err := diaFormacionIDsPorFichaIDs([]uint{id})
+	if err != nil {
+		return nil, err
+	}
+	aplicarDiasFormacionARespuesta(&r, diaIDsByFicha)
 	return &r, nil
 }
 
@@ -143,6 +177,11 @@ func (s *fichaService) FindByIDWithDetail(id uint) (*dto.FichaCaracterizacionRes
 		return nil, errors.New(msgFichaNoEncontrada)
 	}
 	r := s.fichaToResponse(*f, len(f.Aprendices))
+	diaIDsByFicha, err := diaFormacionIDsPorFichaIDs([]uint{id})
+	if err != nil {
+		return nil, err
+	}
+	aplicarDiasFormacionARespuesta(&r, diaIDsByFicha)
 	return &r, nil
 }
 

@@ -101,6 +101,8 @@ export function diasIdsFromListItem(item: FichaCaracterizacionResponse): number[
 }
 
 export function formatDiasEnTabla(item: FichaCaracterizacionResponse, diasFormacion: DiaFormacionItem[]): string {
+  const nombresApi = item.dias_formacion_nombres?.filter((n) => n?.trim());
+  if (nombresApi?.length) return nombresApi.join(', ');
   const ids = diasIdsFromListItem(item);
   if (!ids.length) return '—';
   return ids

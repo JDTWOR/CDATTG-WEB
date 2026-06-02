@@ -339,6 +339,7 @@ export interface FichaCaracterizacionRequest {
   total_horas?: number;
   status?: boolean;
   dias_formacion_ids?: number[];
+  dias_formacion_nombres?: string[];
 }
 
 export interface FichaCaracterizacionResponse {
@@ -361,6 +362,7 @@ export interface FichaCaracterizacionResponse {
   total_horas?: number;
   status: boolean;
   dias_formacion_ids?: number[];
+  dias_formacion_nombres?: string[];
   cantidad_aprendices: number;
 }
 

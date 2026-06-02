@@ -1,4 +1,4 @@
-import { type ReactNode, type ComponentProps, useState, useEffect } from 'react';
+import { type ReactNode, type ComponentProps, useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   HomeIcon,
@@ -23,6 +23,8 @@ import {
   CalendarDaysIcon,
   BuildingOffice2Icon,
   EyeIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import LogoSena from '../../logo-sena-verde-complementario-svg-2022.svg';
 import { useAuth } from '../context/AuthContext';
@@ -42,7 +44,7 @@ const navLinkClass = (isActive: boolean) =>
   }`;
 
 /** Permiso requerido: null = siempre visible. rolesRequired: lista de roles que habilitan el ítem (si se define). */
-const SIDEBAR_ITEMS: {
+interface SidebarItem {
   section: string;
   path: string;
   label: string;
@@ -50,7 +52,30 @@ const SIDEBAR_ITEMS: {
   rolesRequired?: string[];
   /** Visible sin el permiso si el usuario tiene alguno de estos roles (p. ej. INSTRUCTOR en /fichas). */
   alsoVisibleForRoles?: string[];
-}[] = [
+}
+
+function isNavItemActive(pathname: string, item: SidebarItem, items: SidebarItem[]): boolean {
+  if (item.path === '/dashboard') return pathname === '/dashboard';
+  return (
+    pathname === item.path ||
+    (pathname.startsWith(item.path + '/') &&
+      !items.some(
+        (other) =>
+          other.path !== item.path &&
+          other.path.startsWith(item.path + '/') &&
+          pathname.startsWith(other.path)
+      ))
+  );
+}
+
+function sectionForPathname(pathname: string, items: SidebarItem[]): string | null {
+  for (const item of items) {
+    if (isNavItemActive(pathname, item, items)) return item.section;
+  }
+  return items[0]?.section ?? null;
+}
+
+const SIDEBAR_ITEMS: SidebarItem[] = [
   { section: 'Inicio', path: '/perfil', label: 'Mi perfil', permission: null },
   {
     section: 'Inicio',
@@ -173,6 +198,32 @@ export const Layout = ({ children }: LayoutProps) => {
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const visibleItems = useMemo(
+    () =>
+      SIDEBAR_ITEMS.filter((item) => {
+        if (item.rolesRequired && item.rolesRequired.length > 0) {
+          if (!item.rolesRequired.some((r) => roles.includes(r))) return false;
+        }
+        if (item.permission === null) return true;
+        if (hasPermission(item.permission)) return true;
+        if (item.alsoVisibleForRoles?.length && hasAnyRole(roles, item.alsoVisibleForRoles)) return true;
+        return false;
+      }),
+    [roles, hasPermission]
+  );
+
+  const [expandedSection, setExpandedSection] = useState<string | null>(() =>
+    sectionForPathname(location.pathname, visibleItems)
+  );
+
+  useEffect(() => {
+    const activeSection = sectionForPathname(location.pathname, visibleItems);
+    if (activeSection) setExpandedSection(activeSection);
+  }, [location.pathname, visibleItems]);
+
+  const rolesLine = roles.length > 0 ? formatRolesLine(roles) : '';
+  const sections = Array.from(new Set(visibleItems.map((i) => i.section)));
+
   // Evitar scroll del body cuando el drawer está abierto (móvil)
   useEffect(() => {
     if (sidebarOpen) {
@@ -182,19 +233,6 @@ export const Layout = ({ children }: LayoutProps) => {
       };
     }
   }, [sidebarOpen]);
-
-  const visibleItems = SIDEBAR_ITEMS.filter((item) => {
-    if (item.rolesRequired && item.rolesRequired.length > 0) {
-      if (!item.rolesRequired.some((r) => roles.includes(r))) return false;
-    }
-    if (item.permission === null) return true;
-    if (hasPermission(item.permission)) return true;
-    if (item.alsoVisibleForRoles?.length && hasAnyRole(roles, item.alsoVisibleForRoles)) return true;
-    return false;
-  });
-
-  const rolesLine = roles.length > 0 ? formatRolesLine(roles) : '';
-  const sections = Array.from(new Set(visibleItems.map((i) => i.section)));
 
   const handleLogout = () => {
     logout();
@@ -467,37 +505,51 @@ export const Layout = ({ children }: LayoutProps) => {
           </div>
 
           <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-4">
-            {sections.map((section, sectionIndex) => (
-              <div key={section} className={sectionIndex > 0 ? 'mt-4' : ''}>
-                <p className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  {section}
-                </p>
-                {visibleItems
-                  .filter((item) => item.section === section)
-                  .map((item) => {
-                    const isActive =
-                      item.path === '/dashboard'
-                        ? location.pathname === '/dashboard'
-                        : location.pathname === item.path ||
-                          (location.pathname.startsWith(item.path + '/') &&
-                            !visibleItems.some(
-                              (other) => other.path !== item.path && other.path.startsWith(item.path + '/') && location.pathname.startsWith(other.path)
-                            ));
-                    const iconKey = item.path.slice(1); // e.g. "asistencia/dashboard" or "dashboard"
-                    return (
-                      <Link
-                        key={item.path}
-                        to={item.path}
-                        className={`${navLinkClass(isActive)} min-h-[44px] md:min-h-0`}
-                        onClick={() => setSidebarOpen(false)}
-                      >
-                        {ICONS[iconKey] ?? ICONS[iconKey.split('/')[0]] ?? ICONS.dashboard}
-                        <span>{item.label}</span>
-                      </Link>
-                    );
-                  })}
-              </div>
-            ))}
+            {sections.map((section, sectionIndex) => {
+              const isExpanded = expandedSection === section;
+              const sectionHasActiveItem = visibleItems.some(
+                (item) => item.section === section && isNavItemActive(location.pathname, item, visibleItems)
+              );
+              return (
+                <div key={section} className={sectionIndex > 0 ? 'mt-2' : ''}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSection(isExpanded ? null : section)}
+                    className={`flex w-full items-center justify-between rounded-lg px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider transition-colors touch-manipulation ${
+                      sectionHasActiveItem
+                        ? 'text-primary-700 dark:text-primary-300'
+                        : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                    }`}
+                    aria-expanded={isExpanded}
+                  >
+                    <span>{section}</span>
+                    {isExpanded ? (
+                      <ChevronDownIcon className="h-4 w-4 shrink-0" aria-hidden />
+                    ) : (
+                      <ChevronRightIcon className="h-4 w-4 shrink-0" aria-hidden />
+                    )}
+                  </button>
+                  {isExpanded &&
+                    visibleItems
+                      .filter((item) => item.section === section)
+                      .map((item) => {
+                        const isActive = isNavItemActive(location.pathname, item, visibleItems);
+                        const iconKey = item.path.slice(1);
+                        return (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            className={`${navLinkClass(isActive)} min-h-[44px] md:min-h-0`}
+                            onClick={() => setSidebarOpen(false)}
+                          >
+                            {ICONS[iconKey] ?? ICONS[iconKey.split('/')[0]] ?? ICONS.dashboard}
+                            <span>{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                </div>
+              );
+            })}
           </nav>
 
           {/* Bloque usuario en drawer (solo móvil): Cambiar contraseña + Cerrar sesión */}

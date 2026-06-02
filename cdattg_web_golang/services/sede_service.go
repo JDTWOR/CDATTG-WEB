@@ -26,33 +26,31 @@ func NewSedeService() SedeService {
 
 func (s *sedeService) List() ([]dto.SedeListItem, error) {
 	db := database.GetDB()
-	type row struct {
-		ID             uint
-		Nombre         string
-		Direccion      string
-		RegionalID     uint
-		RegionalNombre string
-		Status         bool
-	}
-	var rows []row
-	err := db.Table("sedes s").
-		Select(`s.id, s.nombre, s.direccion, s.regional_id, COALESCE(r.nombre, '') AS regional_nombre, s.status`).
-		Joins("LEFT JOIN regionales r ON r.id = s.regional_id").
-		Where("s.deleted_at IS NULL").
-		Order("s.nombre").
-		Scan(&rows).Error
+	var sedes []models.Sede
+	err := db.Preload("Regional").
+		Where("deleted_at IS NULL").
+		Order("nombre").
+		Find(&sedes).Error
 	if err != nil {
 		return nil, fmt.Errorf("error al listar sedes: %w", err)
 	}
-	out := make([]dto.SedeListItem, len(rows))
-	for i, r := range rows {
+	out := make([]dto.SedeListItem, len(sedes))
+	for i, sede := range sedes {
+		regionalID := uint(0)
+		if sede.RegionalID != nil {
+			regionalID = *sede.RegionalID
+		}
+		regionalNombre := ""
+		if sede.Regional != nil {
+			regionalNombre = sede.Regional.Nombre
+		}
 		out[i] = dto.SedeListItem{
-			ID:             r.ID,
-			Nombre:         r.Nombre,
-			Direccion:      r.Direccion,
-			RegionalID:     r.RegionalID,
-			RegionalNombre: r.RegionalNombre,
-			Status:         r.Status,
+			ID:             sede.ID,
+			Nombre:         sede.Nombre,
+			Direccion:      sede.Direccion,
+			RegionalID:     regionalID,
+			RegionalNombre: regionalNombre,
+			Status:         sede.Status,
 		}
 	}
 	return out, nil

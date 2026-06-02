@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { CalendarDaysIcon, ChartBarIcon } from '@heroicons/react/24/outline';
-import { ASIST_MODAL_IDS_ROOT } from './asistenciaConstants';
-import { AsistenciaModals } from './AsistenciaModals';
+import { FichaCaracterizacionCard } from '../../components/FichaCaracterizacionCard';
+import { ASIST_MODAL_IDS_ROOT } from './asistenciaConstants';import { AsistenciaModals } from './AsistenciaModals';
 import type { AsistenciaPageState } from './useAsistenciaPage';
 
 type Props = Readonly<{ page: AsistenciaPageState }>;
@@ -96,50 +96,23 @@ export function AsistenciaFichasListView({ page }: Props) {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {fichas.map((item) => (
-          <div key={item.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-600 dark:bg-gray-800">
-            <div className="p-5">
-              <div className="mb-3 flex items-start justify-between gap-2">
-                <h3 className="text-sm font-bold uppercase leading-tight text-gray-900 dark:text-white">
-                  {item.programa_formacion_nombre || 'Sin programa'}
-                </h3>
-                {item.modalidad_formacion_nombre ? (
-                  <span className="shrink-0 rounded bg-primary-600 px-2.5 py-1 text-xs font-medium text-white">
-                    {item.modalidad_formacion_nombre}
-                  </span>
-                ) : null}
-              </div>
-              <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">Ficha {item.ficha}</p>
-              <div className="mb-4 space-y-3">
-                <div>
-                  <p className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
-                    Información académica
-                  </p>
-                  <div className="text-sm text-gray-700 dark:text-gray-300">Jornada: {item.jornada_nombre || '–'}</div>
-                  <div className="text-sm text-gray-700 dark:text-gray-300">
-                    Sede / Ambiente: {[item.sede_nombre, item.ambiente_nombre].filter(Boolean).join(' / ') || '–'}
-                  </div>
-                </div>
-                <div>
-                  <p className="mb-1 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Instructor líder</p>
-                  <div className="text-sm text-gray-700 dark:text-gray-300">{item.instructor_nombre || '–'}</div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-700">
-                <span className="text-sm text-gray-600 dark:text-gray-400">{item.cantidad_aprendices} aprendices</span>
-                <button
-                  type="button"
-                  onClick={() => void handleTomarAsistencia(item.id)}
-                  disabled={loading}
-                  className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-                >
-                  {loading ? 'Entrando…' : 'Tomar asistencia'}
-                </button>
-              </div>
-            </div>
-          </div>
+          <FichaCaracterizacionCard
+            key={item.id}
+            ficha={item}
+            actions={
+              <button
+                type="button"
+                onClick={() => void handleTomarAsistencia(item.id)}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                <CalendarDaysIcon className="h-4 w-4" />
+                {loading ? 'Entrando…' : 'Tomar asistencia'}
+              </button>
+            }
+          />
         ))}
       </div>
-
       <AsistenciaModals page={page} estadoFieldIds={ASIST_MODAL_IDS_ROOT} />
     </div>
   );

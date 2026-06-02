@@ -7,10 +7,6 @@ import {
   ArrowLeftIcon,
   MagnifyingGlassIcon,
   AcademicCapIcon,
-  Cog6ToothIcon,
-  MapPinIcon,
-  ComputerDesktopIcon,
-  UserIcon,
   UsersIcon,
   CalendarDaysIcon,
   PlusIcon,
@@ -26,6 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import { SelectSearch } from '../components/SelectSearch';
 import { ModalAsignarFicha } from '../components/ModalAsignarFicha';
 import { FichaFormModal } from '../components/FichaFormModal';
+import { FichaCaracterizacionCard } from '../components/FichaCaracterizacionCard';
 import { formatDiasEnTabla, mergeListAfterSave } from '../utils/fichaCaracterizacionForm';
 import type {
   FichaCaracterizacionResponse,
@@ -220,84 +217,31 @@ function FichasInstructorConFichas({ filteredList, searchQuery, setSearchQuery }
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredList.map((item) => (
-          <div key={item.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm overflow-hidden">
-            <div className="p-5">
-              <div className="flex justify-between items-start gap-2 mb-3">
-                <h3 className="font-bold text-gray-900 dark:text-white uppercase text-sm leading-tight">
-                  {item.programa_formacion_nombre || 'Sin programa'}
-                </h3>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span
-                    className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                      item.status
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
-                    }`}
-                  >
-                    {item.status ? 'Activa' : 'Inactiva'}
-                  </span>
-                  {item.modalidad_formacion_nombre && (
-                    <span className="px-2.5 py-1 bg-primary-600 text-white text-xs font-medium rounded">
-                      {item.modalidad_formacion_nombre}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">Ficha {item.ficha}</p>
-
-              <div className="space-y-3 mb-4">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase flex items-center gap-2 mb-1">
-                    <AcademicCapIcon className="w-4 h-4 text-gray-400" />
-                    Información académica
-                  </p>
-                  <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                    <Cog6ToothIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    <span>Jornada: {item.jornada_nombre || '-'}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 mt-1">
-                    <MapPinIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    <span>Sede / Ambiente: {[item.sede_nombre, item.ambiente_nombre].filter(Boolean).join(' / ') || '-'}</span>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase flex items-center gap-2 mb-1">
-                    <ComputerDesktopIcon className="w-4 h-4 text-gray-400" />
-                    Instructor líder
-                  </p>
-                  <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                    <UserIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    {item.instructor_nombre || '-'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
-                <span className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-                  <UsersIcon className="w-4 h-4 text-gray-400" />
-                  {item.cantidad_aprendices} Aprendices
-                </span>
-                <div className="flex flex-wrap gap-2 justify-end">
+          <FichaCaracterizacionCard
+            key={item.id}
+            ficha={item}
+            showStatusBadge
+            actions={
+              <>
+                <Link
+                  to={`/fichas/${item.id}`}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700/50"
+                >
+                  <EyeIcon className="h-4 w-4" />
+                  Ver ficha
+                </Link>
+                {item.status ? (
                   <Link
-                    to={`/fichas/${item.id}`}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    to={`/asistencia?ficha=${item.id}`}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
                   >
-                    <EyeIcon className="w-4 h-4" />
-                    Ver ficha
+                    <CalendarDaysIcon className="h-4 w-4" />
+                    Tomar Asistencia
                   </Link>
-                  {item.status ? (
-                    <Link
-                      to={`/asistencia?ficha=${item.id}`}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
-                    >
-                      <CalendarDaysIcon className="w-4 h-4" />
-                      Tomar Asistencia
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          </div>
+                ) : null}
+              </>
+            }
+          />
         ))}
       </div>
       {filteredList.length === 0 && searchQuery.trim() && (

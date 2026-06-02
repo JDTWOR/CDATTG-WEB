@@ -14,8 +14,12 @@ export const AsistenciaTiposObservacion = () => {
   const [error, setError] = useState('');
   const [codigo, setCodigo] = useState('');
   const [nombre, setNombre] = useState('');
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [editCodigo, setEditCodigo] = useState('');
+  const [editNombre, setEditNombre] = useState('');
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  const isSuperAdmin = roles.includes('SUPER ADMINISTRADOR');
+  const canManageTiposObs = roles.includes('SUPER ADMINISTRADOR') || roles.includes('ADMINISTRADOR');
   const TIPO_OBS_CODIGO_ID = 'tipo-obs-codigo';
   const TIPO_OBS_NOMBRE_ID = 'tipo-obs-nombre';
 
@@ -33,13 +37,13 @@ export const AsistenciaTiposObservacion = () => {
   }, []);
 
   useEffect(() => {
-    if (!isSuperAdmin) {
+    if (!canManageTiposObs) {
       setLoading(false);
-      setError('Solo el superadministrador puede gestionar tipos de observación.');
+      setError('Solo superadministrador o administrador puede gestionar tipos de observación.');
       return;
     }
     void cargar();
-  }, [isSuperAdmin, cargar]);
+  }, [canManageTiposObs, cargar]);
 
   const crear: ComponentProps<'form'>['onSubmit'] = (e) => {
     e.preventDefault();
@@ -123,7 +127,7 @@ export const AsistenciaTiposObservacion = () => {
             />
           </div>
           <div className="md:col-span-3">
-            <button type="submit" disabled={saving || !isSuperAdmin} className="btn-primary inline-flex items-center gap-2 disabled:opacity-50">
+            <button type="submit" disabled={saving || !canManageTiposObs} className="btn-primary inline-flex items-center gap-2 disabled:opacity-50">
               <PlusIcon className="w-5 h-5" aria-hidden />
               {saving ? 'Creando…' : 'Crear tipo de observación'}
             </button>
@@ -149,13 +153,119 @@ export const AsistenciaTiposObservacion = () => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Código</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Nombre</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
                 {items.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{item.codigo}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{item.nombre}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                      {editandoId === item.id ? (
+                        <input
+                          type="text"
+                          className="input-field w-full"
+                          value={editCodigo}
+                          onChange={(e) => setEditCodigo(e.target.value)}
+                          maxLength={80}
+                        />
+                      ) : item.codigo}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                      {editandoId === item.id ? (
+                        <input
+                          type="text"
+                          className="input-field w-full"
+                          value={editNombre}
+                          onChange={(e) => setEditNombre(e.target.value)}
+                          maxLength={255}
+                        />
+                      ) : item.nombre}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right whitespace-nowrap">
+                      {editandoId === item.id ? (
+                        <div className="inline-flex gap-2">
+                          <button
+                            type="button"
+                            className="btn-primary text-xs"
+                            disabled={saving}
+                            onClick={() => {
+                              if (!editCodigo.trim() || !editNombre.trim()) {
+                                setError('Código y nombre son obligatorios.');
+                                return;
+                              }
+                              void (async () => {
+                                try {
+                                  setSaving(true);
+                                  setError('');
+                                  await apiService.updateTipoObservacionAsistencia(item.id, {
+                                    codigo: editCodigo.trim().toUpperCase(),
+                                    nombre: editNombre.trim(),
+                                    activo: true,
+                                  });
+                                  setEditandoId(null);
+                                  await cargar();
+                                } catch (e: unknown) {
+                                  setError(axiosErrorMessage(e, 'Error al actualizar tipo de observación.'));
+                                } finally {
+                                  setSaving(false);
+                                }
+                              })();
+                            }}
+                          >
+                            Guardar
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary text-xs"
+                            disabled={saving}
+                            onClick={() => {
+                              setEditandoId(null);
+                              setEditCodigo('');
+                              setEditNombre('');
+                            }}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="inline-flex gap-2">
+                          <button
+                            type="button"
+                            className="btn-secondary text-xs"
+                            onClick={() => {
+                              setEditandoId(item.id);
+                              setEditCodigo(item.codigo);
+                              setEditNombre(item.nombre);
+                            }}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary text-xs text-red-600 dark:text-red-400 border-red-300 dark:border-red-700"
+                            disabled={deletingId === item.id}
+                            onClick={() => {
+                              if (!globalThis.confirm(`¿Desactivar tipo "${item.nombre}"?`)) return;
+                              void (async () => {
+                                try {
+                                  setDeletingId(item.id);
+                                  setError('');
+                                  await apiService.deleteTipoObservacionAsistencia(item.id);
+                                  if (editandoId === item.id) setEditandoId(null);
+                                  await cargar();
+                                } catch (e: unknown) {
+                                  setError(axiosErrorMessage(e, 'Error al eliminar tipo de observación.'));
+                                } finally {
+                                  setDeletingId(null);
+                                }
+                              })();
+                            }}
+                          >
+                            {deletingId === item.id ? 'Eliminando…' : 'Eliminar'}
+                          </button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

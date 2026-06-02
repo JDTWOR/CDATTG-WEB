@@ -693,6 +693,15 @@ class ApiService {
     return response.data;
   }
 
+  async updateTipoObservacionAsistencia(id: number, data: TipoObservacionAsistenciaCreateRequest): Promise<TipoObservacionAsistenciaItem> {
+    const response = await this.api.put<TipoObservacionAsistenciaItem>(`/asistencias/tipos-observacion/${id}`, data);
+    return response.data;
+  }
+
+  async deleteTipoObservacionAsistencia(id: number): Promise<void> {
+    await this.api.delete(`/asistencias/tipos-observacion/${id}`);
+  }
+
   async crearOActualizarObservacionesAsistencia(
     asistenciaId: number,
     aprendizId: number,

@@ -338,6 +338,40 @@ func (h *AsistenciaHandler) CrearTipoObservacionAsistencia(c *gin.Context) {
 	c.JSON(http.StatusCreated, item)
 }
 
+// ActualizarTipoObservacionAsistencia actualiza un tipo de observación (solo superadmin/admin).
+func (h *AsistenciaHandler) ActualizarTipoObservacionAsistencia(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	var req dto.TipoObservacionAsistenciaUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
+		return
+	}
+	item, err := h.svc.ActualizarTipoObservacionAsistencia(uint(id), req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
+// EliminarTipoObservacionAsistencia desactiva un tipo de observación (solo superadmin/admin).
+func (h *AsistenciaHandler) EliminarTipoObservacionAsistencia(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	if err := h.svc.EliminarTipoObservacionAsistencia(uint(id)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (h *AsistenciaHandler) ListAprendicesEnSesion(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {

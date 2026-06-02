@@ -9,7 +9,9 @@ import (
 type TipoObservacionAsistenciaRepository interface {
 	ListActivos() ([]models.TipoObservacionAsistencia, error)
 	FindByIDs(ids []uint) ([]models.TipoObservacionAsistencia, error)
+	FindByID(id uint) (*models.TipoObservacionAsistencia, error)
 	Create(item *models.TipoObservacionAsistencia) error
+	Update(item *models.TipoObservacionAsistencia) error
 }
 
 type tipoObservacionAsistenciaRepository struct {
@@ -39,6 +41,18 @@ func (r *tipoObservacionAsistenciaRepository) FindByIDs(ids []uint) ([]models.Ti
 	return list, nil
 }
 
+func (r *tipoObservacionAsistenciaRepository) FindByID(id uint) (*models.TipoObservacionAsistencia, error) {
+	var item models.TipoObservacionAsistencia
+	if err := r.db.First(&item, id).Error; err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
 func (r *tipoObservacionAsistenciaRepository) Create(item *models.TipoObservacionAsistencia) error {
 	return r.db.Create(item).Error
+}
+
+func (r *tipoObservacionAsistenciaRepository) Update(item *models.TipoObservacionAsistencia) error {
+	return r.db.Save(item).Error
 }

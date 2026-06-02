@@ -40,6 +40,8 @@ type AsistenciaService interface {
 	ListAprendicesEnSesion(asistenciaID uint) ([]dto.AsistenciaAprendizResponse, error)
 	ListTiposObservacionAsistencia() ([]dto.TipoObservacionAsistenciaItem, error)
 	CrearTipoObservacionAsistencia(req dto.TipoObservacionAsistenciaCreateRequest) (*dto.TipoObservacionAsistenciaItem, error)
+	ActualizarTipoObservacionAsistencia(id uint, req dto.TipoObservacionAsistenciaUpdateRequest) (*dto.TipoObservacionAsistenciaItem, error)
+	EliminarTipoObservacionAsistencia(id uint) error
 	GetDashboard(sedeID *uint, fecha string) (*dto.AsistenciaDashboardResponse, error)
 	GetCasosBienestar(sedeID *uint, dias, minFallas int) (*dto.CasosBienestarResponse, error)
 	GetDetalleInasistenciasAprendiz(fichaNumero string, aprendizID uint, dias int, sedeNombre string) (*dto.CasoBienestarAprendizDetalleResponse, error)
@@ -515,6 +517,47 @@ func (s *asistenciaService) CrearTipoObservacionAsistencia(req dto.TipoObservaci
 	return &dto.TipoObservacionAsistenciaItem{
 		ID: item.ID, Codigo: item.Codigo, Nombre: item.Nombre,
 	}, nil
+}
+
+func (s *asistenciaService) ActualizarTipoObservacionAsistencia(id uint, req dto.TipoObservacionAsistenciaUpdateRequest) (*dto.TipoObservacionAsistenciaItem, error) {
+	if id == 0 {
+		return nil, errors.New("id inválido")
+	}
+	item, err := s.tipoObsRepo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	codigo := strings.TrimSpace(req.Codigo)
+	nombre := strings.TrimSpace(req.Nombre)
+	if codigo == "" {
+		return nil, errors.New("el código es obligatorio")
+	}
+	if nombre == "" {
+		return nil, errors.New("el nombre es obligatorio")
+	}
+	item.Codigo = strings.ToUpper(codigo)
+	item.Nombre = nombre
+	if req.Activo != nil {
+		item.Activo = *req.Activo
+	}
+	if err := s.tipoObsRepo.Update(item); err != nil {
+		return nil, err
+	}
+	return &dto.TipoObservacionAsistenciaItem{
+		ID: item.ID, Codigo: item.Codigo, Nombre: item.Nombre,
+	}, nil
+}
+
+func (s *asistenciaService) EliminarTipoObservacionAsistencia(id uint) error {
+	if id == 0 {
+		return errors.New("id inválido")
+	}
+	item, err := s.tipoObsRepo.FindByID(id)
+	if err != nil {
+		return err
+	}
+	item.Activo = false
+	return s.tipoObsRepo.Update(item)
 }
 
 func (s *asistenciaService) ListAprendicesEnSesion(asistenciaID uint) ([]dto.AsistenciaAprendizResponse, error) {

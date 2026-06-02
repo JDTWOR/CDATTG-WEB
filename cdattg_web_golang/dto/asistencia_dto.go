@@ -99,6 +99,13 @@ type TipoObservacionAsistenciaCreateRequest struct {
 	Activo *bool  `json:"activo"`
 }
 
+// TipoObservacionAsistenciaUpdateRequest para actualizar tipos de observación (superadmin/admin).
+type TipoObservacionAsistenciaUpdateRequest struct {
+	Codigo string `json:"codigo" binding:"required"`
+	Nombre string `json:"nombre" binding:"required"`
+	Activo *bool  `json:"activo"`
+}
+
 // AsistenciaAprendizEstadoRequest para ajustar estado/motivo de un registro de asistencia de aprendiz
 type AsistenciaAprendizEstadoRequest struct {
 	Estado string `json:"estado" binding:"required"` // ASISTENCIA_COMPLETA, ASISTENCIA_PARCIAL, ABANDONO_JORNADA, REGISTRO_POR_CORREGIR

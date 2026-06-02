@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/dto"
@@ -13,6 +14,7 @@ import (
 const (
 	msgFichaNoEncontrada      = "ficha no encontrada"
 	errFmtSyncInstructorLider = "error al sincronizar instructor líder: %w"
+	ambientePorDefinir        = "POR DEFINIR"
 )
 
 type FichaService interface {
@@ -379,7 +381,9 @@ func (s *fichaService) fichaToResponse(f models.FichaCaracterizacion, cantidadAp
 		}
 	}
 	if f.Ambiente != nil {
-		r.AmbienteNombre = f.Ambiente.Nombre
+		r.AmbienteNombre = formatAmbienteRuta(f.Ambiente)
+	} else {
+		r.AmbienteNombre = ambientePorDefinir
 	}
 	if f.Sede != nil {
 		r.SedeNombre = f.Sede.Nombre
@@ -458,4 +462,27 @@ func (s *fichaService) aprendizToResponse(a models.Aprendiz, fichaNumero string)
 		}
 	}
 	return r
+}
+
+// formatAmbienteRuta devuelve la ubicación completa: "B3 - P3 - MULTIMEDIA".
+func formatAmbienteRuta(a *models.Ambiente) string {
+	if a == nil {
+		return ambientePorDefinir
+	}
+	var parts []string
+	if a.Piso != nil {
+		if a.Piso.Bloque != nil && a.Piso.Bloque.Nombre != "" {
+			parts = append(parts, a.Piso.Bloque.Nombre)
+		}
+		if a.Piso.Nombre != "" {
+			parts = append(parts, a.Piso.Nombre)
+		}
+	}
+	if a.Nombre != "" {
+		parts = append(parts, a.Nombre)
+	}
+	if len(parts) == 0 {
+		return ambientePorDefinir
+	}
+	return strings.Join(parts, " - ")
 }

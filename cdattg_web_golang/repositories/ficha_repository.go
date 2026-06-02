@@ -25,6 +25,8 @@ type FichaRepository interface {
 	CountAll(sedeID *uint) (int64, error)
 }
 
+const preloadAmbienteRuta = "Ambiente.Piso.Bloque"
+
 type fichaRepository struct {
 	db *gorm.DB
 }
@@ -39,7 +41,7 @@ func (r *fichaRepository) FindByID(id uint) (*models.FichaCaracterizacion, error
 	var ficha models.FichaCaracterizacion
 	if err := r.db.Preload("ProgramaFormacion").Preload("ProgramaFormacion.RedConocimiento").
 		Preload("Instructor").Preload("Instructor.Persona").
-		Preload("Sede").Preload("Ambiente").Preload("ModalidadFormacion").
+		Preload("Sede").Preload(preloadAmbienteRuta).Preload("ModalidadFormacion").
 		Preload("Jornada").
 		Preload("FichaDiasFormacion").
 		First(&ficha, id).Error; err != nil {
@@ -50,7 +52,7 @@ func (r *fichaRepository) FindByID(id uint) (*models.FichaCaracterizacion, error
 
 func (r *fichaRepository) FindByIDWithInstructoresAndAprendices(id uint) (*models.FichaCaracterizacion, error) {
 	var ficha models.FichaCaracterizacion
-	if err := r.db.Preload("ProgramaFormacion").Preload("Instructor").Preload("Sede").Preload("Ambiente").Preload("ModalidadFormacion").
+	if err := r.db.Preload("ProgramaFormacion").Preload("Instructor").Preload("Sede").Preload(preloadAmbienteRuta).Preload("ModalidadFormacion").
 		Preload("Jornada").Preload("FichaDiasFormacion").
 		Preload("InstructorFichas.Instructor.Persona").Preload("InstructorFichas.Competencia").Preload("Aprendices.Persona").
 		First(&ficha, id).Error; err != nil {
@@ -104,7 +106,7 @@ func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instruct
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	findQ := r.db.Preload("ProgramaFormacion").Preload("Instructor").Preload("Ambiente").Preload("Sede").Preload("ModalidadFormacion").Preload("Jornada").Preload("FichaDiasFormacion")
+	findQ := r.db.Preload("ProgramaFormacion").Preload("Instructor").Preload(preloadAmbienteRuta).Preload("Sede").Preload("ModalidadFormacion").Preload("Jornada").Preload("FichaDiasFormacion")
 	if programaID != nil && *programaID > 0 {
 		findQ = findQ.Where("programa_formacion_id = ?", *programaID)
 	}

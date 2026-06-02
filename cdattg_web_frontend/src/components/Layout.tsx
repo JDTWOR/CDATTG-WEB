@@ -25,6 +25,8 @@ import {
   EyeIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
 } from '@heroicons/react/24/outline';
 import LogoSena from '../../logo-sena-verde-complementario-svg-2022.svg';
 import { useAuth } from '../context/AuthContext';
@@ -34,6 +36,13 @@ import { formatRolesLine, hasAnyRole } from '../utils/roles';
 
 interface LayoutProps {
   children: ReactNode;
+}
+
+const SIDEBAR_HIDDEN_KEY = 'cdattg-sidebar-hidden';
+
+function readSidebarHidden(): boolean {
+  if (globalThis.window === undefined) return false;
+  return globalThis.window.localStorage.getItem(SIDEBAR_HIDDEN_KEY) === 'true';
 }
 
 const navLinkClass = (isActive: boolean) =>
@@ -197,6 +206,21 @@ export const Layout = ({ children }: LayoutProps) => {
   const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarHidden, setSidebarHidden] = useState(readSidebarHidden);
+
+  useEffect(() => {
+    globalThis.window.localStorage.setItem(SIDEBAR_HIDDEN_KEY, String(sidebarHidden));
+  }, [sidebarHidden]);
+
+  const hideSidebar = () => {
+    setSidebarHidden(true);
+    setSidebarOpen(false);
+  };
+
+  const showSidebarDocked = () => {
+    setSidebarHidden(false);
+    setSidebarOpen(false);
+  };
 
   const visibleItems = useMemo(
     () =>
@@ -298,11 +322,11 @@ export const Layout = ({ children }: LayoutProps) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-14 sm:h-16">
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Hamburger solo en móvil */}
+              {/* Menú: siempre en móvil; en desktop cuando el panel está oculto */}
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="md:hidden p-2.5 -ml-1 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
+                className={`p-2.5 -ml-1 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation ${sidebarHidden ? '' : 'md:hidden'}`}
                 aria-label="Abrir menú"
               >
                 <Bars3Icon className="w-6 h-6" />
@@ -469,38 +493,67 @@ export const Layout = ({ children }: LayoutProps) => {
         </div>
       )}
 
-      {/* Backdrop del drawer (solo móvil) */}
+      {/* Backdrop del drawer (móvil o panel oculto en desktop) */}
       {sidebarOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className={`fixed inset-0 z-40 bg-black/50 ${sidebarHidden ? '' : 'md:hidden'}`}
           aria-label="Cerrar menú"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <div className="flex">
-        {/* Sidebar: en móvil es drawer; en desktop siempre visible */}
+        {/* Sidebar: drawer en móvil; en desktop anclado o oculto según preferencia */}
         <aside
           className={`
             w-64 bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700
-            fixed md:static inset-y-0 left-0 z-50 md:z-auto
-            h-dvh max-h-dvh md:h-auto md:max-h-none md:min-h-[calc(100vh-4rem)]
-            transform transition-transform duration-200 ease-out md:transform-none
+            fixed inset-y-0 left-0 z-50
+            h-dvh max-h-dvh
+            ${sidebarHidden ? '' : 'md:static md:z-auto md:h-auto md:max-h-none md:min-h-[calc(100vh-4rem)]'}
+            transform transition-transform duration-200 ease-out
             flex flex-col
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            ${sidebarHidden ? '' : 'md:translate-x-0'}
           `}
         >
-          {/* Botón cerrar drawer (solo móvil) */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 md:hidden">
+          {/* Cabecera drawer móvil / panel flotante en desktop */}
+          <div className={`flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 ${sidebarHidden ? '' : 'md:hidden'}`}>
             <span className="font-semibold text-gray-900 dark:text-white">Menú</span>
+            <div className="flex items-center gap-1">
+              {sidebarHidden && (
+                <button
+                  type="button"
+                  onClick={showSidebarDocked}
+                  className="p-2 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30 touch-manipulation"
+                  title="Mostrar panel lateral"
+                  aria-label="Mostrar panel lateral"
+                >
+                  <ChevronDoubleRightIcon className="w-5 h-5" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                className="p-2.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 touch-manipulation"
+                aria-label="Cerrar menú"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Ocultar panel (solo desktop con panel anclado) */}
+          <div className={`hidden md:flex items-center justify-end border-b border-gray-200 dark:border-gray-700 px-2 py-1 ${sidebarHidden ? 'md:hidden' : ''}`}>
             <button
               type="button"
-              onClick={() => setSidebarOpen(false)}
-              className="p-2.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 touch-manipulation"
-              aria-label="Cerrar menú"
+              onClick={hideSidebar}
+              className="flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+              title="Ocultar panel lateral"
+              aria-label="Ocultar panel lateral"
             >
-              <XMarkIcon className="w-6 h-6" />
+              <ChevronDoubleLeftIcon className="h-4 w-4" />
+              Ocultar panel
             </button>
           </div>
 

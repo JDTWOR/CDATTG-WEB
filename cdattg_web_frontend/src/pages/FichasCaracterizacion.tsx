@@ -518,7 +518,9 @@ export const FichasCaracterizacion = () => {
                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 max-w-[220px] whitespace-normal break-words">
                           {formatDiasEnTabla(item, diasFormacion)}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{item.ambiente_nombre ?? '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-[200px] whitespace-normal break-words">
+                          {item.ambiente_nombre?.trim() || 'POR DEFINIR'}
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{item.cantidad_aprendices}</td>
                         <td className="px-6 py-4">
                           <span

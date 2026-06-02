@@ -654,10 +654,15 @@ class ApiService {
     return response.data;
   }
 
-  async registrarIngresoAsistenciaPorDocumento(asistenciaId: number, numeroDocumento: string): Promise<AsistenciaAprendizResponse> {
+  async registrarIngresoAsistenciaPorDocumento(
+    asistenciaId: number,
+    numeroDocumento: string,
+    accion: 'ingreso' | 'salida',
+  ): Promise<AsistenciaAprendizResponse> {
     const response = await this.api.post<AsistenciaAprendizResponse>('/asistencias/ingreso-por-documento', {
       asistencia_id: asistenciaId,
       numero_documento: numeroDocumento.trim(),
+      accion,
     });
     return response.data;
   }

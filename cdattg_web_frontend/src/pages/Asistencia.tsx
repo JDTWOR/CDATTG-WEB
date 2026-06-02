@@ -1,15 +1,15 @@
-import { useState, useEffect, useCallback, memo, useRef, type ComponentProps, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, memo, useRef, useMemo, type ComponentProps } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
   ExclamationTriangleIcon,
   ArrowLeftIcon,
   DocumentTextIcon,
-  UserPlusIcon,
   ArrowRightStartOnRectangleIcon,
   ArrowLeftEndOnRectangleIcon,
   PencilSquareIcon,
   ChartBarIcon,
   CalendarDaysIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
@@ -86,6 +86,27 @@ function summaryRegistros(registros: AsistenciaAprendizResponse[]) {
   return { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord };
 }
 
+type AccionRegistroDocumento = 'ingreso' | 'salida';
+
+function estadoAprendizVisual(open: AsistenciaAprendizResponse | null, lastSalida: string | null) {
+  if (open) {
+    return {
+      label: 'En formación',
+      className: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+    };
+  }
+  if (lastSalida) {
+    return {
+      label: 'Salida registrada',
+      className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+    };
+  }
+  return {
+    label: 'Sin entrada',
+    className: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  };
+}
+
 function buildRangoText(firstIngreso: string | null, lastSalida: string | null, open: AsistenciaAprendizResponse | null): string {
   const left = firstIngreso ?? '–';
   if (lastSalida) {
@@ -150,6 +171,9 @@ type TarjetaAprendizAsistenciaProps = Readonly<{
   registros: AsistenciaAprendizResponse[];
   index: number;
   asistenciaId: number | null;
+  selected: boolean;
+  busy: boolean;
+  onToggleSelect: (aprendizId: number) => void;
   onRegistrarIngreso: (aprendizId: number) => void;
   onRegistrarSalida: (asistenciaAprendizId: number) => void;
   onAbrirEstado: (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => void;
@@ -167,6 +191,9 @@ function TarjetaAprendizAsistencia({
   registros,
   index,
   asistenciaId,
+  selected,
+  busy,
+  onToggleSelect,
   onRegistrarIngreso,
   onRegistrarSalida,
   onAbrirEstado,
@@ -174,78 +201,97 @@ function TarjetaAprendizAsistencia({
 }: TarjetaAprendizAsistenciaProps) {
   const { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord } = summaryRegistros(registros);
   const rango = buildRangoText(firstIngreso, lastSalida, open);
-
-  let accionPrincipalTarjeta: ReactNode;
-  if (open) {
-    accionPrincipalTarjeta = (
-      <button
-        type="button"
-        onClick={() => onRegistrarSalida(open.id)}
-        className="flex min-h-[44px] min-w-[120px] flex-1 items-center justify-center rounded-lg bg-red-600 text-sm font-medium text-white hover:bg-red-700 active:bg-red-800 touch-manipulation"
-        aria-label="Registrar salida"
-      >
-        Salida
-      </button>
-    );
-  } else if (requiereRevisionRecord) {
-    accionPrincipalTarjeta = (
-      <button
-        type="button"
-        onClick={() =>
-          onAbrirEstado({
-            asistenciaAprendizId: requiereRevisionRecord.id,
-            nombre: aprendiz.persona_nombre ?? 'Aprendiz',
-            estado: requiereRevisionRecord.estado || 'ASISTENCIA_COMPLETA',
-            motivo: requiereRevisionRecord.motivo_ajuste || '',
-          })
-        }
-        className="flex min-h-[44px] min-w-[120px] flex-1 items-center justify-center rounded-lg border border-amber-400 bg-amber-50 text-sm font-medium text-amber-800 touch-manipulation"
-      >
-        Resolver estado
-      </button>
-    );
-  } else {
-    accionPrincipalTarjeta = (
-      <button
-        type="button"
-        onClick={() => onRegistrarIngreso(aprendiz.id)}
-        className="flex min-h-[44px] min-w-[120px] flex-1 items-center justify-center rounded-lg bg-green-600 text-sm font-medium text-white hover:bg-green-700 active:bg-green-800 touch-manipulation"
-        aria-label="Registrar entrada"
-      >
-        Entrada
-      </button>
-    );
-  }
+  const estado = estadoAprendizVisual(open, lastSalida);
+  const puedeEntrada = !open && !busy;
+  const puedeSalida = !!open && !busy;
 
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-2 mb-2">
+    <div
+      className={`rounded-xl border bg-white p-3 shadow-sm dark:bg-gray-800 ${
+        selected
+          ? 'border-primary-500 ring-2 ring-primary-500/30'
+          : 'border-gray-200 dark:border-gray-600'
+      }`}
+    >
+      <div className="flex gap-3">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(aprendiz.id)}
+          className="mt-1 h-5 w-5 shrink-0 rounded border-gray-300 text-primary-600 focus:ring-primary-500 touch-manipulation"
+          aria-label={`Seleccionar ${aprendiz.persona_nombre ?? 'aprendiz'}`}
+        />
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-gray-900 dark:text-white truncate">{aprendiz.persona_nombre ?? '–'}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Doc: {aprendiz.persona_documento ?? '–'} · #{index}
-          </p>
-        </div>
-        <span className="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">
-          {rango}
-        </span>
-      </div>
-      {(tiposObservacion.length > 0 || observaciones) ? (
-        <div className="text-sm text-gray-600 dark:text-gray-300 mb-3 space-y-1">
-          {tiposObservacion.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {tiposObservacion.map((t) => (
-                <span key={t.id} className="inline-flex items-center rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {t.nombre}
-                </span>
-              ))}
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-semibold leading-snug text-gray-900 dark:text-white">{aprendiz.persona_nombre ?? '–'}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Doc. {aprendiz.persona_documento ?? '–'} · #{index}
+              </p>
             </div>
-          )}
-          {observaciones ? <p className="line-clamp-2" title={observaciones}>{observaciones}</p> : null}
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${estado.className}`}>
+              {estado.label}
+            </span>
+          </div>
+          <p className="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300">{rango}</p>
+          {(tiposObservacion.length > 0 || observaciones) ? (
+            <div className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+              {tiposObservacion.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {tiposObservacion.map((t) => (
+                    <span
+                      key={t.id}
+                      className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                    >
+                      {t.nombre}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {observaciones ? (
+                <p className="line-clamp-2 text-xs" title={observaciones}>
+                  {observaciones}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-      ) : null}
-      <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-2 dark:border-gray-700">
-        {accionPrincipalTarjeta}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-gray-700">
+        <button
+          type="button"
+          disabled={!puedeEntrada}
+          onClick={() => onRegistrarIngreso(aprendiz.id)}
+          className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40 touch-manipulation"
+        >
+          <ArrowRightStartOnRectangleIcon className="h-5 w-5" />
+          Entrada
+        </button>
+        <button
+          type="button"
+          disabled={!puedeSalida}
+          onClick={() => open && onRegistrarSalida(open.id)}
+          className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40 touch-manipulation"
+        >
+          <ArrowLeftEndOnRectangleIcon className="h-5 w-5" />
+          Salida
+        </button>
+        {requiereRevisionRecord ? (
+          <button
+            type="button"
+            onClick={() =>
+              onAbrirEstado({
+                asistenciaAprendizId: requiereRevisionRecord.id,
+                nombre: aprendiz.persona_nombre ?? 'Aprendiz',
+                estado: requiereRevisionRecord.estado || 'ASISTENCIA_COMPLETA',
+                motivo: requiereRevisionRecord.motivo_ajuste || '',
+              })
+            }
+            className="min-h-[44px] w-full rounded-lg border border-amber-400 bg-amber-50 text-sm font-medium text-amber-800 touch-manipulation dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            Resolver estado
+          </button>
+        ) : null}
         {asistenciaId === null ? null : (
           <button
             type="button"
@@ -258,11 +304,10 @@ function TarjetaAprendizAsistencia({
                 tiposObservacion,
               })
             }
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 touch-manipulation"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 touch-manipulation"
             aria-label="Observaciones"
-            title="Observaciones"
           >
-            <PencilSquareIcon className="w-5 h-5" />
+            <PencilSquareIcon className="h-5 w-5" />
           </button>
         )}
       </div>
@@ -275,6 +320,9 @@ type FilaAprendizAsistenciaProps = Readonly<{
   registros: AsistenciaAprendizResponse[];
   index: number;
   asistenciaId: number | null;
+  selected: boolean;
+  busy: boolean;
+  onToggleSelect: (aprendizId: number) => void;
   onRegistrarIngreso: (aprendizId: number) => void;
   onRegistrarSalida: (asistenciaAprendizId: number) => void;
   onAbrirEstado: (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => void;
@@ -292,6 +340,9 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
   registros,
   index,
   asistenciaId,
+  selected,
+  busy,
+  onToggleSelect,
   onRegistrarIngreso,
   onRegistrarSalida,
   onAbrirEstado,
@@ -317,37 +368,20 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
     textoObsCelda = null;
   }
 
-  let iconoEntradaSalida: ReactNode;
-  if (open) {
-    iconoEntradaSalida = (
-      <button
-        type="button"
-        onClick={() => onRegistrarSalida(open.id)}
-        className="flex min-h-[52px] min-w-[52px] items-center justify-center rounded-xl text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300 touch-manipulation"
-        title="Registrar salida"
-        aria-label="Registrar salida"
-      >
-        <ArrowLeftEndOnRectangleIcon className="h-7 w-7" />
-      </button>
-    );
-  } else if (requiereRevisionRecord) {
-    iconoEntradaSalida = <span className="inline-block min-h-[52px] min-w-[52px]" aria-hidden />;
-  } else {
-    iconoEntradaSalida = (
-      <button
-        type="button"
-        onClick={() => onRegistrarIngreso(aprendiz.id)}
-        className="flex min-h-[52px] min-w-[52px] items-center justify-center rounded-xl text-green-600 transition-colors hover:bg-green-50 hover:text-green-700 dark:text-green-500 dark:hover:bg-green-900/30 dark:hover:text-green-400 touch-manipulation"
-        title="Registrar entrada"
-        aria-label="Registrar entrada"
-      >
-        <ArrowRightStartOnRectangleIcon className="h-7 w-7" />
-      </button>
-    );
-  }
+  const puedeEntrada = !open && !busy;
+  const puedeSalida = !!open && !busy;
 
   return (
-    <tr className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+    <tr className={`bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 ${selected ? 'ring-1 ring-inset ring-primary-400' : ''}`}>
+      <td className="border border-gray-200 dark:border-gray-600 px-2 py-2 text-center">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(aprendiz.id)}
+          className="h-4 w-4 rounded border-gray-300 text-primary-600"
+          aria-label={`Seleccionar ${aprendiz.persona_nombre ?? 'aprendiz'}`}
+        />
+      </td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 text-gray-600 dark:text-gray-400">{index}</td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">{aprendiz.persona_documento ?? '-'}</td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2 font-medium">{aprendiz.persona_nombre ?? '-'}</td>
@@ -368,8 +402,27 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
         {textoObsCelda}
       </td>
       <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
-        <div className="flex items-center gap-2">
-          {iconoEntradaSalida}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={!puedeEntrada}
+            onClick={() => onRegistrarIngreso(aprendiz.id)}
+            className="rounded-lg p-2 text-green-600 hover:bg-green-50 disabled:opacity-40 dark:text-green-400 dark:hover:bg-green-900/30"
+            title="Registrar entrada"
+            aria-label="Registrar entrada"
+          >
+            <ArrowRightStartOnRectangleIcon className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            disabled={!puedeSalida}
+            onClick={() => open && onRegistrarSalida(open.id)}
+            className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-900/30"
+            title="Registrar salida"
+            aria-label="Registrar salida"
+          >
+            <ArrowLeftEndOnRectangleIcon className="h-6 w-6" />
+          </button>
           {requiereRevisionRecord && (
             <button
               type="button"
@@ -415,6 +468,9 @@ const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia({
     prev.index === next.index &&
     prev.asistenciaId === next.asistenciaId &&
     sameRegistrosList(prev.registros, next.registros) &&
+    prev.selected === next.selected &&
+    prev.busy === next.busy &&
+    prev.onToggleSelect === next.onToggleSelect &&
     prev.onRegistrarIngreso === next.onRegistrarIngreso &&
     prev.onRegistrarSalida === next.onRegistrarSalida &&
     prev.onAbrirEstado === next.onAbrirEstado &&
@@ -467,6 +523,11 @@ export const Asistencia = () => {
   const [pendientesRevision, setPendientesRevision] = useState<AsistenciaAprendizResponse[]>([]);
   const [pendientesLoading, setPendientesLoading] = useState(false);
   const [pendientesError, setPendientesError] = useState('');
+  const [selectedAprendizIds, setSelectedAprendizIds] = useState<Set<number>>(() => new Set());
+  const [busquedaAprendiz, setBusquedaAprendiz] = useState('');
+  const [modoRegistroDocumento, setModoRegistroDocumento] = useState<AccionRegistroDocumento>('ingreso');
+  const [busyAprendizIds, setBusyAprendizIds] = useState<Set<number>>(() => new Set());
+  const [bulkProcesando, setBulkProcesando] = useState(false);
 
   const upsertAsistenciaAprendizEnSesion = (actualizado: AsistenciaAprendizResponse) => {
     if (!actualizado) return;
@@ -643,6 +704,15 @@ export const Asistencia = () => {
     }
   };
 
+  const setAprendizBusy = useCallback((aprendizId: number, busy: boolean) => {
+    setBusyAprendizIds((prev) => {
+      const next = new Set(prev);
+      if (busy) next.add(aprendizId);
+      else next.delete(aprendizId);
+      return next;
+    });
+  }, []);
+
   const handleRegistrarIngreso = useCallback(
     async (aprendizId: number) => {
       if (!sesionActual) {
@@ -651,6 +721,8 @@ export const Asistencia = () => {
         }
         return;
       }
+      if (busyAprendizIds.has(aprendizId)) return;
+      setAprendizBusy(aprendizId, true);
       try {
         const nuevo = await apiService.registrarIngresoAsistencia({
           asistencia_id: sesionActual.id,
@@ -659,19 +731,29 @@ export const Asistencia = () => {
         upsertAsistenciaAprendizEnSesion(nuevo);
       } catch (e: unknown) {
         globalThis.alert(axiosErrorMessage(e, 'Error al registrar ingreso'));
+      } finally {
+        setAprendizBusy(aprendizId, false);
       }
     },
-    [sesionActual]
+    [sesionActual, busyAprendizIds, setAprendizBusy]
   );
 
-  const handleRegistrarSalida = useCallback(async (asistenciaAprendizId: number) => {
-    try {
-      const actualizado = await apiService.registrarSalidaAsistencia(asistenciaAprendizId);
-      upsertAsistenciaAprendizEnSesion(actualizado);
-    } catch (e: unknown) {
-      globalThis.alert(axiosErrorMessage(e, 'Error al registrar salida'));
-    }
-  }, []);
+  const handleRegistrarSalida = useCallback(
+    async (asistenciaAprendizId: number, aprendizId?: number) => {
+      const busyKey = aprendizId ?? asistenciaAprendizId;
+      if (busyAprendizIds.has(busyKey)) return;
+      setAprendizBusy(busyKey, true);
+      try {
+        const actualizado = await apiService.registrarSalidaAsistencia(asistenciaAprendizId);
+        upsertAsistenciaAprendizEnSesion(actualizado);
+      } catch (e: unknown) {
+        globalThis.alert(axiosErrorMessage(e, 'Error al registrar salida'));
+      } finally {
+        setAprendizBusy(busyKey, false);
+      }
+    },
+    [busyAprendizIds, setAprendizBusy]
+  );
 
   const onAbrirEstadoModal = useCallback(
     (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => {
@@ -771,7 +853,11 @@ export const Asistencia = () => {
     setMensajeRegistroManual('');
     setRegistrandoManual(true);
     try {
-      const data = await apiService.registrarIngresoAsistenciaPorDocumento(sesionActual.id, numeroDocumento.trim());
+      const data = await apiService.registrarIngresoAsistenciaPorDocumento(
+        sesionActual.id,
+        numeroDocumento.trim(),
+        modoRegistroDocumento,
+      );
       setDocumentoManual('');
       upsertAsistenciaAprendizEnSesion(data);
       setMensajeRegistroManual(mensajeRegistroPorTipo(data));
@@ -782,6 +868,100 @@ export const Asistencia = () => {
     }
   };
 
+  const toggleSelectAprendiz = useCallback((aprendizId: number) => {
+    setSelectedAprendizIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(aprendizId)) next.delete(aprendizId);
+      else next.add(aprendizId);
+      return next;
+    });
+  }, []);
+
+  const registroPorAprendizId = groupRegistrosByAprendiz(aprendicesEnSesion);
+
+  const aprendicesFiltrados = useMemo(() => {
+    const q = busquedaAprendiz.trim().toLowerCase();
+    if (!q) return aprendicesFicha;
+    return aprendicesFicha.filter(
+      (a) =>
+        (a.persona_nombre?.toLowerCase().includes(q) ?? false) ||
+        (a.persona_documento?.toLowerCase().includes(q) ?? false),
+    );
+  }, [aprendicesFicha, busquedaAprendiz]);
+
+  const bulkCounts = useMemo(() => {
+    let entradas = 0;
+    let salidas = 0;
+    for (const id of selectedAprendizIds) {
+      const { open } = summaryRegistros(registroPorAprendizId.get(id) ?? []);
+      if (open) salidas += 1;
+      else entradas += 1;
+    }
+    return { entradas, salidas };
+  }, [selectedAprendizIds, registroPorAprendizId]);
+
+  const handleBulkEntrada = async () => {
+    if (!sesionActual || bulkProcesando) return;
+    const ids = [...selectedAprendizIds].filter((id) => {
+      const { open } = summaryRegistros(registroPorAprendizId.get(id) ?? []);
+      return !open;
+    });
+    if (ids.length === 0) return;
+    setBulkProcesando(true);
+    let ok = 0;
+    let fail = 0;
+    for (const id of ids) {
+      try {
+        const nuevo = await apiService.registrarIngresoAsistencia({
+          asistencia_id: sesionActual.id,
+          aprendiz_id: id,
+        });
+        upsertAsistenciaAprendizEnSesion(nuevo);
+        ok += 1;
+      } catch {
+        fail += 1;
+      }
+    }
+    setBulkProcesando(false);
+    setSelectedAprendizIds(new Set());
+    if (fail > 0) {
+      globalThis.alert(`Entrada: ${ok} registradas, ${fail} con error.`);
+    }
+  };
+
+  const handleBulkSalida = async () => {
+    if (bulkProcesando) return;
+    const items = [...selectedAprendizIds]
+      .map((id) => {
+        const { open } = summaryRegistros(registroPorAprendizId.get(id) ?? []);
+        return open ? { aprendizId: id, asistenciaAprendizId: open.id } : null;
+      })
+      .filter((x): x is { aprendizId: number; asistenciaAprendizId: number } => x !== null);
+    if (items.length === 0) return;
+    setBulkProcesando(true);
+    let ok = 0;
+    let fail = 0;
+    for (const item of items) {
+      try {
+        const actualizado = await apiService.registrarSalidaAsistencia(item.asistenciaAprendizId);
+        upsertAsistenciaAprendizEnSesion(actualizado);
+        ok += 1;
+      } catch {
+        fail += 1;
+      }
+    }
+    setBulkProcesando(false);
+    setSelectedAprendizIds(new Set());
+    if (fail > 0) {
+      globalThis.alert(`Salida: ${ok} registradas, ${fail} con error.`);
+    }
+  };
+
+  useEffect(() => {
+    setSelectedAprendizIds(new Set());
+    setBusquedaAprendiz('');
+  }, [sesionActual?.id, fichaId]);
+
   const handleRegistroManualSubmit: NonNullable<ComponentProps<'form'>['onSubmit']> = (e) => {
     e.preventDefault();
     handleRegistrarPorDocumento(documentoManual).catch(() => {});
@@ -789,8 +969,6 @@ export const Asistencia = () => {
 
   const crearSesionReservadaRef = useRef<(() => Promise<void>) | null>(null);
   crearSesionReservadaRef.current = _handleCrearSesion;
-
-  const registroPorAprendizId = groupRegistrosByAprendiz(aprendicesEnSesion);
 
   // Sin fichas asignadas: superadmin o instructor sin asignaciones
   if (!fichasLoading && fichas.length === 0) {
@@ -824,22 +1002,59 @@ export const Asistencia = () => {
   const fichaSeleccionada = fichaId ? fichas.find((f) => f.id === fichaId) : null;
 
   // Vista única de tomar asistencia: pantalla completa (no debajo de las cards)
+  const enSesionCount = new Set(aprendicesEnSesion.map((aa) => aa.aprendiz_id)).size;
+  const todosFiltradosSeleccionados =
+    aprendicesFiltrados.length > 0 && aprendicesFiltrados.every((a) => selectedAprendizIds.has(a.id));
+
   if (sesionActual && !sesionActual.is_finished && fichaSeleccionada) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Tomar asistencia</h1>
-            <p className="mt-1 text-gray-600">Ficha {fichaSeleccionada.ficha} · {fichaSeleccionada.programa_formacion_nombre || 'Sin programa'}</p>
+      <div className={`space-y-4 pb-28 md:pb-6 ${selectedAprendizIds.size > 0 ? 'pb-32' : ''}`}>
+        <div className="sticky top-0 z-20 -mx-4 border-b border-gray-200 bg-gray-50/95 px-4 py-3 backdrop-blur dark:border-gray-700 dark:bg-gray-900/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white sm:text-2xl">Tomar asistencia</h1>
+              <p className="mt-0.5 truncate text-sm text-gray-600 dark:text-gray-400">
+                Ficha {fichaSeleccionada.ficha} · {fichaSeleccionada.programa_formacion_nombre || 'Sin programa'}
+              </p>
+              <p className="mt-1 text-xs font-medium text-primary-700 dark:text-primary-300">
+                {enSesionCount} de {aprendicesFicha.length} con registro hoy
+              </p>
+            </div>
+            <button type="button" onClick={handleVolverAFichas} className="btn-secondary shrink-0 text-sm">
+              Volver
+            </button>
           </div>
-          <button type="button" onClick={handleVolverAFichas} className="btn-secondary">
-            Volver a fichas
-          </button>
         </div>
-        <div className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[1fr,auto]">
-            {/* Panel izquierdo: información de la ficha y sesión */}
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+
+        <div className="space-y-4">
+          <details className="rounded-xl border border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800 lg:hidden">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-800 dark:text-gray-100">
+              Info de ficha y escáner QR
+            </summary>
+            <div className="space-y-4 border-t border-gray-100 px-4 pb-4 pt-3 dark:border-gray-700">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Instructor: {fichaSeleccionada.instructor_nombre || '—'} · Sesión activa
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setObservacionesSesionModal({ observaciones: sesionActual.observaciones ?? '' })}
+                  className="btn-secondary text-sm"
+                >
+                  Observación de sesión
+                </button>
+              </div>
+              <EscanerQR
+                key={`qr-m-${sesionActual.id}-${modoRegistroDocumento}`}
+                activo
+                onEscaneado={handleRegistrarPorDocumento}
+                readerId={`qr-sesion-m-${sesionActual.id}`}
+              />
+            </div>
+          </details>
+
+          <div className="hidden gap-6 lg:grid lg:grid-cols-[1fr,auto]">
+            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-600 dark:bg-gray-800">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-bold uppercase text-gray-900">
@@ -901,9 +1116,8 @@ export const Asistencia = () => {
               </div>
             </div>
 
-            {/* Panel derecho: escáner QR */}
             <EscanerQR
-              key={sesionActual.id}
+              key={`qr-${sesionActual.id}-${modoRegistroDocumento}`}
               activo
               onEscaneado={handleRegistrarPorDocumento}
               className="lg:w-[340px]"
@@ -911,10 +1125,47 @@ export const Asistencia = () => {
             />
           </div>
 
-          {/* Listado de aprendices: registro manual + tabla */}
-          <div className="card">
-            <h3 className="mb-1 text-lg font-semibold text-gray-900">Listado de aprendices</h3>
-            <p className="mb-4 text-sm text-gray-600">Entradas y salidas por sesión</p>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-600 dark:bg-gray-800 sm:p-5">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Aprendices</h3>
+            <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
+              Marque varios con el checkbox y use entrada o salida grupal. Entrada y salida son botones separados (mín. 1 min entre ambas).
+            </p>
+
+            <div className="mb-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setModoRegistroDocumento('ingreso')}
+                className={`min-h-[40px] flex-1 rounded-lg px-3 py-2 text-sm font-semibold touch-manipulation sm:flex-none sm:px-4 ${
+                  modoRegistroDocumento === 'ingreso'
+                    ? 'bg-green-600 text-white'
+                    : 'border border-gray-300 bg-white text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200'
+                }`}
+              >
+                Modo: Entrada
+              </button>
+              <button
+                type="button"
+                onClick={() => setModoRegistroDocumento('salida')}
+                className={`min-h-[40px] flex-1 rounded-lg px-3 py-2 text-sm font-semibold touch-manipulation sm:flex-none sm:px-4 ${
+                  modoRegistroDocumento === 'salida'
+                    ? 'bg-red-600 text-white'
+                    : 'border border-gray-300 bg-white text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200'
+                }`}
+              >
+                Modo: Salida
+              </button>
+            </div>
+
+            <div className="relative mb-4">
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                value={busquedaAprendiz}
+                onChange={(e) => setBusquedaAprendiz(e.target.value)}
+                placeholder="Buscar por nombre o documento..."
+                className="input-field w-full pl-10"
+              />
+            </div>
 
             {errorAprendices && (
               <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
@@ -923,27 +1174,27 @@ export const Asistencia = () => {
               </div>
             )}
 
-            {/* Registro manual por documento */}
-            <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-              <p className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase text-gray-700">
+            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-600 dark:bg-gray-900/40 sm:p-4">
+              <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
                 <DocumentTextIcon className="h-5 w-5" />
-                Registro manual
+                Documento o QR ({modoRegistroDocumento === 'ingreso' ? 'entrada' : 'salida'})
               </p>
-              <form onSubmit={handleRegistroManualSubmit} className="flex flex-wrap items-end gap-3">
-                <div className="min-w-[280px] flex-1">
+              <form onSubmit={handleRegistroManualSubmit} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="flex-1">
                   <label htmlFor={ASIST_REGISTRO_DOC_INPUT_ID} className="sr-only">
                     Número de documento del aprendiz
                   </label>
                   <input
                     id={ASIST_REGISTRO_DOC_INPUT_ID}
                     type="text"
+                    inputMode="numeric"
                     value={documentoManual}
                     onChange={(e) => {
                       setDocumentoManual(e.target.value);
                       setErrorRegistroManual('');
                       setMensajeRegistroManual('');
                     }}
-                    placeholder="Ingrese número de documento del aprendiz..."
+                    placeholder="Número de documento..."
                     className="input-field w-full"
                     disabled={registrandoManual}
                   />
@@ -951,22 +1202,38 @@ export const Asistencia = () => {
                 <button
                   type="submit"
                   disabled={registrandoManual || !documentoManual.trim()}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-3 min-h-[44px] text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 touch-manipulation"
+                  className={`min-h-[44px] rounded-lg px-4 text-sm font-semibold text-white disabled:opacity-50 touch-manipulation ${
+                    modoRegistroDocumento === 'ingreso' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
+                  }`}
                 >
-                  <UserPlusIcon className="h-5 w-5" />
-                  Registrar Asistencia
+                  Registrar {modoRegistroDocumento === 'ingreso' ? 'entrada' : 'salida'}
                 </button>
               </form>
-              {errorRegistroManual && (
-                <p className="mt-2 text-sm text-red-600">{errorRegistroManual}</p>
-              )}
-              {mensajeRegistroManual && (
-                <p className="mt-2 text-sm text-green-700 font-medium">{mensajeRegistroManual}</p>
-              )}
-              <p className="mt-2 text-xs text-gray-500">
-                Seleccione aprendices con checkbox o use esta opción para registro manual por documento. También puede escanear el QR del aprendiz.
-              </p>
+              {errorRegistroManual ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errorRegistroManual}</p> : null}
+              {mensajeRegistroManual ? (
+                <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">{mensajeRegistroManual}</p>
+              ) : null}
             </div>
+
+            {aprendicesFiltrados.length > 0 ? (
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={todosFiltradosSeleccionados}
+                    onChange={() => {
+                      if (todosFiltradosSeleccionados) {
+                        setSelectedAprendizIds(new Set());
+                      } else {
+                        setSelectedAprendizIds(new Set(aprendicesFiltrados.map((a) => a.id)));
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600"
+                  />
+                  Seleccionar todos ({aprendicesFiltrados.length})
+                </label>
+              </div>
+            ) : null}
 
             {/* Listado de aprendices: mostrar solo tabla (también en móvil) para aislar error de renderizado */}
             {loadingAprendices && (
@@ -979,30 +1246,37 @@ export const Asistencia = () => {
                 No hay aprendices en esta ficha. Si debería haber aprendices, asígnelos desde Fichas de caracterización (pestaña Aprendices de la ficha).
               </div>
             )}
-            {!loadingAprendices && aprendicesFicha.length > 0 && (
+            {!loadingAprendices && aprendicesFicha.length > 0 && aprendicesFiltrados.length === 0 && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800/50">
+                Ningún aprendiz coincide con la búsqueda.
+              </div>
+            )}
+            {!loadingAprendices && aprendicesFiltrados.length > 0 && (
               <>
-                {/* Vista móvil: tarjetas por aprendiz */}
                 <div className="space-y-3 md:hidden">
-                  {aprendicesFicha.map((aprendiz, idx) => (
+                  {aprendicesFiltrados.map((aprendiz, idx) => (
                     <TarjetaAprendizAsistencia
                       key={aprendiz.id}
                       aprendiz={aprendiz}
                       registros={registroPorAprendizId.get(aprendiz.id) ?? []}
                       index={idx + 1}
                       asistenciaId={sesionActual?.id ?? null}
+                      selected={selectedAprendizIds.has(aprendiz.id)}
+                      busy={busyAprendizIds.has(aprendiz.id)}
+                      onToggleSelect={toggleSelectAprendiz}
                       onRegistrarIngreso={handleRegistrarIngreso}
-                      onRegistrarSalida={handleRegistrarSalida}
+                      onRegistrarSalida={(aaId) => handleRegistrarSalida(aaId, aprendiz.id)}
                       onAbrirEstado={onAbrirEstadoModal}
                       onAbrirObservaciones={onAbrirObservacionesModal}
                     />
                   ))}
                 </div>
 
-                {/* Vista desktop: tabla */}
                 <div className="hidden overflow-x-auto md:block">
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-gray-100 text-left dark:bg-gray-800">
+                        <th className="border border-gray-200 px-2 py-2 dark:border-gray-600" aria-label="Seleccionar" />
                         <th className="border border-gray-200 px-3 py-2 font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300">#</th>
                         <th className="border border-gray-200 px-3 py-2 font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300">Documento</th>
                         <th className="border border-gray-200 px-3 py-2 font-semibold text-gray-700 dark:border-gray-600 dark:text-gray-300">Nombre del aprendiz</th>
@@ -1013,15 +1287,18 @@ export const Asistencia = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {aprendicesFicha.map((aprendiz, idx) => (
+                      {aprendicesFiltrados.map((aprendiz, idx) => (
                         <FilaAprendizAsistencia
                           key={aprendiz.id}
                           aprendiz={aprendiz}
                           registros={registroPorAprendizId.get(aprendiz.id) ?? []}
                           index={idx + 1}
                           asistenciaId={sesionActual?.id ?? null}
+                          selected={selectedAprendizIds.has(aprendiz.id)}
+                          busy={busyAprendizIds.has(aprendiz.id)}
+                          onToggleSelect={toggleSelectAprendiz}
                           onRegistrarIngreso={handleRegistrarIngreso}
-                          onRegistrarSalida={handleRegistrarSalida}
+                          onRegistrarSalida={(aaId) => handleRegistrarSalida(aaId, aprendiz.id)}
                           onAbrirEstado={onAbrirEstadoModal}
                           onAbrirObservaciones={onAbrirObservacionesModal}
                         />
@@ -1033,6 +1310,34 @@ export const Asistencia = () => {
             )}
           </div>
         </div>
+
+        {selectedAprendizIds.size > 0 ? (
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-gray-700 dark:bg-gray-900/95 md:static md:mt-4 md:rounded-xl md:border md:p-4">
+            <p className="mb-2 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
+              {selectedAprendizIds.size} seleccionado{selectedAprendizIds.size === 1 ? '' : 's'}
+              {bulkCounts.entradas > 0 ? ` · ${bulkCounts.entradas} entrada(s)` : ''}
+              {bulkCounts.salidas > 0 ? ` · ${bulkCounts.salidas} salida(s)` : ''}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={bulkProcesando || bulkCounts.entradas === 0}
+                onClick={() => void handleBulkEntrada()}
+                className="flex min-h-[48px] flex-1 items-center justify-center rounded-lg bg-green-600 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-40 touch-manipulation"
+              >
+                Entrada grupal
+              </button>
+              <button
+                type="button"
+                disabled={bulkProcesando || bulkCounts.salidas === 0}
+                onClick={() => void handleBulkSalida()}
+                className="flex min-h-[48px] flex-1 items-center justify-center rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-40 touch-manipulation"
+              >
+                Salida grupal
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {/* Modal observaciones */}
         {observacionesModal && (

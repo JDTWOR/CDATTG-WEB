@@ -376,30 +376,40 @@ func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngre
 	}
 	hoy := time.Now().Format(time.DateOnly)
 	sessionIDs, _ := s.repo.FindIDsByFichaIDAndFecha(ifc.FichaID, hoy)
-	// Si ya tiene un tramo abierto (entrada sin salida) hoy en esta ficha → registrar salida de ese tramo.
+	var sinSalida *models.AsistenciaAprendiz
 	if len(sessionIDs) > 0 {
-		sinSalida, _ := s.repoAA.FindEntryWithoutExitByAprendizIDAndAsistenciaIDs(aprendiz.ID, sessionIDs)
-		if sinSalida != nil {
-			resp, err := s.RegistrarSalida(sinSalida.ID, instructorFichaIDRegistroIngreso)
-			if err != nil {
-				return nil, err
-			}
-			resp.TipoRegistro = "salida"
-			resp.Mensaje = "Salida registrada"
-			return resp, nil
+		sinSalida, _ = s.repoAA.FindEntryWithoutExitByAprendizIDAndAsistenciaIDs(aprendiz.ID, sessionIDs)
+	}
+	accion := strings.TrimSpace(strings.ToLower(req.Accion))
+	switch accion {
+	case "salida":
+		if sinSalida == nil {
+			return nil, errors.New("el aprendiz no tiene entrada registrada para marcar salida")
 		}
+		resp, err := s.RegistrarSalida(sinSalida.ID, instructorFichaIDRegistroIngreso)
+		if err != nil {
+			return nil, err
+		}
+		resp.TipoRegistro = "salida"
+		resp.Mensaje = "Salida registrada"
+		return resp, nil
+	case "ingreso":
+		if sinSalida != nil {
+			return nil, errors.New("el aprendiz ya tiene entrada sin salida; registre la salida antes de una nueva entrada")
+		}
+		resp, err := s.RegistrarIngreso(dto.AsistenciaAprendizRequest{
+			AsistenciaID: req.AsistenciaID,
+			AprendizID:   aprendiz.ID,
+		}, instructorFichaIDRegistroIngreso)
+		if err != nil {
+			return nil, err
+		}
+		resp.TipoRegistro = "ingreso"
+		resp.Mensaje = "Ingreso registrado"
+		return resp, nil
+	default:
+		return nil, errors.New("acción inválida; use ingreso o salida")
 	}
-	// Sin tramo abierto → registrar nuevo ingreso (puede ser el primero o un tramo adicional).
-	resp, err := s.RegistrarIngreso(dto.AsistenciaAprendizRequest{
-		AsistenciaID: req.AsistenciaID,
-		AprendizID:   aprendiz.ID,
-	}, instructorFichaIDRegistroIngreso)
-	if err != nil {
-		return nil, err
-	}
-	resp.TipoRegistro = "ingreso"
-	resp.Mensaje = "Ingreso registrado"
-	return resp, nil
 }
 
 func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error) {
@@ -414,6 +424,10 @@ func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint, instructo
 		return nil, errors.New("ya tiene hora de salida registrada")
 	}
 	now := time.Now()
+	const minSegundosEntreIngresoYSalida = 60
+	if aa.HoraIngreso != nil && now.Sub(*aa.HoraIngreso) < minSegundosEntreIngresoYSalida*time.Second {
+		return nil, errors.New("debe esperar al menos 1 minuto entre la entrada y la salida")
+	}
 	aa.HoraSalida = &now
 	aa.InstructorFichaIDRegistroSalida = instructorFichaIDRegistroSalida
 	// Salida normal registrada en la sesión → asistencia completa (sin requerir revisión)

@@ -7,6 +7,8 @@ interface EscanerQRProps {
   onEscaneado: (numeroDocumento: string) => void;
   activo: boolean;
   className?: string;
+  /** Sin borde/fondo propio cuando va dentro de otra tarjeta. */
+  embedded?: boolean;
   /** Id único del contenedor para evitar conflicto cuando se monta/desmonta (evita pantalla en blanco). */
   readerId?: string;
 }
@@ -57,6 +59,7 @@ function EscanerQRInner({
   onEscaneado,
   activo,
   className = '',
+  embedded = false,
   readerId = QR_READER_ID_DEFAULT,
 }: Readonly<EscanerQRProps>) {
   const [error, setError] = useState<string | null>(null);
@@ -160,40 +163,44 @@ function EscanerQRInner({
     return null;
   }
 
+  const panelClass = embedded
+    ? 'p-0'
+    : 'rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-600 dark:bg-gray-800';
+
   return (
     <div className={className}>
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-900">Escanear QR</h3>
-          <span className="rounded bg-primary-600 px-2 py-0.5 text-xs font-medium text-white">Registro en tiempo real</span>
+      <div className={panelClass}>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-gray-900 dark:text-white">Escanear QR</h3>
+          <span className="shrink-0 rounded bg-primary-600 px-2 py-0.5 text-xs font-medium text-white">Registro en tiempo real</span>
         </div>
         {camaraActiva ? (
           <>
-            <p className="mb-3 text-sm text-gray-600">Posicione el código QR en el recuadro</p>
+            <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">Posicione el código QR en el recuadro</p>
             {error && (
-              <div className="mb-3 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>
+              <div className="mb-3 rounded bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>
             )}
             {permisos === false && !error && (
-              <div className="mb-3 rounded bg-amber-50 p-3 text-sm text-amber-800">
+              <div className="mb-3 rounded bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
                 Permisos de cámara denegados. Use el registro manual por documento.
               </div>
             )}
-            <div ref={readerContainerRef} id={readerId} className="min-h-[240px] w-full max-w-sm" />
+            <div ref={readerContainerRef} id={readerId} className="min-h-[240px] w-full max-w-sm overflow-hidden rounded-lg bg-gray-900" />
             <button
               type="button"
               onClick={() => setCamaraActiva(false)}
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="btn-secondary mt-3 inline-flex w-full items-center justify-center gap-2 text-sm"
             >
               Desactivar cámara
             </button>
           </>
         ) : (
           <>
-            <p className="mb-3 text-sm text-gray-600">
+            <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
               La cámara se activará solo cuando presione el botón de abajo. Puede usar el registro manual si lo prefiere.
             </p>
             {error && (
-              <div className="mb-3 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>
+              <div className="mb-3 rounded bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>
             )}
             <button
               type="button"

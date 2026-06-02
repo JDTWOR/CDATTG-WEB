@@ -422,8 +422,8 @@ export const Layout = ({ children }: LayoutProps) => {
         <aside
           className={`
             w-64 bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700
-            min-h-screen md:min-h-[calc(100vh-4rem)]
             fixed md:static inset-y-0 left-0 z-50 md:z-auto
+            h-dvh max-h-dvh md:h-auto md:max-h-none md:min-h-[calc(100vh-4rem)]
             transform transition-transform duration-200 ease-out md:transform-none
             flex flex-col
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
@@ -442,7 +442,7 @@ export const Layout = ({ children }: LayoutProps) => {
             </button>
           </div>
 
-          <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
+          <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-4">
             {sections.map((section, sectionIndex) => (
               <div key={section} className={sectionIndex > 0 ? 'mt-4' : ''}>
                 <p className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -477,7 +477,7 @@ export const Layout = ({ children }: LayoutProps) => {
           </nav>
 
           {/* Bloque usuario en drawer (solo móvil): Cambiar contraseña + Cerrar sesión */}
-          <div className="md:hidden border-t border-gray-200 dark:border-gray-700 p-4 space-y-2">
+          <div className="safe-bottom md:hidden shrink-0 border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 p-4 space-y-2">
             <div className="px-4 py-2">
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user?.full_name}</p>
               {rolesLine ? (

@@ -354,62 +354,103 @@ func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest, 
 	return s.GetAsistenciaAprendizByID(aa.ID)
 }
 
-func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngresoPorDocumentoRequest, instructorFichaIDRegistroIngreso *uint) (*dto.AsistenciaAprendizResponse, error) {
-	asist, err := s.repo.FindByID(req.AsistenciaID)
+func (s *asistenciaService) sesionActivaPorID(asistenciaID uint) (*models.Asistencia, error) {
+	asist, err := s.repo.FindByID(asistenciaID)
 	if err != nil {
 		return nil, errors.New(errMsgSesionAsistenciaNoEncontrada)
 	}
 	if asist.IsFinished {
 		return nil, errors.New(errMsgSesionYaFinalizada)
 	}
+	return asist, nil
+}
+
+func (s *asistenciaService) aprendizPorDocumentoEnSesion(asist *models.Asistencia, numeroDocumento string) (aprendizID uint, fichaID uint, err error) {
 	ifc, err := s.instFichaRepo.FindByID(asist.InstructorFichaID)
 	if err != nil || ifc == nil {
-		return nil, errors.New("no se pudo obtener la ficha de la sesión")
+		return 0, 0, errors.New("no se pudo obtener la ficha de la sesión")
 	}
-	persona, err := s.personaRepo.FindByNumeroDocumento(req.NumeroDocumento)
+	persona, err := s.personaRepo.FindByNumeroDocumento(numeroDocumento)
 	if err != nil || persona == nil {
-		return nil, errors.New("no se encontró ninguna persona con ese número de documento")
+		return 0, 0, errors.New("no se encontró ninguna persona con ese número de documento")
 	}
 	aprendiz, err := s.aprendizRepo.FindByPersonaIDAndFichaID(persona.ID, ifc.FichaID)
 	if err != nil || aprendiz == nil {
-		return nil, errors.New("el documento no corresponde a un aprendiz de esta ficha")
+		return 0, 0, errors.New("el documento no corresponde a un aprendiz de esta ficha")
 	}
+	return aprendiz.ID, ifc.FichaID, nil
+}
+
+func (s *asistenciaService) tramoAbiertoAprendizEnFichaHoy(fichaID, aprendizID uint) *models.AsistenciaAprendiz {
 	hoy := time.Now().Format(time.DateOnly)
-	sessionIDs, _ := s.repo.FindIDsByFichaIDAndFecha(ifc.FichaID, hoy)
-	var sinSalida *models.AsistenciaAprendiz
-	if len(sessionIDs) > 0 {
-		sinSalida, _ = s.repoAA.FindEntryWithoutExitByAprendizIDAndAsistenciaIDs(aprendiz.ID, sessionIDs)
+	sessionIDs, _ := s.repo.FindIDsByFichaIDAndFecha(fichaID, hoy)
+	if len(sessionIDs) == 0 {
+		return nil
 	}
-	accion := strings.TrimSpace(strings.ToLower(req.Accion))
-	switch accion {
+	sinSalida, _ := s.repoAA.FindEntryWithoutExitByAprendizIDAndAsistenciaIDs(aprendizID, sessionIDs)
+	return sinSalida
+}
+
+func (s *asistenciaService) registrarIngresoOSalidaPorDocumento(
+	accion string,
+	asistenciaID, aprendizID uint,
+	sinSalida *models.AsistenciaAprendiz,
+	instructorFichaID *uint,
+) (*dto.AsistenciaAprendizResponse, error) {
+	switch strings.TrimSpace(strings.ToLower(accion)) {
 	case "salida":
-		if sinSalida == nil {
-			return nil, errors.New("el aprendiz no tiene entrada registrada para marcar salida")
-		}
-		resp, err := s.RegistrarSalida(sinSalida.ID, instructorFichaIDRegistroIngreso)
-		if err != nil {
-			return nil, err
-		}
-		resp.TipoRegistro = "salida"
-		resp.Mensaje = "Salida registrada"
-		return resp, nil
+		return s.registrarSalidaPorDocumento(sinSalida, instructorFichaID)
 	case "ingreso":
-		if sinSalida != nil {
-			return nil, errors.New("el aprendiz ya tiene entrada sin salida; registre la salida antes de una nueva entrada")
-		}
-		resp, err := s.RegistrarIngreso(dto.AsistenciaAprendizRequest{
-			AsistenciaID: req.AsistenciaID,
-			AprendizID:   aprendiz.ID,
-		}, instructorFichaIDRegistroIngreso)
-		if err != nil {
-			return nil, err
-		}
-		resp.TipoRegistro = "ingreso"
-		resp.Mensaje = "Ingreso registrado"
-		return resp, nil
+		return s.registrarIngresoPorDocumentoAccion(asistenciaID, aprendizID, sinSalida, instructorFichaID)
 	default:
 		return nil, errors.New("acción inválida; use ingreso o salida")
 	}
+}
+
+func (s *asistenciaService) registrarSalidaPorDocumento(sinSalida *models.AsistenciaAprendiz, instructorFichaID *uint) (*dto.AsistenciaAprendizResponse, error) {
+	if sinSalida == nil {
+		return nil, errors.New("el aprendiz no tiene entrada registrada para marcar salida")
+	}
+	resp, err := s.RegistrarSalida(sinSalida.ID, instructorFichaID)
+	if err != nil {
+		return nil, err
+	}
+	resp.TipoRegistro = "salida"
+	resp.Mensaje = "Salida registrada"
+	return resp, nil
+}
+
+func (s *asistenciaService) registrarIngresoPorDocumentoAccion(
+	asistenciaID, aprendizID uint,
+	sinSalida *models.AsistenciaAprendiz,
+	instructorFichaID *uint,
+) (*dto.AsistenciaAprendizResponse, error) {
+	if sinSalida != nil {
+		return nil, errors.New("el aprendiz ya tiene entrada sin salida; registre la salida antes de una nueva entrada")
+	}
+	resp, err := s.RegistrarIngreso(dto.AsistenciaAprendizRequest{
+		AsistenciaID: asistenciaID,
+		AprendizID:   aprendizID,
+	}, instructorFichaID)
+	if err != nil {
+		return nil, err
+	}
+	resp.TipoRegistro = "ingreso"
+	resp.Mensaje = "Ingreso registrado"
+	return resp, nil
+}
+
+func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngresoPorDocumentoRequest, instructorFichaIDRegistroIngreso *uint) (*dto.AsistenciaAprendizResponse, error) {
+	asist, err := s.sesionActivaPorID(req.AsistenciaID)
+	if err != nil {
+		return nil, err
+	}
+	aprendizID, fichaID, err := s.aprendizPorDocumentoEnSesion(asist, req.NumeroDocumento)
+	if err != nil {
+		return nil, err
+	}
+	sinSalida := s.tramoAbiertoAprendizEnFichaHoy(fichaID, aprendizID)
+	return s.registrarIngresoOSalidaPorDocumento(req.Accion, req.AsistenciaID, aprendizID, sinSalida, instructorFichaIDRegistroIngreso)
 }
 
 func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error) {

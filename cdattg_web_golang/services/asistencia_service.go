@@ -243,7 +243,7 @@ func (s *asistenciaService) Finalizar(id uint) (*dto.AsistenciaResponse, error) 
 	if a.IsFinished {
 		return nil, errors.New(errMsgSesionYaFinalizada)
 	}
-	// Cierre automático de salidas: todo registro con ingreso y sin salida
+	// Cierre automático de salidas: registros con ingreso y sin salida
 	// recibe salida al momento de finalizar la sesión.
 	now := time.Now()
 	for i := range a.AsistenciaAprendices {
@@ -650,8 +650,9 @@ func (s *asistenciaService) GetDetalleInasistenciasAprendiz(fichaNumero string, 
 	}
 	for i := range rows {
 		resp.Inasistencias[i] = dto.InasistenciaDetalleItem{
-			Fecha:         rows[i].Fecha,
-			Observaciones: rows[i].Observaciones,
+			Fecha:            rows[i].Fecha,
+			InstructorNombre: rows[i].InstructorNombre,
+			Observaciones:    rows[i].Observaciones,
 		}
 	}
 	return resp, nil

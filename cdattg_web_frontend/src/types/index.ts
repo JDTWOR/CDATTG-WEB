@@ -481,6 +481,7 @@ export interface CasosBienestarResponse {
 
 export interface InasistenciaDetalleItem {
   fecha: string;
+  instructor_nombre?: string;
   observaciones?: string;
 }
 

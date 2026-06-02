@@ -360,6 +360,9 @@ export const CasosBienestarFichaDetalle = () => {
                             Fecha de inasistencia
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                            Instructor
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                             Observaciones
                           </th>
                         </tr>
@@ -368,6 +371,7 @@ export const CasosBienestarFichaDetalle = () => {
                         {detalleInasistencias.map((item, idx) => (
                           <tr key={`${item.fecha}-${idx}`}>
                             <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{item.fecha}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{item.instructor_nombre || '—'}</td>
                             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.observaciones || '—'}</td>
                           </tr>
                         ))}

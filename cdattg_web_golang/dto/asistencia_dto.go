@@ -163,8 +163,9 @@ type CasoBienestarItem struct {
 
 // InasistenciaDetalleItem representa una fecha de sesión en la que el aprendiz no asistió.
 type InasistenciaDetalleItem struct {
-	Fecha         string `json:"fecha"` // YYYY-MM-DD
-	Observaciones string `json:"observaciones,omitempty"`
+	Fecha            string `json:"fecha"` // YYYY-MM-DD
+	InstructorNombre string `json:"instructor_nombre,omitempty"`
+	Observaciones    string `json:"observaciones,omitempty"`
 }
 
 // CasoBienestarAprendizDetalleResponse detalle de inasistencias por aprendiz en una ficha.

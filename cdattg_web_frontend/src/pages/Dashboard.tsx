@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import {
   UsersIcon,
   AcademicCapIcon,
@@ -13,12 +13,11 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
+import { canAccessMainDashboard, getHomeRouteForUser } from '../utils/roles';
 import type { AsistenciaDashboardResponse } from '../types';
 
-const DASHBOARD_ALLOWED_ROLES = ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'] as const;
-
 export const Dashboard = () => {
-  const { user, roles, hasPermission } = useAuth();
+  const { user, roles, permissions, hasPermission } = useAuth();
   const [totalPersonas, setTotalPersonas] = useState<number | null>(null);
   const [totalInstructores, setTotalInstructores] = useState<number | null>(null);
   const [totalAprendices, setTotalAprendices] = useState<number | null>(null);
@@ -29,7 +28,7 @@ export const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const hasRoleAccess = roles.some((r) => DASHBOARD_ALLOWED_ROLES.includes(r as (typeof DASHBOARD_ALLOWED_ROLES)[number]));
+  const hasRoleAccess = canAccessMainDashboard(roles);
 
   useEffect(() => {
     if (!hasRoleAccess) {
@@ -128,11 +127,16 @@ export const Dashboard = () => {
   }, [asistenciaDashboard]);
 
   if (!hasRoleAccess) {
+    const home = getHomeRouteForUser(roles, permissions);
+    if (home !== '/dashboard') {
+      return <Navigate to={home} replace />;
+    }
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
         <p className="text-red-600 dark:text-red-400 text-sm">
-          No tiene permiso para ver este dashboard. Solo pueden acceder los roles SUPER ADMINISTRADOR, ADMINISTRADOR y BIENESTAR AL APRENDIZ.
+          No tiene permiso para ver este dashboard. Solo pueden acceder los roles SUPER ADMINISTRADOR,
+          ADMINISTRADOR y BIENESTAR AL APRENDIZ.
         </p>
         <Link to="/perfil" className="btn-secondary inline-flex items-center justify-center">
           Volver a mi perfil

@@ -21,8 +21,8 @@ export const Login = () => {
     void (async () => {
       setLoading(true);
       try {
-        await login({ email: loginId.trim(), password });
-        navigate('/perfil');
+        const home = await login({ email: loginId.trim(), password });
+        navigate(home, { replace: true });
       } catch (err: unknown) {
         setError(axiosErrorMessage(err, 'Error al iniciar sesión'));
       } finally {

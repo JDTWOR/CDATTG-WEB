@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useMemo, useCallback } 
 import type { ReactNode } from 'react';
 import type { UserResponse, LoginRequest } from '../types';
 import { apiService } from '../services/api';
+import { getHomeRouteForUser } from '../utils/roles';
 
 const ROLES_KEY = 'user_roles';
 const PERMISSIONS_KEY = 'user_permissions';
@@ -12,7 +13,7 @@ interface AuthContextType {
   roles: string[];
   permissions: string[];
   hasPermission: (permission: string) => boolean;
-  login: (credentials: LoginRequest) => Promise<void>;
+  login: (credentials: LoginRequest) => Promise<string>;
   logout: () => void;
   isAuthenticated: boolean;
   loading: boolean;
@@ -79,14 +80,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = useCallback(async (credentials: LoginRequest) => {
     const response = await apiService.login(credentials);
+    const nextRoles = response.roles ?? [];
+    const nextPermissions = response.permissions ?? [];
     setToken(response.token);
     setUser(response.user);
-    setRoles(response.roles ?? []);
-    setPermissions(response.permissions ?? []);
+    setRoles(nextRoles);
+    setPermissions(nextPermissions);
     localStorage.setItem('token', response.token);
     localStorage.setItem('user', JSON.stringify(response.user));
-    localStorage.setItem(ROLES_KEY, JSON.stringify(response.roles ?? []));
-    localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(response.permissions ?? []));
+    localStorage.setItem(ROLES_KEY, JSON.stringify(nextRoles));
+    localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(nextPermissions));
+    return getHomeRouteForUser(nextRoles, nextPermissions);
   }, []);
 
   const contextValue = useMemo(

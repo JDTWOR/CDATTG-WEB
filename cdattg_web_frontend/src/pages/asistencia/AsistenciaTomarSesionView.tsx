@@ -1,5 +1,6 @@
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { FichaCaracterizacionCard } from '../../components/FichaCaracterizacionCard';
+import { formatRangoFechasVista } from '../../utils/formatFecha';
 import { AsistenciaMetodosAccordion } from './AsistenciaMetodosAccordion';
 import { AsistenciaModals } from './AsistenciaModals';
 import type { AsistenciaPageState } from './useAsistenciaPage';
@@ -14,10 +15,10 @@ function SesionFichaCard({ page }: Readonly<{ page: AsistenciaPageState }>) {
     page.setObservacionesSesionModal({ observaciones: sesionActual.observaciones ?? '' });
   };
 
-  const fechasFormacion =
-    fichaSeleccionada.fecha_inicio || fichaSeleccionada.fecha_fin
-      ? [fichaSeleccionada.fecha_inicio, fichaSeleccionada.fecha_fin].filter(Boolean).join(' → ')
-      : null;
+  const fechasFormacion = formatRangoFechasVista(
+    fichaSeleccionada.fecha_inicio,
+    fichaSeleccionada.fecha_fin
+  );
 
   return (
     <FichaCaracterizacionCard

@@ -20,6 +20,7 @@ import { FichaFormModal } from '../components/FichaFormModal';
 import { useAuth } from '../context/AuthContext';
 import { axiosErrorMessage } from '../utils/httpError';
 import { canManageFichas, formatDiasEnTabla } from '../utils/fichaCaracterizacionForm';
+import { formatFechaVista } from '../utils/formatFecha';
 import type {
   FichaCaracterizacionResponse,
   InstructorFichaResponse,
@@ -32,18 +33,6 @@ import type {
 } from '../types';
 
 type Tab = 'instructores' | 'aprendices';
-
-function formatFechaVista(iso?: string | null): string {
-  if (iso == null || iso === '') return '—';
-  const s = String(iso).trim();
-  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) {
-    const [y, m, d] = s.slice(0, 10).split('-');
-    return `${d}/${m}/${y}`;
-  }
-  const dt = new Date(s);
-  if (!Number.isNaN(dt.getTime())) return dt.toLocaleDateString('es-CO');
-  return s;
-}
 
 function diasTexto(ficha: FichaCaracterizacionResponse, catalogo: DiaFormacionItem[]): string {
   return formatDiasEnTabla(ficha, catalogo);

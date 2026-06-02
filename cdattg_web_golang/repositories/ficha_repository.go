@@ -93,9 +93,7 @@ func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instruct
 		q = q.Where("programa_formacion_id = ?", *programaID)
 	}
 	if instructorID != nil && *instructorID > 0 {
-		// Solo fichas activas asignadas al instructor (p. ej. tomar asistencia).
-		q = q.Where("status = ?", true).
-			Where("id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ? AND deleted_at IS NULL)", *instructorID)
+		q = q.Where("id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ? AND deleted_at IS NULL)", *instructorID)
 	}
 	if search != "" {
 		// Reemplazar espacios por % para permitir búsqueda parcial (ej. "analisis software" -> "%analisis%software%")
@@ -111,8 +109,7 @@ func (r *fichaRepository) FindAll(page, pageSize int, programaID *uint, instruct
 		findQ = findQ.Where("programa_formacion_id = ?", *programaID)
 	}
 	if instructorID != nil && *instructorID > 0 {
-		findQ = findQ.Where("status = ?", true).
-			Where("id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ? AND deleted_at IS NULL)", *instructorID)
+		findQ = findQ.Where("id IN (SELECT ficha_id FROM instructor_fichas_caracterizacion WHERE instructor_id = ? AND deleted_at IS NULL)", *instructorID)
 	}
 	if search != "" {
 		searchPattern := "%" + strings.ToLower(strings.Join(strings.Fields(search), "%")) + "%"

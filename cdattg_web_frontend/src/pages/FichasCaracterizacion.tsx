@@ -226,11 +226,22 @@ function FichasInstructorConFichas({ filteredList, searchQuery, setSearchQuery }
                 <h3 className="font-bold text-gray-900 dark:text-white uppercase text-sm leading-tight">
                   {item.programa_formacion_nombre || 'Sin programa'}
                 </h3>
-                {item.modalidad_formacion_nombre && (
-                  <span className="shrink-0 px-2.5 py-1 bg-primary-600 text-white text-xs font-medium rounded">
-                    {item.modalidad_formacion_nombre}
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span
+                    className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                      item.status
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                        : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+                    }`}
+                  >
+                    {item.status ? 'Activa' : 'Inactiva'}
                   </span>
-                )}
+                  {item.modalidad_formacion_nombre && (
+                    <span className="px-2.5 py-1 bg-primary-600 text-white text-xs font-medium rounded">
+                      {item.modalidad_formacion_nombre}
+                    </span>
+                  )}
+                </div>
               </div>
               <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">Ficha {item.ficha}</p>
 
@@ -274,13 +285,15 @@ function FichasInstructorConFichas({ filteredList, searchQuery, setSearchQuery }
                     <EyeIcon className="w-4 h-4" />
                     Ver ficha
                   </Link>
-                  <Link
-                    to={`/asistencia?ficha=${item.id}`}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
-                  >
-                    <CalendarDaysIcon className="w-4 h-4" />
-                    Tomar Asistencia
-                  </Link>
+                  {item.status ? (
+                    <Link
+                      to={`/asistencia?ficha=${item.id}`}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
+                    >
+                      <CalendarDaysIcon className="w-4 h-4" />
+                      Tomar Asistencia
+                    </Link>
+                  ) : null}
                 </div>
               </div>
             </div>

@@ -13,12 +13,23 @@ type Props = Readonly<{
   ficha: FichaCaracterizacionResponse;
   /** Muestra badge Activa/Inactiva (listado admin). */
   showStatusBadge?: boolean;
+  /** Contenido bajo la info académica (estado de sesión, métricas, etc.). */
+  extra?: ReactNode;
+  /** Reemplaza el contador de aprendices en el pie izquierdo. */
+  footerLeft?: ReactNode;
   /** Botones o enlaces del pie de la tarjeta (derecha). */
   actions?: ReactNode;
   className?: string;
 }>;
 
-export function FichaCaracterizacionCard({ ficha, showStatusBadge = false, actions, className = '' }: Props) {
+export function FichaCaracterizacionCard({
+  ficha,
+  showStatusBadge = false,
+  extra,
+  footerLeft,
+  actions,
+  className = '',
+}: Props) {
   const sedeAmbiente = [ficha.sede_nombre, ficha.ambiente_nombre].filter(Boolean).join(' / ') || '–';
 
   return (
@@ -79,11 +90,15 @@ export function FichaCaracterizacionCard({ ficha, showStatusBadge = false, actio
           </div>
         </div>
 
+        {extra ? <div className="mb-4 space-y-3 border-t border-gray-100 pt-4 dark:border-gray-700">{extra}</div> : null}
+
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 dark:border-gray-700">
-          <span className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-            <UsersIcon className="h-4 w-4 text-gray-400" />
-            {ficha.cantidad_aprendices} Aprendices
-          </span>
+          {footerLeft ?? (
+            <span className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+              <UsersIcon className="h-4 w-4 text-gray-400" />
+              {ficha.cantidad_aprendices} Aprendices
+            </span>
+          )}
           {actions ? <div className="flex flex-wrap justify-end gap-2">{actions}</div> : null}
         </div>
       </div>

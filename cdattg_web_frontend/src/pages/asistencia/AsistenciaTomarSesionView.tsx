@@ -1,4 +1,5 @@
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { FichaCaracterizacionCard } from '../../components/FichaCaracterizacionCard';
 import { AsistenciaMetodosAccordion } from './AsistenciaMetodosAccordion';
 import { AsistenciaModals } from './AsistenciaModals';
 import type { AsistenciaPageState } from './useAsistenciaPage';
@@ -13,87 +14,54 @@ function SesionFichaCard({ page }: Readonly<{ page: AsistenciaPageState }>) {
     page.setObservacionesSesionModal({ observaciones: sesionActual.observaciones ?? '' });
   };
 
-  const sedeAmbiente = [fichaSeleccionada.sede_nombre, fichaSeleccionada.ambiente_nombre]
-    .filter(Boolean)
-    .join(' / ');
-
   const fechasFormacion =
     fichaSeleccionada.fecha_inicio || fichaSeleccionada.fecha_fin
       ? [fichaSeleccionada.fecha_inicio, fichaSeleccionada.fecha_fin].filter(Boolean).join(' → ')
       : null;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-600 dark:bg-gray-800">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <h2 className="text-lg font-bold uppercase text-gray-900 dark:text-white">
-                {fichaSeleccionada.programa_formacion_nombre || 'Sin programa'}
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Ficha {fichaSeleccionada.ficha}</p>
-            </div>
-            {fichaSeleccionada.modalidad_formacion_nombre ? (
-              <span className="shrink-0 rounded bg-primary-600 px-2.5 py-1 text-xs font-medium text-white">
-                {fichaSeleccionada.modalidad_formacion_nombre}
-              </span>
-            ) : null}
+    <FichaCaracterizacionCard
+      ficha={fichaSeleccionada}
+      footerLeft={
+        <span className="text-sm text-gray-600 dark:text-gray-400">
+          {page.enSesionCount} de {page.aprendicesFicha.length} con registro en sesión
+        </span>
+      }
+      extra={
+        <>
+          {fechasFormacion ? (
+            <p className="text-sm text-gray-700 dark:text-gray-300">Fechas: {fechasFormacion}</p>
+          ) : null}
+          {fichaSeleccionada.total_horas ? (
+            <p className="text-sm text-gray-700 dark:text-gray-300">Total horas: {fichaSeleccionada.total_horas}</p>
+          ) : null}
+          <div>
+            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Estado de la sesión</p>
+            <p className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <span className="inline-block h-2 w-2 rounded-full bg-green-500" aria-hidden />
+              Asistencia: Activa
+            </p>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              <span className="font-medium text-gray-800 dark:text-gray-100">Observación de la sesión:</span>{' '}
+              {sesionActual.observaciones?.trim() ? sesionActual.observaciones : 'Sin observación registrada'}
+            </p>
           </div>
-
-          <div className="space-y-3 border-t border-gray-100 pt-4 dark:border-gray-700">
-            <div>
-              <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Información del programa</p>
-              <p className="text-sm text-gray-700 dark:text-gray-300">N° Ficha: {fichaSeleccionada.ficha}</p>
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                Instructor líder: {fichaSeleccionada.instructor_nombre || '–'}
-              </p>
-              {fichaSeleccionada.jornada_nombre ? (
-                <p className="text-sm text-gray-700 dark:text-gray-300">Jornada: {fichaSeleccionada.jornada_nombre}</p>
-              ) : null}
-              {sedeAmbiente ? (
-                <p className="text-sm text-gray-700 dark:text-gray-300">Sede / Ambiente: {sedeAmbiente}</p>
-              ) : null}
-              {fechasFormacion ? (
-                <p className="text-sm text-gray-700 dark:text-gray-300">Fechas: {fechasFormacion}</p>
-              ) : null}
-              {fichaSeleccionada.total_horas ? (
-                <p className="text-sm text-gray-700 dark:text-gray-300">Total horas: {fichaSeleccionada.total_horas}</p>
-              ) : null}
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Estado de la sesión</p>
-              <p className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <span className="inline-block h-2 w-2 rounded-full bg-green-500" aria-hidden />
-                Asistencia: Activa
-              </p>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                <span className="font-medium text-gray-800 dark:text-gray-100">Observación de la sesión:</span>{' '}
-                {sesionActual.observaciones?.trim() ? sesionActual.observaciones : 'Sin observación registrada'}
-              </p>
-            </div>
-          </div>
-
-          <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
-            {page.enSesionCount} de {page.aprendicesFicha.length} con registro en sesión
-          </p>
-        </div>
-
-        <div className="flex shrink-0 flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={abrirObservacionSesion} className="btn-secondary text-sm">
-              Observación de sesión
-            </button>
-            <button type="button" onClick={page.handleVolverAFichas} className="btn-secondary text-sm">
-              Volver a fichas
-            </button>
-          </div>
-          <p className="max-w-xs text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             La sesión se cierra automáticamente al terminar el horario de la jornada (más la extensión).
           </p>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+      actions={
+        <>
+          <button type="button" onClick={abrirObservacionSesion} className="btn-secondary text-sm">
+            Observación de sesión
+          </button>
+          <button type="button" onClick={page.handleVolverAFichas} className="btn-secondary text-sm">
+            Volver a fichas
+          </button>
+        </>
+      }
+    />
   );
 }
 

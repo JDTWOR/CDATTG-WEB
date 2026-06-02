@@ -6,11 +6,13 @@ import {
   UserGroupIcon,
   FunnelIcon,
   DocumentMagnifyingGlassIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
 import { useAuth } from '../context/AuthContext';
-import type { CasosBienestarResponse, CasoBienestarItem } from '../types';
+import { FichaCaracterizacionCard } from '../components/FichaCaracterizacionCard';
+import type { CasosBienestarResponse, CasoBienestarItem, FichaCaracterizacionResponse } from '../types';
 
 const CASOS_BIEN_DIAS_ID = 'casos-bienestar-dias';
 const CASOS_BIEN_MIN_FALLAS_ID = 'casos-bienestar-min-fallas';
@@ -50,6 +52,18 @@ function agruparCasosPorFicha(casos: CasoBienestarItem[]): GrupoCasosPorFicha[] 
     {},
   );
   return Object.entries(grupos).map(([groupKey, group]) => ({ ...group, groupKey }));
+}
+
+function grupoCasosToFichaCard(grupo: GrupoCasosPorFicha): FichaCaracterizacionResponse {
+  return {
+    id: 0,
+    programa_formacion_id: 0,
+    ficha: grupo.ficha_numero,
+    programa_formacion_nombre: grupo.programa_nombre,
+    sede_nombre: grupo.sede_nombre,
+    cantidad_aprendices: grupo.casos.length,
+    status: true,
+  };
 }
 
 export const CasosBienestar = () => {
@@ -231,61 +245,41 @@ export const CasosBienestar = () => {
                 No se encontraron aprendices que cumplan los criterios en el período seleccionado.
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {casosPorFicha.map((ficha) => {
-                  return (
-                    <div key={ficha.groupKey} className="card p-4 flex flex-col gap-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                            Ficha
-                          </p>
-                          <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                            {ficha.ficha_numero}
-                          </p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300">
-                            {ficha.programa_nombre || 'Programa sin especificar'}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {ficha.sede_nombre || 'Sede sin especificar'}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                            Aprendices en riesgo
-                          </p>
-                          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                            {ficha.casos.length}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 gap-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {casosPorFicha.map((grupo) => (
+                  <FichaCaracterizacionCard
+                    key={grupo.groupKey}
+                    ficha={grupoCasosToFichaCard(grupo)}
+                    footerLeft={
+                      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
+                        <UsersIcon className="h-4 w-4" aria-hidden />
+                        {grupo.casos.length} Aprendices en riesgo
+                      </span>
+                    }
+                    extra={
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-600 dark:text-gray-400">
                         <span>
                           Sesiones analizadas:{' '}
-                          <span className="font-semibold text-gray-900 dark:text-white">
-                            {ficha.totalSesiones}
-                          </span>
+                          <span className="font-semibold text-gray-900 dark:text-white">{grupo.totalSesiones}</span>
                         </span>
                         <span>
                           Total inasistencias:{' '}
                           <span className="font-semibold text-amber-600 dark:text-amber-400">
-                            {ficha.totalInasistencias}
+                            {grupo.totalInasistencias}
                           </span>
                         </span>
                       </div>
+                    }
+                    actions={
                       <Link
-                        to={`/asistencia/dashboard/casos-bienestar/ficha/${encodeURIComponent(
-                          ficha.ficha_numero
-                        )}?sede=${encodeURIComponent(
-                          ficha.sede_nombre || ''
-                        )}&dias=${dias}&min_fallas=${minFallas}`}
-                        className="btn-primary mt-1 text-center"
+                        to={`/asistencia/dashboard/casos-bienestar/ficha/${encodeURIComponent(grupo.ficha_numero)}?sede=${encodeURIComponent(grupo.sede_nombre || '')}&dias=${dias}&min_fallas=${minFallas}`}
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
                       >
                         Ver aprendices
                       </Link>
-                    </div>
-                  );
-                })}
+                    }
+                  />
+                ))}
               </div>
             )}
           </div>

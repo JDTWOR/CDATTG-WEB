@@ -28,6 +28,7 @@ import LogoSena from '../../logo-sena-verde-complementario-svg-2022.svg';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiService } from '../services/api';
+import { formatRolesLine, hasAnyRole } from '../utils/roles';
 
 interface LayoutProps {
   children: ReactNode;
@@ -47,6 +48,8 @@ const SIDEBAR_ITEMS: {
   label: string;
   permission: string | null;
   rolesRequired?: string[];
+  /** Visible sin el permiso si el usuario tiene alguno de estos roles (p. ej. INSTRUCTOR en /fichas). */
+  alsoVisibleForRoles?: string[];
 }[] = [
   { section: 'Inicio', path: '/perfil', label: 'Mi perfil', permission: null },
   {
@@ -57,7 +60,13 @@ const SIDEBAR_ITEMS: {
     rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
   },
   { section: 'Gestión académica', path: '/programas', label: 'Programas', permission: 'VER PROGRAMAS' },
-  { section: 'Gestión académica', path: '/fichas', label: 'Fichas', permission: 'VER FICHAS' },
+  {
+    section: 'Gestión académica',
+    path: '/fichas',
+    label: 'Fichas',
+    permission: 'VER FICHAS',
+    alsoVisibleForRoles: ['INSTRUCTOR'],
+  },
   { section: 'Gestión de personal', path: '/instructores', label: 'Instructores', permission: 'VER FICHAS' },
   { section: 'Gestión de personal', path: '/aprendices', label: 'Aprendices', permission: 'VER APRENDICES' },
   { section: 'Gestión de personal', path: '/personas', label: 'Personas', permission: 'VER PERSONAS' },
@@ -154,8 +163,13 @@ export const Layout = ({ children }: LayoutProps) => {
     if (item.rolesRequired && item.rolesRequired.length > 0) {
       if (!item.rolesRequired.some((r) => roles.includes(r))) return false;
     }
-    return item.permission === null || hasPermission(item.permission);
+    if (item.permission === null) return true;
+    if (hasPermission(item.permission)) return true;
+    if (item.alsoVisibleForRoles?.length && hasAnyRole(roles, item.alsoVisibleForRoles)) return true;
+    return false;
   });
+
+  const rolesLine = roles.length > 0 ? formatRolesLine(roles) : '';
   const sections = Array.from(new Set(visibleItems.map((i) => i.section)));
 
   const handleLogout = () => {
@@ -258,6 +272,9 @@ export const Layout = ({ children }: LayoutProps) => {
               <div className="hidden md:flex items-center space-x-3">
                 <div className="text-right">
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user?.full_name}</p>
+                  {rolesLine ? (
+                    <p className="text-xs font-medium text-primary-600 dark:text-primary-400">{rolesLine}</p>
+                  ) : null}
                   <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
                 </div>
                 <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/50 rounded-full flex items-center justify-center">
@@ -463,6 +480,9 @@ export const Layout = ({ children }: LayoutProps) => {
           <div className="md:hidden border-t border-gray-200 dark:border-gray-700 p-4 space-y-2">
             <div className="px-4 py-2">
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user?.full_name}</p>
+              {rolesLine ? (
+                <p className="text-xs font-medium text-primary-600 dark:text-primary-400 truncate">{rolesLine}</p>
+              ) : null}
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
             </div>
             <button

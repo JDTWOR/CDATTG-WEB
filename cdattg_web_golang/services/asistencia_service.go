@@ -152,8 +152,12 @@ func (s *asistenciaService) EntrarTomarAsistencia(instructorID uint, fichaID uin
 	if err != nil || ifc == nil {
 		return nil, errors.New("no está asignado como instructor de esta ficha")
 	}
+	ficha, _ := s.fichaRepo.FindByID(ifc.FichaID)
+	if ficha != nil && !ficha.Status {
+		return nil, errors.New("la ficha está inactiva; no se puede tomar asistencia")
+	}
 	// Validar horario de jornada (opcional: si la ficha tiene jornada configurada)
-	if ficha, _ := s.fichaRepo.FindByID(ifc.FichaID); ficha != nil && ficha.JornadaID != nil {
+	if ficha != nil && ficha.JornadaID != nil {
 		ok, _ := NewJornadaValidationService().ValidarHorarioJornada(*ficha.JornadaID)
 		if !ok {
 			return nil, errors.New("fuera del horario de la jornada de la ficha; solo se puede tomar asistencia en el horario configurado")

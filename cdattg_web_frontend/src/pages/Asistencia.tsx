@@ -487,7 +487,8 @@ export const Asistencia = () => {
     setFichasLoading(true);
     try {
       const res = await apiService.getFichasCaracterizacion(1, 200, undefined, true);
-      setFichas(res.data);
+      const activas = res.data.filter((f) => f.status);
+      setFichas(activas);
     } catch (cause: unknown) {
       setFichas([]);
       if (import.meta.env.DEV) {
@@ -526,11 +527,22 @@ export const Asistencia = () => {
   }, []);
 
   useEffect(() => {
-    if (fichaFromUrl) {
-      const id = Number.parseInt(fichaFromUrl, 10);
-      if (Number.isFinite(id)) setFichaId(id);
+    if (fichasLoading) return;
+    if (!fichaFromUrl) return;
+    const id = Number.parseInt(fichaFromUrl, 10);
+    if (!Number.isFinite(id)) return;
+    const existeActiva = fichas.some((f) => f.id === id);
+    if (existeActiva) {
+      setFichaId(id);
+    } else {
+      setFichaId('');
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('ficha');
+        return next;
+      });
     }
-  }, [fichaFromUrl]);
+  }, [fichaFromUrl, fichas, fichasLoading, setSearchParams]);
 
   useEffect(() => {
     if (!fichaId) {

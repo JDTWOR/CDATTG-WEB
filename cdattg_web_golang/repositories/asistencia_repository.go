@@ -26,7 +26,7 @@ type AsistenciaRepository interface {
 	FindIDsByFichaIDAndFecha(fichaID uint, fecha string) ([]uint, error)
 	Update(a *models.Asistencia) error
 	GetDashboardResumen(sedeID *uint, fecha string) (totalAprendices int, porFicha []DashboardFichaRow, err error)
-	// GetFichasSinSesionHoy lista todas las fichas (no eliminadas) sin ninguna sesión de asistencia en la fecha dada.
+	// GetFichasSinSesionHoy lista fichas activas (no eliminadas) sin ninguna sesión de asistencia en la fecha dada.
 	GetFichasSinSesionHoy(sedeID *uint, fecha string) ([]DashboardFichaSinSesionRow, error)
 	CountPendientesRevisionByFecha(sedeID *uint, fecha string) (int, error)
 	GetCasosBienestar(sedeID *uint, fechaInicio, fechaFin string, minFallas int) ([]CasosBienestarRow, error)
@@ -269,7 +269,7 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 	return totalAprendices, porFicha, nil
 }
 
-// GetFichasSinSesionHoy devuelve todas las fichas no eliminadas que no tienen ninguna fila en asistencias
+// GetFichasSinSesionHoy devuelve fichas activas (status=true, no eliminadas) que no tienen ninguna fila en asistencias
 // para el rango del día indicado (coherente con GetDashboardResumen). Opcional filtro por sede.
 func (r *asistenciaRepository) GetFichasSinSesionHoy(sedeID *uint, fecha string) ([]DashboardFichaSinSesionRow, error) {
 	tInicio, tFin, err := parseDashboardFechaRange(fecha)
@@ -298,6 +298,7 @@ SELECT fc.id AS ficha_id, fc.ficha AS ficha_numero,
 		LEFT JOIN sedes s ON fc.sede_id = s.id
 		LEFT JOIN aprendices af ON af.ficha_caracterizacion_id = fc.id AND af.estado = true AND af.deleted_at IS NULL
 		WHERE fc.deleted_at IS NULL
+		AND fc.status = true
 		AND NOT EXISTS (
 			SELECT 1 FROM asistencias a
 			INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id

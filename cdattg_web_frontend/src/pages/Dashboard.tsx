@@ -261,7 +261,7 @@ export const Dashboard = () => {
                 Fichas pendientes (sin sesión hoy)
               </h2>
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Fichas que aún no tienen una sesión de asistencia creada para el día{' '}
+                Fichas activas que aún no tienen una sesión de asistencia creada para el día{' '}
                 <span className="font-medium text-gray-800 dark:text-gray-200">{asistenciaDashboard?.fecha ?? '—'}</span>
                 {loading && !asistenciaDashboard ? ' (cargando…)' : ''}. Si solo existe una ficha en el sistema y ya se abrió
                 sesión, este listado quedará vacío.
@@ -271,7 +271,7 @@ export const Dashboard = () => {
                 typeof asistenciaDashboard.fichas_con_sesion_hoy === 'number' && (
                   <p className="mt-2 text-sm font-medium text-gray-800 dark:text-gray-200">
                     Resumen:{' '}
-                    <span className="tabular-nums">{asistenciaDashboard.total_fichas_registradas}</span> fichas en el sistema ·{' '}
+                    <span className="tabular-nums">{asistenciaDashboard.total_fichas_registradas}</span> fichas activas ·{' '}
                     <span className="tabular-nums">{asistenciaDashboard.fichas_con_sesion_hoy}</span> con sesión hoy ·{' '}
                     <span className="tabular-nums text-amber-700 dark:text-amber-300">
                       {fichasSinAsistenciaHoy.length}
@@ -286,7 +286,7 @@ export const Dashboard = () => {
           </div>
           {fichasSinAsistenciaHoy.length === 0 ? (
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              No hay fichas pendientes: todas las fichas registradas ya tienen al menos una sesión de asistencia para este día,
+              No hay fichas pendientes: todas las fichas activas ya tienen al menos una sesión de asistencia para este día,
               o en el sistema solo hay una ficha y ya se abrió sesión. Revise el resumen numérico arriba.
             </p>
           ) : (

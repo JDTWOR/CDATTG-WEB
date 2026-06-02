@@ -120,7 +120,7 @@ type AsistenciaDashboardResponse struct {
 	TotalAprendicesEnFormacion int                           `json:"total_aprendices_en_formacion"`
 	PendientesRevision         int                           `json:"pendientes_revision"` // registros del día que requieren revisión
 	PorFicha                   []AsistenciaDashboardPorFicha `json:"por_ficha"`
-	// FichasSinAsistenciaHoy: todas las fichas del sistema sin ninguna sesión de asistencia en la fecha consultada
+	// FichasSinAsistenciaHoy: fichas activas sin ninguna sesión de asistencia en la fecha consultada
 	FichasSinAsistenciaHoy []AsistenciaDashboardFichaSinSesion `json:"fichas_sin_asistencia_hoy"`
 	// TotalFichasRegistradas fichas no eliminadas (mismo filtro sede que el resto del dashboard, si aplica)
 	TotalFichasRegistradas int `json:"total_fichas_registradas"`

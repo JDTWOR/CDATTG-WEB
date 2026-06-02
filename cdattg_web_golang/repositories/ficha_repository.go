@@ -21,7 +21,7 @@ type FichaRepository interface {
 	Delete(id uint) error
 	ExistsByFicha(ficha string) bool
 	ExistsByFichaExcludingID(ficha string, excludeID uint) bool
-	// CountAll cuenta fichas no eliminadas; sedeID opcional filtra por sede.
+	// CountAll cuenta fichas activas (status=true, no eliminadas); sedeID opcional filtra por sede.
 	CountAll(sedeID *uint) (int64, error)
 }
 
@@ -160,7 +160,7 @@ func (r *fichaRepository) ExistsByFichaExcludingID(ficha string, excludeID uint)
 
 func (r *fichaRepository) CountAll(sedeID *uint) (int64, error) {
 	var n int64
-	q := r.db.Model(&models.FichaCaracterizacion{})
+	q := r.db.Model(&models.FichaCaracterizacion{}).Where("status = ?", true)
 	if sedeID != nil && *sedeID > 0 {
 		q = q.Where("sede_id = ?", *sedeID)
 	}

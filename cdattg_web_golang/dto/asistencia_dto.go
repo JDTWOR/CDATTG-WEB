@@ -39,11 +39,12 @@ type AsistenciaAprendizRequest struct {
 	AprendizID   uint `json:"aprendiz_id" binding:"required"`
 }
 
-// AsistenciaIngresoPorDocumentoRequest registrar por documento (manual o QR). Accion: "ingreso" o "salida".
+// AsistenciaIngresoPorDocumentoRequest registrar por documento (manual o QR).
+// Accion es opcional: si no se envía, el backend infiere ingreso o salida según tramo abierto del aprendiz.
 type AsistenciaIngresoPorDocumentoRequest struct {
 	AsistenciaID    uint   `json:"asistencia_id" binding:"required"`
 	NumeroDocumento string `json:"numero_documento" binding:"required"`
-	Accion          string `json:"accion" binding:"required,oneof=ingreso salida"`
+	Accion          string `json:"accion" binding:"omitempty,oneof=ingreso salida"`
 }
 
 // AsistenciaAprendizObservacionesRequest actualizar observaciones de un registro de asistencia-aprendiz (texto libre + tipos predefinidos)

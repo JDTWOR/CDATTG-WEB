@@ -391,6 +391,13 @@ func (s *asistenciaService) tramoAbiertoAprendizEnFichaHoy(fichaID, aprendizID u
 	return sinSalida
 }
 
+func accionAutomaticaPorEstado(sinSalida *models.AsistenciaAprendiz) string {
+	if sinSalida != nil {
+		return "salida"
+	}
+	return "ingreso"
+}
+
 func (s *asistenciaService) registrarIngresoOSalidaPorDocumento(
 	accion string,
 	asistenciaID, aprendizID uint,
@@ -450,7 +457,8 @@ func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngre
 		return nil, err
 	}
 	sinSalida := s.tramoAbiertoAprendizEnFichaHoy(fichaID, aprendizID)
-	return s.registrarIngresoOSalidaPorDocumento(req.Accion, req.AsistenciaID, aprendizID, sinSalida, instructorFichaIDRegistroIngreso)
+	accion := accionAutomaticaPorEstado(sinSalida)
+	return s.registrarIngresoOSalidaPorDocumento(accion, req.AsistenciaID, aprendizID, sinSalida, instructorFichaIDRegistroIngreso)
 }
 
 func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error) {

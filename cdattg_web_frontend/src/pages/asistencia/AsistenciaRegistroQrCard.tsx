@@ -1,7 +1,6 @@
 import { QrCodeIcon } from '@heroicons/react/24/outline';
 import { EscanerQR } from '../../components/EscanerQR';
 import { AsistenciaCollapsibleCard } from './AsistenciaCollapsibleCard';
-import { ModoEntradaSalidaToggle } from './ModoEntradaSalidaToggle';
 import type { AsistenciaAccordionSectionProps } from './asistenciaConstants';
 import type { AsistenciaPageState } from './useAsistenciaPage';
 
@@ -16,12 +15,14 @@ export function AsistenciaRegistroQrCard({ page, open, onToggle }: Props) {
       open={open}
       onToggle={onToggle}
       title="Registro con código QR"
-      description="Active la cámara y escanee el QR del aprendiz (contiene su documento)."
+      description="Escanee el QR del aprendiz; el sistema registra entrada o salida automáticamente."
       icon={<QrCodeIcon className="h-6 w-6" />}
     >
-      <ModoEntradaSalidaToggle modo={page.modoRegistroDocumento} onChange={page.setModoRegistroDocumento} />
+      <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+        Si el aprendiz ya tiene entrada sin salida hoy en la ficha, se registrará la salida al escanear.
+      </p>
       <EscanerQR
-        key={`qr-${sesionId}-${page.modoRegistroDocumento}`}
+        key={`qr-${sesionId}`}
         activo
         embedded
         onEscaneado={page.handleRegistrarPorDocumento}

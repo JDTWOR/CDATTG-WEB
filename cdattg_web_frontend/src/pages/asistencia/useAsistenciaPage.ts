@@ -11,12 +11,12 @@ import type {
   TipoObservacionAsistenciaItem,
 } from '../../types';
 import {
-  type AccionRegistroDocumento,
-  groupRegistrosByAprendiz,
-  summaryRegistros,
-  mensajeRegistroPorTipo,
   computeBulkCounts,
+  groupRegistrosByAprendiz,
+  inferirAccionPorDocumento,
+  mensajeRegistroPorTipo,
   sortAprendicesAz,
+  summaryRegistros,
 } from './asistenciaUtils';
 
 export function useAsistenciaPage() {
@@ -71,7 +71,6 @@ export function useAsistenciaPage() {
   const [pendientesError, setPendientesError] = useState('');
   const [selectedAprendizIds, setSelectedAprendizIds] = useState<Set<number>>(() => new Set());
   const [busquedaAprendiz, setBusquedaAprendiz] = useState('');
-  const [modoRegistroDocumento, setModoRegistroDocumento] = useState<AccionRegistroDocumento>('ingreso');
   const [busyAprendizIds, setBusyAprendizIds] = useState<Set<number>>(() => new Set());
   const [bulkProcesando, setBulkProcesando] = useState(false);
 
@@ -369,7 +368,6 @@ export function useAsistenciaPage() {
       const data = await apiService.registrarIngresoAsistenciaPorDocumento(
         sesionActual.id,
         numeroDocumento.trim(),
-        modoRegistroDocumento,
       );
       setDocumentoManual('');
       upsertAsistenciaAprendizEnSesion(data);
@@ -393,6 +391,11 @@ export function useAsistenciaPage() {
   const registroPorAprendizId = useMemo(
     () => groupRegistrosByAprendiz(aprendicesEnSesion),
     [aprendicesEnSesion],
+  );
+
+  const accionInferidaDocumento = useMemo(
+    () => inferirAccionPorDocumento(documentoManual, aprendicesFicha, registroPorAprendizId),
+    [documentoManual, aprendicesFicha, registroPorAprendizId],
   );
 
   const aprendicesFiltrados = useMemo(() => {
@@ -513,8 +516,7 @@ export function useAsistenciaPage() {
     selectedAprendizIds,
     busquedaAprendiz,
     setBusquedaAprendiz,
-    modoRegistroDocumento,
-    setModoRegistroDocumento,
+    accionInferidaDocumento,
     busyAprendizIds,
     bulkProcesando,
     registroPorAprendizId,

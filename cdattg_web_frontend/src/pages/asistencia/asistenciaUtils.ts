@@ -2,6 +2,19 @@ import type { AprendizResponse, AsistenciaAprendizResponse } from '../../types';
 
 export type AccionRegistroDocumento = 'ingreso' | 'salida';
 
+export function inferirAccionPorDocumento(
+  documento: string,
+  aprendicesFicha: AprendizResponse[],
+  registroPorAprendizId: Map<number, AsistenciaAprendizResponse[]>,
+): AccionRegistroDocumento | null {
+  const doc = documento.trim();
+  if (!doc) return null;
+  const aprendiz = aprendicesFicha.find((a) => (a.persona_documento ?? '').trim() === doc);
+  if (!aprendiz) return null;
+  const { open } = summaryRegistros(registroPorAprendizId.get(aprendiz.id) ?? []);
+  return open ? 'salida' : 'ingreso';
+}
+
 /** Orden A–Z por nombre de persona (desempate por documento). */
 export function sortAprendicesAz(aprendices: AprendizResponse[]): AprendizResponse[] {
   return [...aprendices].sort((a, b) => {

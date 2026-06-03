@@ -1,4 +1,9 @@
 import { CalendarDaysIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import {
+  ACTION_DESIGNAR_INSTRUCTOR_LIDER,
+  LABEL_INSTRUCTOR_LIDER,
+} from '../../../constants/instructorLiderLabels';
+import { isInstructorLiderDeFicha } from '../../../utils/instructorLider';
 import { formatFechaVista } from '../../../utils/formatFecha';
 import type { FichaInstructoresTabModel } from '../hooks/useFichaInstructores';
 import { DiasInstructorLabel } from './DiasInstructorLabel';
@@ -21,8 +26,8 @@ export function FichaDetalleInstructoresTab({
   onEditarFicha,
   showFormInstructores,
   setShowFormInstructores,
-  instructorPrincipalId,
-  setInstructorPrincipalId,
+  instructorLiderId,
+  setInstructorLiderId,
   fechaInicio,
   setFechaInicio,
   fechaFin,
@@ -73,7 +78,7 @@ export function FichaDetalleInstructoresTab({
           <li className="py-4 text-gray-500 dark:text-gray-400">Ningún instructor asignado.</li>
         ) : (
           instructores.map((inst) => {
-            const esPrincipal = ficha.instructor_id != null && inst.instructor_id === ficha.instructor_id;
+            const esInstructorLider = isInstructorLiderDeFicha(ficha, inst.instructor_id);
             const editando = programandoInstructorId === inst.instructor_id;
             return (
               <li
@@ -84,9 +89,9 @@ export function FichaDetalleInstructoresTab({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-gray-900 dark:text-gray-100">{inst.instructor_nombre}</span>
-                      {esPrincipal ? (
+                      {esInstructorLider ? (
                         <span className="inline-flex shrink-0 rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-800 dark:bg-primary-900/40 dark:text-primary-200">
-                          Principal
+                          {LABEL_INSTRUCTOR_LIDER}
                         </span>
                       ) : null}
                     </div>
@@ -116,13 +121,13 @@ export function FichaDetalleInstructoresTab({
                         {editando ? 'Cerrar' : 'Editar programación'}
                       </button>
                     )}
-                    {!esPrincipal && puedeEditarFicha && !editando && (
+                    {!esInstructorLider && puedeEditarFicha && !editando && (
                       <button
                         type="button"
                         onClick={onEditarFicha}
                         className="text-sm font-medium text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300"
                       >
-                        Hacer principal
+                        {ACTION_DESIGNAR_INSTRUCTOR_LIDER}
                       </button>
                     )}
                     {puedeProgramarInstructores && !editando && (
@@ -160,8 +165,8 @@ export function FichaDetalleInstructoresTab({
       {showFormInstructores && (
         <FichaDetalleAsignarInstructoresForm
           instructores={instructores}
-          instructorPrincipalId={instructorPrincipalId}
-          setInstructorPrincipalId={setInstructorPrincipalId}
+          instructorLiderId={instructorLiderId}
+          setInstructorLiderId={setInstructorLiderId}
           fechaInicio={fechaInicio}
           setFechaInicio={setFechaInicio}
           fechaFin={fechaFin}

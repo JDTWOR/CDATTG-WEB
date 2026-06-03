@@ -335,7 +335,7 @@
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"instructor_principal_id\": 1,\n    \"instructores\": [\n        {\n            \"instructor_id\": 1,\n            \"competencia_id\": null,\n            \"fecha_inicio\": \"2024-01-15\",\n            \"fecha_fin\": \"2024-12-15\",\n            \"total_horas_instructor\": 600\n        }\n    ]\n}"
+              "raw": "{\n    \"instructor_lider_id\": 1,\n    \"instructores\": [\n        {\n            \"instructor_id\": 1,\n            \"competencia_id\": null,\n            \"fecha_inicio\": \"2024-01-15\",\n            \"fecha_fin\": \"2024-12-15\",\n            \"total_horas_instructor\": 600\n        }\n    ]\n}"
             },
             "url": {"raw": "{{base_url}}/fichas-caracterizacion/:id/instructores", "host": ["{{base_url}}"], "path": ["fichas-caracterizacion", ":id", "instructores"], "variable": [{"key": "id", "value": "1"}]},
             "description": "Asigna instructores a una ficha"

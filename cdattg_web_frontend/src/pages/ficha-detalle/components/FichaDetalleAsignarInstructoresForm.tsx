@@ -1,11 +1,12 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { InstructorSelectAsync } from '../../../components/InstructorSelectAsync';
+import { LABEL_INSTRUCTOR_LIDER } from '../../../constants/instructorLiderLabels';
 import type { InstructorFichaItem, InstructorFichaResponse, InstructorItem, DiaFormacionItem } from '../../../types';
 
 type FichaDetalleAsignarInstructoresFormProps = Readonly<{
   instructores: InstructorFichaResponse[];
-  instructorPrincipalId: number;
-  setInstructorPrincipalId: Dispatch<SetStateAction<number>>;
+  instructorLiderId: number;
+  setInstructorLiderId: Dispatch<SetStateAction<number>>;
   fechaInicio: string;
   setFechaInicio: Dispatch<SetStateAction<string>>;
   fechaFin: string;
@@ -22,8 +23,8 @@ type FichaDetalleAsignarInstructoresFormProps = Readonly<{
 
 export function FichaDetalleAsignarInstructoresForm({
   instructores,
-  instructorPrincipalId,
-  setInstructorPrincipalId,
+  instructorLiderId,
+  setInstructorLiderId,
   fechaInicio,
   setFechaInicio,
   fechaFin,
@@ -43,21 +44,21 @@ export function FichaDetalleAsignarInstructoresForm({
       <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label
-            htmlFor="detalle-ins-principal-form"
+            htmlFor="detalle-ins-lider-form"
             className="block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
-            Instructor principal
+            {LABEL_INSTRUCTOR_LIDER}
           </label>
           <div className="mt-1">
             <InstructorSelectAsync
-              inputId="detalle-ins-principal-form"
-              value={instructorPrincipalId || undefined}
-              onChange={(v) => setInstructorPrincipalId(v ?? 0)}
+              inputId="detalle-ins-lider-form"
+              value={instructorLiderId || undefined}
+              onChange={(v) => setInstructorLiderId(v ?? 0)}
               placeholder="Buscar por nombre o documento..."
               isRequired
               defaultLabel={
-                instructores.find((i) => i.instructor_id === instructorPrincipalId)?.instructor_nombre ??
-                instructoresDisponibles.find((i) => i.id === instructorPrincipalId)?.nombre
+                instructores.find((i) => i.instructor_id === instructorLiderId)?.instructor_nombre ??
+                instructoresDisponibles.find((i) => i.id === instructorLiderId)?.nombre
               }
             />
           </div>

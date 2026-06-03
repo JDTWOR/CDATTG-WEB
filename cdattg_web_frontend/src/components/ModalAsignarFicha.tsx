@@ -2,6 +2,13 @@ import { useState, useEffect, useCallback, type DragEvent } from 'react';
 import { XMarkIcon, UserGroupIcon, AcademicCapIcon, MagnifyingGlassIcon, ArrowRightIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
+import {
+  LABEL_INSTRUCTOR_LIDER,
+  MSG_ERROR_ACTUALIZAR_INSTRUCTOR_LIDER,
+  MSG_SELECCIONE_INSTRUCTOR_LIDER_PRIMERO,
+  PLACEHOLDER_INSTRUCTOR_LIDER,
+} from '../constants/instructorLiderLabels';
+import { resolveInstructorLiderId } from '../utils/instructorLider';
 import { SelectSearch } from './SelectSearch';
 import type {
   InstructorFichaResponse,
@@ -79,7 +86,7 @@ export function ModalAsignarFicha(props: Readonly<ModalAsignarFichaProps>) {
   const { fichaId, fichaNombre, tipo, onClose, onSuccess } = props;
   const [asignados, setAsignados] = useState<InstructorFichaResponse[] | AprendizResponse[]>([]);
   const [noAsignados, setNoAsignados] = useState<InstructorItem[] | PersonaResponse[]>([]);
-  const [instructorPrincipalId, setInstructorPrincipalId] = useState<number | undefined>(undefined);
+  const [instructorLiderId, setInstructorLiderId] = useState<number | undefined>(undefined);
   const [filterAsignados, setFilterAsignados] = useState('');
   const [filterNoAsignados, setFilterNoAsignados] = useState('');
   const [loading, setLoading] = useState(true);
@@ -98,17 +105,10 @@ export function ModalAsignarFicha(props: Readonly<ModalAsignarFichaProps>) {
           apiService.getFichaCaracterizacionById(fichaId),
         ]);
         setAsignados(instFicha);
-        const idsAsignados = new Set(instFicha.map((i) => i.instructor_id));
         if (instFicha.length === 0) {
-          setInstructorPrincipalId(undefined);
+          setInstructorLiderId(undefined);
         } else {
-          const liderBd =
-            ficha.instructor_id != null &&
-            ficha.instructor_id > 0 &&
-            idsAsignados.has(ficha.instructor_id)
-              ? ficha.instructor_id
-              : instFicha[0].instructor_id;
-          setInstructorPrincipalId(liderBd);
+          setInstructorLiderId(resolveInstructorLiderId(ficha, instFicha));
         }
       } else {
         const aprendices = await apiService.getFichaAprendices(fichaId);
@@ -122,10 +122,10 @@ export function ModalAsignarFicha(props: Readonly<ModalAsignarFichaProps>) {
     }
   }, [fichaId, isInstructores]);
 
-  const handleCambioInstructorPrincipal = async (v: number | undefined) => {
-    const prev = instructorPrincipalId;
+  const handleCambioInstructorLider = async (v: number | undefined) => {
+    const prev = instructorLiderId;
     if (v === undefined) {
-      setInstructorPrincipalId(prev);
+      setInstructorLiderId(prev);
       return;
     }
     if (v === prev) return;
@@ -134,17 +134,17 @@ export function ModalAsignarFicha(props: Readonly<ModalAsignarFichaProps>) {
     try {
       const ficha = await apiService.getFichaCaracterizacionById(fichaId);
       if (v === ficha.instructor_id) {
-        setInstructorPrincipalId(v);
+        setInstructorLiderId(v);
         return;
       }
       const payload = buildFichaUpdatePayload(ficha, v);
       await apiService.updateFichaCaracterizacion(fichaId, payload);
-      setInstructorPrincipalId(v);
+      setInstructorLiderId(v);
       onSuccess?.();
       await load();
     } catch (e: unknown) {
-      setInstructorPrincipalId(prev);
-      setError(axiosErrorMessage(e, 'No se pudo actualizar el instructor principal'));
+      setInstructorLiderId(prev);
+      setError(axiosErrorMessage(e, MSG_ERROR_ACTUALIZAR_INSTRUCTOR_LIDER));
     } finally {
       setSaving(false);
     }
@@ -196,22 +196,21 @@ export function ModalAsignarFicha(props: Readonly<ModalAsignarFichaProps>) {
 
   const handleAssignInstructor = async (instructorId: number) => {
     const asignadosActuales = asignados as InstructorFichaResponse[];
-    let principal = instructorPrincipalId ?? asignadosActuales[0]?.instructor_id;
+    let liderId = instructorLiderId ?? asignadosActuales[0]?.instructor_id;
 
-    if (!principal) {
-      // Si no hay ninguno asignado todavía, el primero que se asigne será el principal
-      principal = instructorId;
+    if (!liderId) {
+      liderId = instructorId;
     }
 
-    if (!principal) {
-      setError('Seleccione un instructor principal primero (en la columna izquierda).');
+    if (!liderId) {
+      setError(MSG_SELECCIONE_INSTRUCTOR_LIDER_PRIMERO);
       return;
     }
     setSaving(true);
     setError('');
     try {
       await apiService.asignarInstructores(fichaId, {
-        instructor_principal_id: principal,
+        instructor_lider_id: liderId,
         instructores: [
           {
             instructor_id: instructorId,
@@ -234,9 +233,9 @@ export function ModalAsignarFicha(props: Readonly<ModalAsignarFichaProps>) {
     setError('');
     try {
       await apiService.desasignarInstructor(fichaId, instructorId);
-      if (instructorPrincipalId === instructorId) {
+      if (instructorLiderId === instructorId) {
         const next = (asignados as InstructorFichaResponse[]).find((i) => i.instructor_id !== instructorId);
-        setInstructorPrincipalId(next?.instructor_id);
+        setInstructorLiderId(next?.instructor_id);
       }
       onSuccess?.();
       await load();
@@ -324,21 +323,21 @@ export function ModalAsignarFicha(props: Readonly<ModalAsignarFichaProps>) {
         {isInstructores && (asignados as InstructorFichaResponse[]).length > 0 && (
           <div className="px-4 pt-2">
             <label
-              htmlFor="modal-asignar-instructor-principal"
+              htmlFor="modal-asignar-instructor-lider"
               className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Instructor principal
+              {LABEL_INSTRUCTOR_LIDER}
             </label>
             <div className="max-w-xs">
               <SelectSearch
-                inputId="modal-asignar-instructor-principal"
+                inputId="modal-asignar-instructor-lider"
                 options={(asignados as InstructorFichaResponse[]).map((i) => ({
                   value: i.instructor_id,
                   label: i.instructor_nombre,
                 }))}
-                value={instructorPrincipalId}
-                onChange={(v) => void handleCambioInstructorPrincipal(v)}
-                placeholder="Seleccione instructor principal"
+                value={instructorLiderId}
+                onChange={(v) => void handleCambioInstructorLider(v)}
+                placeholder={PLACEHOLDER_INSTRUCTOR_LIDER}
                 isDisabled={saving}
               />
             </div>

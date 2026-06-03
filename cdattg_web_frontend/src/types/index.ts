@@ -387,7 +387,7 @@ export interface InstructorFichaItem {
 }
 
 export interface AsignarInstructoresRequest {
-  instructor_principal_id: number;
+  instructor_lider_id: number;
   instructores: InstructorFichaItem[];
 }
 

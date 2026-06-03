@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiService } from '../../../services/api';
 import { axiosErrorMessage } from '../../../utils/httpError';
+import {
+  MSG_ERROR_IDENTIFICAR_INSTRUCTOR_LIDER,
+  MSG_SELECCIONE_INSTRUCTOR_LIDER,
+} from '../../../constants/instructorLiderLabels';
 import type {
   AsignarInstructoresRequest,
   FichaCaracterizacionResponse,
@@ -31,7 +35,7 @@ export function useFichaInstructores({
   const [instructores, setInstructores] = useState<InstructorFichaResponse[]>([]);
   const [instructoresDisponibles, setInstructoresDisponibles] = useState<InstructorItem[]>([]);
   const [showFormInstructores, setShowFormInstructores] = useState(false);
-  const [instructorPrincipalId, setInstructorPrincipalId] = useState(0);
+  const [instructorLiderId, setInstructorLiderId] = useState(0);
   const [instructoresSeleccionados, setInstructoresSeleccionados] = useState<InstructorFichaItem[]>([]);
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
@@ -43,7 +47,7 @@ export function useFichaInstructores({
 
   useEffect(() => {
     if (ficha?.instructor_id != null) {
-      setInstructorPrincipalId(ficha.instructor_id);
+      setInstructorLiderId(ficha.instructor_id);
     }
   }, [ficha?.instructor_id]);
 
@@ -67,12 +71,12 @@ export function useFichaInstructores({
   }, []);
 
   const handleAsignarInstructores = async () => {
-    if (instructoresSeleccionados.length === 0 || !instructorPrincipalId) {
-      alert('Seleccione al menos un instructor y un instructor principal.');
+    if (instructoresSeleccionados.length === 0 || !instructorLiderId) {
+      alert(MSG_SELECCIONE_INSTRUCTOR_LIDER);
       return;
     }
     const req: AsignarInstructoresRequest = {
-      instructor_principal_id: instructorPrincipalId,
+      instructor_lider_id: instructorLiderId,
       instructores: instructoresSeleccionados.map((i) => ({
         instructor_id: i.instructor_id,
         fecha_inicio: fechaInicio || hoyISO(),
@@ -140,7 +144,7 @@ export function useFichaInstructores({
 
   const onGuardarProgramacionInstructor = async () => {
     if (!programandoInstructorId || !ficha?.instructor_id) {
-      alert('No se pudo identificar el instructor o el instructor principal de la ficha.');
+      alert(MSG_ERROR_IDENTIFICAR_INSTRUCTOR_LIDER);
       return;
     }
     if (programacionDiasDraft.length === 0) {
@@ -158,7 +162,7 @@ export function useFichaInstructores({
     const inst = instructores.find((i) => i.instructor_id === programandoInstructorId);
     if (!inst) return;
     const req: AsignarInstructoresRequest = {
-      instructor_principal_id: ficha.instructor_id,
+      instructor_lider_id: ficha.instructor_id,
       instructores: [
         {
           instructor_id: inst.instructor_id,
@@ -197,8 +201,8 @@ export function useFichaInstructores({
     instructores,
     showFormInstructores,
     setShowFormInstructores,
-    instructorPrincipalId,
-    setInstructorPrincipalId,
+    instructorLiderId,
+    setInstructorLiderId,
     fechaInicio,
     setFechaInicio,
     fechaFin,

@@ -4,6 +4,7 @@ import { ClipboardDocumentListIcon, CalendarDaysIcon, MagnifyingGlassIcon } from
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
 import { useAuth } from '../context/AuthContext';
+import { LABEL_INSTRUCTOR_LIDER } from '../constants/instructorLiderLabels';
 import { FichaCaracterizacionCard } from '../components/FichaCaracterizacionCard';
 import type { FichaCaracterizacionResponse } from '../types';
 
@@ -26,7 +27,7 @@ function HistorialFichasTable({ rows }: HistorialFichasTableProps) {
                 Programa de formación
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                Instructor líder
+                {LABEL_INSTRUCTOR_LIDER}
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                 Jornada

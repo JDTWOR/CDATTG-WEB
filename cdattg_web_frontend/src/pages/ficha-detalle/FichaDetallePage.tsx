@@ -48,7 +48,7 @@ export function FichaDetallePage() {
   });
 
   const { ficha, setFicha, loading, setLoading, error, isValidFichaId, diasLabel, loadFicha } = data;
-  const { loadInstructores, loadInstructoresDisponibles, setInstructorPrincipalId } = instructoresModel;
+  const { loadInstructores, loadInstructoresDisponibles, setInstructorLiderId } = instructoresModel;
   const { loadAprendices, loadPersonas } = aprendicesModel;
 
   useFichaDetallePage({
@@ -118,7 +118,7 @@ export function FichaDetallePage() {
           inputIdPrefix="ficha-detalle"
           onSaved={(saved) => {
             setFicha(saved);
-            setInstructorPrincipalId(saved.instructor_id ?? 0);
+            setInstructorLiderId(saved.instructor_id ?? 0);
             void loadInstructores();
             void loadAprendices();
           }}

@@ -9,6 +9,7 @@ import {
   SunIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
+import { LABEL_INSTRUCTOR_LIDER } from '../../../constants/instructorLiderLabels';
 import { formatFechaVista } from '../../../utils/formatFecha';
 import type { FichaCaracterizacionResponse } from '../../../types';
 
@@ -34,7 +35,7 @@ export function FichaDetalleResumen({ ficha, diasLabel, puedeEditarFicha }: Fich
           <AcademicCapIcon className="h-5 w-5 shrink-0 text-gray-400" />
           <div className="min-w-0 flex-1">
             <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Instructor principal
+              {LABEL_INSTRUCTOR_LIDER}
             </dt>
             <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{ficha.instructor_nombre || '—'}</dd>
             {puedeEditarFicha && (

@@ -4,6 +4,7 @@ import type {
   FichaCaracterizacionResponse,
   ProgramaFormacionResponse,
 } from '../types';
+import { MSG_INSTRUCTOR_LIDER_OBLIGATORIO } from '../constants/instructorLiderLabels';
 
 /** API puede devolver ISO (RFC3339); input type=date exige yyyy-MM-DD */
 export function toDateInputString(iso?: string | null): string | undefined {
@@ -40,7 +41,7 @@ export function validarFormFicha(
   editing: FichaCaracterizacionResponse | null
 ): string | null {
   if (!editing && (!form.instructor_id || form.instructor_id === 0)) {
-    return 'El instructor líder es obligatorio.';
+    return MSG_INSTRUCTOR_LIDER_OBLIGATORIO;
   }
   if (!form.ficha?.trim()) {
     return 'El número de ficha es obligatorio.';

@@ -7,6 +7,7 @@ import {
   UserIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
+import { LABEL_INSTRUCTOR_LIDER } from '../constants/instructorLiderLabels';
 import type { FichaCaracterizacionResponse } from '../types';
 
 type Props = Readonly<{
@@ -81,7 +82,7 @@ export function FichaCaracterizacionCard({
           <div>
             <p className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
               <ComputerDesktopIcon className="h-4 w-4 text-gray-400" />
-              Instructor líder
+              {LABEL_INSTRUCTOR_LIDER}
             </p>
             <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <UserIcon className="h-4 w-4 shrink-0 text-gray-400" />

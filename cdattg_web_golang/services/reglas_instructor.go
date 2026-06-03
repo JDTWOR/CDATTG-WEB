@@ -12,14 +12,14 @@ import (
 
 // es especialidades JSON: {"principal": <id>, "secundarias": [id, ...]}
 type especialidadesJSON struct {
-	Principal   *uint   `json:"principal"`
-	Secundarias []uint  `json:"secundarias"`
+	Principal   *uint  `json:"principal"`
+	Secundarias []uint `json:"secundarias"`
 }
 
 // ValidarAsignacionInstructor aplica reglas de negocio para asignar un instructor a una ficha
 func ValidarAsignacionInstructor(
 	instructorID, fichaID uint,
-	esLider bool,
+	esInstructorLider bool,
 	instRepo repositories.InstructorRepository,
 	fichaRepo repositories.FichaRepository,
 	instFichaRepo repositories.InstructorFichaRepository,
@@ -30,65 +30,109 @@ func ValidarAsignacionInstructor(
 	if err != nil {
 		return errors.New("instructor no encontrado")
 	}
-	if !instructor.Status {
-		return errors.New("el instructor está inactivo")
+	if err := validarInstructorAsignable(instructor); err != nil {
+		return err
 	}
 
 	ficha, err := fichaRepo.FindByID(fichaID)
 	if err != nil {
 		return errors.New("ficha no encontrada")
 	}
+	if err := validarFichaAsignable(ficha); err != nil {
+		return err
+	}
+
+	if err := validarExperienciaMinimaInstructor(cfg, instructor); err != nil {
+		return err
+	}
+	if err := validarRegionalInstructorFicha(instructor, ficha); err != nil {
+		return err
+	}
+	return validarEspecialidadInstructorFicha(cfg, esInstructorLider, instructor, ficha)
+}
+
+func validarInstructorAsignable(instructor *models.Instructor) error {
+	if !instructor.Status {
+		return errors.New("el instructor está inactivo")
+	}
+	return nil
+}
+
+func validarFichaAsignable(ficha *models.FichaCaracterizacion) error {
 	if !ficha.Status {
 		return errors.New("la ficha no está activa")
 	}
-
-	// Experiencia mínima (configurable)
-	if cfg.ExperienciaMinimaAnios > 0 {
-		anos := 0
-		if instructor.AnosExperiencia != nil {
-			anos = *instructor.AnosExperiencia
-		}
-		meses := 0
-		if instructor.ExperienciaInstructorMeses != nil {
-			meses = *instructor.ExperienciaInstructorMeses
-		}
-		equivAnos := anos + meses/12
-		if equivAnos < cfg.ExperienciaMinimaAnios {
-			return fmt.Errorf("el instructor debe tener al menos %d año(s) de experiencia (tiene el equivalente a %d)", cfg.ExperienciaMinimaAnios, equivAnos)
-		}
-	}
-
-	// 3. Regional: la regional del instructor debe coincidir con la de la ficha (vía sede)
-	if ficha.Sede != nil && ficha.Sede.RegionalID != nil && *ficha.Sede.RegionalID != 0 {
-		if instructor.RegionalID == nil || *instructor.RegionalID != *ficha.Sede.RegionalID {
-			return errors.New("la regional del instructor no coincide con la regional de la sede de la ficha")
-		}
-	}
-
-	// 4. Especialidad (red de conocimiento): el instructor debe tener la especialidad del programa, salvo si es líder.
-	// Desactivado por defecto (ValidarEspecialidadInstructor=false); activar a futuro con NEGOCIO_VALIDAR_ESPECIALIDAD_INSTRUCTOR=true
-	if cfg.ValidarEspecialidadInstructor && !esLider && ficha.ProgramaFormacion != nil && ficha.ProgramaFormacion.RedConocimientoID != nil && *ficha.ProgramaFormacion.RedConocimientoID != 0 {
-		redID := *ficha.ProgramaFormacion.RedConocimientoID
-		var esp especialidadesJSON
-		if instructor.Especialidades != "" {
-			_ = json.Unmarshal([]byte(instructor.Especialidades), &esp)
-		}
-		tiene := false
-		if esp.Principal != nil && *esp.Principal == redID {
-			tiene = true
-		}
-		for _, id := range esp.Secundarias {
-			if id == redID {
-				tiene = true
-				break
-			}
-		}
-		if !tiene {
-			return errors.New("el instructor no tiene la especialidad (red de conocimiento) requerida por el programa de la ficha")
-		}
-	}
-
 	return nil
+}
+
+func validarExperienciaMinimaInstructor(cfg config.NegocioConfig, instructor *models.Instructor) error {
+	if cfg.ExperienciaMinimaAnios <= 0 {
+		return nil
+	}
+	anos := 0
+	if instructor.AnosExperiencia != nil {
+		anos = *instructor.AnosExperiencia
+	}
+	meses := 0
+	if instructor.ExperienciaInstructorMeses != nil {
+		meses = *instructor.ExperienciaInstructorMeses
+	}
+	equivAnos := anos + meses/12
+	if equivAnos < cfg.ExperienciaMinimaAnios {
+		return fmt.Errorf(
+			"el instructor debe tener al menos %d año(s) de experiencia (tiene el equivalente a %d)",
+			cfg.ExperienciaMinimaAnios,
+			equivAnos,
+		)
+	}
+	return nil
+}
+
+func validarRegionalInstructorFicha(instructor *models.Instructor, ficha *models.FichaCaracterizacion) error {
+	if ficha.Sede == nil || ficha.Sede.RegionalID == nil || *ficha.Sede.RegionalID == 0 {
+		return nil
+	}
+	if instructor.RegionalID == nil || *instructor.RegionalID != *ficha.Sede.RegionalID {
+		return errors.New("la regional del instructor no coincide con la regional de la sede de la ficha")
+	}
+	return nil
+}
+
+func validarEspecialidadInstructorFicha(
+	cfg config.NegocioConfig,
+	esInstructorLider bool,
+	instructor *models.Instructor,
+	ficha *models.FichaCaracterizacion,
+) error {
+	if !cfg.ValidarEspecialidadInstructor || esInstructorLider {
+		return nil
+	}
+	if ficha.ProgramaFormacion == nil ||
+		ficha.ProgramaFormacion.RedConocimientoID == nil ||
+		*ficha.ProgramaFormacion.RedConocimientoID == 0 {
+		return nil
+	}
+	redID := *ficha.ProgramaFormacion.RedConocimientoID
+	if !instructorTieneRedConocimiento(instructor, redID) {
+		return errors.New("el instructor no tiene la especialidad (red de conocimiento) requerida por el programa de la ficha")
+	}
+	return nil
+}
+
+func instructorTieneRedConocimiento(instructor *models.Instructor, redID uint) bool {
+	var esp especialidadesJSON
+	if instructor.Especialidades != "" {
+		_ = json.Unmarshal([]byte(instructor.Especialidades), &esp)
+	}
+	if esp.Principal != nil && *esp.Principal == redID {
+		return true
+	}
+	for _, id := range esp.Secundarias {
+		if id == redID {
+			return true
+		}
+	}
+	return false
 }
 
 // SincronizarInstructorLiderEnPivote asegura que el instructor líder de la ficha exista en instructor_ficha

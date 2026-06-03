@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { Link } from 'react-router-dom';
 import { asistenciaFichaPath } from './asistencia/asistenciaPaths';
+import { LABEL_INSTRUCTOR_LIDER } from '../constants/instructorLiderLabels';
 import {
   DocumentTextIcon,
   HomeIcon,
@@ -493,7 +494,7 @@ export const FichasCaracterizacion = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ficha</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Programa</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Instructor principal</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{LABEL_INSTRUCTOR_LIDER}</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sede</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase max-w-[220px]">
                       Días de formación

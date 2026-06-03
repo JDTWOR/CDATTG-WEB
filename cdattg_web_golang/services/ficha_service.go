@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	msgFichaNoEncontrada      = "ficha no encontrada"
-	errFmtSyncInstructorLider = "error al sincronizar instructor líder: %w"
-	ambientePorDefinir        = "POR DEFINIR"
+	msgFichaNoEncontrada           = "ficha no encontrada"
+	errFmtSyncInstructorLider      = "error al sincronizar instructor líder: %w"
+	msgInstructorLiderObligatorio  = "debe asignar un instructor líder a la ficha"
+	ambientePorDefinir             = "POR DEFINIR"
 )
 
 type FichaService interface {
@@ -207,7 +208,7 @@ func (s *fichaService) Create(req dto.FichaCaracterizacionRequest) (*dto.FichaCa
 	}
 	// Regla: instructor líder obligatorio
 	if req.InstructorID == nil || *req.InstructorID == 0 {
-		return nil, errors.New("debe asignar un instructor líder a la ficha")
+		return nil, errors.New(msgInstructorLiderObligatorio)
 	}
 	f := s.fichaRequestToModel(req)
 	if req.Status != nil {
@@ -326,13 +327,13 @@ func (s *fichaService) AsignarInstructores(fichaID uint, req dto.AsignarInstruct
 	instRepo := repositories.NewInstructorRepository()
 	// Validar cada instructor según reglas de negocio antes de asignar
 	for _, it := range req.Instructores {
-		esLider := it.InstructorID == req.InstructorPrincipalID
-		if err := ValidarAsignacionInstructor(it.InstructorID, fichaID, esLider, instRepo, s.fichaRepo, s.instFichaRepo); err != nil {
+		esInstructorLider := it.InstructorID == req.InstructorLiderID
+		if err := ValidarAsignacionInstructor(it.InstructorID, fichaID, esInstructorLider, instRepo, s.fichaRepo, s.instFichaRepo); err != nil {
 			return fmt.Errorf("instructor %d: %w", it.InstructorID, err)
 		}
 	}
-	// Actualizar instructor principal de la ficha
-	f.InstructorID = &req.InstructorPrincipalID
+	// Actualizar instructor líder de la ficha
+	f.InstructorID = &req.InstructorLiderID
 	if err := s.fichaRepo.Update(f); err != nil {
 		return err
 	}

@@ -14,7 +14,7 @@ type InstructorFichaItem struct {
 
 // AsignarInstructoresRequest para POST /fichas/:id/instructores
 type AsignarInstructoresRequest struct {
-	InstructorPrincipalID uint                 `json:"instructor_principal_id" binding:"required"`
+	InstructorLiderID uint                 `json:"instructor_lider_id" binding:"required"`
 	Instructores         []InstructorFichaItem `json:"instructores" binding:"required,min=1,dive"`
 }
 

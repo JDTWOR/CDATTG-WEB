@@ -1,16 +1,15 @@
 import type { InstructorAgendaEvent } from '../../types/agenda';
 import { ScheduleEventCard } from './ScheduleEventCard';
 import {
-  buildHourLabels,
   DAY_LABELS,
+  DEFAULT_GRID_RANGE,
   eventHeightPercent,
   eventTopPercent,
   eventsForDay,
   formatLocalISO,
-  GRID_END_HOUR,
-  GRID_START_HOUR,
   gridBodyHeightPx,
-  SLOT_HEIGHT_PX,
+  hourTicksForRange,
+  type GridTimeRange,
   weekDaysFromStart,
 } from './calendarUtils';
 
@@ -18,15 +17,21 @@ type WeekScheduleTimeGridProps = Readonly<{
   events: InstructorAgendaEvent[];
   weekStart: Date;
   mode: 'instructor' | 'ficha';
+  gridRange?: GridTimeRange;
+  instructorColorMap?: Map<number, string>;
 }>;
 
-const HOUR_LABELS = buildHourLabels(GRID_START_HOUR, GRID_END_HOUR);
-const GRID_HEIGHT = gridBodyHeightPx();
-const SLOT_COUNT = GRID_END_HOUR - GRID_START_HOUR;
-
-export function WeekScheduleTimeGrid({ events, weekStart, mode }: WeekScheduleTimeGridProps) {
+export function WeekScheduleTimeGrid({
+  events,
+  weekStart,
+  mode,
+  gridRange = DEFAULT_GRID_RANGE,
+  instructorColorMap,
+}: WeekScheduleTimeGridProps) {
   const days = weekDaysFromStart(weekStart);
   const todayISO = formatLocalISO(new Date());
+  const hourTicks = hourTicksForRange(gridRange);
+  const gridHeight = gridBodyHeightPx(gridRange);
 
   return (
     <div className="max-h-[70vh] overflow-auto">
@@ -65,22 +70,19 @@ export function WeekScheduleTimeGrid({ events, weekStart, mode }: WeekScheduleTi
           className="grid"
           style={{
             gridTemplateColumns: '3.5rem repeat(7, minmax(0, 1fr))',
-            height: GRID_HEIGHT,
+            height: gridHeight,
           }}
         >
           <div className="relative border-r border-gray-200 bg-gray-50/80 dark:border-gray-600 dark:bg-gray-900/30">
-            {HOUR_LABELS.map((label, idx) => {
-              const topPx = idx < SLOT_COUNT ? idx * SLOT_HEIGHT_PX : GRID_HEIGHT;
-              return (
-                <div
-                  key={label}
-                  className="absolute right-1 -translate-y-1/2 text-[10px] font-medium text-gray-500 dark:text-gray-400"
-                  style={{ top: topPx }}
-                >
-                  {label}
-                </div>
-              );
-            })}
+            {hourTicks.map((tick) => (
+              <div
+                key={tick.hour}
+                className="absolute right-1 -translate-y-1/2 text-[10px] font-medium text-gray-500 dark:text-gray-400"
+                style={{ top: `${tick.topPercent}%` }}
+              >
+                {tick.label}
+              </div>
+            ))}
           </div>
 
           {days.map((d) => {
@@ -95,11 +97,11 @@ export function WeekScheduleTimeGrid({ events, weekStart, mode }: WeekScheduleTi
                   isToday ? 'bg-primary-50/30 dark:bg-primary-900/10' : ''
                 }`}
               >
-                {Array.from({ length: SLOT_COUNT }, (_, i) => (
+                {hourTicks.map((tick) => (
                   <div
-                    key={i}
+                    key={tick.hour}
                     className="absolute left-0 right-0 border-t border-gray-100 dark:border-gray-700/80"
-                    style={{ top: i * SLOT_HEIGHT_PX, height: SLOT_HEIGHT_PX }}
+                    style={{ top: `${tick.topPercent}%` }}
                   />
                 ))}
                 {dayEvents.map((ev) => (
@@ -108,9 +110,10 @@ export function WeekScheduleTimeGrid({ events, weekStart, mode }: WeekScheduleTi
                     event={ev}
                     mode={mode}
                     isToday={isToday}
+                    instructorColorMap={instructorColorMap}
                     style={{
-                      top: `${eventTopPercent(ev.hora_inicio)}%`,
-                      height: `${eventHeightPercent(ev.hora_inicio, ev.hora_fin)}%`,
+                      top: `${eventTopPercent(ev.hora_inicio, gridRange)}%`,
+                      height: `${eventHeightPercent(ev.hora_inicio, ev.hora_fin, gridRange)}%`,
                       minHeight: '1.25rem',
                     }}
                   />

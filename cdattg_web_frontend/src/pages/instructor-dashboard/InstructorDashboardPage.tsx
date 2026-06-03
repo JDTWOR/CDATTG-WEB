@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AcademicCapIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { WeekScheduleCalendar } from '../../components/calendar/WeekScheduleCalendar';
+import { computeGridTimeRangeFromEvents, formatGridRangeLabel } from '../../components/calendar/calendarUtils';
 import { useInstructorAgenda, useInitialWeekStart } from './useInstructorAgenda';
 
 export function InstructorDashboardPage() {
@@ -9,13 +11,17 @@ export function InstructorDashboardPage() {
   const eventos = data?.eventos ?? [];
   const clasesSemana = eventos.length;
   const fichasUnicas = new Set(eventos.map((e) => e.ficha_id)).size;
+  const gridRangeLabel = useMemo(
+    () => formatGridRangeLabel(computeGridTimeRangeFromEvents(eventos)),
+    [eventos],
+  );
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Mi programación</h1>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Calendario semanal · horario <span className="font-medium">06:00–24:00</span>
+          Calendario semanal · horario <span className="font-medium">{gridRangeLabel}</span>
         </p>
         {error && (
           <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">

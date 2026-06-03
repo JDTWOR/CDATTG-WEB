@@ -5,16 +5,90 @@ export const GRID_END_HOUR = 24;
 export const GRID_SLOT_MINUTES = 60;
 export const SLOT_HEIGHT_PX = 48;
 
-export function gridBodyHeightPx(): number {
-  return (GRID_END_HOUR - GRID_START_HOUR) * SLOT_HEIGHT_PX;
+export type GridTimeRange = { startMinutes: number; endMinutes: number };
+
+export const DEFAULT_GRID_RANGE: GridTimeRange = {
+  startMinutes: GRID_START_HOUR * 60,
+  endMinutes: GRID_END_HOUR * 60,
+};
+
+const FICHA_COLORS = [
+  'bg-primary-500/90 border-primary-600',
+  'bg-emerald-500/90 border-emerald-600',
+  'bg-violet-500/90 border-violet-600',
+  'bg-amber-500/90 border-amber-600',
+  'bg-rose-500/90 border-rose-600',
+  'bg-cyan-500/90 border-cyan-600',
+];
+
+export function gridBodyHeightPx(range: GridTimeRange = DEFAULT_GRID_RANGE): number {
+  const hours = (range.endMinutes - range.startMinutes) / GRID_SLOT_MINUTES;
+  return hours * SLOT_HEIGHT_PX;
 }
 
-export function buildHourLabels(startHour: number, endHour: number): string[] {
-  const labels: string[] = [];
+export function hourTicksForRange(range: GridTimeRange): { hour: number; label: string; topPercent: number }[] {
+  const startHour = Math.floor(range.startMinutes / 60);
+  const endHour = Math.ceil(range.endMinutes / 60);
+  const total = range.endMinutes - range.startMinutes;
+  if (total <= 0) return [];
+
+  const ticks: { hour: number; label: string; topPercent: number }[] = [];
   for (let h = startHour; h <= endHour; h++) {
-    labels.push(`${String(h).padStart(2, '0')}:00`);
+    const minute = h * 60;
+    const topPercent = Math.max(0, Math.min(100, ((minute - range.startMinutes) / total) * 100));
+    ticks.push({
+      hour: h,
+      label: `${String(h).padStart(2, '0')}:00`,
+      topPercent,
+    });
   }
-  return labels;
+  return ticks;
+}
+
+export function computeGridTimeRangeFromEvents(
+  events: InstructorAgendaEvent[],
+  marginMinutes = 30,
+): GridTimeRange {
+  if (events.length === 0) {
+    return DEFAULT_GRID_RANGE;
+  }
+
+  let minStart = Number.POSITIVE_INFINITY;
+  let maxEnd = Number.NEGATIVE_INFINITY;
+
+  for (const ev of events) {
+    const start = parseTimeToMinutes(ev.hora_inicio);
+    const end = parseTimeToMinutes(ev.hora_fin);
+    if (start < minStart) minStart = start;
+    if (end > maxEnd) maxEnd = end;
+  }
+
+  const startMinutes = Math.max(0, minStart - marginMinutes);
+  const endMinutes = Math.min(24 * 60, maxEnd + marginMinutes);
+
+  if (endMinutes <= startMinutes) {
+    return DEFAULT_GRID_RANGE;
+  }
+
+  return { startMinutes, endMinutes };
+}
+
+export function formatGridRangeLabel(range: GridTimeRange): string {
+  const formatMinutes = (totalMinutes: number): string => {
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+  return `${formatMinutes(range.startMinutes)}–${formatMinutes(range.endMinutes)}`;
+}
+
+export function buildInstructorColorMap(events: InstructorAgendaEvent[]): Map<number, string> {
+  const instructors = uniqueInstructorsFromEvents(events);
+  const map = new Map<number, string>();
+  instructors.forEach((ins, i) => {
+    map.set(ins.id, FICHA_COLORS[i % FICHA_COLORS.length]);
+  });
+  return map;
 }
 
 export function startOfWeekMonday(d: Date): Date {
@@ -53,37 +127,37 @@ export function eventsForDay(events: InstructorAgendaEvent[], isoDate: string): 
   return events.filter((e) => e.fecha === isoDate);
 }
 
-export function eventTopPercent(horaInicio: string): number {
-  const startMin = GRID_START_HOUR * 60;
-  const endMin = GRID_END_HOUR * 60;
-  const total = endMin - startMin;
+export function eventTopPercent(horaInicio: string, range: GridTimeRange = DEFAULT_GRID_RANGE): number {
+  const total = range.endMinutes - range.startMinutes;
+  if (total <= 0) return 0;
   const ev = parseTimeToMinutes(horaInicio);
-  return Math.max(0, Math.min(100, ((ev - startMin) / total) * 100));
+  return Math.max(0, Math.min(100, ((ev - range.startMinutes) / total) * 100));
 }
 
-export function eventHeightPercent(horaInicio: string, horaFin: string): number {
-  const startMin = GRID_START_HOUR * 60;
-  const endMin = GRID_END_HOUR * 60;
-  const total = endMin - startMin;
+export function eventHeightPercent(
+  horaInicio: string,
+  horaFin: string,
+  range: GridTimeRange = DEFAULT_GRID_RANGE,
+): number {
+  const total = range.endMinutes - range.startMinutes;
+  if (total <= 0) return 0;
   const dur = Math.max(30, parseTimeToMinutes(horaFin) - parseTimeToMinutes(horaInicio));
   return Math.min(100, (dur / total) * 100);
 }
 
-const FICHA_COLORS = [
-  'bg-primary-500/90 border-primary-600',
-  'bg-emerald-500/90 border-emerald-600',
-  'bg-violet-500/90 border-violet-600',
-  'bg-amber-500/90 border-amber-600',
-  'bg-rose-500/90 border-rose-600',
-  'bg-cyan-500/90 border-cyan-600',
-];
-
-export function colorClassForInstructor(instructorId: number | undefined, mode: 'instructor' | 'ficha'): string {
+export function colorClassForInstructor(
+  instructorId: number | undefined,
+  mode: 'instructor' | 'ficha',
+  colorMap?: Map<number, string>,
+): string {
   if (mode === 'instructor') {
     return 'bg-primary-600/90 border-primary-700';
   }
-  const id = instructorId ?? 0;
-  return FICHA_COLORS[id % FICHA_COLORS.length];
+  if (colorMap && instructorId != null) {
+    const mapped = colorMap.get(instructorId);
+    if (mapped) return mapped;
+  }
+  return FICHA_COLORS[0];
 }
 
 export const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];

@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import type { InstructorAgendaEvent } from '../../types/agenda';
+import { buildInstructorColorMap, computeGridTimeRangeFromEvents } from './calendarUtils';
 import { WeekScheduleTimeGrid } from './WeekScheduleTimeGrid';
 import { WeekScheduleToolbar } from './WeekScheduleToolbar';
 
@@ -19,6 +21,16 @@ export function WeekScheduleCalendar({
   loading,
   error,
 }: WeekScheduleCalendarProps) {
+  const gridRange = useMemo(
+    () => computeGridTimeRangeFromEvents(events),
+    [events],
+  );
+
+  const instructorColorMap = useMemo(
+    () => (mode === 'ficha' ? buildInstructorColorMap(events) : undefined),
+    [events, mode],
+  );
+
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-600 dark:bg-gray-800/80">
       <WeekScheduleToolbar weekStart={weekStart} onWeekChange={onWeekChange} />
@@ -30,7 +42,13 @@ export function WeekScheduleCalendar({
       {loading ? (
         <p className="p-8 text-center text-sm text-gray-500">Cargando programación…</p>
       ) : (
-        <WeekScheduleTimeGrid events={events} weekStart={weekStart} mode={mode} />
+        <WeekScheduleTimeGrid
+          events={events}
+          weekStart={weekStart}
+          mode={mode}
+          gridRange={gridRange}
+          instructorColorMap={instructorColorMap}
+        />
       )}
     </div>
   );

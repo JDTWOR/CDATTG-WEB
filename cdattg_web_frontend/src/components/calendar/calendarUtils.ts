@@ -1,8 +1,21 @@
 import type { InstructorAgendaEvent } from '../../types/agenda';
 
 export const GRID_START_HOUR = 6;
-export const GRID_END_HOUR = 23;
+export const GRID_END_HOUR = 24;
 export const GRID_SLOT_MINUTES = 60;
+export const SLOT_HEIGHT_PX = 48;
+
+export function gridBodyHeightPx(): number {
+  return (GRID_END_HOUR - GRID_START_HOUR) * SLOT_HEIGHT_PX;
+}
+
+export function buildHourLabels(startHour: number, endHour: number): string[] {
+  const labels: string[] = [];
+  for (let h = startHour; h <= endHour; h++) {
+    labels.push(`${String(h).padStart(2, '0')}:00`);
+  }
+  return labels;
+}
 
 export function startOfWeekMonday(d: Date): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -74,3 +87,17 @@ export function colorClassForInstructor(instructorId: number | undefined, mode: 
 }
 
 export const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+export function uniqueInstructorsFromEvents(
+  events: InstructorAgendaEvent[],
+): { id: number; nombre: string }[] {
+  const map = new Map<number, string>();
+  for (const ev of events) {
+    if (ev.instructor_id != null && ev.instructor_nombre) {
+      map.set(ev.instructor_id, ev.instructor_nombre);
+    }
+  }
+  return Array.from(map.entries())
+    .map(([id, nombre]) => ({ id, nombre }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}

@@ -6,11 +6,21 @@ import { confirmOcultarAprendizAsistencia } from '../../../utils/confirmOcultarA
 import { axiosErrorMessage } from '../../../utils/httpError';
 import type { AprendizResponse, PersonaResponse } from '../../../types';
 
+function matchesBusqueda(a: AprendizResponse, q: string): boolean {
+  const term = q.trim().toLowerCase();
+  if (!term) return true;
+  return (
+    (a.persona_nombre?.toLowerCase().includes(term) ?? false) ||
+    (a.persona_documento?.toLowerCase().includes(term) ?? false)
+  );
+}
+
 export function useFichaAprendices(fichaId: number, loadFicha: () => Promise<void>) {
   const [aprendices, setAprendices] = useState<AprendizResponse[]>([]);
   const [personas, setPersonas] = useState<PersonaResponse[]>([]);
   const [showFormAprendices, setShowFormAprendices] = useState(false);
   const [personasSeleccionadas, setPersonasSeleccionadas] = useState<number[]>([]);
+  const [busquedaAprendiz, setBusquedaAprendiz] = useState('');
 
   const loadAprendices = useCallback(async () => {
     if (!fichaId) return;
@@ -30,6 +40,18 @@ export function useFichaAprendices(fichaId: number, loadFicha: () => Promise<voi
       setPersonas([]);
     }
   }, []);
+
+  const aprendicesActivos = useMemo(() => aprendices.filter((a) => a.estado), [aprendices]);
+
+  const stats = useMemo(() => {
+    const ocultos = aprendicesActivos.filter((a) => a.oculto_en_asistencia).length;
+    return { total: aprendicesActivos.length, ocultos };
+  }, [aprendicesActivos]);
+
+  const aprendicesFiltrados = useMemo(
+    () => aprendicesActivos.filter((a) => matchesBusqueda(a, busquedaAprendiz)),
+    [aprendicesActivos, busquedaAprendiz],
+  );
 
   const handleAsignarAprendices = async () => {
     if (personasSeleccionadas.length === 0) {
@@ -100,6 +122,11 @@ export function useFichaAprendices(fichaId: number, loadFicha: () => Promise<voi
 
   return {
     aprendices,
+    aprendicesActivos,
+    aprendicesFiltrados,
+    stats,
+    busquedaAprendiz,
+    setBusquedaAprendiz,
     showFormAprendices,
     setShowFormAprendices,
     personasNoAprendices,

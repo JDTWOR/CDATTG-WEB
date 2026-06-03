@@ -15,7 +15,7 @@ export function InstructorDashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Mi programación</h1>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Calendario semanal de formación asignada
+          Calendario semanal · horario <span className="font-medium">06:00–24:00</span>
         </p>
         {error && (
           <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">

@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useParams } from 'react-router-dom';
+import { useBreadcrumbOverride } from '../../navigation/breadcrumb';
 import { FichaFormModal } from '../../components/FichaFormModal';
 import { useAuth } from '../../context/AuthContext';
 import { canGestionarAprendicesFicha } from '../../utils/aprendizFichaPermissions';
@@ -25,8 +26,10 @@ import { useFichaInstructores } from './hooks/useFichaInstructores';
 
 export function FichaDetallePage() {
   const { roles, hasPermission } = useAuth();
-  const { id } = useParams<{ id: string }>();
-  const fichaId = id ? Number.parseInt(id, 10) : 0;
+  const { pathname } = useLocation();
+  const { fichaId: fichaIdParam } = useParams<{ fichaId: string }>();
+  const fichaId = fichaIdParam ? Number.parseInt(fichaIdParam, 10) : 0;
+  const { setLabel, clearLabel } = useBreadcrumbOverride();
 
   const puedeEditarFicha = canManageFichas(roles);
   const puedeGestionarAprendices = canGestionarAprendicesFicha(roles, hasPermission);
@@ -62,6 +65,15 @@ export function FichaDetallePage() {
     loadInstructoresDisponibles,
     loadPersonas,
   });
+
+  useEffect(() => {
+    if (!ficha?.ficha) {
+      clearLabel(pathname);
+      return;
+    }
+    setLabel(pathname, `Ficha ${ficha.ficha}`);
+    return () => clearLabel(pathname);
+  }, [ficha?.ficha, pathname, setLabel, clearLabel]);
 
   if (!isValidFichaId) {
     return <FichaDetalleInvalidIdState />;

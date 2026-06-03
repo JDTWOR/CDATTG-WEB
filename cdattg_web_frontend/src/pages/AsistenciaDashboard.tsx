@@ -6,7 +6,8 @@ import { axiosErrorMessage } from '../utils/httpError';
 import { useAuth } from '../context/AuthContext';
 import { getAsistenciaDashboardWsUrl } from '../config/api';
 import type { AsistenciaDashboardPorFicha, AsistenciaDashboardResponse } from '../types';
-import { canViewCasosBienestar } from './casos-bienestar/casosBienestarPermissions';
+import { asistenciaPaths, bienestarPaths } from '../routes/paths';
+import { canViewCasosBienestar } from './bienestar/casos/casosBienestarPermissions';
 
 const DASH_SEARCH_ID = 'asistencia-dashboard-buscar-ficha';
 const DASH_JORNADA_ID = 'asistencia-dashboard-filtro-jornada';
@@ -114,7 +115,7 @@ function AsistenciaDashboardDataView({
             </div>
           </div>
           <Link
-            to="/asistencia/dashboard/casos-bienestar"
+            to={bienestarPaths.casos.index}
             className="btn-primary inline-flex items-center justify-center gap-2 shrink-0"
           >
             <ExclamationTriangleIcon className="w-5 h-5" aria-hidden />
@@ -351,7 +352,7 @@ export const AsistenciaDashboard = () => {
         <p className="text-red-600 dark:text-red-400">
           No tiene permiso para acceder al dashboard de asistencia (requiere rol de Superadministrador o Bienestar al Aprendiz).
         </p>
-        <Link to="/asistencia" className="btn-secondary inline-flex items-center gap-2">
+        <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center gap-2">
           <ArrowLeftIcon className="w-5 h-5" aria-hidden />
           Volver a Asistencia
         </Link>
@@ -361,14 +362,6 @@ export const AsistenciaDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <nav className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400" aria-label="Miga de pan">
-        <Link to="/dashboard" className="hover:text-primary-600 dark:hover:text-primary-400">Inicio</Link>
-        <span>/</span>
-        <Link to="/asistencia" className="hover:text-primary-600 dark:hover:text-primary-400">Asistencia</Link>
-        <span>/</span>
-        <span className="text-gray-900 dark:text-white font-medium">Dashboard</span>
-      </nav>
-
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -386,7 +379,7 @@ export const AsistenciaDashboard = () => {
               En vivo
             </span>
           )}
-          <Link to="/asistencia" className="btn-secondary inline-flex items-center gap-2">
+          <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center gap-2">
             <ArrowLeftIcon className="w-5 h-5" aria-hidden />
             Tomar asistencia
           </Link>

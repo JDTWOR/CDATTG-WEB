@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { apiService } from '../../../services/api';
-import { axiosErrorMessage } from '../../../utils/httpError';
-import type { CasosBienestarResponse } from '../../../types';
+import { apiService } from '../../../../services/api';
+import { axiosErrorMessage } from '../../../../utils/httpError';
+import type { CasosBienestarResponse } from '../../../../types';
 
 type UseCasosBienestarParams = Readonly<{
   enabled: boolean;

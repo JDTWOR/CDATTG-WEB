@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeftIcon, ExclamationTriangleIcon, UserGroupIcon } from '@heroicons/react/24/outline';
-import { CasosBienestarBreadcrumb } from './components/CasosBienestarBreadcrumb';
+import { bienestarPaths } from '../bienestarPaths';
 import { CasosBienestarAprendicesFilters } from './components/CasosBienestarAprendicesFilters';
 import { CasosBienestarAprendicesTable } from './components/CasosBienestarAprendicesTable';
 import { CasosBienestarInasistenciasModal } from './components/CasosBienestarInasistenciasModal';
@@ -16,7 +16,7 @@ export function CasosBienestarFichaDetallePage() {
           {page.permissionError}
         </p>
         <Link
-          to="/asistencia/dashboard/casos-bienestar"
+          to={bienestarPaths.casos.index}
           className="btn-secondary inline-flex items-center gap-2"
         >
           <ArrowLeftIcon className="h-5 w-5" aria-hidden />
@@ -28,8 +28,6 @@ export function CasosBienestarFichaDetallePage() {
 
   return (
     <div className="space-y-6">
-      <CasosBienestarBreadcrumb tail={page.fichaNumero ? `Ficha ${page.fichaNumero}` : undefined} />
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white">
@@ -47,7 +45,7 @@ export function CasosBienestarFichaDetallePage() {
           )}
         </div>
         <Link
-          to="/asistencia/dashboard/casos-bienestar"
+          to={bienestarPaths.casos.index}
           className="btn-secondary inline-flex items-center gap-2"
         >
           <ArrowLeftIcon className="h-5 w-5" aria-hidden />

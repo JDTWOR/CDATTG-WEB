@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, type ComponentProps } from 'react';
 import { Link } from 'react-router-dom';
+import { instructoresPaths } from '../routes/paths';
 import { PlusIcon, EyeIcon, PencilSquareIcon, TrashIcon, XMarkIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
@@ -151,7 +152,7 @@ export const Instructores = () => {
           <p className="mt-2 text-gray-600 dark:text-gray-400">Gestiona y administra los instructores del SENA</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link to="/instructores/importar" className="btn-secondary inline-flex items-center">
+          <Link to={instructoresPaths.importar} className="btn-secondary inline-flex items-center">
             <ArrowUpTrayIcon className="w-5 h-5 mr-2" aria-hidden />
             Importar instructores
           </Link>

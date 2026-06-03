@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { Link } from 'react-router-dom';
+import { DASHBOARD_PATH, fichasPaths } from '../routes/paths';
 import { asistenciaFichaPath } from './asistencia/asistenciaPaths';
 import { LABEL_INSTRUCTOR_LIDER } from '../constants/instructorLiderLabels';
 import {
   DocumentTextIcon,
-  HomeIcon,
   ExclamationTriangleIcon,
   ArrowLeftIcon,
   MagnifyingGlassIcon,
@@ -144,14 +144,6 @@ function FichasInstructorSinFichas() {
             <p className="mt-1 text-gray-600 dark:text-gray-400">Gestión de fichas de formación</p>
           </div>
         </div>
-        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-          <Link to="/dashboard" className="flex items-center gap-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-            <HomeIcon className="w-4 h-4" />
-            Inicio
-          </Link>
-          <span className="text-gray-400">/</span>
-          <span className="text-gray-700 dark:text-gray-300">Fichas de formación</span>
-        </nav>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 p-8 md:p-12 text-center max-w-xl mx-auto">
@@ -164,7 +156,7 @@ function FichasInstructorSinFichas() {
         <p className="text-gray-600 dark:text-gray-400 mb-2">No se encontraron fichas de formación asignadas a tu cuenta.</p>
         <p className="text-gray-600 dark:text-gray-400 mb-6">Contacta al administrador para que te asigne las fichas correspondientes.</p>
         <Link
-          to="/dashboard"
+          to={DASHBOARD_PATH}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors"
         >
           <ArrowLeftIcon className="w-5 h-5" />
@@ -194,14 +186,6 @@ function FichasInstructorConFichas({ filteredList, searchQuery, setSearchQuery }
             <p className="mt-1 text-gray-600 dark:text-gray-400">Gestión de fichas de formación</p>
           </div>
         </div>
-        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-          <Link to="/dashboard" className="flex items-center gap-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-            <HomeIcon className="w-4 h-4" />
-            Inicio
-          </Link>
-          <span className="text-gray-400">/</span>
-          <span className="text-gray-700 dark:text-gray-300">Fichas de formación</span>
-        </nav>
       </div>
 
       <div className="relative">
@@ -227,7 +211,7 @@ function FichasInstructorConFichas({ filteredList, searchQuery, setSearchQuery }
             actions={
               <>
                 <Link
-                  to={`/fichas/${item.id}`}
+                  to={fichasPaths.detalle(item.id)}
                   className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700/50"
                 >
                   <EyeIcon className="h-4 w-4" />
@@ -538,7 +522,7 @@ export const FichasCaracterizacion = () => {
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Link
-                              to={`/fichas/${item.id}`}
+                              to={fichasPaths.detalle(item.id)}
                               className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
                               title="Ver ficha"
                             >
@@ -546,7 +530,7 @@ export const FichasCaracterizacion = () => {
                             </Link>
                             {puedeProgramarInstructores && (
                               <Link
-                                to={`/fichas/${item.id}?tab=programacion`}
+                                to={`${fichasPaths.detalle(item.id)}?tab=programacion`}
                                 className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
                                 title="Programar instructores"
                               >

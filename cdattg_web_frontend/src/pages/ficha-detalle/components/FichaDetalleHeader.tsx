@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeftIcon, CalendarDaysIcon, ChartBarIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import type { FichaCaracterizacionResponse } from '../../../types';
-import { asistenciaFichaPath } from '../../asistencia/asistenciaPaths';
+import { fichasPaths } from '../../../routes/paths';
+import { asistenciaFichaPath, asistenciaHistorialFichaPath } from '../../asistencia/asistenciaPaths';
 
 type FichaDetalleHeaderProps = Readonly<{
   ficha: FichaCaracterizacionResponse;
@@ -14,7 +15,7 @@ export function FichaDetalleHeader({ ficha, puedeEditarFicha, onEditarFicha }: F
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex items-start gap-3">
         <Link
-          to="/fichas"
+          to={fichasPaths.index}
           className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
           title="Volver al listado"
         >
@@ -47,7 +48,7 @@ export function FichaDetalleHeader({ ficha, puedeEditarFicha, onEditarFicha }: F
           </Link>
         ) : null}
         <Link
-          to={`/asistencia/historial/ficha/${ficha.id}`}
+          to={asistenciaHistorialFichaPath(ficha.id)}
           className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2.5 text-sm font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/50"
         >
           <ChartBarIcon className="h-5 w-5" />

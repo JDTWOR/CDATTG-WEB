@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type ChangeEvent } from 'react';
-import { Link } from 'react-router-dom';
 import {
-  HomeIcon,
   ArrowUpTrayIcon,
   PlayIcon,
   ArrowDownTrayIcon,
@@ -110,17 +108,6 @@ export const ImportarPersonas = () => {
 
   return (
     <div className="space-y-6">
-      {/* Migas */}
-      <nav className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-        <Link to="/dashboard" className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400">
-          <HomeIcon className="w-4 h-4" aria-hidden /> Inicio
-        </Link>
-        <span>/</span>
-        <Link to="/personas" className="hover:text-primary-600 dark:hover:text-primary-400">Personas</Link>
-        <span>/</span>
-        <span className="text-gray-900 dark:text-white font-medium">Importar</span>
-      </nav>
-
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
         Importar Personas
       </h1>

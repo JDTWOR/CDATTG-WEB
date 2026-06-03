@@ -29,10 +29,12 @@ import {
   ChevronDoubleRightIcon,
 } from '@heroicons/react/24/outline';
 import LogoSena from '../../logo-sena-verde-complementario-svg-2022.svg';
+import { AppBreadcrumb } from './navigation/AppBreadcrumb';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiService } from '../services/api';
 import { formatRolesLine, hasAnyRole } from '../utils/roles';
+import { SIDEBAR_MANIFEST, type SidebarManifestItem } from '../navigation/sidebar';
 
 interface LayoutProps {
   children: ReactNode;
@@ -52,18 +54,7 @@ const navLinkClass = (isActive: boolean) =>
       : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
   }`;
 
-/** Permiso requerido: null = siempre visible. rolesRequired: lista de roles que habilitan el ítem (si se define). */
-interface SidebarItem {
-  section: string;
-  path: string;
-  label: string;
-  permission: string | null;
-  rolesRequired?: string[];
-  /** Visible sin el permiso principal si el usuario tiene alguno de estos roles (p. ej. INSTRUCTOR en /fichas). */
-  alsoVisibleForRoles?: string[];
-  /** Visible sin el permiso principal si el usuario tiene alguno de estos permisos adicionales. */
-  alsoVisibleForPermissions?: string[];
-}
+type SidebarItem = SidebarManifestItem;
 
 function isNavItemActive(pathname: string, item: SidebarItem, items: SidebarItem[]): boolean {
   if (item.path === '/dashboard') return pathname === '/dashboard';
@@ -86,88 +77,7 @@ function sectionForPathname(pathname: string, items: SidebarItem[]): string | nu
   return items[0]?.section ?? null;
 }
 
-const SIDEBAR_ITEMS: SidebarItem[] = [
-  { section: 'Inicio', path: '/perfil', label: 'Mi perfil', permission: null },
-  {
-    section: 'Inicio',
-    path: '/dashboard',
-    label: 'Dashboard',
-    permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
-    alsoVisibleForPermissions: ['VER MI AGENDA'],
-  },
-  { section: 'Gestión académica', path: '/programas', label: 'Programas', permission: 'VER PROGRAMAS' },
-  {
-    section: 'Gestión académica',
-    path: '/fichas',
-    label: 'Fichas',
-    permission: 'VER FICHAS',
-    alsoVisibleForRoles: ['INSTRUCTOR'],
-  },
-  { section: 'Gestión de personal', path: '/instructores', label: 'Instructores', permission: 'VER FICHAS' },
-  { section: 'Gestión de personal', path: '/aprendices', label: 'Aprendices', permission: 'VER APRENDICES' },
-  { section: 'Gestión de personal', path: '/personas', label: 'Personas', permission: 'VER PERSONAS' },
-  { section: 'Control y seguimiento', path: '/asistencia', label: 'Asistencia', permission: 'VER ASISTENCIA' },
-  { section: 'Control y seguimiento', path: '/asistencia/historial', label: 'Historial asistencias', permission: 'VER ASISTENCIA' },
-  {
-    section: 'Control y seguimiento',
-    path: '/asistencia/dashboard',
-    label: 'Dashboard Asistencia',
-    permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
-  },
-  {
-    section: 'Control y seguimiento',
-    path: '/asistencia/dashboard/casos-bienestar',
-    label: 'Casos Bienestar',
-    permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
-  },
-  {
-    section: 'Control y seguimiento',
-    path: '/asistencia/tipos-observacion',
-    label: 'Tipos de observación',
-    permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
-  },
-  {
-    section: 'Infraestructura',
-    path: '/infraestructura/sedes',
-    label: 'Sedes',
-    permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
-  },
-  {
-    section: 'Infraestructura',
-    path: '/infraestructura/bloques',
-    label: 'Bloques',
-    permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
-  },
-  {
-    section: 'Infraestructura',
-    path: '/infraestructura/pisos',
-    label: 'Pisos',
-    permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
-  },
-  {
-    section: 'Infraestructura',
-    path: '/infraestructura/ambientes',
-    label: 'Ambientes de formación',
-    permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
-  },
-  {
-    section: 'Control y seguimiento',
-    path: '/vigilancia/ambientes',
-    label: 'Vigilancia de ambientes',
-    permission: null,
-    rolesRequired: ['VIGILANTE', 'SUPER ADMINISTRADOR'],
-  },
-  // Inventario desactivado
-  { section: 'Administración', path: '/permisos', label: 'Permisos y roles', permission: 'ASIGNAR PERMISOS' },
-];
+const SIDEBAR_ITEMS = SIDEBAR_MANIFEST;
 
 const ICONS: Record<string, ReactNode> = {
   perfil: <UsersIcon className="w-5 h-5" />,
@@ -180,7 +90,7 @@ const ICONS: Record<string, ReactNode> = {
   asistencia: <ClipboardDocumentListIcon className="w-5 h-5" />,
   'asistencia/historial': <CalendarDaysIcon className="w-5 h-5" />,
   'asistencia/dashboard': <ChartBarIcon className="w-5 h-5" />,
-  'asistencia/dashboard/casos-bienestar': <ExclamationTriangleIcon className="w-5 h-5" />,
+  'bienestar/casos': <ExclamationTriangleIcon className="w-5 h-5" />,
   'asistencia/tipos-observacion': <ClipboardDocumentListIcon className="w-5 h-5" />,
   inventario: <CubeIcon className="w-5 h-5" />,
   'inventario/dashboard': <CubeIcon className="w-5 h-5" />,
@@ -597,7 +507,7 @@ export const Layout = ({ children }: LayoutProps) => {
                       .filter((item) => item.section === section)
                       .map((item) => {
                         const isActive = isNavItemActive(location.pathname, item, visibleItems);
-                        const iconKey = item.path.slice(1);
+                        const iconKey = item.iconKey;
                         return (
                           <Link
                             key={item.path}
@@ -644,6 +554,7 @@ export const Layout = ({ children }: LayoutProps) => {
 
         {/* Main Content */}
         <main className="flex-1 p-4 sm:p-6 dark:bg-gray-900 min-w-0">
+          <AppBreadcrumb />
           {children}
         </main>
       </div>

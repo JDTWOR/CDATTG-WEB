@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, type ChangeEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { asistenciaPaths, fichasPaths } from '../routes/paths';
 import { ArrowLeftIcon, ArrowDownTrayIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
@@ -721,7 +722,7 @@ export const AsistenciaHistorialFicha = () => {
   if (fichaId == null || !Number.isFinite(fichaId)) {
     return (
       <div className="space-y-4">
-        <Link to="/asistencia/historial" className="inline-flex items-center gap-2 text-primary-600 dark:text-primary-400">
+        <Link to={asistenciaPaths.historial.index} className="inline-flex items-center gap-2 text-primary-600 dark:text-primary-400">
           <ArrowLeftIcon className="w-5 h-5" aria-hidden />
           Volver al historial
         </Link>
@@ -735,7 +736,7 @@ export const AsistenciaHistorialFicha = () => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link
-            to="/asistencia/historial"
+            to={asistenciaPaths.historial.index}
             className="inline-flex items-center gap-2 text-primary-600 dark:text-primary-400 mb-2"
           >
             <ArrowLeftIcon className="w-5 h-5" aria-hidden />
@@ -761,7 +762,7 @@ export const AsistenciaHistorialFicha = () => {
           }
           actions={
             <Link
-              to={`/fichas/${ficha.id}`}
+              to={fichasPaths.detalle(ficha.id)}
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700/50"
             >
               <EyeIcon className="h-4 w-4" aria-hidden />

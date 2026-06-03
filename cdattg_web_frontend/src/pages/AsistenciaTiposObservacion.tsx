@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, type ComponentProps } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeftIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { asistenciaPaths } from '../routes/paths';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
 import { useAuth } from '../context/AuthContext';
@@ -80,7 +81,7 @@ export const AsistenciaTiposObservacion = () => {
             Gestione el catálogo de observaciones predefinidas para asistencia.
           </p>
         </div>
-        <Link to="/asistencia" className="btn-secondary inline-flex items-center gap-2">
+        <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center gap-2">
           <ArrowLeftIcon className="w-5 h-5" aria-hidden />
           Volver a asistencia
         </Link>

@@ -1,4 +1,4 @@
-import type { CasoBienestarItem, FichaCaracterizacionResponse } from '../../types';
+import type { CasoBienestarItem, FichaCaracterizacionResponse } from '../../../types';
 
 export type GrupoCasosPorFicha = {
   ficha_numero: string;

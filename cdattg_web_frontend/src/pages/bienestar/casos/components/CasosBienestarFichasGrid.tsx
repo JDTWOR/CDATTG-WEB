@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { UsersIcon } from '@heroicons/react/24/outline';
-import { FichaCaracterizacionCard } from '../../../components/FichaCaracterizacionCard';
+import { bienestarPaths } from '../../bienestarPaths';
+import { FichaCaracterizacionCard } from '../../../../components/FichaCaracterizacionCard';
 import { grupoCasosToFichaCard, type GrupoCasosPorFicha } from '../casosBienestarUtils';
 
 type CasosBienestarFichasGridProps = Readonly<{
@@ -62,7 +63,11 @@ export function CasosBienestarFichasGrid({
           }
           actions={
             <Link
-              to={`/asistencia/dashboard/casos-bienestar/ficha/${encodeURIComponent(grupo.ficha_numero)}?sede=${encodeURIComponent(grupo.sede_nombre || '')}&dias=${dias}&min_fallas=${minFallas}`}
+              to={bienestarPaths.casos.ficha(grupo.ficha_numero, {
+                sede: grupo.sede_nombre || '',
+                dias,
+                min_fallas: minFallas,
+              })}
               className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
             >
               Ver aprendices

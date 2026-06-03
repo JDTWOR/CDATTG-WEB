@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeftIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { asistenciaPaths } from '../../routes/paths';
 
 export function AsistenciaSinFichasView() {
   return (
@@ -13,7 +14,7 @@ export function AsistenciaSinFichasView() {
         <p className="mb-6 max-w-md text-gray-600 dark:text-gray-400">
           Contacta al administrador para que te asigne las fichas correspondientes.
         </p>
-        <Link to="/asistencia" className="inline-flex items-center gap-2 font-medium text-primary-600 hover:text-primary-700">
+        <Link to={asistenciaPaths.index} className="inline-flex items-center gap-2 font-medium text-primary-600 hover:text-primary-700">
           <ArrowLeftIcon className="h-5 w-5" />
           Volver
         </Link>

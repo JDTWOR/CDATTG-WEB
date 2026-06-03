@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { inventarioPaths } from '../routes/paths';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
@@ -105,7 +106,7 @@ export const InventarioOrdenes = () => {
           <p className="mt-2 text-gray-600 dark:text-gray-400">Préstamos y salidas de inventario</p>
         </div>
         <div className="flex gap-2">
-          <Link to="/inventario/ordenes/pendientes" className="btn-secondary">
+          <Link to={inventarioPaths.ordenes.pendientes} className="btn-secondary">
             Pendientes de aprobación
           </Link>
           <button type="button" onClick={() => setModalOpen(true)} className="btn-primary">
@@ -164,7 +165,7 @@ export const InventarioOrdenes = () => {
                       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{o.persona_nombre ?? '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{new Date(o.fecha_orden).toLocaleDateString()}</td>
                       <td className="px-4 py-3 text-right">
-                        <Link to={`/inventario/ordenes/${o.id}`} className="text-primary-600 dark:text-primary-400 hover:underline text-sm">
+                        <Link to={inventarioPaths.ordenes.detalle(o.id)} className="text-primary-600 dark:text-primary-400 hover:underline text-sm">
                           Ver
                         </Link>
                       </td>

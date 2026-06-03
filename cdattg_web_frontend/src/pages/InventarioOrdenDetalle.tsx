@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { inventarioPaths } from '../routes/paths';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
 import type { OrdenResponse } from '../types';
@@ -41,7 +42,7 @@ export const InventarioOrdenDetalle = () => {
         className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-red-700 dark:text-red-300"
       >
         {error || 'Orden no encontrada'}
-        <Link to="/inventario/ordenes" className="ml-2 underline">
+        <Link to={inventarioPaths.ordenes.index} className="ml-2 underline">
           Volver a órdenes
         </Link>
       </div>
@@ -51,7 +52,7 @@ export const InventarioOrdenDetalle = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link to="/inventario/ordenes" className="text-primary-600 dark:text-primary-400 hover:underline">
+        <Link to={inventarioPaths.ordenes.index} className="text-primary-600 dark:text-primary-400 hover:underline">
           <span aria-hidden>←</span> Órdenes
         </Link>
       </div>

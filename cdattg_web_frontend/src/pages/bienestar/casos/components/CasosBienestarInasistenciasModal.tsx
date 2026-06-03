@@ -1,4 +1,4 @@
-import type { CasoBienestarItem, InasistenciaDetalleItem } from '../../../types';
+import type { CasoBienestarItem, InasistenciaDetalleItem } from '../../../../types';
 
 type CasosBienestarInasistenciasModalProps = Readonly<{
   aprendiz: CasoBienestarItem;

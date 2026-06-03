@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { CalendarDaysIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { asistenciaPaths } from '../../routes/paths';
 import { FichaCaracterizacionCard } from '../../components/FichaCaracterizacionCard';
-import { ASIST_MODAL_IDS_ROOT } from './asistenciaConstants';import { AsistenciaModals } from './AsistenciaModals';
+import { ASIST_MODAL_IDS_ROOT } from './asistenciaConstants';
+import { AsistenciaModals } from './AsistenciaModals';
 import type { AsistenciaFichasPageState } from './useAsistenciaFichasCatalog';
 
 type Props = Readonly<{ page: AsistenciaFichasPageState }>;
@@ -28,12 +30,12 @@ export function AsistenciaFichasListView({ page }: Props) {
           <p className="mt-2 text-gray-600 dark:text-gray-400">Tomar asistencia por ficha e instructor</p>
         </div>
         <div className="flex gap-2">
-          <Link to="/asistencia/historial" className="btn-secondary inline-flex items-center gap-2">
+          <Link to={asistenciaPaths.historial.index} className="btn-secondary inline-flex items-center gap-2">
             <CalendarDaysIcon className="h-5 w-5" />
             Historial
           </Link>
           {isSuperAdmin && (
-            <Link to="/asistencia/dashboard" className="btn-secondary inline-flex items-center gap-2">
+            <Link to={asistenciaPaths.dashboard} className="btn-secondary inline-flex items-center gap-2">
               <ChartBarIcon className="h-5 w-5" />
               Dashboard
             </Link>

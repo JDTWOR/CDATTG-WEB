@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { LABEL_INSTRUCTOR_LIDER } from '../constants/instructorLiderLabels';
 import { FichaCaracterizacionCard } from '../components/FichaCaracterizacionCard';
 import type { FichaCaracterizacionResponse } from '../types';
+import { asistenciaHistorialFichaPath, asistenciaPaths } from './asistencia/asistenciaPaths';
 
 const HISTORIAL_SEARCH_ID = 'asistencia-historial-buscar-ficha';
 
@@ -58,7 +59,7 @@ function HistorialFichasTable({ rows }: HistorialFichasTableProps) {
                 <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.cantidad_aprendices}</td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    to={`/asistencia/historial/ficha/${item.id}`}
+                    to={asistenciaHistorialFichaPath(item.id)}
                     className="inline-flex items-center gap-1.5 px-3 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
                   >
                     <CalendarDaysIcon className="w-4 h-4" aria-hidden />
@@ -85,7 +86,7 @@ function HistorialFichasCards({ rows }: HistorialFichasCardsProps) {
           ficha={item}
           actions={
             <Link
-              to={`/asistencia/historial/ficha/${item.id}`}
+              to={asistenciaHistorialFichaPath(item.id)}
               className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
             >
               <CalendarDaysIcon className="h-4 w-4" aria-hidden />
@@ -149,7 +150,7 @@ export const AsistenciaHistorial = () => {
               : 'Consulte por fecha qué aprendices asistieron o no a cada ficha. Solo puede ver el historial de las fichas en las que está asignado.'}
           </p>
         </div>
-        <Link to="/asistencia" className="btn-secondary inline-flex items-center gap-2">
+        <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center gap-2">
           <ClipboardDocumentListIcon className="w-5 h-5" aria-hidden />
           Tomar asistencia
         </Link>
@@ -205,7 +206,7 @@ export const AsistenciaHistorial = () => {
               ? 'No hay fichas registradas'
               : 'No tiene fichas asignadas como instructor. Solo puede ver el historial de las fichas en las que está asignado.'}
           </p>
-          <Link to="/asistencia" className="btn-primary mt-4 inline-flex">
+          <Link to={asistenciaPaths.index} className="btn-primary mt-4 inline-flex">
             Ir a tomar asistencia
           </Link>
         </div>

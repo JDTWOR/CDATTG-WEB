@@ -1,6 +1,14 @@
+import { asistenciaPaths } from '../../routes/paths';
+
+export { asistenciaPaths };
+
 /** Ruta de toma de asistencia para una ficha (deep-link directo). */
 export function asistenciaFichaPath(fichaId: number): string {
-  return `/asistencia/ficha/${fichaId}`;
+  return asistenciaPaths.sesion(fichaId);
+}
+
+export function asistenciaHistorialFichaPath(fichaId: number): string {
+  return asistenciaPaths.historial.ficha(fichaId);
 }
 
 export function parseAsistenciaFichaIdParam(raw: string | undefined): number | null {

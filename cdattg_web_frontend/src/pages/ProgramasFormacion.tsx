@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { programasPaths } from '../routes/paths';
 import { PencilSquareIcon, TrashIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
@@ -94,7 +95,7 @@ export const ProgramasFormacion = () => {
           <p className="mt-2 text-gray-600 dark:text-gray-400">Gestión de programas de formación</p>
         </div>
         <div className="flex gap-2">
-          <Link to="/programas/importar" className="btn-secondary">
+          <Link to={programasPaths.importar} className="btn-secondary">
             <ArrowUpTrayIcon className="w-5 h-5 inline mr-2" aria-hidden />
             Importar programas
           </Link>

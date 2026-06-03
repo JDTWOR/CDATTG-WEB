@@ -1,5 +1,5 @@
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { SelectSearch } from '../../../components/SelectSearch';
+import { SelectSearch } from '../../../../components/SelectSearch';
 import { CASOS_BIEN_LISTA_PROGRAMA_ID, CASOS_BIEN_LISTA_SEARCH_ID } from '../casosBienestarConstants';
 
 type CasosBienestarListaFiltersProps = Readonly<{

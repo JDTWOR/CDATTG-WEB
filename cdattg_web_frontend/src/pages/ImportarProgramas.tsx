@@ -1,6 +1,5 @@
 import { useState, useRef, type ChangeEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { HomeIcon, ArrowUpTrayIcon, PlayIcon, LightBulbIcon } from '@heroicons/react/24/outline';
+import { ArrowUpTrayIcon, PlayIcon, LightBulbIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
 import type { ProgramaImportResult } from '../types';
@@ -50,16 +49,6 @@ export const ImportarProgramas = () => {
 
   return (
     <div className="space-y-6">
-      <nav className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-        <Link to="/dashboard" className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400">
-          <HomeIcon className="w-4 h-4" aria-hidden /> Inicio
-        </Link>
-        <span>/</span>
-        <Link to="/programas" className="hover:text-primary-600 dark:hover:text-primary-400">Programas</Link>
-        <span>/</span>
-        <span className="text-gray-900 dark:text-white font-medium">Importar</span>
-      </nav>
-
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
         Importar programas de formación
       </h1>

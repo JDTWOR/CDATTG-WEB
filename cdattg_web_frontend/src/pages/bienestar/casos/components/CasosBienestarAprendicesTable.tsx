@@ -1,4 +1,4 @@
-import type { CasoBienestarItem } from '../../../types';
+import type { CasoBienestarItem } from '../../../../types';
 
 type CasosBienestarAprendicesTableProps = Readonly<{
   fichaNumero: string;

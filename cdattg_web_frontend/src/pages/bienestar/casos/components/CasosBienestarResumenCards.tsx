@@ -1,5 +1,5 @@
 import { DocumentMagnifyingGlassIcon, UserGroupIcon } from '@heroicons/react/24/outline';
-import type { CasosBienestarResponse } from '../../../types';
+import type { CasosBienestarResponse } from '../../../../types';
 
 type CasosBienestarResumenCardsProps = Readonly<{
   data: CasosBienestarResponse;

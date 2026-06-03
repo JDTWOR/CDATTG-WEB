@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { apiService } from '../../../services/api';
-import { axiosErrorMessage } from '../../../utils/httpError';
-import { useAuth } from '../../../context/AuthContext';
+import { apiService } from '../../../../services/api';
+import { axiosErrorMessage } from '../../../../utils/httpError';
+import { useAuth } from '../../../../context/AuthContext';
 import { canViewCasosBienestar, MENSAJE_SIN_PERMISO_CASOS_BIENESTAR } from '../casosBienestarPermissions';
 import { casosDeFicha, filtrarCasosAprendiz } from '../casosBienestarUtils';
-import type { CasoBienestarItem, InasistenciaDetalleItem } from '../../../types';
+import type { CasoBienestarItem, InasistenciaDetalleItem } from '../../../../types';
 import { useCasosBienestar } from './useCasosBienestar';
 
 export function useCasosBienestarFichaDetalle() {

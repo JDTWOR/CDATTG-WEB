@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { personasPaths } from '../routes/paths';
 import { PlusIcon, EyeIcon, PencilSquareIcon, KeyIcon, TrashIcon, ArrowUpTrayIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
@@ -94,7 +95,7 @@ export const Personas = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Link to="/personas/importar" className="btn-secondary">
+          <Link to={personasPaths.importar} className="btn-secondary">
             <ArrowUpTrayIcon className="w-5 h-5 inline mr-2" />
             Importar personas
           </Link>

@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { fichasPaths } from '../../../routes/paths';
 
 export function FichaDetalleInvalidIdState() {
   return (
     <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-4 py-6 text-red-800 dark:text-red-200">
       <p className="font-medium">Identificador inválido.</p>
-      <Link to="/fichas" className="mt-2 inline-flex items-center gap-1 text-sm underline">
+      <Link to={fichasPaths.index} className="mt-2 inline-flex items-center gap-1 text-sm underline">
         <ArrowLeftIcon className="w-4 h-4" /> Volver a fichas
       </Link>
     </div>
@@ -32,7 +33,7 @@ export function FichaDetalleErrorState({ message }: FichaDetalleErrorStateProps)
         <p className="font-medium">{message}</p>
       </div>
       <Link
-        to="/fichas"
+        to={fichasPaths.index}
         className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
       >
         <ArrowLeftIcon className="w-4 h-4" /> Volver a fichas

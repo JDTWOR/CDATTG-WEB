@@ -13,7 +13,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
 import { axiosErrorMessage } from '../../utils/httpError';
-import { canViewCasosBienestar } from '../casos-bienestar/casosBienestarPermissions';
+import { asistenciaPaths, bienestarPaths, fichasPaths } from '../../routes/paths';
+import { canViewCasosBienestar } from '../bienestar/casos/casosBienestarPermissions';
 import type { AsistenciaDashboardResponse } from '../../types';
 
 export function AdminDashboardView() {
@@ -301,7 +302,7 @@ export function AdminDashboardView() {
                       <td className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">{row.total_aprendices}</td>
                       <td className="px-4 py-2 text-right">
                         <Link
-                          to={`/fichas/${row.ficha_id}`}
+                          to={fichasPaths.detalle(row.ficha_id)}
                           className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline text-xs font-medium"
                         >
                           <DocumentTextIcon className="w-4 h-4" aria-hidden />
@@ -389,21 +390,21 @@ export function AdminDashboardView() {
       <div className="card">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Accesos directos</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <Link to="/asistencia" className="btn-secondary inline-flex items-center justify-center">
+          <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center justify-center">
             Tomar asistencia
           </Link>
-          <Link to="/asistencia/historial" className="btn-secondary inline-flex items-center justify-center">
+          <Link to={asistenciaPaths.historial.index} className="btn-secondary inline-flex items-center justify-center">
             <CalendarDaysIcon className="w-5 h-5 mr-2" aria-hidden />
             Historial asistencias
           </Link>
-          <Link to="/asistencia/dashboard" className="btn-secondary inline-flex items-center justify-center">
+          <Link to={asistenciaPaths.dashboard} className="btn-secondary inline-flex items-center justify-center">
             Dashboard asistencia
           </Link>
-          <Link to="/asistencia/dashboard/casos-bienestar" className="btn-secondary inline-flex items-center justify-center">
+          <Link to={bienestarPaths.casos.index} className="btn-secondary inline-flex items-center justify-center">
             Casos bienestar
           </Link>
           {roles.includes('SUPER ADMINISTRADOR') && (
-            <Link to="/asistencia/tipos-observacion" className="btn-secondary inline-flex items-center justify-center">
+            <Link to={asistenciaPaths.tiposObservacion} className="btn-secondary inline-flex items-center justify-center">
               Tipos de observación
             </Link>
           )}

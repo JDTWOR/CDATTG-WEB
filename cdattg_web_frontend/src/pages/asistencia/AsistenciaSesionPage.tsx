@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { asistenciaPaths } from '../../routes/paths';
 import { useAsistenciaSesion } from './useAsistenciaSesion';
 import { AsistenciaTomarSesionView } from './AsistenciaTomarSesionView';
 
@@ -23,7 +24,7 @@ export function AsistenciaSesionPage() {
           {page.errorEntrada || 'No se pudo abrir la sesión de asistencia.'}
         </div>
         <Link
-          to="/asistencia"
+          to={asistenciaPaths.index}
           className="inline-flex items-center gap-2 font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
         >
           <ArrowLeftIcon className="h-5 w-5" />

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useLocation, useParams, Link } from 'react-router-dom';
+import { useBreadcrumbOverride } from '../navigation/breadcrumb';
+import { permisosPaths } from '../routes/paths';
 import { ArrowLeftIcon, UserCircleIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
@@ -193,7 +195,9 @@ function UsuarioPermisosDetallePanel({
 }
 
 export function Permisos() {
+  const { pathname } = useLocation();
   const { userId } = useParams<{ userId: string }>();
+  const { setLabel, clearLabel } = useBreadcrumbOverride();
   const { user: currentUser, roles, hasPermission } = useAuth();
   const isSuperAdmin = roles.includes('SUPER ADMINISTRADOR');
 
@@ -249,6 +253,17 @@ export function Permisos() {
       .catch((err: unknown) => setError(axiosErrorMessage(err, 'Error al cargar detalle')))
       .finally(() => setLoadingDetalle(false));
   }, [targetUserId, hasPermission]);
+
+  useEffect(() => {
+    if (!targetUserId) {
+      clearLabel(pathname);
+      return;
+    }
+    const usuario = list.find((u) => u.id === targetUserId);
+    const nombre = detalle?.full_name ?? usuario?.full_name;
+    setLabel(pathname, nombre ? `Usuario ${nombre}` : `Usuario ${targetUserId}`);
+    return () => clearLabel(pathname);
+  }, [targetUserId, detalle?.full_name, list, pathname, setLabel, clearLabel]);
 
   const handleAsignarPermiso = async (obj: string, act: string) => {
     if (!targetUserId || esYo || saving) return;
@@ -333,7 +348,7 @@ export function Permisos() {
       <div className="space-y-6">
         <div className="flex items-center gap-4">
           <Link
-            to="/permisos"
+            to={permisosPaths.index}
             className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200"
             aria-label="Volver al listado de permisos"
           >

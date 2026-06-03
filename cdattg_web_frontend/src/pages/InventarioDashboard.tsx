@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { inventarioPaths } from '../routes/paths';
 import { CubeIcon, ExclamationTriangleIcon, ShoppingCartIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import type { InventarioDashboardResponse } from '../types';
@@ -107,16 +108,16 @@ export const InventarioDashboard = () => {
       <div className="card p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Acciones rápidas</h2>
         <div className="flex flex-wrap gap-3">
-          <Link to="/inventario/productos" className="btn-primary">
+          <Link to={inventarioPaths.productos} className="btn-primary">
             Ver productos
           </Link>
-          <Link to="/inventario/ordenes" className="btn-secondary">
+          <Link to={inventarioPaths.ordenes.index} className="btn-secondary">
             Ver órdenes
           </Link>
-          <Link to="/inventario/ordenes/pendientes" className="btn-secondary">
+          <Link to={inventarioPaths.ordenes.pendientes} className="btn-secondary">
             Pendientes de aprobación
           </Link>
-          <Link to="/inventario/devoluciones" className="btn-secondary">
+          <Link to={inventarioPaths.devoluciones} className="btn-secondary">
             Registrar devolución
           </Link>
         </div>

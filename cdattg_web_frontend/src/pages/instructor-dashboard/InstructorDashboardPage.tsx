@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AcademicCapIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
+import { asistenciaPaths, fichasPaths } from '../../routes/paths';
 import { WeekScheduleCalendar } from '../../components/calendar/WeekScheduleCalendar';
 import { computeGridTimeRangeFromEvents, formatGridRangeLabel } from '../../components/calendar/calendarUtils';
 import { useInstructorAgenda, useInitialWeekStart } from './useInstructorAgenda';
@@ -40,11 +41,11 @@ export function InstructorDashboardPage() {
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{loading ? '…' : fichasUnicas}</p>
         </div>
         <div className="card flex flex-col justify-center gap-2">
-          <Link to="/asistencia" className="btn-primary inline-flex items-center justify-center gap-2 text-sm">
+          <Link to={asistenciaPaths.index} className="btn-primary inline-flex items-center justify-center gap-2 text-sm">
             <CalendarDaysIcon className="h-5 w-5" />
             Tomar asistencia
           </Link>
-          <Link to="/fichas" className="btn-secondary inline-flex items-center justify-center gap-2 text-sm">
+          <Link to={fichasPaths.index} className="btn-secondary inline-flex items-center justify-center gap-2 text-sm">
             <AcademicCapIcon className="h-5 w-5" />
             Mis fichas
           </Link>

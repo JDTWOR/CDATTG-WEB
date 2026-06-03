@@ -23,3 +23,17 @@ export function toggleDiaEnInstructores(
 export function hoyISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+export function fechaInputValue(iso?: string | null): string {
+  if (!iso) return '';
+  return iso.slice(0, 10);
+}
+
+export function vigenciaInstructorDefault(
+  inst: { fecha_inicio?: string; fecha_fin?: string },
+  ficha: { fecha_inicio?: string; fecha_fin?: string } | null,
+): { inicio: string; fin: string } {
+  const inicio = fechaInputValue(inst.fecha_inicio) || fechaInputValue(ficha?.fecha_inicio) || hoyISO();
+  const fin = fechaInputValue(inst.fecha_fin) || fechaInputValue(ficha?.fecha_fin) || hoyISO();
+  return { inicio, fin };
+}

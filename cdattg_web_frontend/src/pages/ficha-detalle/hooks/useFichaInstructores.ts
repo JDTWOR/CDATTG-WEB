@@ -9,7 +9,7 @@ import type {
   InstructorItem,
   DiaFormacionItem,
 } from '../../../types';
-import { hoyISO, toggleDiaEnInstructores } from '../fichaDetalleUtils';
+import { hoyISO, toggleDiaEnInstructores, vigenciaInstructorDefault } from '../fichaDetalleUtils';
 
 type UseFichaInstructoresParams = Readonly<{
   fichaId: number;
@@ -37,6 +37,8 @@ export function useFichaInstructores({
   const [fechaFin, setFechaFin] = useState('');
   const [programandoInstructorId, setProgramandoInstructorId] = useState<number | null>(null);
   const [programacionDiasDraft, setProgramacionDiasDraft] = useState<number[]>([]);
+  const [programacionFechaInicioDraft, setProgramacionFechaInicioDraft] = useState('');
+  const [programacionFechaFinDraft, setProgramacionFechaFinDraft] = useState('');
   const [guardandoProgramacion, setGuardandoProgramacion] = useState(false);
 
   useEffect(() => {
@@ -112,17 +114,22 @@ export function useFichaInstructores({
 
   const onIniciarProgramacion = useCallback(
     (inst: InstructorFichaResponse) => {
+      const vigencia = vigenciaInstructorDefault(inst, ficha);
       setProgramandoInstructorId(inst.instructor_id);
+      setProgramacionFechaInicioDraft(vigencia.inicio);
+      setProgramacionFechaFinDraft(vigencia.fin);
       setProgramacionDiasDraft(
         inst.dias_formacion_ids?.length ? [...inst.dias_formacion_ids] : [...defaultDiasIds],
       );
     },
-    [defaultDiasIds],
+    [defaultDiasIds, ficha],
   );
 
   const onCancelarProgramacion = useCallback(() => {
     setProgramandoInstructorId(null);
     setProgramacionDiasDraft([]);
+    setProgramacionFechaInicioDraft('');
+    setProgramacionFechaFinDraft('');
   }, []);
 
   const onToggleDiaProgramacion = useCallback((diaId: number) => {
@@ -140,6 +147,14 @@ export function useFichaInstructores({
       alert('Seleccione al menos un día de formación.');
       return;
     }
+    if (
+      !programacionFechaInicioDraft ||
+      !programacionFechaFinDraft ||
+      programacionFechaInicioDraft > programacionFechaFinDraft
+    ) {
+      alert('Revise las fechas de vigencia: la fecha fin debe ser igual o posterior a la de inicio.');
+      return;
+    }
     const inst = instructores.find((i) => i.instructor_id === programandoInstructorId);
     if (!inst) return;
     const req: AsignarInstructoresRequest = {
@@ -147,8 +162,8 @@ export function useFichaInstructores({
       instructores: [
         {
           instructor_id: inst.instructor_id,
-          fecha_inicio: inst.fecha_inicio?.slice(0, 10) || ficha.fecha_inicio?.slice(0, 10) || hoyISO(),
-          fecha_fin: inst.fecha_fin?.slice(0, 10) || ficha.fecha_fin?.slice(0, 10) || hoyISO(),
+          fecha_inicio: programacionFechaInicioDraft,
+          fecha_fin: programacionFechaFinDraft,
           dias_formacion_ids: programacionDiasDraft,
         },
       ],
@@ -197,6 +212,10 @@ export function useFichaInstructores({
     handleAsignarInstructores,
     programandoInstructorId,
     programacionDiasDraft,
+    programacionFechaInicioDraft,
+    programacionFechaFinDraft,
+    setProgramacionFechaInicioDraft,
+    setProgramacionFechaFinDraft,
     onIniciarProgramacion,
     onCancelarProgramacion,
     onToggleDiaProgramacion,

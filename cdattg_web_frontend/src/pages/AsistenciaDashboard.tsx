@@ -6,6 +6,7 @@ import { axiosErrorMessage } from '../utils/httpError';
 import { useAuth } from '../context/AuthContext';
 import { getAsistenciaDashboardWsUrl } from '../config/api';
 import type { AsistenciaDashboardPorFicha, AsistenciaDashboardResponse } from '../types';
+import { canViewCasosBienestar } from './casos-bienestar/casosBienestarPermissions';
 
 const DASH_SEARCH_ID = 'asistencia-dashboard-buscar-ficha';
 const DASH_JORNADA_ID = 'asistencia-dashboard-filtro-jornada';
@@ -244,7 +245,7 @@ export const AsistenciaDashboard = () => {
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageSize = 20;
 
-  const canViewBienestar = roles.includes('SUPER ADMINISTRADOR') || roles.includes('BIENESTAR AL APRENDIZ');
+  const canViewBienestar = canViewCasosBienestar(roles);
 
   const fetchDashboard = useCallback(async () => {
     try {

@@ -19,8 +19,8 @@ import { Asistencia, AsistenciaSesionPage } from './pages/Asistencia';
 import { AsistenciaHistorial } from './pages/AsistenciaHistorial';
 import { AsistenciaHistorialFicha } from './pages/AsistenciaHistorialFicha';
 import { AsistenciaDashboard } from './pages/AsistenciaDashboard';
-import { CasosBienestar } from './pages/CasosBienestar';
-import { CasosBienestarFichaDetalle } from './pages/CasosBienestarFichaDetalle';
+import { CasosBienestarPage } from './pages/casos-bienestar/CasosBienestarPage';
+import { CasosBienestarFichaDetallePage } from './pages/casos-bienestar/CasosBienestarFichaDetallePage';
 import { AsistenciaTiposObservacion } from './pages/AsistenciaTiposObservacion';
 import { InventarioDashboard } from './pages/InventarioDashboard';
 import { InventarioProductos } from './pages/InventarioProductos';
@@ -208,7 +208,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <Layout>
-                  <CasosBienestar />
+                  <CasosBienestarPage />
                 </Layout>
               </ProtectedRoute>
             }
@@ -218,7 +218,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <Layout>
-                  <CasosBienestarFichaDetalle />
+                  <CasosBienestarFichaDetallePage />
                 </Layout>
               </ProtectedRoute>
             }

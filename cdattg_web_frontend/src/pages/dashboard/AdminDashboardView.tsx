@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
 import { axiosErrorMessage } from '../../utils/httpError';
+import { canViewCasosBienestar } from '../casos-bienestar/casosBienestarPermissions';
 import type { AsistenciaDashboardResponse } from '../../types';
 
 export function AdminDashboardView() {
@@ -38,7 +39,7 @@ export function AdminDashboardView() {
         const canSeeAsistenciaNow = hasPermission('VER ASISTENCIA');
         const isSuperAdminNow = roles.includes('SUPER ADMINISTRADOR');
         const canLoadAsistenciaDashboard = canSeeAsistenciaNow || isSuperAdminNow;
-        const canSeeBienestarNow = isSuperAdminNow || roles.includes('BIENESTAR AL APRENDIZ');
+        const canSeeBienestarNow = canViewCasosBienestar(roles);
 
         const [personasRes, instructoresRes, aprendicesRes, asistenciaRes, casosRes] = await Promise.all([
           canSeePersonasNow ? apiService.getPersonas(1, 1) : Promise.resolve(null),
@@ -78,7 +79,7 @@ export function AdminDashboardView() {
   const canSeeInstructores = hasPermission('VER FICHAS'); // listado de instructores usa permiso de fichas
   const canSeeAprendices = hasPermission('VER APRENDICES');
   const canSeeAsistencia = hasPermission('VER ASISTENCIA');
-  const canSeeBienestar = roles.includes('SUPER ADMINISTRADOR') || roles.includes('BIENESTAR AL APRENDIZ');
+  const canSeeBienestar = canViewCasosBienestar(roles);
   const esSuperAdmin = roles.includes('SUPER ADMINISTRADOR');
 
   const fichasSinAsistenciaHoy = useMemo(

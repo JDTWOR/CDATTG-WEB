@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 import { apiService } from '../../../services/api';
+import { confirmOcultarAprendizAsistencia } from '../../../utils/confirmOcultarAprendizAsistencia';
 import { axiosErrorMessage } from '../../../utils/httpError';
 import type { AprendizResponse, PersonaResponse } from '../../../types';
 
@@ -56,11 +58,13 @@ export function useFichaAprendices(fichaId: number, loadFicha: () => Promise<voi
     }
   };
 
-  const handleOcultarEnAsistencia = async (personaId: number, oculto: boolean) => {
-    const msg = oculto
-      ? '¿Ocultar este aprendiz de la toma de asistencia del día? Seguirá en la ficha y contará inasistencias si no asiste.'
-      : '¿Mostrar de nuevo este aprendiz en la toma de asistencia?';
-    if (!confirm(msg)) return;
+  const handleOcultarEnAsistencia = async (
+    personaId: number,
+    oculto: boolean,
+    nombreAprendiz: string,
+  ) => {
+    const confirmed = await confirmOcultarAprendizAsistencia(nombreAprendiz, oculto);
+    if (!confirmed) return;
     try {
       await apiService.setOcultoAprendicesAsistencia(fichaId, [personaId], oculto);
       await loadAprendices();

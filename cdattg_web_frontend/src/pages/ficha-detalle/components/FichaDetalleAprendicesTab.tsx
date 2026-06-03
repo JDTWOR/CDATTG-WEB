@@ -55,7 +55,13 @@ export function FichaDetalleAprendicesTab({
                 <div className="flex shrink-0 flex-wrap items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => void handleOcultarEnAsistencia(a.persona_id, !a.oculto_en_asistencia)}
+                    onClick={() =>
+                      void handleOcultarEnAsistencia(
+                        a.persona_id,
+                        !a.oculto_en_asistencia,
+                        a.persona_nombre,
+                      )
+                    }
                     className="text-sm font-medium text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300"
                   >
                     {a.oculto_en_asistencia ? 'Mostrar en asistencia' : 'Ocultar de asistencia'}

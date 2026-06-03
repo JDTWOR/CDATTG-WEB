@@ -80,6 +80,11 @@ import type {
   DefinicionesPermisosResponse,
 } from '../types';
 import type { InstructorAgendaResponse } from '../types/agenda';
+import { sortAprendicesAz } from '../utils/sortAprendices';
+
+function normalizeAprendicesList(data: AprendizResponse[]): AprendizResponse[] {
+  return sortAprendicesAz(data);
+}
 
 /** Payload parcial desde el stream NDJSON de importación de personas */
 type PersonaImportStreamJson = PersonaImportProgress & {
@@ -559,7 +564,7 @@ class ApiService {
   // Aprendices de una ficha
   async getFichaAprendices(fichaId: number): Promise<AprendizResponse[]> {
     const response = await this.api.get<{ data: AprendizResponse[] }>(`/fichas-caracterizacion/${fichaId}/aprendices`);
-    return response.data.data;
+    return normalizeAprendicesList(response.data.data);
   }
 
   async asignarAprendices(fichaId: number, personas: number[]): Promise<void> {
@@ -608,7 +613,10 @@ class ApiService {
     const response = await this.api.get<PaginatedResponse<AprendizResponse>>('/aprendices', {
       params: { page, page_size: pageSize, ficha_id: fichaId, search: search || undefined },
     });
-    return response.data;
+    return {
+      ...response.data,
+      data: normalizeAprendicesList(response.data.data),
+    };
   }
 
   async getAprendizById(id: number): Promise<AprendizResponse> {

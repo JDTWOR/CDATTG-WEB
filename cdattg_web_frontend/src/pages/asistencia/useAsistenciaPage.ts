@@ -15,7 +15,6 @@ import {
   computeBulkCounts,
   groupRegistrosByAprendiz,
   inferirAccionPorDocumento,
-  sortAprendicesAz,
   summaryRegistros,
 } from './asistenciaUtils';
 import { mostrarToastErrorAsistencia, mostrarToastRegistroAsistencia } from './asistenciaToast';
@@ -162,7 +161,7 @@ export function useAsistenciaPage() {
           apiService.getFichaAprendices(fid),
           apiService.getAsistenciaAprendices(asistenciaId),
         ]);
-        setAprendicesFicha(sortAprendicesAz(aprendices.filter(aprendizVisibleEnTomaAsistencia)));
+        setAprendicesFicha(aprendices.filter(aprendizVisibleEnTomaAsistencia));
         setAprendicesEnSesion(enSesion);
       } catch (e: unknown) {
         setErrorAprendices(
@@ -404,14 +403,12 @@ export function useAsistenciaPage() {
 
   const aprendicesFiltrados = useMemo(() => {
     const q = busquedaAprendiz.trim().toLowerCase();
-    const lista = q
-      ? aprendicesFicha.filter(
-          (a) =>
-            (a.persona_nombre?.toLowerCase().includes(q) ?? false) ||
-            (a.persona_documento?.toLowerCase().includes(q) ?? false),
-        )
-      : aprendicesFicha;
-    return sortAprendicesAz(lista);
+    if (!q) return aprendicesFicha;
+    return aprendicesFicha.filter(
+      (a) =>
+        (a.persona_nombre?.toLowerCase().includes(q) ?? false) ||
+        (a.persona_documento?.toLowerCase().includes(q) ?? false),
+    );
   }, [aprendicesFicha, busquedaAprendiz]);
 
   const bulkCounts = useMemo(

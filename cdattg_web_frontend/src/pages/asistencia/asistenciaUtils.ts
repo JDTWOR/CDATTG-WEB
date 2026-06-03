@@ -15,16 +15,8 @@ export function inferirAccionPorDocumento(
   return open ? 'salida' : 'ingreso';
 }
 
-/** Orden A–Z por nombre de persona (desempate por documento). */
-export function sortAprendicesAz(aprendices: AprendizResponse[]): AprendizResponse[] {
-  return [...aprendices].sort((a, b) => {
-    const byNombre = (a.persona_nombre ?? '').localeCompare(b.persona_nombre ?? '', 'es', {
-      sensitivity: 'base',
-    });
-    if (byNombre !== 0) return byNombre;
-    return (a.persona_documento ?? '').localeCompare(b.persona_documento ?? '', 'es', { sensitivity: 'base' });
-  });
-}
+/** Re-export legacy; usar utils/sortAprendices o apiService para listas normalizadas. */
+export { sortAprendicesAz } from '../../utils/sortAprendices';
 
 export function groupRegistrosByAprendiz(list: AsistenciaAprendizResponse[]): Map<number, AsistenciaAprendizResponse[]> {
   const map = new Map<number, AsistenciaAprendizResponse[]>();

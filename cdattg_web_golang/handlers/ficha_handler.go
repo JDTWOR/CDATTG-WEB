@@ -12,8 +12,10 @@ import (
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
+	"github.com/sena/cdattg-web-golang/repositories/aprendizorder"
 	"github.com/sena/cdattg-web-golang/services"
 	"github.com/xuri/excelize/v2"
+	"gorm.io/gorm"
 )
 
 const errMsgInstructorParamInvalido = "ID de instructor inválido"
@@ -358,7 +360,9 @@ func (h *FichaHandler) ExportAllExcel(c *gin.Context) {
 	var fichas []models.FichaCaracterizacion
 	if err := database.GetDB().
 		Preload("ProgramaFormacion").
-		Preload("Aprendices", "estado = ?", true).
+		Preload("Aprendices", func(db *gorm.DB) *gorm.DB {
+			return aprendizorder.ScopeOrderByPersonaNombre(db.Where("estado = ?", true), false)
+		}).
 		Preload("Aprendices.Persona").
 		Order("ficha ASC").
 		Find(&fichas).Error; err != nil {
@@ -393,9 +397,9 @@ func appendFichaSheetToExport(xlsx *excelize.File, ficha models.FichaCaracteriza
 	}
 	sheetName := uniqueSheetName(baseSheetName, st.used)
 	if st.idx == 0 {
-		xlsx.SetSheetName(st.originalFirst, sheetName)
+		_ = xlsx.SetSheetName(st.originalFirst, sheetName)
 	} else {
-		xlsx.NewSheet(sheetName)
+		_, _ = xlsx.NewSheet(sheetName)
 	}
 	st.idx++
 

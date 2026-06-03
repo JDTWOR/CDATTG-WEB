@@ -5,6 +5,7 @@ import (
 
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/models"
+	"github.com/sena/cdattg-web-golang/repositories/aprendizorder"
 	"gorm.io/gorm"
 )
 
@@ -42,7 +43,9 @@ func (r *aprendizRepository) FindByID(id uint) (*models.Aprendiz, error) {
 
 func (r *aprendizRepository) FindByFichaID(fichaID uint) ([]models.Aprendiz, error) {
 	var list []models.Aprendiz
-	if err := r.db.Where("ficha_caracterizacion_id = ?", fichaID).Preload("Persona").Preload(aprendizPreloadFichaPrograma).Preload(aprendizPreloadFichaSedeRegional).Find(&list).Error; err != nil {
+	q := r.db.Where("ficha_caracterizacion_id = ?", fichaID)
+	q = aprendizorder.ScopeOrderByPersonaNombre(q, false)
+	if err := q.Preload("Persona").Preload(aprendizPreloadFichaPrograma).Preload(aprendizPreloadFichaSedeRegional).Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -100,12 +103,15 @@ func (r *aprendizRepository) FindAll(page, pageSize int, fichaID *uint, search s
 	if fichaID != nil && *fichaID > 0 {
 		findQ = findQ.Where("aprendices.ficha_caracterizacion_id = ?", *fichaID)
 	}
+	personaJoinAlready := false
 	if search != "" {
 		findQ = findQ.Joins("LEFT JOIN personas ON personas.id = aprendices.persona_id").
 			Joins("LEFT JOIN fichas_caracterizacion ON fichas_caracterizacion.id = aprendices.ficha_caracterizacion_id").
 			Joins("LEFT JOIN programas_formacion ON programas_formacion.id = fichas_caracterizacion.programa_formacion_id")
 		findQ = applyAprendizSearch(findQ, search)
+		personaJoinAlready = true
 	}
+	findQ = aprendizorder.ScopeOrderByPersonaNombre(findQ, personaJoinAlready)
 	if err := findQ.Offset(offset).Limit(pageSize).Find(&list).Error; err != nil {
 		return nil, 0, err
 	}

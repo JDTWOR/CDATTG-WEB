@@ -9,7 +9,7 @@ export function canProgramarInstructores(
   roles: string[],
   hasPermission: (permission: string) => boolean,
 ): boolean {
-  if (hasPermission(PERM_PROGRAMAR_INSTRUCTORES)) return true;
+  if (hasPermission('*') || hasPermission(PERM_PROGRAMAR_INSTRUCTORES)) return true;
   return ROLES_PROGRAMACION.some((r) => roles.includes(r));
 }
 

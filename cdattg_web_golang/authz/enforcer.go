@@ -127,6 +127,34 @@ func GetDirectPermissionsForUser(e *casbin.Enforcer, userID string) [][]string {
 	return rules
 }
 
+func addRolePolicyActs(rules [][]string, seen map[string]bool) {
+	for _, r := range rules {
+		if len(r) < 3 {
+			continue
+		}
+		if r[1] == "*" && r[2] == "*" {
+			seen["*"] = true
+		}
+		seen[r[2]] = true
+	}
+}
+
+func addDirectPolicyActs(rules [][]string, seen map[string]bool) {
+	for _, r := range rules {
+		if len(r) >= 3 {
+			seen[r[2]] = true
+		}
+	}
+}
+
+func permissionNamesFromSet(seen map[string]bool) []string {
+	out := make([]string, 0, len(seen))
+	for k := range seen {
+		out = append(out, k)
+	}
+	return out
+}
+
 // GetAllPermissionsForUser devuelve todos los nombres de permiso (act) que tiene el usuario:
 // por roles (p) y por asignación directa (p2). Sin duplicados, para login/respuesta API.
 func GetAllPermissionsForUser(e *casbin.Enforcer, userID string) ([]string, error) {
@@ -137,23 +165,11 @@ func GetAllPermissionsForUser(e *casbin.Enforcer, userID string) ([]string, erro
 	}
 	for _, role := range roles {
 		rules, _ := e.GetFilteredPolicy(0, role)
-		for _, r := range rules {
-			if len(r) >= 3 {
-				seen[r[2]] = true // act
-			}
-		}
+		addRolePolicyActs(rules, seen)
 	}
 	p2Rules, _ := e.GetFilteredNamedPolicy(policyDirect, 0, userID)
-	for _, r := range p2Rules {
-		if len(r) >= 3 {
-			seen[r[2]] = true
-		}
-	}
-	out := make([]string, 0, len(seen))
-	for k := range seen {
-		out = append(out, k)
-	}
-	return out, nil
+	addDirectPolicyActs(p2Rules, seen)
+	return permissionNamesFromSet(seen), nil
 }
 
 // DeleteRolesForUser quita todos los roles del usuario (g). Útil antes de reasignar.

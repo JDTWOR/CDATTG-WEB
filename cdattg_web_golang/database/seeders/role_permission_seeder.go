@@ -106,7 +106,7 @@ func syncAgendaPermissions(e *casbin.Enforcer) error {
 	return nil
 }
 
-// SyncAgendaPermissionsToRoles idempotente para despliegues existentes (sin re-ejecutar todo el seeder).
+// SyncAgendaPermissionsToRoles idempotente para despliegues existentes (sin re-ejecutar el seeder completo).
 func SyncAgendaPermissionsToRoles(db *gorm.DB) error {
 	log.Println("Sincronizando permisos de agenda/programación...")
 	e, err := authz.GetEnforcer(db)

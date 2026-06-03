@@ -24,6 +24,7 @@ import { ModalAsignarFicha } from '../components/ModalAsignarFicha';
 import { FichaFormModal } from '../components/FichaFormModal';
 import { FichaCaracterizacionCard } from '../components/FichaCaracterizacionCard';
 import { formatDiasEnTabla, mergeListAfterSave } from '../utils/fichaCaracterizacionForm';
+import { canProgramarInstructores } from '../utils/programacionPermissions';
 import type {
   FichaCaracterizacionResponse,
   FichaImportResult,
@@ -252,7 +253,8 @@ function FichasInstructorConFichas({ filteredList, searchQuery, setSearchQuery }
 }
 
 export const FichasCaracterizacion = () => {
-  const { roles } = useAuth();
+  const { roles, hasPermission } = useAuth();
+  const puedeProgramarInstructores = canProgramarInstructores(roles, hasPermission);
   const [list, setList] = useState<FichaCaracterizacionResponse[]>([]);
   const [programas, setProgramas] = useState<ProgramaFormacionResponse[]>([]);
   const [diasFormacion, setDiasFormacion] = useState<DiaFormacionItem[]>([]);
@@ -540,6 +542,15 @@ export const FichasCaracterizacion = () => {
                             >
                               <EyeIcon className="w-5 h-5" />
                             </Link>
+                            {puedeProgramarInstructores && (
+                              <Link
+                                to={`/fichas/${item.id}?tab=programacion`}
+                                className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
+                                title="Programar instructores"
+                              >
+                                <CalendarDaysIcon className="w-5 h-5" />
+                              </Link>
+                            )}
                             <button
                               type="button"
                               onClick={() => setModalAsignar({ ficha: item, tipo: 'instructores' })}

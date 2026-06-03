@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiService } from '../../services/api';
-import { axiosErrorMessage } from '../../utils/httpError';
-import type { InstructorAgendaResponse } from '../../types/agenda';
-import { addDays, formatLocalISO, startOfWeekMonday } from '../../components/calendar/calendarUtils';
+import { apiService } from '../../../services/api';
+import { axiosErrorMessage } from '../../../utils/httpError';
+import type { InstructorAgendaResponse } from '../../../types/agenda';
+import { addDays, formatLocalISO, startOfWeekMonday } from '../../../components/calendar/calendarUtils';
 
 export function useFichaAgenda(fichaId: number, weekStart: Date, enabled = true) {
   const [data, setData] = useState<InstructorAgendaResponse | null>(null);
@@ -33,7 +33,7 @@ export function useFichaAgenda(fichaId: number, weekStart: Date, enabled = true)
     void load();
   }, [load]);
 
-  return { data, loading, error };
+  return { data, loading, error, reload: load };
 }
 
 export function useInitialWeekStart() {

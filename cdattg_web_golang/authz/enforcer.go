@@ -54,8 +54,19 @@ func modelPath() string {
 }
 
 // Enforce verifica si el sujeto (userID como string) tiene permiso para (obj, act).
+// Los permisos por rol usan Casbin (p); los directos (p2) se evalúan aparte (Casbin v3 no soporta p2 en el mismo matcher m).
 func Enforce(e *casbin.Enforcer, sub string, obj, act string) (bool, error) {
-	return e.Enforce(sub, obj, act)
+	allowed, err := e.Enforce(sub, obj, act)
+	if err != nil {
+		return false, err
+	}
+	if allowed {
+		return true, nil
+	}
+	if enforceDirectUserPermission(e, sub, obj, act) {
+		return true, nil
+	}
+	return false, nil
 }
 
 // AddRoleForUser asigna un rol a un usuario (g, userID, roleName).
@@ -167,7 +178,22 @@ g = _, _
 e = some(where (p.eft == allow))
 
 [matchers]
-m = (g(r.sub, p.sub) && (r.obj == p.obj || p.obj == "*") && (r.act == p.act || p.act == "*")) || (r.sub == p2.sub && (r.obj == p2.obj || p2.obj == "*") && (r.act == p2.act || p2.act == "*"))
+m = g(r.sub, p.sub) && (r.obj == p.obj || p.obj == "*") && (r.act == p.act || p.act == "*")
 `
 	return model.NewModelFromString(text)
+}
+
+func enforceDirectUserPermission(e *casbin.Enforcer, userID, obj, act string) bool {
+	for _, rule := range GetDirectPermissionsForUser(e, userID) {
+		if len(rule) < 3 {
+			continue
+		}
+		ruleObj, ruleAct := rule[1], rule[2]
+		objOK := ruleObj == obj || ruleObj == "*"
+		actOK := ruleAct == act || ruleAct == "*"
+		if objOK && actOK {
+			return true
+		}
+	}
+	return false
 }

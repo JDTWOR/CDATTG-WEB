@@ -31,6 +31,7 @@ const (
 	actVerFichas                  = "VER FICHAS"
 	actGestionarInstructoresFicha = "GESTIONAR INSTRUCTORES FICHA"
 	actGestionarAprendicesFicha   = "GESTIONAR APRENDICES FICHA"
+	actVerMiAgenda                = "VER MI AGENDA"
 )
 
 // requireAuthenticatedUserID devuelve el userID o ya respondió 401/403 y abortó.
@@ -98,7 +99,8 @@ func tryFallbackAsistenciaInstructor(c *gin.Context, obj, act string) bool {
 }
 
 func handleRequirePermissionDenied(c *gin.Context, obj, act string, err error) {
-	if err != nil && !(obj == authz.ObjAsistencia && (act == actVerAsistencia || act == actTomarAsistencia)) {
+	isAsistenciaAct := obj == authz.ObjAsistencia && (act == actVerAsistencia || act == actTomarAsistencia || act == actVerMiAgenda)
+	if err != nil && !isAsistenciaAct {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": msgErrorVerificandoPermiso})
 		c.Abort()
 		return

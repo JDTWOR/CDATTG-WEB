@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom';
 import { CalendarDaysIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { FichaCaracterizacionCard } from '../../components/FichaCaracterizacionCard';
 import { ASIST_MODAL_IDS_ROOT } from './asistenciaConstants';import { AsistenciaModals } from './AsistenciaModals';
-import type { AsistenciaPageState } from './useAsistenciaPage';
+import type { AsistenciaFichasPageState } from './useAsistenciaFichasCatalog';
 
-type Props = Readonly<{ page: AsistenciaPageState }>;
+type Props = Readonly<{ page: AsistenciaFichasPageState }>;
 
 export function AsistenciaFichasListView({ page }: Props) {
   const {
@@ -102,7 +102,7 @@ export function AsistenciaFichasListView({ page }: Props) {
             actions={
               <button
                 type="button"
-                onClick={() => void handleTomarAsistencia(item.id)}
+                onClick={() => handleTomarAsistencia(item.id)}
                 disabled={loading}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
               >

@@ -1,6 +1,6 @@
-import type { AsistenciaPageState } from './useAsistenciaPage';
+import type { AsistenciaSesionPageState } from './useAsistenciaSesion';
 
-type Props = Readonly<{ page: AsistenciaPageState; embedded?: boolean }>;
+type Props = Readonly<{ page: AsistenciaSesionPageState; embedded?: boolean }>;
 
 export function AsistenciaBulkBar({ page, embedded = false }: Props) {
   const { selectedAprendizIds, bulkCounts, bulkProcesando, handleBulkEntrada, handleBulkSalida } = page;

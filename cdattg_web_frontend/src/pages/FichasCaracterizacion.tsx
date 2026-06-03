@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { Link } from 'react-router-dom';
+import { asistenciaFichaPath } from './asistencia/asistenciaPaths';
 import {
   DocumentTextIcon,
   HomeIcon,
@@ -233,7 +234,7 @@ function FichasInstructorConFichas({ filteredList, searchQuery, setSearchQuery }
                 </Link>
                 {item.status ? (
                   <Link
-                    to={`/asistencia?ficha=${item.id}`}
+                    to={asistenciaFichaPath(item.id)}
                     className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
                   >
                     <CalendarDaysIcon className="h-4 w-4" />

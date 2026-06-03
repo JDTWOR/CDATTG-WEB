@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeftIcon, CalendarDaysIcon, ChartBarIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import type { FichaCaracterizacionResponse } from '../../../types';
+import { asistenciaFichaPath } from '../../asistencia/asistenciaPaths';
 
 type FichaDetalleHeaderProps = Readonly<{
   ficha: FichaCaracterizacionResponse;
@@ -38,7 +39,7 @@ export function FichaDetalleHeader({ ficha, puedeEditarFicha, onEditarFicha }: F
         )}
         {ficha.status ? (
           <Link
-            to={`/asistencia?ficha=${ficha.id}`}
+            to={asistenciaFichaPath(ficha.id)}
             className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700"
           >
             <CalendarDaysIcon className="h-5 w-5" />

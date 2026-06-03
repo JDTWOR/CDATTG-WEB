@@ -1,9 +1,9 @@
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { FilaAprendizAsistencia, TarjetaAprendizAsistencia, type ModoListaAprendiz } from './AprendizAsistenciaListItems';
-import type { AsistenciaPageState } from './useAsistenciaPage';
+import type { AsistenciaSesionPageState } from './useAsistenciaSesion';
 
 type Props = Readonly<{
-  page: AsistenciaPageState;
+  page: AsistenciaSesionPageState;
   modoLista: ModoListaAprendiz;
   busqueda?: boolean;
 }>;

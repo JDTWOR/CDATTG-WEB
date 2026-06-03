@@ -5,9 +5,9 @@ import {
 } from './asistenciaConstants';
 import { AsistenciaCollapsibleCard } from './AsistenciaCollapsibleCard';
 import type { AccionRegistroDocumento } from './asistenciaUtils';
-import type { AsistenciaPageState } from './useAsistenciaPage';
+import type { AsistenciaSesionPageState } from './useAsistenciaSesion';
 
-type Props = Readonly<{ page: AsistenciaPageState } & AsistenciaAccordionSectionProps>;
+type Props = Readonly<{ page: AsistenciaSesionPageState } & AsistenciaAccordionSectionProps>;
 
 function textoBotonRegistro(registrando: boolean, accion: AccionRegistroDocumento | null): string {
   if (registrando) return 'Registrando…';

@@ -2,9 +2,9 @@ import { QrCodeIcon } from '@heroicons/react/24/outline';
 import { EscanerQR } from '../../components/EscanerQR';
 import { AsistenciaCollapsibleCard } from './AsistenciaCollapsibleCard';
 import type { AsistenciaAccordionSectionProps } from './asistenciaConstants';
-import type { AsistenciaPageState } from './useAsistenciaPage';
+import type { AsistenciaSesionPageState } from './useAsistenciaSesion';
 
-type Props = Readonly<{ page: AsistenciaPageState } & AsistenciaAccordionSectionProps>;
+type Props = Readonly<{ page: AsistenciaSesionPageState } & AsistenciaAccordionSectionProps>;
 
 export function AsistenciaRegistroQrCard({ page, open, onToggle }: Props) {
   const sesionId = page.sesionActual?.id;

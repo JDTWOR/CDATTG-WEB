@@ -23,6 +23,7 @@ const (
 	permTomarAsistencia = "TOMAR ASISTENCIA"
 	permVerAsistencia          = "VER ASISTENCIA"
 	permProgramarInstructores  = "PROGRAMAR INSTRUCTORES"
+	permGestionarAprendicesFicha = "GESTIONAR APRENDICES FICHA"
 	permVerMiAgenda            = "VER MI AGENDA"
 )
 
@@ -140,9 +141,9 @@ func SetupRouter() *gin.Engine {
 				fichas.POST("/:id/instructores", middleware.RequirePermission("ficha", permProgramarInstructores), fichaHandler.AsignarInstructores)
 				fichas.DELETE("/:id/instructores/:instructorId", middleware.RequirePermission("ficha", permProgramarInstructores), fichaHandler.DesasignarInstructor)
 				fichas.GET(routeIDAprendices, middleware.RequirePermissionListAprendicesFicha(), fichaHandler.ListAprendices)
-				fichas.POST(routeIDAprendices, middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.AsignarAprendices)
-				fichas.POST(routeIDAprendices+"/desasignar", middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.DesasignarAprendices)
-				fichas.POST(routeIDAprendices+"/ocultar-asistencia", middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.OcultarAprendicesEnAsistencia)
+				fichas.POST(routeIDAprendices, middleware.RequirePermission("ficha", permGestionarAprendicesFicha), fichaHandler.AsignarAprendices)
+				fichas.POST(routeIDAprendices+"/desasignar", middleware.RequirePermission("ficha", permGestionarAprendicesFicha), fichaHandler.DesasignarAprendices)
+				fichas.POST(routeIDAprendices+"/ocultar-asistencia", middleware.RequirePermission("ficha", permGestionarAprendicesFicha), fichaHandler.OcultarAprendicesEnAsistencia)
 			}
 
 			instructores := protected.Group("/instructores")

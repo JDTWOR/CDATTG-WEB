@@ -3,9 +3,9 @@ import { AsistenciaAprendicesListaSesion } from './AsistenciaAprendicesListaSesi
 import { AsistenciaBulkBar } from './AsistenciaBulkBar';
 import { AsistenciaCollapsibleCard } from './AsistenciaCollapsibleCard';
 import type { AsistenciaAccordionSectionProps } from './asistenciaConstants';
-import type { AsistenciaPageState } from './useAsistenciaPage';
+import type { AsistenciaSesionPageState } from './useAsistenciaSesion';
 
-type Props = Readonly<{ page: AsistenciaPageState } & AsistenciaAccordionSectionProps>;
+type Props = Readonly<{ page: AsistenciaSesionPageState } & AsistenciaAccordionSectionProps>;
 
 export function AsistenciaRegistroGrupalCard({ page, open, onToggle }: Props) {
   const seleccionados = page.selectedAprendizIds.size;

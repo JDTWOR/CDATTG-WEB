@@ -4,10 +4,10 @@ import { AsistenciaRegistroDocumentoCard } from './AsistenciaRegistroDocumentoCa
 import { AsistenciaRegistroGrupalCard } from './AsistenciaRegistroGrupalCard';
 import { AsistenciaRegistroIndividualCard } from './AsistenciaRegistroIndividualCard';
 import { AsistenciaRegistroQrCard } from './AsistenciaRegistroQrCard';
-import type { AsistenciaPageState } from './useAsistenciaPage';
+import type { AsistenciaSesionPageState } from './useAsistenciaSesion';
 
 type Props = Readonly<{
-  page: AsistenciaPageState;
+  page: AsistenciaSesionPageState;
   sesionId: number;
 }>;
 

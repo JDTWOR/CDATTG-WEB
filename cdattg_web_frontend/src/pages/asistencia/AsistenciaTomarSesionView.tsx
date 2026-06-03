@@ -3,11 +3,11 @@ import { FichaCaracterizacionCard } from '../../components/FichaCaracterizacionC
 import { formatRangoFechasVista } from '../../utils/formatFecha';
 import { AsistenciaMetodosAccordion } from './AsistenciaMetodosAccordion';
 import { AsistenciaModals } from './AsistenciaModals';
-import type { AsistenciaPageState } from './useAsistenciaPage';
+import type { AsistenciaSesionPageState } from './useAsistenciaSesion';
 
-type Props = Readonly<{ page: AsistenciaPageState }>;
+type Props = Readonly<{ page: AsistenciaSesionPageState }>;
 
-function SesionFichaCard({ page }: Readonly<{ page: AsistenciaPageState }>) {
+function SesionFichaCard({ page }: Readonly<{ page: AsistenciaSesionPageState }>) {
   const { fichaSeleccionada, sesionActual } = page;
   if (!fichaSeleccionada || !sesionActual) return null;
 
@@ -40,7 +40,7 @@ function SesionFichaCard({ page }: Readonly<{ page: AsistenciaPageState }>) {
             <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Estado de la sesión</p>
             <p className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <span className="inline-block h-2 w-2 rounded-full bg-green-500" aria-hidden />
-              Asistencia: Activa
+              <span>Asistencia: Activa</span>
             </p>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               <span className="font-medium text-gray-800 dark:text-gray-100">Observación de la sesión:</span>{' '}

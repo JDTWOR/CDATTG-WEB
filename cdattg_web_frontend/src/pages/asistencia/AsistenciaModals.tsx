@@ -1,8 +1,8 @@
 import { ASIST_MODAL_IDS, ASIST_MODAL_IDS_ROOT } from './asistenciaConstants';
-import type { AsistenciaPageState } from './useAsistenciaPage';
+import type { AsistenciaModalsModel } from './asistenciaModalsTypes';
 
 type ModalsProps = Readonly<{
-  page: AsistenciaPageState;
+  page: AsistenciaModalsModel;
   estadoFieldIds?: typeof ASIST_MODAL_IDS | typeof ASIST_MODAL_IDS_ROOT;
 }>;
 

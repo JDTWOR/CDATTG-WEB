@@ -1,10 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, type ComponentProps } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { apiService } from '../../services/api';
 import { axiosErrorMessage } from '../../utils/httpError';
-import { useAuth } from '../../context/AuthContext';
 import type {
-  FichaCaracterizacionResponse,
   AsistenciaResponse,
   AprendizResponse,
   AsistenciaAprendizResponse,
@@ -18,57 +15,30 @@ import {
   summaryRegistros,
 } from './asistenciaUtils';
 import { mostrarToastErrorAsistencia, mostrarToastRegistroAsistencia } from './asistenciaToast';
+import type { AsistenciaModalsModel } from './asistenciaModalsTypes';
 
-export function useAsistenciaPage() {
-  const { roles } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const fichaFromUrl = searchParams.get('ficha');
-  const [fichas, setFichas] = useState<FichaCaracterizacionResponse[]>([]);
-  const [fichasLoading, setFichasLoading] = useState(true);
-  const [fichaId, setFichaId] = useState<number | ''>(() => {
-    const id = fichaFromUrl ? Number.parseInt(fichaFromUrl, 10) : Number.NaN;
-    return Number.isFinite(id) ? id : '';
-  });
-  const [sesionActual, setSesionActual] = useState<AsistenciaResponse | null>(null);
+type UseAsistenciaRegistroParams = Readonly<{
+  fichaId: number;
+  sesionActual: AsistenciaResponse | null;
+  setSesionActual: React.Dispatch<React.SetStateAction<AsistenciaResponse | null>>;
+}>;
+
+export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual }: UseAsistenciaRegistroParams) {
   const [aprendicesFicha, setAprendicesFicha] = useState<AprendizResponse[]>([]);
   const [aprendicesEnSesion, setAprendicesEnSesion] = useState<AsistenciaAprendizResponse[]>([]);
   const [loadingAprendices, setLoadingAprendices] = useState(false);
   const [errorAprendices, setErrorAprendices] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const nuevaSesionPayloadRef = useRef<{
-    instructorFichaSeleccionado: number | '';
-    fechaSesion: string;
-  }>({
-    instructorFichaSeleccionado: '',
-    fechaSesion: new Date().toISOString().slice(0, 10),
-  });
-  const [errorSesionMsg] = useState('');
   const [documentoManual, setDocumentoManual] = useState('');
   const [errorRegistroManual, setErrorRegistroManual] = useState('');
   const [mensajeRegistroManual, setMensajeRegistroManual] = useState('');
   const [registrandoManual, setRegistrandoManual] = useState(false);
-  const [observacionesModal, setObservacionesModal] = useState<{
-    asistenciaId: number;
-    aprendizId: number;
-    nombre: string;
-    observaciones: string;
-    tipoObservacionIds: number[];
-  } | null>(null);
+  const [observacionesModal, setObservacionesModal] = useState<AsistenciaModalsModel['observacionesModal']>(null);
   const [tiposObservacionCatalog, setTiposObservacionCatalog] = useState<TipoObservacionAsistenciaItem[]>([]);
   const [observacionesGuardando, setObservacionesGuardando] = useState(false);
   const [observacionesSesionModal, setObservacionesSesionModal] = useState<{ observaciones: string } | null>(null);
   const [observacionesSesionGuardando, setObservacionesSesionGuardando] = useState(false);
-  const [estadoModal, setEstadoModal] = useState<{
-    asistenciaAprendizId: number;
-    nombre: string;
-    estado: string;
-    motivo: string;
-  } | null>(null);
+  const [estadoModal, setEstadoModal] = useState<AsistenciaModalsModel['estadoModal']>(null);
   const [estadoGuardando, setEstadoGuardando] = useState(false);
-  const [pendientesRevision, setPendientesRevision] = useState<AsistenciaAprendizResponse[]>([]);
-  const [pendientesLoading, setPendientesLoading] = useState(false);
-  const [pendientesError, setPendientesError] = useState('');
   const [selectedAprendizIds, setSelectedAprendizIds] = useState<Set<number>>(() => new Set());
   const [busquedaAprendiz, setBusquedaAprendiz] = useState('');
   const [busyAprendizIds, setBusyAprendizIds] = useState<Set<number>>(() => new Set());
@@ -88,102 +58,36 @@ export function useAsistenciaPage() {
     });
   }, []);
 
-  const fetchFichas = useCallback(async () => {
-    setFichasLoading(true);
+  const loadAprendicesYSesion = useCallback(async (asistenciaId: number) => {
+    setErrorAprendices('');
+    setLoadingAprendices(true);
+    setAprendicesFicha([]);
     try {
-      const res = await apiService.getFichasCaracterizacion(1, 200, undefined, true);
-      setFichas(res.data.filter((f) => f.status));
-    } catch (cause: unknown) {
-      setFichas([]);
-      if (import.meta.env.DEV) console.warn('[Asistencia] No se pudieron cargar fichas', cause);
-    } finally {
-      setFichasLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchFichas();
-  }, [fetchFichas]);
-
-  useEffect(() => {
-    const loadPendientes = async () => {
-      setPendientesLoading(true);
-      setPendientesError('');
-      try {
-        setPendientesRevision(await apiService.getAsistenciaPendientesRevision());
-      } catch (e: unknown) {
-        const status = (e as { response?: { status?: number } }).response?.status;
-        setPendientesError(
-          status === 403
-            ? 'Solo instructores con permiso de asistencia pueden ver ajustes pendientes.'
-            : axiosErrorMessage(e, 'No se pudo cargar la bandeja de ajustes pendientes.'),
-        );
-        setPendientesRevision([]);
-      } finally {
-        setPendientesLoading(false);
-      }
-    };
-    void loadPendientes();
-  }, []);
-
-  useEffect(() => {
-    if (fichasLoading || !fichaFromUrl) return;
-    const id = Number.parseInt(fichaFromUrl, 10);
-    if (!Number.isFinite(id)) return;
-    if (fichas.some((f) => f.id === id)) {
-      setFichaId(id);
-      return;
-    }
-    setFichaId('');
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('ficha');
-      return next;
-    });
-  }, [fichaFromUrl, fichas, fichasLoading, setSearchParams]);
-
-  useEffect(() => {
-    if (!fichaId) {
-      setSesionActual(null);
+      const [aprendices, enSesion] = await Promise.all([
+        apiService.getFichaAprendices(fichaId),
+        apiService.getAsistenciaAprendices(asistenciaId),
+      ]);
+      setAprendicesFicha(aprendices.filter(aprendizVisibleEnTomaAsistencia));
+      setAprendicesEnSesion(enSesion);
+    } catch (e: unknown) {
+      setErrorAprendices(
+        axiosErrorMessage(
+          e,
+          'No se pudo cargar el listado de aprendices. Verifique permisos (VER ASISTENCIA) o que los aprendices estén asignados a la ficha.',
+        ),
+      );
+      setAprendicesFicha([]);
       setAprendicesEnSesion([]);
+    } finally {
+      setLoadingAprendices(false);
     }
   }, [fichaId]);
-
-  const loadAprendicesYSesion = useCallback(
-    async (asistenciaId: number, fichaIdParam?: number) => {
-      const fid = fichaIdParam ?? fichaId;
-      if (!fid) return;
-      setErrorAprendices('');
-      setLoadingAprendices(true);
-      setAprendicesFicha([]);
-      try {
-        const [aprendices, enSesion] = await Promise.all([
-          apiService.getFichaAprendices(fid),
-          apiService.getAsistenciaAprendices(asistenciaId),
-        ]);
-        setAprendicesFicha(aprendices.filter(aprendizVisibleEnTomaAsistencia));
-        setAprendicesEnSesion(enSesion);
-      } catch (e: unknown) {
-        setErrorAprendices(
-          axiosErrorMessage(
-            e,
-            'No se pudo cargar el listado de aprendices. Verifique permisos (VER ASISTENCIA) o que los aprendices estén asignados a la ficha.',
-          ),
-        );
-        setAprendicesFicha([]);
-        setAprendicesEnSesion([]);
-      } finally {
-        setLoadingAprendices(false);
-      }
-    },
-    [fichaId],
-  );
 
   const sesionId = sesionActual?.id;
 
   useEffect(() => {
     if (sesionActual && fichaId) {
-      void loadAprendicesYSesion(sesionActual.id, fichaId);
+      void loadAprendicesYSesion(sesionActual.id);
       return;
     }
     setAprendicesEnSesion([]);
@@ -199,31 +103,6 @@ export function useAsistenciaPage() {
     setSelectedAprendizIds(new Set());
     setBusquedaAprendiz('');
   }, [sesionId, fichaId]);
-
-  const handleTomarAsistencia = async (id: number) => {
-    setError('');
-    setErrorAprendices('');
-    setLoading(true);
-    setAprendicesFicha([]);
-    try {
-      const sesion = await apiService.entrarTomarAsistencia(id);
-      setFichaId(id);
-      setSearchParams({ ficha: String(id) });
-      setSesionActual(sesion);
-      if (id) void loadAprendicesYSesion(sesion.id, id);
-    } catch (e: unknown) {
-      setError(axiosErrorMessage(e, 'No está asignado como instructor de esta ficha.'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVolverAFichas = () => {
-    setSesionActual(null);
-    setFichaId('');
-    setSearchParams({});
-    setAprendicesEnSesion([]);
-  };
 
   const setAprendizBusy = useCallback((aprendizId: number, busy: boolean) => {
     setBusyAprendizIds((prev) => {
@@ -269,13 +148,6 @@ export function useAsistenciaPage() {
     [busyAprendizIds, setAprendizBusy, upsertAsistenciaAprendizEnSesion],
   );
 
-  const onAbrirEstadoModal = useCallback(
-    (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => {
-      setEstadoModal(payload);
-    },
-    [],
-  );
-
   const onAbrirObservacionesModal = useCallback(
     (payload: {
       asistenciaId: number;
@@ -291,6 +163,13 @@ export function useAsistenciaPage() {
         observaciones: payload.observaciones,
         tipoObservacionIds: payload.tiposObservacion?.map((t) => t.id) ?? [],
       });
+    },
+    [],
+  );
+
+  const onAbrirEstadoModal = useCallback(
+    (payload: { asistenciaAprendizId: number; nombre: string; estado: string; motivo: string }) => {
+      setEstadoModal(payload);
     },
     [],
   );
@@ -324,11 +203,6 @@ export function useAsistenciaPage() {
       });
       setEstadoModal(null);
       upsertAsistenciaAprendizEnSesion(actualizado);
-      try {
-        setPendientesRevision(await apiService.getAsistenciaPendientesRevision());
-      } catch {
-        /* ignorar */
-      }
     } catch (e: unknown) {
       globalThis.alert(axiosErrorMessage(e, 'Error al guardar estado'));
     } finally {
@@ -352,12 +226,6 @@ export function useAsistenciaPage() {
     } finally {
       setObservacionesSesionGuardando(false);
     }
-  };
-
-  const quitarTipoObservacionEnModal = (tipoId: number) => {
-    setObservacionesModal((prev) =>
-      prev ? { ...prev, tipoObservacionIds: prev.tipoObservacionIds.filter((x) => x !== tipoId) } : null,
-    );
   };
 
   const handleRegistrarPorDocumento = async (numeroDocumento: string) => {
@@ -466,13 +334,9 @@ export function useAsistenciaPage() {
     void handleRegistrarPorDocumento(documentoManual);
   };
 
-  const fichaSeleccionada = fichaId ? fichas.find((f) => f.id === fichaId) : null;
-  const showSinFichas = !fichasLoading && fichas.length === 0;
-  const showTomarSesion = Boolean(sesionActual && !sesionActual.is_finished && fichaSeleccionada);
   const enSesionCount = new Set(aprendicesEnSesion.map((aa) => aa.aprendiz_id)).size;
   const todosFiltradosSeleccionados =
     aprendicesFiltrados.length > 0 && aprendicesFiltrados.every((a) => selectedAprendizIds.has(a.id));
-  const isSuperAdmin = roles.includes('SUPER ADMINISTRADOR');
 
   const toggleSeleccionarTodosFiltrados = () => {
     if (todosFiltradosSeleccionados) setSelectedAprendizIds(new Set());
@@ -480,21 +344,11 @@ export function useAsistenciaPage() {
   };
 
   return {
-    roles,
-    isSuperAdmin,
-    fichas,
-    fichasLoading,
-    fichaId,
-    sesionActual,
     aprendicesFicha,
     aprendicesEnSesion,
     loadingAprendices,
     errorAprendices,
-    loading,
-    error,
-    errorSesionMsg,
     setMensajeRegistroManual,
-    nuevaSesionPayloadRef,
     documentoManual,
     setDocumentoManual,
     errorRegistroManual,
@@ -511,9 +365,6 @@ export function useAsistenciaPage() {
     estadoModal,
     setEstadoModal,
     estadoGuardando,
-    pendientesRevision,
-    pendientesLoading,
-    pendientesError,
     selectedAprendizIds,
     busquedaAprendiz,
     setBusquedaAprendiz,
@@ -523,13 +374,8 @@ export function useAsistenciaPage() {
     registroPorAprendizId,
     aprendicesFiltrados,
     bulkCounts,
-    fichaSeleccionada,
-    showSinFichas,
-    showTomarSesion,
     enSesionCount,
     todosFiltradosSeleccionados,
-    handleTomarAsistencia,
-    handleVolverAFichas,
     handleRegistrarIngreso,
     handleRegistrarSalida,
     onAbrirEstadoModal,
@@ -537,7 +383,6 @@ export function useAsistenciaPage() {
     handleGuardarObservaciones,
     handleGuardarEstado,
     handleGuardarObservacionesSesion,
-    quitarTipoObservacionEnModal,
     handleRegistrarPorDocumento,
     toggleSelectAprendiz,
     handleBulkEntrada,
@@ -547,4 +392,4 @@ export function useAsistenciaPage() {
   };
 }
 
-export type AsistenciaPageState = ReturnType<typeof useAsistenciaPage>;
+export type AsistenciaRegistroModel = ReturnType<typeof useAsistenciaRegistro>;

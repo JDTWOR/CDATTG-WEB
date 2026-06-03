@@ -15,7 +15,7 @@ import { ProgramasFormacion } from './pages/ProgramasFormacion';
 import { ImportarProgramas } from './pages/ImportarProgramas';
 import { FichasCaracterizacion } from './pages/FichasCaracterizacion';
 import { FichaDetalle } from './pages/FichaDetalle';
-import { Asistencia } from './pages/Asistencia';
+import { Asistencia, AsistenciaSesionPage } from './pages/Asistencia';
 import { AsistenciaHistorial } from './pages/AsistenciaHistorial';
 import { AsistenciaHistorialFicha } from './pages/AsistenciaHistorialFicha';
 import { AsistenciaDashboard } from './pages/AsistenciaDashboard';
@@ -149,6 +149,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <FichaDetalle />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/asistencia/ficha/:fichaId"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AsistenciaSesionPage />
                 </Layout>
               </ProtectedRoute>
             }

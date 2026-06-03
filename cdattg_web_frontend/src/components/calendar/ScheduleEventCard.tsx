@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import type { InstructorAgendaEvent } from '../../types/agenda';
+import { asistenciaFichaPath } from '../../pages/asistencia/asistenciaPaths';
 import { colorClassForInstructor } from './calendarUtils';
 
 type ScheduleEventCardProps = Readonly<{
@@ -38,7 +39,7 @@ export function ScheduleEventCard({
       )}
       {mode === 'instructor' && isToday && (
         <Link
-          to={`/asistencia?ficha=${event.ficha_id}`}
+          to={asistenciaFichaPath(event.ficha_id)}
           className="mt-0.5 block rounded bg-white/20 px-1 py-0.5 text-center text-[9px] hover:bg-white/30"
           onClick={(e) => e.stopPropagation()}
         >

@@ -4,7 +4,6 @@ import {
   RedirectAsistenciaHistorialFichaLegacy,
   RedirectCasosBienestarFichaLegacy,
   RedirectCasosBienestarLegacy,
-  RedirectFichaIdLegacy,
 } from '../legacyRedirects';
 
 export const legacyRoutes: RouteObject[] = [
@@ -19,5 +18,4 @@ export const legacyRoutes: RouteObject[] = [
     path: '/asistencia/dashboard/casos-bienestar/fichas/:fichaNumero',
     Component: RedirectCasosBienestarFichaLegacy,
   },
-  { path: '/fichas/:id', Component: RedirectFichaIdLegacy },
 ];

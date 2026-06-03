@@ -1,5 +1,5 @@
 import { Navigate, useParams } from 'react-router-dom';
-import { asistenciaPaths, bienestarPaths, fichasPaths } from './paths';
+import { asistenciaPaths, bienestarPaths } from './paths';
 
 export function RedirectAsistenciaFichaLegacy() {
   const { fichaId } = useParams<{ fichaId: string }>();
@@ -27,13 +27,6 @@ export function RedirectCasosBienestarFichaLegacy() {
       replace
     />
   );
-}
-
-export function RedirectFichaIdLegacy() {
-  const { id, fichaId } = useParams<{ id?: string; fichaId?: string }>();
-  const raw = fichaId ?? id;
-  if (!raw) return <Navigate to={fichasPaths.index} replace />;
-  return <Navigate to={fichasPaths.detalle(raw)} replace />;
 }
 
 export function RedirectBienestarIndex() {

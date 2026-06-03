@@ -157,7 +157,7 @@ func (s *InstructorHorarioService) bloquesInstructor(instructorID uint, excluirF
 			continue
 		}
 		ficha, err := s.fichaRepo.FindByID(asg.FichaID)
-		if err != nil || ficha == nil {
+		if err != nil || ficha == nil || !ficha.Status {
 			continue
 		}
 		diasInst, err := s.instFichaDiasRepo.FindByInstructorAndFicha(instructorID, asg.FichaID)

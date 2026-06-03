@@ -21,6 +21,7 @@ const (
 	errMsgNoEstaCreadoComoInstructor     = "NO ESTÁ CREADO COMO INSTRUCTOR DE ESTA FICHA"
 	errMsgFueraDelHorarioJornada         = "FUERA DEL HORARIO DE LA JORNADA DE LA FICHA; SOLO SE PUEDE TOMAR ASISTENCIA EN EL HORARIO CONFIGURADO"
 	errMsgSesionOtroInstructor           = "NO PUEDE TOMAR ASISTENCIA EN LA SESIÓN DE OTRO INSTRUCTOR"
+	errMsgAprendizOcultoEnAsistencia     = "EL APRENDIZ ESTÁ OCULTO DE LA TOMA DE ASISTENCIA EN ESTA FICHA"
 )
 
 const plazoEdicionObservacionSesionDias = 5
@@ -129,6 +130,20 @@ func fichaIDDesdeAsistencia(asist *models.Asistencia, instFichaRepo repositories
 		return ifc.FichaID
 	}
 	return 0
+}
+
+func (s *asistenciaService) validarAprendizPuedeTomarAsistencia(aprendizID uint) error {
+	a, err := s.aprendizRepo.FindByID(aprendizID)
+	if err != nil || a == nil {
+		return errors.New("aprendiz no encontrado")
+	}
+	if !a.Estado {
+		return errors.New("el aprendiz no está asignado a la ficha")
+	}
+	if a.OcultoEnAsistencia {
+		return errors.New(errMsgAprendizOcultoEnAsistencia)
+	}
+	return nil
 }
 
 func (s *asistenciaService) validarAprendizSinIngresoAbiertoEnFichaHoy(
@@ -367,6 +382,9 @@ func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest, 
 		return nil, err
 	}
 	fichaID := fichaIDDesdeAsistencia(asist, s.instFichaRepo)
+	if err := s.validarAprendizPuedeTomarAsistencia(req.AprendizID); err != nil {
+		return nil, err
+	}
 	if err := s.validarAprendizSinIngresoAbiertoEnFichaHoy(fichaID, req.AprendizID, req.AsistenciaID); err != nil {
 		return nil, err
 	}
@@ -412,6 +430,9 @@ func (s *asistenciaService) aprendizPorDocumentoEnSesion(asist *models.Asistenci
 	aprendiz, err := s.aprendizRepo.FindByPersonaIDAndFichaID(persona.ID, ifc.FichaID)
 	if err != nil || aprendiz == nil {
 		return 0, 0, errors.New("el documento no corresponde a un aprendiz de esta ficha")
+	}
+	if err := s.validarAprendizPuedeTomarAsistencia(aprendiz.ID); err != nil {
+		return 0, 0, err
 	}
 	return aprendiz.ID, ifc.FichaID, nil
 }

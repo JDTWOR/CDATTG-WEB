@@ -570,6 +570,17 @@ class ApiService {
     await this.api.post(`/fichas-caracterizacion/${fichaId}/aprendices/desasignar`, { personas });
   }
 
+  async setOcultoAprendicesAsistencia(
+    fichaId: number,
+    personas: number[],
+    oculto: boolean,
+  ): Promise<void> {
+    await this.api.post(`/fichas-caracterizacion/${fichaId}/aprendices/ocultar-asistencia`, {
+      personas,
+      oculto,
+    });
+  }
+
   // Instructores (paginado; sin args devuelve página 1 con pageSize grande para compatibilidad)
   async getInstructores(page = 1, pageSize = 10000, search?: string): Promise<PaginatedResponse<InstructorItem>> {
     const response = await this.api.get<PaginatedResponse<InstructorItem>>('/instructores', {

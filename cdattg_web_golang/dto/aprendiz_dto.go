@@ -18,6 +18,13 @@ type AprendizResponse struct {
 	ProgramaNombre         string `json:"programa_nombre,omitempty"`
 	RegionalNombre         string `json:"regional_nombre,omitempty"`
 	Estado                 bool   `json:"estado"`
+	OcultoEnAsistencia     bool   `json:"oculto_en_asistencia"`
+}
+
+// OcultarAprendicesAsistenciaRequest para POST /fichas/:id/aprendices/ocultar-asistencia
+type OcultarAprendicesAsistenciaRequest struct {
+	Personas []uint `json:"personas" binding:"required,min=1,dive,required"`
+	Oculto   bool   `json:"oculto"`
 }
 
 // AsignarAprendicesRequest para POST /fichas/:id/aprendices

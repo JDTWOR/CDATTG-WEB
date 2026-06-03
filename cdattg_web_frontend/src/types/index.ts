@@ -422,6 +422,7 @@ export interface AprendizResponse {
   programa_nombre?: string;
   regional_nombre?: string;
   estado: boolean;
+  oculto_en_asistencia?: boolean;
 }
 
 export interface AsignarAprendicesRequest {

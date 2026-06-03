@@ -161,7 +161,9 @@ export function useAsistenciaPage() {
           apiService.getFichaAprendices(fid),
           apiService.getAsistenciaAprendices(asistenciaId),
         ]);
-        setAprendicesFicha(sortAprendicesAz(aprendices.filter((a) => a.estado)));
+        setAprendicesFicha(
+          sortAprendicesAz(aprendices.filter((a) => a.estado && !a.oculto_en_asistencia)),
+        );
         setAprendicesEnSesion(enSesion);
       } catch (e: unknown) {
         setErrorAprendices(

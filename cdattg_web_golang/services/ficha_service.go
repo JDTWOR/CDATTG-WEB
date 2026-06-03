@@ -31,6 +31,7 @@ type FichaService interface {
 	ListAprendices(fichaID uint) ([]dto.AprendizResponse, error)
 	AsignarAprendices(fichaID uint, personas []uint) error
 	DesasignarAprendices(fichaID uint, personas []uint) error
+	OcultarAprendicesEnAsistencia(fichaID uint, personas []uint, oculto bool) error
 }
 
 type fichaService struct {
@@ -425,6 +426,7 @@ func (s *fichaService) AsignarAprendices(fichaID uint, personas []uint) error {
 		a, err := s.aprendizRepo.FindByPersonaIDAndFichaID(personaID, fichaID)
 		if err == nil {
 			a.Estado = true
+			a.OcultoEnAsistencia = false
 			_ = s.aprendizRepo.Update(a)
 			continue
 		}
@@ -432,6 +434,7 @@ func (s *fichaService) AsignarAprendices(fichaID uint, personas []uint) error {
 			PersonaID:              personaID,
 			FichaCaracterizacionID: fichaID,
 			Estado:                 true,
+			OcultoEnAsistencia:     false,
 		}
 		if err := s.aprendizRepo.Create(a); err != nil {
 			return fmt.Errorf("error al asignar aprendiz: %w", err)
@@ -447,6 +450,21 @@ func (s *fichaService) DesasignarAprendices(fichaID uint, personas []uint) error
 			continue
 		}
 		a.Estado = false
+		_ = s.aprendizRepo.Update(a)
+	}
+	return nil
+}
+
+func (s *fichaService) OcultarAprendicesEnAsistencia(fichaID uint, personas []uint, oculto bool) error {
+	if _, err := s.fichaRepo.FindByID(fichaID); err != nil {
+		return errors.New(msgFichaNoEncontrada)
+	}
+	for _, personaID := range personas {
+		a, err := s.aprendizRepo.FindByPersonaIDAndFichaID(personaID, fichaID)
+		if err != nil || a == nil || !a.Estado {
+			continue
+		}
+		a.OcultoEnAsistencia = oculto
 		_ = s.aprendizRepo.Update(a)
 	}
 	return nil
@@ -605,6 +623,7 @@ func (s *fichaService) aprendizToResponse(a models.Aprendiz, fichaNumero string)
 		PersonaID:              a.PersonaID,
 		FichaCaracterizacionID: a.FichaCaracterizacionID,
 		Estado:                 a.Estado,
+		OcultoEnAsistencia:     a.OcultoEnAsistencia,
 		FichaNumero:            fichaNumero,
 	}
 	if a.Persona != nil {

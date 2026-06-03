@@ -113,6 +113,7 @@ func (s *aprendizService) toResponse(a models.Aprendiz, fichaNumero string) dto.
 		PersonaID:              a.PersonaID,
 		FichaCaracterizacionID: a.FichaCaracterizacionID,
 		Estado:                 a.Estado,
+		OcultoEnAsistencia:     a.OcultoEnAsistencia,
 		FichaNumero:            fichaNumero,
 	}
 	if a.Persona != nil {

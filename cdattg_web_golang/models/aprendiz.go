@@ -6,7 +6,8 @@ type Aprendiz struct {
 	PersonaID            uint `gorm:"column:persona_id;not null" json:"persona_id"`
 	FichaCaracterizacionID uint `gorm:"column:ficha_caracterizacion_id;not null" json:"ficha_caracterizacion_id"`
 	Estado               bool `gorm:"default:true" json:"estado"`
-	
+	OcultoEnAsistencia   bool `gorm:"column:oculto_en_asistencia;default:false" json:"oculto_en_asistencia"`
+
 	// Relaciones
 	Persona            *Persona            `gorm:"foreignKey:PersonaID" json:"persona,omitempty"`
 	FichaCaracterizacion *FichaCaracterizacion `gorm:"foreignKey:FichaCaracterizacionID" json:"ficha_caracterizacion,omitempty"`

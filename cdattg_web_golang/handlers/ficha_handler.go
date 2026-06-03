@@ -292,6 +292,28 @@ func (h *FichaHandler) DesasignarAprendices(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Aprendices desasignados correctamente"})
 }
 
+func (h *FichaHandler) OcultarAprendicesEnAsistencia(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	var req dto.OcultarAprendicesAsistenciaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
+		return
+	}
+	if err := h.svc.OcultarAprendicesEnAsistencia(uint(id), req.Personas, req.Oculto); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	msg := "Aprendices visibles en toma de asistencia"
+	if req.Oculto {
+		msg = "Aprendices ocultos de la toma de asistencia"
+	}
+	c.JSON(http.StatusOK, gin.H{"message": msg})
+}
+
 // ImportFichas sube un Excel de reporte de aprendices (ficha de caracterización) e importa ficha y personas como aprendices.
 func (h *FichaHandler) ImportFichas(c *gin.Context) {
 	file, err := c.FormFile("file")

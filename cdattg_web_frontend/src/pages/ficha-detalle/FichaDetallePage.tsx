@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { FichaFormModal } from '../../components/FichaFormModal';
 import { useAuth } from '../../context/AuthContext';
+import { canGestionarAprendicesFicha } from '../../utils/aprendizFichaPermissions';
 import { canManageFichas } from '../../utils/fichaCaracterizacionForm';
 import { canProgramarInstructores } from '../../utils/programacionPermissions';
 import { FichaDetalleAprendicesTab } from './components/FichaDetalleAprendicesTab';
@@ -27,6 +28,7 @@ export function FichaDetallePage() {
   const fichaId = id ? Number.parseInt(id, 10) : 0;
 
   const puedeEditarFicha = canManageFichas(roles);
+  const puedeGestionarAprendices = canGestionarAprendicesFicha(hasPermission);
   const puedeProgramarInstructores = canProgramarInstructores(roles, hasPermission);
   const [tab, setTab] = useFichaDetalleTab(puedeProgramarInstructores);
   const [weekStart, setWeekStart] = useInitialWeekStart();
@@ -130,7 +132,9 @@ export function FichaDetallePage() {
         />
       )}
 
-      {tab === 'aprendices' && <FichaDetalleAprendicesTab {...aprendicesModel} />}
+      {tab === 'aprendices' && (
+        <FichaDetalleAprendicesTab {...aprendicesModel} puedeGestionarAprendices={puedeGestionarAprendices} />
+      )}
 
       {puedeEditarFicha && (
         <FichaFormModal

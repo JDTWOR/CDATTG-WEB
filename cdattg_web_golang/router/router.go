@@ -142,6 +142,7 @@ func SetupRouter() *gin.Engine {
 				fichas.GET(routeIDAprendices, middleware.RequirePermissionListAprendicesFicha(), fichaHandler.ListAprendices)
 				fichas.POST(routeIDAprendices, middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.AsignarAprendices)
 				fichas.POST(routeIDAprendices+"/desasignar", middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.DesasignarAprendices)
+				fichas.POST(routeIDAprendices+"/ocultar-asistencia", middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.OcultarAprendicesEnAsistencia)
 			}
 
 			instructores := protected.Group("/instructores")

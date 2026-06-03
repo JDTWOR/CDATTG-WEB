@@ -55,6 +55,19 @@ export function useFichaAprendices(fichaId: number, loadFicha: () => Promise<voi
     }
   };
 
+  const handleOcultarEnAsistencia = async (personaId: number, oculto: boolean) => {
+    const msg = oculto
+      ? '¿Ocultar este aprendiz de la toma de asistencia del día? Seguirá en la ficha y contará inasistencias si no asiste.'
+      : '¿Mostrar de nuevo este aprendiz en la toma de asistencia?';
+    if (!confirm(msg)) return;
+    try {
+      await apiService.setOcultoAprendicesAsistencia(fichaId, [personaId], oculto);
+      await loadAprendices();
+    } catch (err: unknown) {
+      alert(axiosErrorMessage(err, 'Error al actualizar visibilidad en asistencia'));
+    }
+  };
+
   const onPersonaCheckboxChange = useCallback((personaId: number, checked: boolean) => {
     if (checked) {
       setPersonasSeleccionadas((prev) => [...prev, personaId]);
@@ -77,6 +90,7 @@ export function useFichaAprendices(fichaId: number, loadFicha: () => Promise<voi
     onPersonaCheckboxChange,
     handleAsignarAprendices,
     handleDesasignarAprendices,
+    handleOcultarEnAsistencia,
     loadAprendices,
     loadPersonas,
   };

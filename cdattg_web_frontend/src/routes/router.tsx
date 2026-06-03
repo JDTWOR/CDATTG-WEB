@@ -1,6 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { ProtectedLayout } from './layouts/ProtectedLayout';
-import { legacyRoutes } from './modules/legacy.routes';
 import { authRoutes } from './modules/auth.routes';
 import { homeRoutes } from './modules/home.routes';
 import { personasRoutes } from './modules/personas.routes';
@@ -21,7 +20,6 @@ import { permisosRoutes } from './modules/permisos.routes';
  * Resolución de migas: navigation/breadcrumb (useMatches + overrides en páginas).
  */
 export const appRouter = createBrowserRouter([
-  ...legacyRoutes,
   ...authRoutes,
   {
     Component: ProtectedLayout,

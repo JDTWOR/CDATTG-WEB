@@ -62,7 +62,10 @@ export function FichaDetalleInstructoresTab({
       {puedeProgramarInstructores && (
         <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
           Use <strong>Editar programación</strong> para ajustar la vigencia (fechas) y los días de formación de cada
-          instructor. Las horas se toman de la jornada de la ficha y se ven en la pestaña Programación.
+          instructor. Las horas se toman de la jornada de la ficha y se ven en la pestaña Programación. Hasta que guarde
+          días explícitos, esa asignación no bloquea otras fichas del mismo instructor. Si reparte días entre fichas,
+          primero acote la ficha que cede un día (por ejemplo solo miércoles) y luego programe el resto en la otra sin
+          ese día.
         </p>
       )}
       <ul className="divide-y divide-gray-200 dark:divide-gray-600">

@@ -183,7 +183,7 @@ func (s *InstructorAgendaService) expandirAsignacion(
 	if err != nil {
 		return nil, err
 	}
-	diaIDs := diaIDsInstructorEnFicha(ficha, diasInst)
+	diaIDs := diaIDsProgramadosInstructor(diasInst)
 	ctx := s.cargarContextoAgenda(asg, ficha, diaIDs)
 	return s.eventosEnRango(ficha, asg, desde, hasta, ctx), nil
 }

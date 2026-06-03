@@ -33,6 +33,7 @@ export function FichaDetalleInstructorProgramacionPanel({
     !fechaFinDraft ||
     fechaInicioDraft > fechaFinDraft;
   const puedeGuardar = !fechasInvalidas && programacionDiasDraft.length > 0 && !guardando;
+  const sinDiasGuardados = !inst.dias_formacion_ids?.length;
 
   return (
     <div className="mt-3 w-full rounded-lg border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-800 dark:bg-primary-900/20">
@@ -42,6 +43,13 @@ export function FichaDetalleInstructorProgramacionPanel({
           Programación de {inst.instructor_nombre}
         </p>
       </div>
+
+      {sinDiasGuardados && (
+        <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100">
+          Seleccione los días en los que dará formación en esta ficha. Mientras no guarde, no se consideran bloques de
+          horario frente a otras fichas del mismo instructor.
+        </p>
+      )}
 
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
@@ -82,8 +90,11 @@ export function FichaDetalleInstructorProgramacionPanel({
         </p>
       )}
 
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
         Días de formación
+      </p>
+      <p className="mb-2 text-xs text-gray-600 dark:text-gray-400">
+        Solo los días marcados y guardados participan en la validación de solapamiento con otras fichas activas.
       </p>
       {diasFichaDisponibles.length > 0 ? (
         <div className="flex flex-wrap gap-3">

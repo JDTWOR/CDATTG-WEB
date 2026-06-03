@@ -119,10 +119,10 @@ export function useFichaInstructores({
       setProgramacionFechaInicioDraft(vigencia.inicio);
       setProgramacionFechaFinDraft(vigencia.fin);
       setProgramacionDiasDraft(
-        inst.dias_formacion_ids?.length ? [...inst.dias_formacion_ids] : [...defaultDiasIds],
+        inst.dias_formacion_ids?.length ? [...inst.dias_formacion_ids] : [],
       );
     },
-    [defaultDiasIds, ficha],
+    [ficha],
   );
 
   const onCancelarProgramacion = useCallback(() => {

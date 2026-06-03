@@ -128,20 +128,14 @@ func (s *InstructorHorarioService) appendBloquesFicha(
 	return bloques
 }
 
-func diaIDsInstructorEnFicha(
-	ficha *models.FichaCaracterizacion,
-	diasInst []models.InstructorFichaDias,
-) []uint {
-	if len(diasInst) > 0 {
-		ids := make([]uint, len(diasInst))
-		for i, d := range diasInst {
-			ids[i] = d.DiaFormacionID
-		}
-		return ids
+// diaIDsProgramadosInstructor devuelve solo días guardados en instructor_ficha_dias (sin inferir los de la ficha).
+func diaIDsProgramadosInstructor(diasInst []models.InstructorFichaDias) []uint {
+	if len(diasInst) == 0 {
+		return nil
 	}
-	ids := make([]uint, 0, len(ficha.FichaDiasFormacion))
-	for _, fd := range ficha.FichaDiasFormacion {
-		ids = append(ids, fd.DiaFormacionID)
+	ids := make([]uint, len(diasInst))
+	for i, d := range diasInst {
+		ids[i] = d.DiaFormacionID
 	}
 	return ids
 }
@@ -164,7 +158,7 @@ func (s *InstructorHorarioService) bloquesInstructor(instructorID uint, excluirF
 		if err != nil {
 			continue
 		}
-		diaIDs := diaIDsInstructorEnFicha(ficha, diasInst)
+		diaIDs := diaIDsProgramadosInstructor(diasInst)
 		bloques = s.appendBloquesFicha(bloques, ficha, asg, diaIDs)
 	}
 	return bloques, nil
@@ -273,15 +267,7 @@ func (s *InstructorHorarioService) ValidarDiasSubsetFicha(fichaID uint, diasIDs 
 	return nil
 }
 
-func instructorTieneDiaProgramado(diaHoy uint, diasInst []models.InstructorFichaDias, ficha *models.FichaCaracterizacion) bool {
-	if len(diasInst) == 0 {
-		for _, fd := range ficha.FichaDiasFormacion {
-			if fd.DiaFormacionID == diaHoy {
-				return true
-			}
-		}
-		return false
-	}
+func instructorTieneDiaProgramado(diaHoy uint, diasInst []models.InstructorFichaDias) bool {
 	for _, d := range diasInst {
 		if d.DiaFormacionID == diaHoy {
 			return true
@@ -350,7 +336,7 @@ func (s *InstructorHorarioService) ValidarPuedeTomarAsistencia(instructorID, fic
 	if err != nil {
 		return err
 	}
-	if !instructorTieneDiaProgramado(diaHoy, diasInst, ficha) {
+	if !instructorTieneDiaProgramado(diaHoy, diasInst) {
 		return errors.New(strings.ToLower(errMsgDiaNoProgramadoInstructor))
 	}
 	vigInicio := intersectarVigencia(ficha.FechaInicio, ifc.FechaInicio)

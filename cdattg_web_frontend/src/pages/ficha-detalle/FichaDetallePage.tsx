@@ -28,7 +28,7 @@ export function FichaDetallePage() {
   const fichaId = id ? Number.parseInt(id, 10) : 0;
 
   const puedeEditarFicha = canManageFichas(roles);
-  const puedeGestionarAprendices = canGestionarAprendicesFicha(hasPermission);
+  const puedeGestionarAprendices = canGestionarAprendicesFicha(roles, hasPermission);
   const puedeProgramarInstructores = canProgramarInstructores(roles, hasPermission);
   const [tab, setTab] = useFichaDetalleTab(puedeProgramarInstructores);
   const [weekStart, setWeekStart] = useInitialWeekStart();

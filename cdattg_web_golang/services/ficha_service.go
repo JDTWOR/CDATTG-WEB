@@ -459,13 +459,20 @@ func (s *fichaService) OcultarAprendicesEnAsistencia(fichaID uint, personas []ui
 	if _, err := s.fichaRepo.FindByID(fichaID); err != nil {
 		return errors.New(msgFichaNoEncontrada)
 	}
+	var actualizados int
 	for _, personaID := range personas {
 		a, err := s.aprendizRepo.FindByPersonaIDAndFichaID(personaID, fichaID)
 		if err != nil || a == nil || !a.Estado {
 			continue
 		}
 		a.OcultoEnAsistencia = oculto
-		_ = s.aprendizRepo.Update(a)
+		if err := s.aprendizRepo.Update(a); err != nil {
+			return fmt.Errorf("error al actualizar visibilidad del aprendiz: %w", err)
+		}
+		actualizados++
+	}
+	if actualizados == 0 {
+		return errors.New("no se encontró ningún aprendiz activo en esta ficha para actualizar")
 	}
 	return nil
 }

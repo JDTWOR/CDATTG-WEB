@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import Swal from 'sweetalert2';
 import { apiService } from '../../../services/api';
 import { axiosErrorMessage } from '../../../utils/httpError';
 import type { AprendizResponse, PersonaResponse } from '../../../types';
@@ -63,8 +64,20 @@ export function useFichaAprendices(fichaId: number, loadFicha: () => Promise<voi
     try {
       await apiService.setOcultoAprendicesAsistencia(fichaId, [personaId], oculto);
       await loadAprendices();
+      void Swal.fire({
+        toast: true,
+        position: 'bottom-end',
+        icon: 'success',
+        title: oculto ? 'Aprendiz oculto en toma de asistencia' : 'Aprendiz visible en toma de asistencia',
+        showConfirmButton: false,
+        timer: 2000,
+      });
     } catch (err: unknown) {
-      alert(axiosErrorMessage(err, 'Error al actualizar visibilidad en asistencia'));
+      void Swal.fire({
+        icon: 'error',
+        title: 'No se pudo actualizar',
+        text: axiosErrorMessage(err, 'Error al actualizar visibilidad en asistencia'),
+      });
     }
   };
 

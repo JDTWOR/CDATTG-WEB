@@ -17,6 +17,9 @@ func main() {
 	if err := database.Initialize(); err != nil {
 		log.Fatal("Error inicializando base de datos:", err)
 	}
+	if err := database.EnsureSchemaPatches(); err != nil {
+		log.Fatal("Error aplicando parches de esquema:", err)
+	}
 
 	// Inicializar Casbin (carga políticas desde BD)
 	if _, err := authz.GetEnforcer(database.GetDB()); err != nil {

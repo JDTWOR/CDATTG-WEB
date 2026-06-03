@@ -10,6 +10,7 @@ import type {
   AsistenciaAprendizResponse,
   TipoObservacionAsistenciaItem,
 } from '../../types';
+import { aprendizVisibleEnTomaAsistencia } from '../../utils/aprendizFichaPermissions';
 import {
   computeBulkCounts,
   groupRegistrosByAprendiz,
@@ -161,9 +162,7 @@ export function useAsistenciaPage() {
           apiService.getFichaAprendices(fid),
           apiService.getAsistenciaAprendices(asistenciaId),
         ]);
-        setAprendicesFicha(
-          sortAprendicesAz(aprendices.filter((a) => a.estado && !a.oculto_en_asistencia)),
-        );
+        setAprendicesFicha(sortAprendicesAz(aprendices.filter(aprendizVisibleEnTomaAsistencia)));
         setAprendicesEnSesion(enSesion);
       } catch (e: unknown) {
         setErrorAprendices(

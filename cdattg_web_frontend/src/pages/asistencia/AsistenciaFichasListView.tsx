@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-import { CalendarDaysIcon, ChartBarIcon } from '@heroicons/react/24/outline';
-import { asistenciaPaths } from '../../routes/paths';
+import { CalendarDaysIcon, ChartBarIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { asistenciaPaths, fichasPaths } from '../../routes/paths';
 import { FichaCaracterizacionCard } from '../../components/FichaCaracterizacionCard';
 import { ASIST_MODAL_IDS_ROOT } from './asistenciaConstants';
 import { AsistenciaModals } from './AsistenciaModals';
@@ -101,16 +101,26 @@ export function AsistenciaFichasListView({ page }: Props) {
           <FichaCaracterizacionCard
             key={item.id}
             ficha={item}
+            showHorarioHoy
             actions={
-              <button
-                type="button"
-                onClick={() => handleTomarAsistencia(item.id)}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-              >
-                <CalendarDaysIcon className="h-4 w-4" />
-                {loading ? 'Entrando…' : 'Tomar asistencia'}
-              </button>
+              <>
+                <Link
+                  to={fichasPaths.detalle(item.id)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700/50"
+                >
+                  <EyeIcon className="h-4 w-4" />
+                  Ver ficha
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleTomarAsistencia(item.id)}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                >
+                  <CalendarDaysIcon className="h-4 w-4" />
+                  {loading ? 'Entrando…' : 'Tomar asistencia'}
+                </button>
+              </>
             }
           />
         ))}

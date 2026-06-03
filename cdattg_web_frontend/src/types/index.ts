@@ -1,3 +1,7 @@
+import type { FichaDiaFormacionItem } from './agenda';
+
+export type { FichaDiaFormacionItem } from './agenda';
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -363,6 +367,7 @@ export interface FichaCaracterizacionResponse {
   status: boolean;
   dias_formacion_ids?: number[];
   dias_formacion_nombres?: string[];
+  dias_formacion?: FichaDiaFormacionItem[];
   cantidad_aprendices: number;
 }
 

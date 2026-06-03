@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   AcademicCapIcon,
+  ClockIcon,
   Cog6ToothIcon,
   ComputerDesktopIcon,
   MapPinIcon,
@@ -9,11 +10,14 @@ import {
 } from '@heroicons/react/24/outline';
 import { LABEL_INSTRUCTOR_LIDER } from '../constants/instructorLiderLabels';
 import type { FichaCaracterizacionResponse } from '../types';
+import { getHorarioHoy } from '../utils/fichaHorario';
 
 type Props = Readonly<{
   ficha: FichaCaracterizacionResponse;
   /** Muestra badge Activa/Inactiva (listado admin). */
   showStatusBadge?: boolean;
+  /** Muestra hora_inicio–hora_fin del día actual si la ficha tiene clase hoy. */
+  showHorarioHoy?: boolean;
   /** Contenido bajo la info académica (estado de sesión, métricas, etc.). */
   extra?: ReactNode;
   /** Reemplaza el contador de aprendices en el pie izquierdo. */
@@ -26,12 +30,14 @@ type Props = Readonly<{
 export function FichaCaracterizacionCard({
   ficha,
   showStatusBadge = false,
+  showHorarioHoy = false,
   extra,
   footerLeft,
   actions,
   className = '',
 }: Props) {
   const sedeAmbiente = [ficha.sede_nombre, ficha.ambiente_nombre].filter(Boolean).join(' / ') || '–';
+  const horarioHoy = showHorarioHoy ? getHorarioHoy(ficha) : null;
 
   return (
     <div
@@ -74,6 +80,12 @@ export function FichaCaracterizacionCard({
               <Cog6ToothIcon className="h-4 w-4 shrink-0 text-gray-400" />
               <span>Jornada: {ficha.jornada_nombre || '–'}</span>
             </div>
+            {horarioHoy ? (
+              <div className="mt-1 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <ClockIcon className="h-4 w-4 shrink-0 text-gray-400" />
+                <span>Hora (hoy): {horarioHoy}</span>
+              </div>
+            ) : null}
             <div className="mt-1 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <MapPinIcon className="h-4 w-4 shrink-0 text-gray-400" />
               <span>Sede / Ambiente: {sedeAmbiente}</span>

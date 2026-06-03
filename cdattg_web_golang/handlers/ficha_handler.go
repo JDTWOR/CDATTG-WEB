@@ -214,6 +214,10 @@ func (h *FichaHandler) AsignarInstructores(c *gin.Context) {
 		return
 	}
 	if err := h.svc.AsignarInstructores(uint(id), req); err != nil {
+		if strings.Contains(err.Error(), "PROGRAMADO EN ESE DÍA") {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

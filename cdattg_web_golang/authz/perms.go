@@ -31,6 +31,7 @@ var (
 	PermisosFicha = []string{
 		"VER FICHAS", "VER FICHA", "CREAR FICHA", "EDITAR FICHA", "ELIMINAR FICHA",
 		"GESTIONAR INSTRUCTORES FICHA", "GESTIONAR APRENDICES FICHA",
+		"PROGRAMAR INSTRUCTORES",
 	}
 	PermisosAprendiz = []string{
 		"VER APRENDICES", "VER APRENDIZ", "CREAR APRENDIZ", "EDITAR APRENDIZ", "ELIMINAR APRENDIZ",
@@ -39,7 +40,7 @@ var (
 		"VER INSTRUCTORES", "CREAR INSTRUCTOR", "EDITAR INSTRUCTOR", "ELIMINAR INSTRUCTOR",
 	}
 	PermisosAsistencia = []string{
-		"VER ASISTENCIA", "TOMAR ASISTENCIA",
+		"VER ASISTENCIA", "TOMAR ASISTENCIA", "VER MI AGENDA",
 	}
 	// PermisosInventario desactivado: módulo inventario no en uso
 	PermisosInventario = []string{}

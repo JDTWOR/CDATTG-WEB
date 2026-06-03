@@ -15,7 +15,8 @@ type FichaCaracterizacionRequest struct {
 	JornadaID            *uint      `json:"jornada_id"`
 	TotalHoras           *int       `json:"total_horas"`
 	Status               *bool      `json:"status"`
-	DiasFormacionIDs     []uint     `json:"dias_formacion_ids"`
+	DiasFormacionIDs     []uint                    `json:"dias_formacion_ids"`
+	DiasFormacion        []FichaDiaFormacionItem `json:"dias_formacion,omitempty"`
 }
 
 // FichaCaracterizacionResponse representa la respuesta de ficha
@@ -39,6 +40,7 @@ type FichaCaracterizacionResponse struct {
 	TotalHoras            *int       `json:"total_horas"`
 	Status                bool       `json:"status"`
 	DiasFormacionIDs      []uint     `json:"dias_formacion_ids"`
-	DiasFormacionNombres  []string   `json:"dias_formacion_nombres"`
-	CantidadAprendices    int        `json:"cantidad_aprendices"`
+	DiasFormacionNombres  []string                  `json:"dias_formacion_nombres"`
+	DiasFormacion         []FichaDiaFormacionItem   `json:"dias_formacion,omitempty"`
+	CantidadAprendices    int                       `json:"cantidad_aprendices"`
 }

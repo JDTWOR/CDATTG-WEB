@@ -4,11 +4,12 @@ import "time"
 
 // InstructorFichaItem un instructor en la asignación a ficha
 type InstructorFichaItem struct {
-	InstructorID          uint      `json:"instructor_id" binding:"required"`
-	CompetenciaID         *uint     `json:"competencia_id"`
-	FechaInicio           FlexDate  `json:"fecha_inicio" binding:"required"`
-	FechaFin              FlexDate  `json:"fecha_fin" binding:"required"`
-	TotalHorasInstructor  *int      `json:"total_horas_instructor"`
+	InstructorID         uint     `json:"instructor_id" binding:"required"`
+	CompetenciaID        *uint    `json:"competencia_id"`
+	FechaInicio          FlexDate `json:"fecha_inicio" binding:"required"`
+	FechaFin             FlexDate `json:"fecha_fin" binding:"required"`
+	TotalHorasInstructor *int     `json:"total_horas_instructor"`
+	DiasFormacionIDs     []uint   `json:"dias_formacion_ids"`
 }
 
 // AsignarInstructoresRequest para POST /fichas/:id/instructores
@@ -28,4 +29,6 @@ type InstructorFichaResponse struct {
 	FechaInicio           *time.Time `json:"fecha_inicio"`
 	FechaFin              *time.Time `json:"fecha_fin"`
 	TotalHorasInstructor  *int       `json:"total_horas_instructor"`
+	DiasFormacionIDs      []uint     `json:"dias_formacion_ids"`
+	DiasFormacionNombres  []string   `json:"dias_formacion_nombres"`
 }

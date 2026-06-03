@@ -59,8 +59,10 @@ interface SidebarItem {
   label: string;
   permission: string | null;
   rolesRequired?: string[];
-  /** Visible sin el permiso si el usuario tiene alguno de estos roles (p. ej. INSTRUCTOR en /fichas). */
+  /** Visible sin el permiso principal si el usuario tiene alguno de estos roles (p. ej. INSTRUCTOR en /fichas). */
   alsoVisibleForRoles?: string[];
+  /** Visible sin el permiso principal si el usuario tiene alguno de estos permisos adicionales. */
+  alsoVisibleForPermissions?: string[];
 }
 
 function isNavItemActive(pathname: string, item: SidebarItem, items: SidebarItem[]): boolean {
@@ -92,6 +94,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
     label: 'Dashboard',
     permission: null,
     rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
+    alsoVisibleForPermissions: ['VER MI AGENDA'],
   },
   { section: 'Gestión académica', path: '/programas', label: 'Programas', permission: 'VER PROGRAMAS' },
   {
@@ -226,10 +229,17 @@ export const Layout = ({ children }: LayoutProps) => {
     () =>
       SIDEBAR_ITEMS.filter((item) => {
         if (item.rolesRequired && item.rolesRequired.length > 0) {
-          if (!item.rolesRequired.some((r) => roles.includes(r))) return false;
+          const matchRequired = item.rolesRequired.some((r) => roles.includes(r));
+          const matchAlsoRole = item.alsoVisibleForRoles?.some((r) => roles.includes(r)) ?? false;
+          const matchAlsoPerm =
+            item.alsoVisibleForPermissions?.some((p) => hasPermission(p)) ?? false;
+          if (!matchRequired && !matchAlsoRole && !matchAlsoPerm) return false;
         }
         if (item.permission === null) return true;
         if (hasPermission(item.permission)) return true;
+        if (item.alsoVisibleForPermissions?.length && item.alsoVisibleForPermissions.some((p) => hasPermission(p))) {
+          return true;
+        }
         if (item.alsoVisibleForRoles?.length && hasAnyRole(roles, item.alsoVisibleForRoles)) return true;
         return false;
       }),

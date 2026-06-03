@@ -30,6 +30,9 @@ func RunRolePermissionSeeder(db *gorm.DB) error {
 	if err := seedInstructorPermissions(e); err != nil {
 		return err
 	}
+	if err := syncAgendaPermissions(e); err != nil {
+		return err
+	}
 	if err := seedVerPersonaForRoles(e, []string{"APRENDIZ", "VISITANTE", "ASPIRANTE", "PROVEEDOR"}); err != nil {
 		return err
 	}
@@ -80,13 +83,40 @@ func seedInstructorPermissions(e *casbin.Enforcer) error {
 	if _, err := authz.RemoveFilteredPolicyForRole(e, "INSTRUCTOR", authz.ObjPersona); err != nil {
 		return err
 	}
-	if err := addPermissionsForObject(e, "INSTRUCTOR", authz.ObjAsistencia, authz.PermisosAsistencia); err != nil {
+	instructorAsistencia := []string{"VER ASISTENCIA", "TOMAR ASISTENCIA", "VER MI AGENDA"}
+	if err := addPermissionsForObject(e, "INSTRUCTOR", authz.ObjAsistencia, instructorAsistencia); err != nil {
 		return err
 	}
 	if _, err := authz.AddPermissionForRole(e, "INSTRUCTOR", authz.ObjPersona, "VER PERSONA"); err != nil {
 		return err
 	}
 	return nil
+}
+
+// syncAgendaPermissions asegura PROGRAMAR INSTRUCTORES en coordinación/admin y VER MI AGENDA en instructor.
+func syncAgendaPermissions(e *casbin.Enforcer) error {
+	for _, role := range []string{"ADMINISTRADOR", "COORDINADOR"} {
+		if _, err := authz.AddPermissionForRole(e, role, authz.ObjFicha, "PROGRAMAR INSTRUCTORES"); err != nil {
+			return err
+		}
+	}
+	if _, err := authz.AddPermissionForRole(e, "INSTRUCTOR", authz.ObjAsistencia, "VER MI AGENDA"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// SyncAgendaPermissionsToRoles idempotente para despliegues existentes (sin re-ejecutar todo el seeder).
+func SyncAgendaPermissionsToRoles(db *gorm.DB) error {
+	log.Println("Sincronizando permisos de agenda/programación...")
+	e, err := authz.GetEnforcer(db)
+	if err != nil {
+		return err
+	}
+	if err := syncAgendaPermissions(e); err != nil {
+		return err
+	}
+	return e.SavePolicy()
 }
 
 func seedVerPersonaForRoles(e *casbin.Enforcer, roleNames []string) error {

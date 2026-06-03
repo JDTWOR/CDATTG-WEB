@@ -1,0 +1,383 @@
+package services
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/sena/cdattg-web-golang/models"
+	"github.com/sena/cdattg-web-golang/repositories"
+)
+
+const (
+	errMsgDiaNoProgramadoInstructor = "HOY NO TIENE FORMACIÓN PROGRAMADA EN ESTA FICHA"
+	errMsgFueraHorarioProgramado    = "FUERA DEL HORARIO PROGRAMADO; SOLO SE PUEDE TOMAR ASISTENCIA EN EL HORARIO CONFIGURADO"
+	errMsgColisionHorarioInstructor = "EL INSTRUCTOR YA ESTÁ PROGRAMADO EN ESE DÍA Y HORARIO EN OTRA FICHA"
+)
+
+// InstructorHorarioService valida colisiones de horario y ventana de asistencia.
+type InstructorHorarioService struct {
+	fichaRepo         repositories.FichaRepository
+	fichaDiasRepo     repositories.FichaDiasRepository
+	instFichaRepo     repositories.InstructorFichaRepository
+	instFichaDiasRepo repositories.InstructorFichaDiasRepository
+	catalogoRepo      repositories.CatalogoRepository
+}
+
+func NewInstructorHorarioService() *InstructorHorarioService {
+	return &InstructorHorarioService{
+		fichaRepo:         repositories.NewFichaRepository(),
+		fichaDiasRepo:     repositories.NewFichaDiasRepository(),
+		instFichaRepo:     repositories.NewInstructorFichaRepository(),
+		instFichaDiasRepo: repositories.NewInstructorFichaDiasRepository(),
+		catalogoRepo:      repositories.NewCatalogoRepository(),
+	}
+}
+
+// WeekdayToDiaFormacionID convierte time.Weekday a dia_formacion_id (1=lunes … 7=domingo).
+func WeekdayToDiaFormacionID(w time.Weekday) uint {
+	if w == time.Sunday {
+		return 7
+	}
+	return uint(w)
+}
+
+func intervalosSeSolapan(aInicio, aFin, bInicio, bFin string) bool {
+	ai, err1 := parseHora(aInicio)
+	af, err2 := parseHora(aFin)
+	bi, err3 := parseHora(bInicio)
+	bf, err4 := parseHora(bFin)
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		return false
+	}
+	aStart := ai.Hour()*60 + ai.Minute()
+	aEnd := af.Hour()*60 + af.Minute()
+	bStart := bi.Hour()*60 + bi.Minute()
+	bEnd := bf.Hour()*60 + bf.Minute()
+	if aEnd < aStart {
+		aEnd += 24 * 60
+	}
+	if bEnd < bStart {
+		bEnd += 24 * 60
+	}
+	return aStart < bEnd && bStart < aEnd
+}
+
+func fechasVigenciaSeSolapan(aInicio, aFin, bInicio, bFin *time.Time) bool {
+	if aInicio == nil || aFin == nil || bInicio == nil || bFin == nil {
+		return true
+	}
+	ai := aInicio.Truncate(24 * time.Hour)
+	af := aFin.Truncate(24 * time.Hour)
+	bi := bInicio.Truncate(24 * time.Hour)
+	bf := bFin.Truncate(24 * time.Hour)
+	return !ai.After(bf) && !bi.After(af)
+}
+
+type bloqueSemanal struct {
+	fichaID        uint
+	fichaNum       string
+	diaFormacionID uint
+	horaInicio     string
+	horaFin        string
+	vigenciaInicio *time.Time
+	vigenciaFin    *time.Time
+}
+
+func (s *InstructorHorarioService) horasDiaFicha(ficha *models.FichaCaracterizacion, diaFormacionID uint) (inicio, fin string) {
+	for _, fd := range ficha.FichaDiasFormacion {
+		if fd.DiaFormacionID == diaFormacionID {
+			inicio, fin = fd.HoraInicio, fd.HoraFin
+			break
+		}
+	}
+	if inicio != "" && fin != "" {
+		return inicio, fin
+	}
+	if ficha.Jornada != nil {
+		inicio, fin = ficha.Jornada.HoraInicio, ficha.Jornada.HoraFin
+		if inicio != "" && fin != "" {
+			return inicio, fin
+		}
+		if def, ok := defaultHorarios[ficha.Jornada.Nombre]; ok {
+			return def.inicio, def.fin
+		}
+	}
+	return "", ""
+}
+
+func (s *InstructorHorarioService) appendBloquesFicha(
+	bloques []bloqueSemanal,
+	ficha *models.FichaCaracterizacion,
+	asg models.InstructorFichaCaracterizacion,
+	diaIDs []uint,
+) []bloqueSemanal {
+	for _, diaID := range diaIDs {
+		hi, hf := s.horasDiaFicha(ficha, diaID)
+		if hi == "" || hf == "" {
+			continue
+		}
+		bloques = append(bloques, bloqueSemanal{
+			fichaID: asg.FichaID, fichaNum: ficha.Ficha,
+			diaFormacionID: diaID, horaInicio: hi, horaFin: hf,
+			vigenciaInicio: intersectarVigencia(ficha.FechaInicio, asg.FechaInicio),
+			vigenciaFin:    intersectarVigenciaFin(ficha.FechaFin, asg.FechaFin),
+		})
+	}
+	return bloques
+}
+
+func diaIDsInstructorEnFicha(
+	ficha *models.FichaCaracterizacion,
+	diasInst []models.InstructorFichaDias,
+) []uint {
+	if len(diasInst) > 0 {
+		ids := make([]uint, len(diasInst))
+		for i, d := range diasInst {
+			ids[i] = d.DiaFormacionID
+		}
+		return ids
+	}
+	ids := make([]uint, 0, len(ficha.FichaDiasFormacion))
+	for _, fd := range ficha.FichaDiasFormacion {
+		ids = append(ids, fd.DiaFormacionID)
+	}
+	return ids
+}
+
+func (s *InstructorHorarioService) bloquesInstructor(instructorID uint, excluirFichaID uint) ([]bloqueSemanal, error) {
+	assignments, err := s.instFichaRepo.FindByInstructorID(instructorID)
+	if err != nil {
+		return nil, err
+	}
+	var bloques []bloqueSemanal
+	for _, asg := range assignments {
+		if excluirFichaID > 0 && asg.FichaID == excluirFichaID {
+			continue
+		}
+		ficha, err := s.fichaRepo.FindByID(asg.FichaID)
+		if err != nil || ficha == nil {
+			continue
+		}
+		diasInst, err := s.instFichaDiasRepo.FindByInstructorAndFicha(instructorID, asg.FichaID)
+		if err != nil {
+			continue
+		}
+		diaIDs := diaIDsInstructorEnFicha(ficha, diasInst)
+		bloques = s.appendBloquesFicha(bloques, ficha, asg, diaIDs)
+	}
+	return bloques, nil
+}
+
+func intersectarVigencia(fichaInicio, asgInicio *time.Time) *time.Time {
+	if fichaInicio == nil {
+		return asgInicio
+	}
+	if asgInicio == nil {
+		return fichaInicio
+	}
+	if asgInicio.After(*fichaInicio) {
+		return asgInicio
+	}
+	return fichaInicio
+}
+
+func intersectarVigenciaFin(fichaFin, asgFin *time.Time) *time.Time {
+	if fichaFin == nil {
+		return asgFin
+	}
+	if asgFin == nil {
+		return fichaFin
+	}
+	if asgFin.Before(*fichaFin) {
+		return asgFin
+	}
+	return fichaFin
+}
+
+func colisionaConBloquesExistentes(
+	diaID uint, hi, hf string,
+	vigInicio, vigFin *time.Time,
+	existing []bloqueSemanal,
+	fichaNum string,
+) error {
+	for _, ex := range existing {
+		if ex.diaFormacionID != diaID {
+			continue
+		}
+		if !intervalosSeSolapan(hi, hf, ex.horaInicio, ex.horaFin) {
+			continue
+		}
+		if !fechasVigenciaSeSolapan(vigInicio, vigFin, ex.vigenciaInicio, ex.vigenciaFin) {
+			continue
+		}
+		return fmt.Errorf("%s: el %s %s–%s en ficha %s solapa con ficha %s (%s–%s)",
+			errMsgColisionHorarioInstructor, nombreDia(diaID), hi, hf, fichaNum, ex.fichaNum, ex.horaInicio, ex.horaFin)
+	}
+	return nil
+}
+
+func (s *InstructorHorarioService) ValidarColisionAlAsignar(instructorID, fichaID uint, diasIDs []uint, fechaInicio, fechaFin time.Time, excluirFichaActual bool) error {
+	excluir := uint(0)
+	if excluirFichaActual {
+		excluir = fichaID
+	}
+	existing, err := s.bloquesInstructor(instructorID, excluir)
+	if err != nil {
+		return err
+	}
+	ficha, err := s.fichaRepo.FindByID(fichaID)
+	if err != nil || ficha == nil {
+		return errors.New(msgFichaNoEncontrada)
+	}
+	vigInicio := intersectarVigencia(ficha.FechaInicio, &fechaInicio)
+	vigFin := intersectarVigenciaFin(ficha.FechaFin, &fechaFin)
+	for _, diaID := range diasIDs {
+		hi, hf := s.horasDiaFicha(ficha, diaID)
+		if hi == "" || hf == "" {
+			continue
+		}
+		if errCol := colisionaConBloquesExistentes(diaID, hi, hf, vigInicio, vigFin, existing, ficha.Ficha); errCol != nil {
+			return errCol
+		}
+	}
+	return nil
+}
+
+func nombreDia(diaID uint) string {
+	names := map[uint]string{1: "lunes", 2: "martes", 3: "miércoles", 4: "jueves", 5: "viernes", 6: "sábado", 7: "domingo"}
+	if n, ok := names[diaID]; ok {
+		return n
+	}
+	return fmt.Sprintf("día %d", diaID)
+}
+
+func (s *InstructorHorarioService) ValidarDiasSubsetFicha(fichaID uint, diasIDs []uint) error {
+	fichaDias, err := s.fichaDiasRepo.FindByFichaID(fichaID)
+	if err != nil {
+		return err
+	}
+	allowed := make(map[uint]bool, len(fichaDias))
+	for _, fd := range fichaDias {
+		allowed[fd.DiaFormacionID] = true
+	}
+	for _, id := range diasIDs {
+		if id == 0 {
+			continue
+		}
+		if !allowed[id] {
+			return fmt.Errorf("el día %d no está configurado en la ficha", id)
+		}
+	}
+	return nil
+}
+
+func instructorTieneDiaProgramado(diaHoy uint, diasInst []models.InstructorFichaDias, ficha *models.FichaCaracterizacion) bool {
+	if len(diasInst) == 0 {
+		for _, fd := range ficha.FichaDiasFormacion {
+			if fd.DiaFormacionID == diaHoy {
+				return true
+			}
+		}
+		return false
+	}
+	for _, d := range diasInst {
+		if d.DiaFormacionID == diaHoy {
+			return true
+		}
+	}
+	return false
+}
+
+func diaDentroDeVigencia(diaMomento time.Time, vigInicio, vigFin *time.Time) bool {
+	if vigInicio != nil && diaMomento.Before(vigInicio.Truncate(24*time.Hour)) {
+		return false
+	}
+	if vigFin != nil && diaMomento.After(vigFin.Truncate(24*time.Hour)) {
+		return false
+	}
+	return true
+}
+
+func extensionMinutosJornada(j *models.Jornada) int {
+	extMin := 60
+	if j == nil {
+		return extMin
+	}
+	if j.MinutosExtensionFin != nil && *j.MinutosExtensionFin >= 0 {
+		return *j.MinutosExtensionFin
+	}
+	if d, ok := defaultExtensionMinutos[j.Nombre]; ok {
+		return d
+	}
+	return extMin
+}
+
+func (s *InstructorHorarioService) validarHorarioAsistencia(ficha *models.FichaCaracterizacion, diaHoy uint, momento time.Time) error {
+	hi, hf := s.horasDiaFicha(ficha, diaHoy)
+	if hi == "" || hf == "" {
+		if ficha.JornadaID == nil {
+			return nil
+		}
+		ok, _ := NewJornadaValidationService().ValidarHorarioJornada(*ficha.JornadaID)
+		if !ok {
+			return errors.New(strings.ToLower(errMsgFueraHorarioProgramado))
+		}
+		return nil
+	}
+	extMin := extensionMinutosJornada(ficha.Jornada)
+	if !validarHorarioRango(hi, hf, extMin, momento) {
+		return errors.New(strings.ToLower(errMsgFueraHorarioProgramado))
+	}
+	return nil
+}
+
+func (s *InstructorHorarioService) ValidarPuedeTomarAsistencia(instructorID, fichaID uint, momento time.Time) error {
+	ifc, err := s.instFichaRepo.FindByFichaIDAndInstructorID(fichaID, instructorID)
+	if err != nil || ifc == nil {
+		return errors.New(errMsgNoEstaCreadoComoInstructor)
+	}
+	ficha, err := s.fichaRepo.FindByID(fichaID)
+	if err != nil || ficha == nil {
+		return errors.New(msgFichaNoEncontrada)
+	}
+	if !ficha.Status {
+		return errors.New("la ficha está inactiva; no se puede tomar asistencia")
+	}
+	diaHoy := WeekdayToDiaFormacionID(momento.Weekday())
+	diasInst, err := s.instFichaDiasRepo.FindByInstructorAndFicha(instructorID, fichaID)
+	if err != nil {
+		return err
+	}
+	if !instructorTieneDiaProgramado(diaHoy, diasInst, ficha) {
+		return errors.New(strings.ToLower(errMsgDiaNoProgramadoInstructor))
+	}
+	vigInicio := intersectarVigencia(ficha.FechaInicio, ifc.FechaInicio)
+	vigFin := intersectarVigenciaFin(ficha.FechaFin, ifc.FechaFin)
+	diaMomento := time.Date(momento.Year(), momento.Month(), momento.Day(), 0, 0, 0, 0, momento.Location())
+	if !diaDentroDeVigencia(diaMomento, vigInicio, vigFin) {
+		return errors.New("fuera del periodo de vigencia de la asignación")
+	}
+	return s.validarHorarioAsistencia(ficha, diaHoy, momento)
+}
+
+func validarHorarioRango(horaInicio, horaFin string, extMin int, now time.Time) bool {
+	tInicio, err1 := parseHora(horaInicio)
+	tFin, err2 := parseHora(horaFin)
+	if err1 != nil || err2 != nil {
+		return true
+	}
+	hoy := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	actual := hoy.Add(time.Duration(now.Hour())*time.Hour + time.Duration(now.Minute())*time.Minute)
+	start := hoy.Add(time.Duration(tInicio.Hour())*time.Hour + time.Duration(tInicio.Minute())*time.Minute)
+	end := hoy.Add(time.Duration(tFin.Hour())*time.Hour + time.Duration(tFin.Minute())*time.Minute)
+	if end.Before(start) {
+		end = end.Add(24 * time.Hour)
+		if actual.Before(start) {
+			actual = actual.Add(24 * time.Hour)
+		}
+	}
+	endEffective := end.Add(time.Duration(extMin) * time.Minute)
+	return !actual.Before(start) && !actual.After(endEffective)
+}

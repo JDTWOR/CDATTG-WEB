@@ -79,6 +79,7 @@ import type {
   UsuarioPermisosResponse,
   DefinicionesPermisosResponse,
 } from '../types';
+import type { InstructorAgendaResponse } from '../types/agenda';
 
 /** Payload parcial desde el stream NDJSON de importación de personas */
 type PersonaImportStreamJson = PersonaImportProgress & {
@@ -538,6 +539,21 @@ class ApiService {
 
   async desasignarInstructor(fichaId: number, instructorId: number): Promise<void> {
     await this.api.delete(`/fichas-caracterizacion/${fichaId}/instructores/${instructorId}`);
+  }
+
+  async getInstructorAgenda(desde: string, hasta: string): Promise<InstructorAgendaResponse> {
+    const response = await this.api.get<InstructorAgendaResponse>('/instructor/agenda', {
+      params: { desde, hasta },
+    });
+    return response.data;
+  }
+
+  async getFichaAgenda(fichaId: number, desde: string, hasta: string): Promise<InstructorAgendaResponse> {
+    const response = await this.api.get<InstructorAgendaResponse>(
+      `/fichas-caracterizacion/${fichaId}/agenda`,
+      { params: { desde, hasta } },
+    );
+    return response.data;
   }
 
   // Aprendices de una ficha

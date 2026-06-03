@@ -383,6 +383,7 @@ export interface InstructorFichaItem {
   fecha_inicio: string;
   fecha_fin: string;
   total_horas_instructor?: number;
+  dias_formacion_ids?: number[];
 }
 
 export interface AsignarInstructoresRequest {
@@ -400,6 +401,8 @@ export interface InstructorFichaResponse {
   fecha_inicio?: string;
   fecha_fin?: string;
   total_horas_instructor?: number;
+  dias_formacion_ids?: number[];
+  dias_formacion_nombres?: string[];
 }
 
 // Aprendices

@@ -36,3 +36,16 @@ func (h *AdminHandler) SyncInventarioPermissions(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Permisos de inventario sincronizados. Los coordinadores y administradores deben cerrar sesión y volver a entrar para ver el menú Inventario."})
 }
+
+// SyncAgendaPermissions asigna PROGRAMAR INSTRUCTORES (admin/coordinador) y VER MI AGENDA (instructor)
+// en Casbin sin quitar permisos existentes. Útil tras desplegar el módulo de programación.
+func (h *AdminHandler) SyncAgendaPermissions(c *gin.Context) {
+	db := database.GetDB()
+	if err := seeders.SyncAgendaPermissionsToRoles(db); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al sincronizar permisos de agenda: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Permisos de agenda sincronizados. Los usuarios deben cerrar sesión y volver a entrar para aplicar PROGRAMAR INSTRUCTORES y VER MI AGENDA.",
+	})
+}

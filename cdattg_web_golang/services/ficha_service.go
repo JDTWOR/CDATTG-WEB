@@ -34,20 +34,24 @@ type FichaService interface {
 }
 
 type fichaService struct {
-	fichaRepo     repositories.FichaRepository
-	progRepo      repositories.ProgramaFormacionRepository
-	instFichaRepo repositories.InstructorFichaRepository
-	aprendizRepo  repositories.AprendizRepository
-	fichaDiasRepo repositories.FichaDiasRepository
+	fichaRepo         repositories.FichaRepository
+	progRepo          repositories.ProgramaFormacionRepository
+	instFichaRepo     repositories.InstructorFichaRepository
+	instFichaDiasRepo repositories.InstructorFichaDiasRepository
+	aprendizRepo      repositories.AprendizRepository
+	fichaDiasRepo     repositories.FichaDiasRepository
+	horarioSvc        *InstructorHorarioService
 }
 
 func NewFichaService() FichaService {
 	return &fichaService{
-		fichaRepo:     repositories.NewFichaRepository(),
-		progRepo:      repositories.NewProgramaFormacionRepository(),
-		instFichaRepo: repositories.NewInstructorFichaRepository(),
-		aprendizRepo:  repositories.NewAprendizRepository(),
-		fichaDiasRepo: repositories.NewFichaDiasRepository(),
+		fichaRepo:         repositories.NewFichaRepository(),
+		progRepo:          repositories.NewProgramaFormacionRepository(),
+		instFichaRepo:     repositories.NewInstructorFichaRepository(),
+		instFichaDiasRepo: repositories.NewInstructorFichaDiasRepository(),
+		aprendizRepo:      repositories.NewAprendizRepository(),
+		fichaDiasRepo:     repositories.NewFichaDiasRepository(),
+		horarioSvc:        NewInstructorHorarioService(),
 	}
 }
 
@@ -223,7 +227,7 @@ func (s *fichaService) Create(req dto.FichaCaracterizacionRequest) (*dto.FichaCa
 		return nil, fmt.Errorf(errFmtSyncInstructorLider, err)
 	}
 	if req.DiasFormacionIDs != nil {
-		if err := s.fichaDiasRepo.ReplaceByFichaID(f.ID, req.DiasFormacionIDs); err != nil {
+		if err := s.guardarDiasFormacionFicha(f.ID, req.DiasFormacionIDs, req.DiasFormacion, f.JornadaID); err != nil {
 			return nil, fmt.Errorf("error al guardar días de formación: %w", err)
 		}
 	}
@@ -266,7 +270,7 @@ func (s *fichaService) Update(id uint, req dto.FichaCaracterizacionRequest) (*dt
 		return nil, fmt.Errorf(errFmtSyncInstructorLider, err)
 	}
 	if req.DiasFormacionIDs != nil {
-		if err := s.fichaDiasRepo.ReplaceByFichaID(id, req.DiasFormacionIDs); err != nil {
+		if err := s.guardarDiasFormacionFicha(id, req.DiasFormacionIDs, req.DiasFormacion, f.JornadaID); err != nil {
 			return nil, fmt.Errorf("error al guardar días de formación: %w", err)
 		}
 	}
@@ -288,8 +292,29 @@ func (s *fichaService) ListInstructores(fichaID uint) ([]dto.InstructorFichaResp
 	resp := make([]dto.InstructorFichaResponse, len(list))
 	for i := range list {
 		resp[i] = s.instructorFichaToResponse(list[i])
+		dias, _ := s.instFichaDiasRepo.FindByInstructorAndFicha(list[i].InstructorID, fichaID)
+		if len(dias) > 0 {
+			ids := make([]uint, len(dias))
+			for j, d := range dias {
+				ids[j] = d.DiaFormacionID
+			}
+			resp[i].DiasFormacionIDs = ids
+			resp[i].DiasFormacionNombres = diaFormacionNombresPorIDs(ids)
+		}
 	}
 	return resp, nil
+}
+
+func (s *fichaService) diasFormacionFicha(fichaID uint) []uint {
+	list, err := s.fichaDiasRepo.FindByFichaID(fichaID)
+	if err != nil {
+		return nil
+	}
+	ids := make([]uint, 0, len(list))
+	for _, d := range list {
+		ids = append(ids, d.DiaFormacionID)
+	}
+	return ids
 }
 
 func (s *fichaService) AsignarInstructores(fichaID uint, req dto.AsignarInstructoresRequest) error {
@@ -314,34 +339,69 @@ func (s *fichaService) AsignarInstructores(fichaID uint, req dto.AsignarInstruct
 		return fmt.Errorf(errFmtSyncInstructorLider, err)
 	}
 	// Crear o actualizar asignaciones
+	fichaDiasDefault := s.diasFormacionFicha(fichaID)
 	for _, it := range req.Instructores {
-		fechaInicio := it.FechaInicio.Time
-		fechaFin := it.FechaFin.Time
-		ex, err := s.instFichaRepo.FindByFichaIDAndInstructorID(fichaID, it.InstructorID)
-		if err == nil {
-			ex.CompetenciaID = it.CompetenciaID
-			ex.FechaInicio = &fechaInicio
-			ex.FechaFin = &fechaFin
-			ex.TotalHorasInstructor = it.TotalHorasInstructor
-			_ = s.instFichaRepo.Update(ex)
-			continue
-		}
-		m := models.InstructorFichaCaracterizacion{
-			InstructorID:         it.InstructorID,
-			FichaID:              fichaID,
-			CompetenciaID:        it.CompetenciaID,
-			FechaInicio:          &fechaInicio,
-			FechaFin:             &fechaFin,
-			TotalHorasInstructor: it.TotalHorasInstructor,
-		}
-		if err := s.instFichaRepo.Create(&m); err != nil {
-			return fmt.Errorf("error al asignar instructor: %w", err)
+		if err := s.persistirAsignacionInstructor(fichaID, it, fichaDiasDefault); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
+func (s *fichaService) persistirAsignacionInstructor(
+	fichaID uint,
+	it dto.InstructorFichaItem,
+	fichaDiasDefault []uint,
+) error {
+	fechaInicio := it.FechaInicio.Time
+	fechaFin := it.FechaFin.Time
+	diasIDs := it.DiasFormacionIDs
+	if len(diasIDs) == 0 {
+		diasIDs = fichaDiasDefault
+	}
+	if len(diasIDs) == 0 {
+		return fmt.Errorf("instructor %d: debe asignar al menos un día de formación", it.InstructorID)
+	}
+	if err := s.horarioSvc.ValidarDiasSubsetFicha(fichaID, diasIDs); err != nil {
+		return fmt.Errorf("instructor %d: %w", it.InstructorID, err)
+	}
+	if err := s.horarioSvc.ValidarColisionAlAsignar(it.InstructorID, fichaID, diasIDs, fechaInicio, fechaFin, true); err != nil {
+		return err
+	}
+	ex, err := s.instFichaRepo.FindByFichaIDAndInstructorID(fichaID, it.InstructorID)
+	if err == nil {
+		ex.CompetenciaID = it.CompetenciaID
+		ex.FechaInicio = &fechaInicio
+		ex.FechaFin = &fechaFin
+		ex.TotalHorasInstructor = it.TotalHorasInstructor
+		if errUp := s.instFichaRepo.Update(ex); errUp != nil {
+			return errUp
+		}
+		return s.guardarDiasInstructor(it.InstructorID, fichaID, diasIDs)
+	}
+	m := models.InstructorFichaCaracterizacion{
+		InstructorID:         it.InstructorID,
+		FichaID:              fichaID,
+		CompetenciaID:        it.CompetenciaID,
+		FechaInicio:          &fechaInicio,
+		FechaFin:             &fechaFin,
+		TotalHorasInstructor: it.TotalHorasInstructor,
+	}
+	if err := s.instFichaRepo.Create(&m); err != nil {
+		return fmt.Errorf("error al asignar instructor: %w", err)
+	}
+	return s.guardarDiasInstructor(it.InstructorID, fichaID, diasIDs)
+}
+
+func (s *fichaService) guardarDiasInstructor(instructorID, fichaID uint, diasIDs []uint) error {
+	if err := s.instFichaDiasRepo.ReplaceByInstructorAndFicha(instructorID, fichaID, diasIDs); err != nil {
+		return fmt.Errorf("error al guardar días del instructor: %w", err)
+	}
+	return nil
+}
+
 func (s *fichaService) DesasignarInstructor(fichaID, instructorID uint) error {
+	_ = s.instFichaDiasRepo.DeleteByInstructorAndFicha(instructorID, fichaID)
 	return s.instFichaRepo.DeleteByFichaIDAndInstructorID(fichaID, instructorID)
 }
 
@@ -435,6 +495,15 @@ func (s *fichaService) fichaToResponse(f models.FichaCaracterizacion, cantidadAp
 	}
 	for _, fd := range f.FichaDiasFormacion {
 		r.DiasFormacionIDs = append(r.DiasFormacionIDs, fd.DiaFormacionID)
+		item := dto.FichaDiaFormacionItem{
+			DiaFormacionID: fd.DiaFormacionID,
+			HoraInicio:     fd.HoraInicio,
+			HoraFin:        fd.HoraFin,
+		}
+		if fd.DiaFormacion != nil {
+			item.DiaNombre = fd.DiaFormacion.Nombre
+		}
+		r.DiasFormacion = append(r.DiasFormacion, item)
 	}
 	return r
 }
@@ -452,6 +521,56 @@ func (s *fichaService) fichaRequestToModel(req dto.FichaCaracterizacionRequest) 
 		JornadaID:            req.JornadaID,
 		TotalHoras:           req.TotalHoras,
 	}
+}
+
+func horasDefaultJornada(jornadaID *uint) (inicio, fin string) {
+	if jornadaID == nil || *jornadaID == 0 {
+		return "", ""
+	}
+	j, err := repositories.NewCatalogoRepository().FindJornadaByID(*jornadaID)
+	if err != nil || j == nil {
+		return "", ""
+	}
+	inicio, fin = j.HoraInicio, j.HoraFin
+	if inicio != "" && fin != "" {
+		return inicio, fin
+	}
+	if def, ok := defaultHorarios[j.Nombre]; ok {
+		return def.inicio, def.fin
+	}
+	return "", ""
+}
+
+func buildFichaDiaInputs(ids []uint, detalle []dto.FichaDiaFormacionItem, hi, hf string) []repositories.FichaDiaInput {
+	horasByDia := make(map[uint]dto.FichaDiaFormacionItem)
+	for _, d := range detalle {
+		if d.DiaFormacionID > 0 {
+			horasByDia[d.DiaFormacionID] = d
+		}
+	}
+	inputs := make([]repositories.FichaDiaInput, 0, len(ids))
+	for _, id := range ids {
+		if id == 0 {
+			continue
+		}
+		in := repositories.FichaDiaInput{DiaFormacionID: id, HoraInicio: hi, HoraFin: hf}
+		if h, ok := horasByDia[id]; ok {
+			if h.HoraInicio != "" {
+				in.HoraInicio = h.HoraInicio
+			}
+			if h.HoraFin != "" {
+				in.HoraFin = h.HoraFin
+			}
+		}
+		inputs = append(inputs, in)
+	}
+	return inputs
+}
+
+func (s *fichaService) guardarDiasFormacionFicha(fichaID uint, ids []uint, detalle []dto.FichaDiaFormacionItem, jornadaID *uint) error {
+	hi, hf := horasDefaultJornada(jornadaID)
+	inputs := buildFichaDiaInputs(ids, detalle, hi, hf)
+	return s.fichaDiasRepo.ReplaceByFichaIDWithHorarios(fichaID, inputs)
 }
 
 func (s *fichaService) instructorFichaToResponse(m models.InstructorFichaCaracterizacion) dto.InstructorFichaResponse {

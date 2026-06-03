@@ -21,7 +21,9 @@ const (
 	permVerFichas       = "VER FICHAS"
 	permCrearInstructor = "CREAR INSTRUCTOR"
 	permTomarAsistencia = "TOMAR ASISTENCIA"
-	permVerAsistencia   = "VER ASISTENCIA"
+	permVerAsistencia          = "VER ASISTENCIA"
+	permProgramarInstructores  = "PROGRAMAR INSTRUCTORES"
+	permVerMiAgenda            = "VER MI AGENDA"
 )
 
 func SetupRouter() *gin.Engine {
@@ -39,6 +41,7 @@ func SetupRouter() *gin.Engine {
 	personaHandler := handlers.NewPersonaHandler()
 	programaHandler := handlers.NewProgramaFormacionHandler()
 	fichaHandler := handlers.NewFichaHandler()
+	agendaHandler := handlers.NewInstructorAgendaHandler()
 	catalogoHandler := handlers.NewCatalogoHandler()
 	aprendizHandler := handlers.NewAprendizHandler()
 	instructorHandler := handlers.NewInstructorHandler()
@@ -133,8 +136,9 @@ func SetupRouter() *gin.Engine {
 				fichas.PUT("/:id", middleware.RequirePermission("ficha", "EDITAR FICHA"), fichaHandler.Update)
 				fichas.DELETE("/:id", middleware.RequirePermission("ficha", "ELIMINAR FICHA"), fichaHandler.Delete)
 				fichas.GET("/:id/instructores", middleware.RequirePermissionListInstructoresFicha(), fichaHandler.ListInstructores)
-				fichas.POST("/:id/instructores", middleware.RequirePermission("ficha", "GESTIONAR INSTRUCTORES FICHA"), fichaHandler.AsignarInstructores)
-				fichas.DELETE("/:id/instructores/:instructorId", middleware.RequirePermission("ficha", "GESTIONAR INSTRUCTORES FICHA"), fichaHandler.DesasignarInstructor)
+				fichas.GET("/:id/agenda", middleware.RequirePermission("ficha", permProgramarInstructores), agendaHandler.GetAgendaFicha)
+				fichas.POST("/:id/instructores", middleware.RequirePermission("ficha", permProgramarInstructores), fichaHandler.AsignarInstructores)
+				fichas.DELETE("/:id/instructores/:instructorId", middleware.RequirePermission("ficha", permProgramarInstructores), fichaHandler.DesasignarInstructor)
 				fichas.GET(routeIDAprendices, middleware.RequirePermissionListAprendicesFicha(), fichaHandler.ListAprendices)
 				fichas.POST(routeIDAprendices, middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.AsignarAprendices)
 				fichas.POST(routeIDAprendices+"/desasignar", middleware.RequirePermission("ficha", "GESTIONAR APRENDICES FICHA"), fichaHandler.DesasignarAprendices)
@@ -142,6 +146,10 @@ func SetupRouter() *gin.Engine {
 
 			instructores := protected.Group("/instructores")
 			instructores.GET("", middleware.RequirePermission("ficha", permVerFichas), instructorHandler.GetAll)
+			instructores.GET("/agenda", middleware.RequirePermission("asistencia", permVerMiAgenda), agendaHandler.GetMiAgenda)
+
+			instructorSelf := protected.Group("/instructor")
+			instructorSelf.GET("/agenda", middleware.RequirePermission("asistencia", permVerMiAgenda), agendaHandler.GetMiAgenda)
 			instructores.GET("/imports", middleware.RequirePermission("instructor", permCrearInstructor), instructorHandler.ListInstructorImports)
 			instructores.POST(routeImport, middleware.RequirePermission("instructor", permCrearInstructor), instructorHandler.ImportInstructores)
 			instructores.GET("/:id", middleware.RequirePermission("ficha", permVerFichas), instructorHandler.GetByID)
@@ -181,6 +189,7 @@ func SetupRouter() *gin.Engine {
 
 			admin := protected.Group("/admin")
 			admin.POST("/sync-instructor-roles", middleware.RequirePermission("ficha", permVerFichas), adminHandler.SyncInstructorRoles)
+			admin.POST("/sync-agenda-permissions", middleware.RequireSuperAdminOrAdmin(), adminHandler.SyncAgendaPermissions)
 			// sync-inventario-permissions desactivado (módulo inventario no en uso)
 
 			// Gestión de permisos y roles (ASIGNAR PERMISOS o SUPER ADMIN para roles)

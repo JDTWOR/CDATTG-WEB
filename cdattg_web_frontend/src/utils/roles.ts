@@ -1,4 +1,6 @@
 /** Etiqueta legible: "INSTRUCTOR" → "Instructor", "SUPER ADMINISTRADOR" → "Super Administrador". */
+import { PERM_VER_MI_AGENDA } from './programacionPermissions';
+
 export function formatRoleLabel(role: string): string {
   return role
     .trim()
@@ -30,6 +32,9 @@ export function getHomeRouteForUser(roles: string[], permissions: string[]): str
     return '/vigilancia/ambientes';
   }
   if (normalized.includes('INSTRUCTOR')) {
+    if (permissions.includes('*') || permissions.includes(PERM_VER_MI_AGENDA)) {
+      return '/dashboard';
+    }
     const canAsistencia =
       permissions.includes('*') || permissions.includes('VER ASISTENCIA');
     return canAsistencia ? '/asistencia' : '/fichas';

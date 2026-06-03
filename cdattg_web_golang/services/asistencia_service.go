@@ -20,6 +20,7 @@ const (
 	errMsgYaExisteSesionActiva           = "YA EXISTE UNA SESIÓN DE ASISTENCIA ACTIVA PARA ESTA FICHA. FINALÍCELA ANTES DE CREAR OTRA"
 	errMsgNoEstaCreadoComoInstructor     = "NO ESTÁ CREADO COMO INSTRUCTOR DE ESTA FICHA"
 	errMsgFueraDelHorarioJornada         = "FUERA DEL HORARIO DE LA JORNADA DE LA FICHA; SOLO SE PUEDE TOMAR ASISTENCIA EN EL HORARIO CONFIGURADO"
+	errMsgSesionOtroInstructor           = "NO PUEDE TOMAR ASISTENCIA EN LA SESIÓN DE OTRO INSTRUCTOR"
 )
 
 const plazoEdicionObservacionSesionDias = 5
@@ -60,6 +61,7 @@ type asistenciaService struct {
 	aprendizRepo  repositories.AprendizRepository
 	evidenciaRepo repositories.EvidenciaRepository
 	fichaRepo     repositories.FichaRepository
+	horarioSvc    *InstructorHorarioService
 }
 
 // esSesionDeHoy indica si la fecha de la sesión (interpretada en hora local) es el día de hoy.
@@ -97,7 +99,71 @@ func NewAsistenciaService() AsistenciaService {
 		aprendizRepo:  repositories.NewAprendizRepository(),
 		evidenciaRepo: repositories.NewEvidenciaRepository(),
 		fichaRepo:     repositories.NewFichaRepository(),
+		horarioSvc:    NewInstructorHorarioService(),
 	}
+}
+
+func (s *asistenciaService) assertSesionPropia(asist *models.Asistencia, instructorFichaID *uint) error {
+	if instructorFichaID == nil {
+		return errors.New(errMsgNoEstaCreadoComoInstructor)
+	}
+	if asist.InstructorFichaID != *instructorFichaID {
+		return errors.New(strings.ToLower(errMsgSesionOtroInstructor))
+	}
+	return nil
+}
+
+func codigoFichaParaSesion(ifc *models.InstructorFichaCaracterizacion) string {
+	if ifc.Ficha != nil && ifc.Ficha.Ficha != "" {
+		return ifc.Ficha.Ficha
+	}
+	return "ficha"
+}
+
+func fichaIDDesdeAsistencia(asist *models.Asistencia, instFichaRepo repositories.InstructorFichaRepository) uint {
+	if asist.InstructorFicha != nil {
+		return asist.InstructorFicha.FichaID
+	}
+	ifc, _ := instFichaRepo.FindByID(asist.InstructorFichaID)
+	if ifc != nil {
+		return ifc.FichaID
+	}
+	return 0
+}
+
+func (s *asistenciaService) validarAprendizSinIngresoAbiertoEnFichaHoy(
+	fichaID, aprendizID, asistenciaIDActual uint,
+) error {
+	if fichaID == 0 {
+		return nil
+	}
+	hoy := time.Now().Format(time.DateOnly)
+	sessionIDs, _ := s.repo.FindIDsByFichaIDAndFecha(fichaID, hoy)
+	if len(sessionIDs) == 0 {
+		return nil
+	}
+	sinSalida, _ := s.repoAA.FindEntryWithoutExitByAprendizIDAndAsistenciaIDs(aprendizID, sessionIDs)
+	if sinSalida != nil && sinSalida.AsistenciaID != asistenciaIDActual {
+		return errors.New("el aprendiz ya tiene un ingreso sin salida registrado hoy en esta ficha")
+	}
+	return nil
+}
+
+func (s *asistenciaService) assertSesionPropiaDesdeAprendiz(
+	aa *models.AsistenciaAprendiz,
+	instructorFichaID *uint,
+) error {
+	if aa.Asistencia != nil {
+		return s.assertSesionPropia(aa.Asistencia, instructorFichaID)
+	}
+	if aa.AsistenciaID == 0 {
+		return nil
+	}
+	asist, err := s.repo.FindByID(aa.AsistenciaID)
+	if err != nil || asist == nil {
+		return nil
+	}
+	return s.assertSesionPropia(asist, instructorFichaID)
 }
 
 func (s *asistenciaService) CreateSesion(req dto.AsistenciaRequest) (*dto.AsistenciaResponse, error) {
@@ -106,22 +172,20 @@ func (s *asistenciaService) CreateSesion(req dto.AsistenciaRequest) (*dto.Asiste
 	if err != nil {
 		return nil, errors.New("fecha inválida, use YYYY-MM-DD")
 	}
-	// Regla: solo una sesión activa por ficha (no por instructor-ficha)
-	ifc, _ := s.instFichaRepo.FindByID(req.InstructorFichaID)
-	if ifc != nil {
-		activa, _ := s.repo.FindActivaByFichaID(ifc.FichaID)
-		if activa != nil {
-			return nil, errors.New("ya existe una sesión de asistencia activa para esta ficha. Finalícela antes de crear otra")
-		}
+	ifc, errIFC := s.instFichaRepo.FindByID(req.InstructorFichaID)
+	if errIFC != nil || ifc == nil {
+		return nil, errors.New(errMsgNoEstaCreadoComoInstructor)
+	}
+	if errVal := s.horarioSvc.ValidarPuedeTomarAsistencia(ifc.InstructorID, ifc.FichaID, time.Now()); errVal != nil {
+		return nil, errVal
+	}
+	// Regla: solo una sesión activa por instructor-ficha
+	activa, _ := s.repo.FindActivaByInstructorFichaID(req.InstructorFichaID)
+	if activa != nil {
+		return nil, errors.New("ya existe una sesión de asistencia activa para este instructor en la ficha. Finalícela antes de crear otra")
 	}
 	// Crear evidencia por defecto para la sesión
-	fichaNum := ""
-	if ifc != nil && ifc.Ficha != nil {
-		fichaNum = ifc.Ficha.Ficha
-	}
-	if fichaNum == "" {
-		fichaNum = "ficha"
-	}
+	fichaNum := codigoFichaParaSesion(ifc)
 	ev := models.Evidencia{
 		Nombre: fmt.Sprintf("Asistencia Ficha %s %s", fichaNum, req.Fecha),
 		Codigo: fmt.Sprintf("ASIST-%s-%s", fichaNum, req.Fecha),
@@ -146,34 +210,21 @@ func (s *asistenciaService) CreateSesion(req dto.AsistenciaRequest) (*dto.Asiste
 	return s.GetByID(a.ID)
 }
 
-// EntrarTomarAsistencia devuelve la sesión activa para la ficha (la del instructor o la de otro instructor asignado a la misma ficha) o crea una nueva (hoy). Error si el instructor no está asignado a esa ficha.
+// EntrarTomarAsistencia devuelve la sesión activa del instructor o crea una nueva (hoy).
 func (s *asistenciaService) EntrarTomarAsistencia(instructorID uint, fichaID uint) (*dto.AsistenciaResponse, error) {
 	ifc, err := s.instFichaRepo.FindByFichaIDAndInstructorID(fichaID, instructorID)
 	if err != nil || ifc == nil {
 		return nil, errors.New("no está asignado como instructor de esta ficha")
 	}
-	ficha, _ := s.fichaRepo.FindByID(ifc.FichaID)
-	if ficha != nil && !ficha.Status {
-		return nil, errors.New("la ficha está inactiva; no se puede tomar asistencia")
+	if errVal := s.horarioSvc.ValidarPuedeTomarAsistencia(instructorID, fichaID, time.Now()); errVal != nil {
+		return nil, errVal
 	}
-	// Validar horario de jornada (opcional: si la ficha tiene jornada configurada)
-	if ficha != nil && ficha.JornadaID != nil {
-		ok, _ := NewJornadaValidationService().ValidarHorarioJornada(*ficha.JornadaID)
-		if !ok {
-			return nil, errors.New("fuera del horario de la jornada de la ficha; solo se puede tomar asistencia en el horario configurado")
-		}
-	}
-	// 1) Sesión activa de este instructor para la ficha → usarla solo si es de hoy (hora local)
+	// Sesión activa de este instructor → usarla solo si es de hoy (hora local)
 	activa, _ := s.repo.FindActivaByInstructorFichaID(ifc.ID)
 	if activa != nil && esSesionDeHoy(activa.Fecha) {
 		return s.asistenciaToResponse(activa), nil
 	}
-	// 2) Sesión activa de la ficha (creada por otro instructor) → permitir acceder solo si es de hoy
-	activaFicha, _ := s.repo.FindActivaByFichaID(ifc.FichaID)
-	if activaFicha != nil && esSesionDeHoy(activaFicha.Fecha) {
-		return s.asistenciaToResponse(activaFicha), nil
-	}
-	// 3) No hay sesión activa de hoy → crear una nueva
+	// No hay sesión activa de hoy → crear una nueva
 	hoy := time.Now().Format(time.DateOnly)
 	return s.CreateSesion(dto.AsistenciaRequest{
 		InstructorFichaID: ifc.ID,
@@ -205,10 +256,7 @@ func (s *asistenciaService) ActualizarObservacionesSesion(asistenciaID uint, obs
 		a.InstructorFicha = ifc
 	}
 	if a.InstructorFicha != nil && *instructorFichaIDEditor != a.InstructorFichaID {
-		editorIfc, errEditor := s.instFichaRepo.FindByID(*instructorFichaIDEditor)
-		if errEditor != nil || editorIfc == nil || editorIfc.FichaID != a.InstructorFicha.FichaID {
-			return nil, errors.New("no está autorizado para editar esta sesión")
-		}
+		return nil, errors.New(strings.ToLower(errMsgSesionOtroInstructor))
 	}
 	a.Observaciones = strings.TrimSpace(observaciones)
 	if err := s.repo.Update(a); err != nil {
@@ -315,25 +363,12 @@ func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest, 
 	if asist.IsFinished {
 		return nil, errors.New(errMsgSesionYaFinalizada)
 	}
-	// Regla: no puede haber más de un tramo abierto (ingreso sin salida) por aprendiz en la ficha hoy.
-	var fichaID uint
-	if asist.InstructorFicha != nil {
-		fichaID = asist.InstructorFicha.FichaID
-	} else {
-		ifc, _ := s.instFichaRepo.FindByID(asist.InstructorFichaID)
-		if ifc != nil {
-			fichaID = ifc.FichaID
-		}
+	if err := s.assertSesionPropia(asist, instructorFichaIDRegistroIngreso); err != nil {
+		return nil, err
 	}
-	if fichaID > 0 {
-		hoy := time.Now().Format(time.DateOnly)
-		sessionIDs, _ := s.repo.FindIDsByFichaIDAndFecha(fichaID, hoy)
-		if len(sessionIDs) > 0 {
-			sinSalida, _ := s.repoAA.FindEntryWithoutExitByAprendizIDAndAsistenciaIDs(req.AprendizID, sessionIDs)
-			if sinSalida != nil && sinSalida.AsistenciaID != req.AsistenciaID {
-				return nil, errors.New("el aprendiz ya tiene un ingreso sin salida registrado hoy en esta ficha")
-			}
-		}
+	fichaID := fichaIDDesdeAsistencia(asist, s.instFichaRepo)
+	if err := s.validarAprendizSinIngresoAbiertoEnFichaHoy(fichaID, req.AprendizID, req.AsistenciaID); err != nil {
+		return nil, err
 	}
 	// Múltiples tramos: solo permitir nuevo ingreso si no hay tramo abierto en esta sesión.
 	open, _ := s.repoAA.FindOpenByAsistenciaIDAndAprendizID(req.AsistenciaID, req.AprendizID)
@@ -466,6 +501,9 @@ func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint, instructo
 	if err != nil {
 		return nil, errors.New(errMsgRegistroAsistenciaNoEncontrado)
 	}
+	if err := s.assertSesionPropiaDesdeAprendiz(aa, instructorFichaIDRegistroSalida); err != nil {
+		return nil, err
+	}
 	if aa.HoraIngreso == nil {
 		return nil, errors.New("el aprendiz no tiene hora de ingreso")
 	}
@@ -474,7 +512,7 @@ func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint, instructo
 	}
 	now := time.Now()
 	const minSegundosEntreIngresoYSalida = 60
-	if aa.HoraIngreso != nil && now.Sub(*aa.HoraIngreso) < minSegundosEntreIngresoYSalida*time.Second {
+	if now.Sub(*aa.HoraIngreso) < minSegundosEntreIngresoYSalida*time.Second {
 		return nil, errors.New("debe esperar al menos 1 minuto entre la entrada y la salida")
 	}
 	aa.HoraSalida = &now

@@ -12,6 +12,7 @@ type InstructorFichaRepository interface {
 	FindByID(id uint) (*models.InstructorFichaCaracterizacion, error)
 	FindByFichaID(fichaID uint) ([]models.InstructorFichaCaracterizacion, error)
 	FindByFichaIDAndInstructorID(fichaID, instructorID uint) (*models.InstructorFichaCaracterizacion, error)
+	FindByInstructorID(instructorID uint) ([]models.InstructorFichaCaracterizacion, error)
 	CountActiveFichasByInstructorID(instructorID uint) (int, error)
 	Create(m *models.InstructorFichaCaracterizacion) error
 	Update(m *models.InstructorFichaCaracterizacion) error
@@ -51,6 +52,14 @@ func (r *instructorFichaRepository) FindByFichaIDAndInstructorID(fichaID, instru
 		return nil, err
 	}
 	return &m, nil
+}
+
+func (r *instructorFichaRepository) FindByInstructorID(instructorID uint) ([]models.InstructorFichaCaracterizacion, error) {
+	var list []models.InstructorFichaCaracterizacion
+	if err := r.db.Where("instructor_id = ?", instructorID).Find(&list).Error; err != nil {
+		return nil, err
+	}
+	return list, nil
 }
 
 // CountActiveFichasByInstructorID cuenta fichas activas (status=true, fecha_fin >= hoy) asignadas al instructor

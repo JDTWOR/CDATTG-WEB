@@ -336,14 +336,19 @@ func (s *InstructorHorarioService) ValidarPuedeTomarAsistencia(instructorID, fic
 	if err != nil {
 		return err
 	}
-	if !instructorTieneDiaProgramado(diaHoy, diasInst) {
-		return errors.New(strings.ToLower(errMsgDiaNoProgramadoInstructor))
-	}
 	vigInicio := intersectarVigencia(ficha.FechaInicio, ifc.FechaInicio)
 	vigFin := intersectarVigenciaFin(ficha.FechaFin, ifc.FechaFin)
 	diaMomento := time.Date(momento.Year(), momento.Month(), momento.Day(), 0, 0, 0, 0, momento.Location())
 	if !diaDentroDeVigencia(diaMomento, vigInicio, vigFin) {
 		return errors.New("fuera del periodo de vigencia de la asignación")
+	}
+	// Modo legacy: sin filas en instructor_ficha_dias (programación no cargada en app).
+	// Basta asignación + vigencia; no exigir día ni ventana horaria del instructor.
+	if len(diasInst) == 0 {
+		return nil
+	}
+	if !instructorTieneDiaProgramado(diaHoy, diasInst) {
+		return errors.New(strings.ToLower(errMsgDiaNoProgramadoInstructor))
 	}
 	return s.validarHorarioAsistencia(ficha, diaHoy, momento)
 }

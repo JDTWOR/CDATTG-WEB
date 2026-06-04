@@ -286,6 +286,14 @@ func diaDentroDeVigencia(diaMomento time.Time, vigInicio, vigFin *time.Time) boo
 	return true
 }
 
+func vigenciaAplica(vigInicio, vigFin *time.Time) bool {
+	return vigInicio != nil || vigFin != nil
+}
+
+func fichaSinFechasProgramadas(ficha *models.FichaCaracterizacion) bool {
+	return ficha != nil && ficha.FechaInicio == nil && ficha.FechaFin == nil
+}
+
 func extensionMinutosJornada(j *models.Jornada) int {
 	extMin := 60
 	if j == nil {
@@ -336,16 +344,32 @@ func (s *InstructorHorarioService) ValidarPuedeTomarAsistencia(instructorID, fic
 	if err != nil {
 		return err
 	}
+	fichaDias, err := s.fichaDiasRepo.FindByFichaID(fichaID)
+	if err != nil {
+		return err
+	}
+	sinDiasFicha := len(fichaDias) == 0
+	// Modo asignación: programación académica de la ficha o del instructor aún no cargada.
+	modoAsignacion := len(diasInst) == 0 || sinDiasFicha
+	if modoAsignacion {
+		if sinDiasFicha && fichaSinFechasProgramadas(ficha) {
+			return nil
+		}
+		vigInicio := intersectarVigencia(ficha.FechaInicio, ifc.FechaInicio)
+		vigFin := intersectarVigenciaFin(ficha.FechaFin, ifc.FechaFin)
+		if vigenciaAplica(vigInicio, vigFin) {
+			diaMomento := time.Date(momento.Year(), momento.Month(), momento.Day(), 0, 0, 0, 0, momento.Location())
+			if !diaDentroDeVigencia(diaMomento, vigInicio, vigFin) {
+				return errors.New("fuera del periodo de vigencia de la asignación")
+			}
+		}
+		return nil
+	}
 	vigInicio := intersectarVigencia(ficha.FechaInicio, ifc.FechaInicio)
 	vigFin := intersectarVigenciaFin(ficha.FechaFin, ifc.FechaFin)
 	diaMomento := time.Date(momento.Year(), momento.Month(), momento.Day(), 0, 0, 0, 0, momento.Location())
 	if !diaDentroDeVigencia(diaMomento, vigInicio, vigFin) {
 		return errors.New("fuera del periodo de vigencia de la asignación")
-	}
-	// Modo legacy: sin filas en instructor_ficha_dias (programación no cargada en app).
-	// Basta asignación + vigencia; no exigir día ni ventana horaria del instructor.
-	if len(diasInst) == 0 {
-		return nil
 	}
 	if !instructorTieneDiaProgramado(diaHoy, diasInst) {
 		return errors.New(strings.ToLower(errMsgDiaNoProgramadoInstructor))

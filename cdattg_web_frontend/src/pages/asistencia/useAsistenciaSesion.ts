@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useBreadcrumbOverride } from '../../navigation/breadcrumb';
 import { apiService } from '../../services/api';
 import { axiosErrorMessage } from '../../utils/httpError';
 import type { AsistenciaResponse, FichaCaracterizacionResponse } from '../../types';
@@ -8,6 +9,8 @@ import { useAsistenciaRegistro } from './useAsistenciaRegistro';
 
 export function useAsistenciaSesion() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const { setLabel, clearLabel } = useBreadcrumbOverride();
   const { fichaId: fichaIdParam } = useParams<{ fichaId: string }>();
   const fichaId = parseAsistenciaFichaIdParam(fichaIdParam);
 
@@ -54,6 +57,16 @@ export function useAsistenciaSesion() {
 
     void entrar();
   }, [fichaId]);
+
+  useEffect(() => {
+    const numero = fichaSeleccionada?.ficha?.trim();
+    if (!numero) {
+      clearLabel(pathname);
+      return;
+    }
+    setLabel(pathname, `Tomar asistencia · Ficha ${numero}`);
+    return () => clearLabel(pathname);
+  }, [fichaSeleccionada?.ficha, pathname, setLabel, clearLabel]);
 
   const handleVolverAFichas = () => {
     navigate('/asistencia');

@@ -17,9 +17,7 @@ export const asistenciaRoutes: RouteObject = {
     {
       path: 'fichas/:fichaId/sesion',
       handle: {
-        breadcrumb: (params: Record<string, string | undefined>) => ({
-          label: params.fichaId ? `Tomar asistencia · Ficha ${params.fichaId}` : 'Tomar asistencia',
-        }),
+        breadcrumb: { label: 'Tomar asistencia' },
       },
       lazy: async () => {
         const { AsistenciaSesionPage } = await import('../../pages/asistencia/AsistenciaSesionPage');

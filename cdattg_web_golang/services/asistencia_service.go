@@ -741,7 +741,7 @@ func (s *asistenciaService) ListAprendicesEnSesion(asistenciaID uint) ([]dto.Asi
 }
 
 func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.AsistenciaDashboardResponse, error) {
-	total, porFicha, err := s.repo.GetDashboardResumen(sedeID, fecha)
+	_, porFichaRaw, err := s.repo.GetDashboardResumen(sedeID, fecha)
 	if err != nil {
 		return nil, err
 	}
@@ -750,6 +750,7 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 	if errEsp != nil {
 		return nil, errEsp
 	}
+	porFicha, totalEnFormacion := filtrarPorFichaEsperadas(porFichaRaw, esperados)
 	sinSesionDTO, errSin := buildFichasSinSesionEsperadas(esperados, s.repo, fecha)
 	if errSin != nil {
 		return nil, errSin
@@ -760,7 +761,7 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 	}
 	resp := &dto.AsistenciaDashboardResponse{
 		Fecha:                      fecha,
-		TotalAprendicesEnFormacion: total,
+		TotalAprendicesEnFormacion: totalEnFormacion,
 		TotalAprendicesEsperados:   esperados.TotalEsperados,
 		JornadasActivas:            esperados.JornadasActivas,
 		PendientesRevision:         pendientes,

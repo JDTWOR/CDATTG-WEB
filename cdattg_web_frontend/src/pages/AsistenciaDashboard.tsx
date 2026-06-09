@@ -218,8 +218,15 @@ function AsistenciaDashboardDataView({
   const jornadasTexto = formatearJornadasActivas(data.jornadas_activas);
   const fichasConSesion = data.fichas_con_sesion_hoy ?? data.por_ficha.length;
   const fichasSinSesion = data.fichas_sin_asistencia_hoy?.length ?? 0;
-  const porcentaje =
-    esperado > 0 ? ((real / esperado) * 100).toFixed(1) : null;
+  const porcentaje = esperado > 0 ? ((real / esperado) * 100).toFixed(1) : null;
+
+  const totalesConSesion = fichasConSesionFiltradas.reduce(
+    (acc, row) => ({
+      vinieron: acc.vinieron + (row.cantidad_vinieron ?? 0),
+      enFichasConSesion: acc.enFichasConSesion + (row.total_aprendices ?? 0),
+    }),
+    { vinieron: 0, enFichasConSesion: 0 },
+  );
 
   return (
     <>
@@ -267,7 +274,7 @@ function AsistenciaDashboardDataView({
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fichas con sesión hoy</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fichas con sesión (jornada activa)</p>
               <p className="text-3xl font-bold text-green-600 dark:text-green-400 mt-1 tabular-nums">{fichasConSesion}</p>
             </div>
             <div className="w-14 h-14 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center">
@@ -333,10 +340,12 @@ function AsistenciaDashboardDataView({
 
       <div className="card">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-          Fichas con sesión de asistencia hoy
+          Fichas con sesión (jornada activa)
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Fichas que ya abrieron al menos una sesión de asistencia para el día {data.fecha}.
+          Solo fichas con formación hoy y jornada en curso que ya abrieron sesión el {data.fecha}
+          {jornadasTexto ? ` (${jornadasTexto})` : ''}. No se listan fichas de otras jornadas (ej. noche en horario de
+          mañana).
         </p>
 
         <FiltrosDashboard
@@ -348,11 +357,13 @@ function AsistenciaDashboardDataView({
         />
 
         {fichasConSesionFiltradas.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400">Ninguna ficha tiene sesión de asistencia hoy.</p>
+          <p className="text-gray-500 dark:text-gray-400">
+            Ninguna ficha de la jornada activa tiene sesión de asistencia abierta.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-              <caption className="sr-only">Fichas con sesión de asistencia hoy</caption>
+              <caption className="sr-only">Fichas con sesión en jornada activa</caption>
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -396,7 +407,23 @@ function AsistenciaDashboardDataView({
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="bg-gray-50 dark:bg-gray-700/50 border-t-2 border-gray-200 dark:border-gray-600">
+                <tr>
+                  <td colSpan={4} className="px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Total en fichas con sesión (jornada activa)
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900 dark:text-white tabular-nums">
+                    {totalesConSesion.vinieron.toLocaleString('es-CO')} /{' '}
+                    {totalesConSesion.enFichasConSesion.toLocaleString('es-CO')}
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
             </table>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              La card superior compara en formación ahora ({real.toLocaleString('es-CO')}) frente al esperado en toda la
+              jornada activa ({esperado.toLocaleString('es-CO')}), incluidas fichas que aún no abrieron sesión.
+            </p>
           </div>
         )}
         <PaginacionTabla

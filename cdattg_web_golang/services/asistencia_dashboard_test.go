@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/sena/cdattg-web-golang/models"
+	"github.com/sena/cdattg-web-golang/repositories"
 )
 
 func fichaTest(id uint, numero string, j *models.Jornada) models.FichaCaracterizacion {
@@ -87,6 +88,20 @@ func TestFiltrarFichasEsperadasDashboard_fechaHistoricaSinFiltroHorario(t *testi
 	}
 	if len(jornadas) != 2 {
 		t.Fatalf("jornadas históricas: %v", jornadas)
+	}
+}
+
+func TestFiltrarPorFichaEsperadas_excluyeJornadaNoActiva(t *testing.T) {
+	rows := []repositories.DashboardFichaRow{
+		{FichaID: 1, FichaNumero: "111", Cantidad: 10, TotalAprendices: 20},
+		{FichaID: 2, FichaNumero: "222", Cantidad: 50, TotalAprendices: 60},
+	}
+	esperados := &dashboardEsperadosCalc{
+		FichasEsperadas: []models.FichaCaracterizacion{fichaTest(1, "111", jornadaManana())},
+	}
+	filtered, total := filtrarPorFichaEsperadas(rows, esperados)
+	if len(filtered) != 1 || total != 10 {
+		t.Fatalf("solo ficha esperada: got len=%d total=%d", len(filtered), total)
 	}
 }
 

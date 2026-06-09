@@ -121,6 +121,30 @@ func fichaToSinSesionDTO(f models.FichaCaracterizacion, totalAprendices int) dto
 	}
 }
 
+// filtrarPorFichaEsperadas deja solo fichas del resumen que están en el alcance esperado
+// (formación hoy + jornada activa si es el día en curso). Alinea card, tabla y denominador.
+func filtrarPorFichaEsperadas(
+	porFicha []repositories.DashboardFichaRow,
+	esperados *dashboardEsperadosCalc,
+) (filtered []repositories.DashboardFichaRow, totalVinieron int) {
+	if esperados == nil || len(esperados.FichasEsperadas) == 0 {
+		return []repositories.DashboardFichaRow{}, 0
+	}
+	ids := make(map[uint]struct{}, len(esperados.FichasEsperadas))
+	for i := range esperados.FichasEsperadas {
+		ids[esperados.FichasEsperadas[i].ID] = struct{}{}
+	}
+	filtered = make([]repositories.DashboardFichaRow, 0, len(porFicha))
+	for i := range porFicha {
+		if _, ok := ids[porFicha[i].FichaID]; !ok {
+			continue
+		}
+		filtered = append(filtered, porFicha[i])
+		totalVinieron += porFicha[i].Cantidad
+	}
+	return filtered, totalVinieron
+}
+
 func buildFichasSinSesionEsperadas(
 	esperados *dashboardEsperadosCalc,
 	repo repositories.AsistenciaRepository,

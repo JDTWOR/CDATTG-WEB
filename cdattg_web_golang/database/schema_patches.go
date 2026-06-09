@@ -64,9 +64,9 @@ func EnsureSchemaPatches() error {
 	if err := DB.Exec(`
 		UPDATE ficha_dias_formacion
 		SET jornada_id = jb.jornada_id
-		FROM jornada_bloques jb
-		INNER JOIN fichas_caracterizacion fc ON fc.id = ficha_dias_formacion.ficha_id
-		WHERE ficha_dias_formacion.jornada_id IS NULL
+		FROM jornada_bloques jb, fichas_caracterizacion fc
+		WHERE fc.id = ficha_dias_formacion.ficha_id
+		  AND ficha_dias_formacion.jornada_id IS NULL
 		  AND ficha_dias_formacion.deleted_at IS NULL
 		  AND fc.jornada_id = jb.jornada_id
 		  AND ficha_dias_formacion.dia_formacion_id = jb.dia_formacion_id

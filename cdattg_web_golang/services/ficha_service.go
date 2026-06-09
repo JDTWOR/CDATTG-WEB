@@ -228,9 +228,13 @@ func (s *fichaService) Create(req dto.FichaCaracterizacionRequest) (*dto.FichaCa
 	if err := SincronizarInstructorLiderEnPivote(&f, s.instFichaRepo); err != nil {
 		return nil, fmt.Errorf(errFmtSyncInstructorLider, err)
 	}
-	if req.DiasFormacionIDs != nil {
-		if err := s.guardarDiasFormacionFicha(f.ID, req.DiasFormacionIDs, req.DiasFormacion, f.JornadaID); err != nil {
-			return nil, fmt.Errorf("error al guardar días de formación: %w", err)
+	if req.Horarios != nil || req.DiasFormacionIDs != nil || req.DiasFormacion != nil {
+		if err := s.guardarProgramacionHoraria(f.ID, req); err != nil {
+			return nil, fmt.Errorf("error al guardar programación horaria: %w", err)
+		}
+		if jid := derivarJornadaPrincipalID(req); jid != nil {
+			f.JornadaID = jid
+			_ = s.fichaRepo.Update(&f)
 		}
 	}
 	return s.FindByID(f.ID)
@@ -271,9 +275,15 @@ func (s *fichaService) Update(id uint, req dto.FichaCaracterizacionRequest) (*dt
 	if err := SincronizarInstructorLiderEnPivote(f, s.instFichaRepo); err != nil {
 		return nil, fmt.Errorf(errFmtSyncInstructorLider, err)
 	}
-	if req.DiasFormacionIDs != nil {
-		if err := s.guardarDiasFormacionFicha(id, req.DiasFormacionIDs, req.DiasFormacion, f.JornadaID); err != nil {
-			return nil, fmt.Errorf("error al guardar días de formación: %w", err)
+	if req.Horarios != nil || req.DiasFormacionIDs != nil || req.DiasFormacion != nil {
+		if err := s.guardarProgramacionHoraria(id, req); err != nil {
+			return nil, fmt.Errorf("error al guardar programación horaria: %w", err)
+		}
+		if jid := derivarJornadaPrincipalID(req); jid != nil {
+			f.JornadaID = jid
+			if err := s.fichaRepo.Update(f); err != nil {
+				return nil, fmt.Errorf("error al actualizar jornada principal: %w", err)
+			}
 		}
 	}
 	return s.FindByID(id)
@@ -520,18 +530,40 @@ func (s *fichaService) fichaToResponse(f models.FichaCaracterizacion, cantidadAp
 		r.JornadaNombre = f.Jornada.Nombre
 	}
 	for _, fd := range f.FichaDiasFormacion {
-		r.DiasFormacionIDs = append(r.DiasFormacionIDs, fd.DiaFormacionID)
-		item := dto.FichaDiaFormacionItem{
-			DiaFormacionID: fd.DiaFormacionID,
-			HoraInicio:     normalizeHoraMM(fd.HoraInicio),
-			HoraFin:        normalizeHoraMM(fd.HoraFin),
-		}
-		if fd.DiaFormacion != nil {
-			item.DiaNombre = fd.DiaFormacion.Nombre
-		}
+		item := fichaDiaToItem(fd)
 		r.DiasFormacion = append(r.DiasFormacion, item)
+		if !containsUint(r.DiasFormacionIDs, fd.DiaFormacionID) {
+			r.DiasFormacionIDs = append(r.DiasFormacionIDs, fd.DiaFormacionID)
+		}
 	}
+	r.Horarios = r.DiasFormacion
 	return r
+}
+
+func containsUint(list []uint, id uint) bool {
+	for _, x := range list {
+		if x == id {
+			return true
+		}
+	}
+	return false
+}
+
+func fichaDiaToItem(fd models.FichaDiasFormacion) dto.FichaDiaFormacionItem {
+	item := dto.FichaDiaFormacionItem{
+		DiaFormacionID: fd.DiaFormacionID,
+		HoraInicio:     normalizeHoraMM(fd.HoraInicio),
+		HoraFin:        normalizeHoraMM(fd.HoraFin),
+		Orden:          fd.Orden,
+		JornadaID:      fd.JornadaID,
+	}
+	if fd.DiaFormacion != nil {
+		item.DiaNombre = fd.DiaFormacion.Nombre
+	}
+	if fd.Jornada != nil {
+		item.JornadaNombre = fd.Jornada.Nombre
+	}
+	return item
 }
 
 func (s *fichaService) fichaRequestToModel(req dto.FichaCaracterizacionRequest) models.FichaCaracterizacion {
@@ -553,72 +585,129 @@ func horasDefaultJornada(jornadaID *uint) (inicio, fin string) {
 	if jornadaID == nil || *jornadaID == 0 {
 		return "", ""
 	}
+	bloqueRepo := repositories.NewJornadaBloqueRepository()
+	bloques, err := bloqueRepo.FindByJornadaID(*jornadaID)
+	if err == nil && len(bloques) > 0 {
+		return normalizeHoraMM(bloques[0].HoraInicio), normalizeHoraMM(bloques[0].HoraFin)
+	}
 	j, err := repositories.NewCatalogoRepository().FindJornadaByID(*jornadaID)
 	if err != nil || j == nil {
 		return "", ""
 	}
-	inicio, fin = j.HoraInicio, j.HoraFin
-	if inicio != "" && fin != "" {
-		return inicio, fin
-	}
-	if def, ok := defaultHorarios[j.Nombre]; ok {
-		return def.inicio, def.fin
-	}
-	return "", ""
+	return normalizeHoraMM(j.HoraInicio), normalizeHoraMM(j.HoraFin)
 }
 
-func buildFichaDiaInputs(ids []uint, detalle []dto.FichaDiaFormacionItem, hi, hf string) []repositories.FichaDiaInput {
+func resolveHorariosFromRequest(req dto.FichaCaracterizacionRequest) []dto.FichaDiaFormacionItem {
+	if len(req.Horarios) > 0 {
+		return req.Horarios
+	}
+	if len(req.DiasFormacion) > 0 {
+		return req.DiasFormacion
+	}
+	if len(req.DiasFormacionIDs) == 0 {
+		return nil
+	}
+	hi, hf := horasDefaultJornada(req.JornadaID)
+	return buildDiasFormacionFromIDs(req.DiasFormacionIDs, req.DiasFormacion, hi, hf)
+}
+
+func buildDiasFormacionFromIDs(ids []uint, detalle []dto.FichaDiaFormacionItem, hi, hf string) []dto.FichaDiaFormacionItem {
 	horasByDia := make(map[uint]dto.FichaDiaFormacionItem)
 	for _, d := range detalle {
 		if d.DiaFormacionID > 0 {
 			horasByDia[d.DiaFormacionID] = d
 		}
 	}
-	inputs := make([]repositories.FichaDiaInput, 0, len(ids))
+	out := make([]dto.FichaDiaFormacionItem, 0, len(ids))
 	for _, id := range ids {
 		if id == 0 {
 			continue
 		}
-		in := repositories.FichaDiaInput{DiaFormacionID: id, HoraInicio: hi, HoraFin: hf}
+		item := dto.FichaDiaFormacionItem{
+			DiaFormacionID: id,
+			HoraInicio:     hi,
+			HoraFin:        hf,
+		}
 		if h, ok := horasByDia[id]; ok {
 			if h.HoraInicio != "" {
-				in.HoraInicio = h.HoraInicio
+				item.HoraInicio = h.HoraInicio
 			}
 			if h.HoraFin != "" {
-				in.HoraFin = h.HoraFin
+				item.HoraFin = h.HoraFin
 			}
+			item.Orden = h.Orden
+			item.JornadaID = h.JornadaID
 		}
-		inputs = append(inputs, in)
+		out = append(out, item)
+	}
+	return out
+}
+
+func horariosToInputs(items []dto.FichaDiaFormacionItem) []HorarioBloqueInput {
+	out := make([]HorarioBloqueInput, 0, len(items))
+	for _, it := range items {
+		out = append(out, HorarioBloqueInput{
+			DiaFormacionID: it.DiaFormacionID,
+			HoraInicio:     it.HoraInicio,
+			HoraFin:        it.HoraFin,
+			JornadaID:      it.JornadaID,
+			Orden:          it.Orden,
+		})
+	}
+	return out
+}
+
+func horariosToRepoInputs(items []dto.FichaDiaFormacionItem) []repositories.FichaDiaInput {
+	inputs := make([]repositories.FichaDiaInput, 0, len(items))
+	for _, it := range items {
+		if it.DiaFormacionID == 0 {
+			continue
+		}
+		inputs = append(inputs, repositories.FichaDiaInput{
+			DiaFormacionID: it.DiaFormacionID,
+			HoraInicio:     normalizeHoraMM(it.HoraInicio),
+			HoraFin:        normalizeHoraMM(it.HoraFin),
+			Orden:          it.Orden,
+			JornadaID:      it.JornadaID,
+		})
 	}
 	return inputs
 }
 
-func (s *fichaService) guardarDiasFormacionFicha(fichaID uint, ids []uint, detalle []dto.FichaDiaFormacionItem, jornadaID *uint) error {
-	hi, hf := horasDefaultJornada(jornadaID)
-	inputs := buildFichaDiaInputs(ids, detalle, hi, hf)
-	if len(detalle) == 0 {
-		existing, err := s.fichaDiasRepo.FindByFichaID(fichaID)
-		if err == nil {
-			existingByDia := make(map[uint]models.FichaDiasFormacion, len(existing))
-			for _, fd := range existing {
-				existingByDia[fd.DiaFormacionID] = fd
-			}
-			for i := range inputs {
-				if ex, ok := existingByDia[inputs[i].DiaFormacionID]; ok {
-					if ex.HoraInicio != "" {
-						inputs[i].HoraInicio = normalizeHoraMM(ex.HoraInicio)
-					}
-					if ex.HoraFin != "" {
-						inputs[i].HoraFin = normalizeHoraMM(ex.HoraFin)
-					}
-				}
-			}
+func derivarJornadaPrincipalID(req dto.FichaCaracterizacionRequest) *uint {
+	if req.JornadaID != nil && *req.JornadaID > 0 {
+		return req.JornadaID
+	}
+	items := resolveHorariosFromRequest(req)
+	counts := make(map[uint]int)
+	for _, it := range items {
+		if it.JornadaID != nil && *it.JornadaID > 0 {
+			counts[*it.JornadaID]++
 		}
 	}
-	for i := range inputs {
-		inputs[i].HoraInicio = normalizeHoraMM(inputs[i].HoraInicio)
-		inputs[i].HoraFin = normalizeHoraMM(inputs[i].HoraFin)
+	var bestID uint
+	bestN := 0
+	for id, n := range counts {
+		if n > bestN {
+			bestN = n
+			bestID = id
+		}
 	}
+	if bestID == 0 {
+		return nil
+	}
+	return &bestID
+}
+
+func (s *fichaService) guardarProgramacionHoraria(fichaID uint, req dto.FichaCaracterizacionRequest) error {
+	items := resolveHorariosFromRequest(req)
+	if len(items) == 0 {
+		return s.fichaDiasRepo.ReplaceByFichaIDWithHorarios(fichaID, nil)
+	}
+	if err := ValidarHorariosSinSolape(horariosToInputs(items)); err != nil {
+		return err
+	}
+	inputs := horariosToRepoInputs(items)
 	return s.fichaDiasRepo.ReplaceByFichaIDWithHorarios(fichaID, inputs)
 }
 

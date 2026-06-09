@@ -189,11 +189,39 @@ export interface ModalidadFormacionItem {
   nombre: string;
   codigo?: string;
 }
+export interface JornadaBloqueItem {
+  id?: number;
+  dia_formacion_id: number;
+  dia_nombre?: string;
+  hora_inicio: string;
+  hora_fin: string;
+  orden?: number;
+}
+
+export interface JornadaAdminItem {
+  id: number;
+  nombre: string;
+  minutos_extension_fin: number;
+  bloques: JornadaBloqueItem[];
+}
+
+export interface JornadaPropagateResult {
+  actualizadas: number;
+  omitidas: number;
+  detalles?: { ficha_id: number; ficha?: string; motivo: string }[];
+}
+
+export interface JornadaUpdateResponse extends JornadaAdminItem {
+  propagacion?: JornadaPropagateResult;
+}
+
 export interface JornadaItem {
   id: number;
   nombre: string;
   hora_inicio?: string;
   hora_fin?: string;
+  minutos_extension_fin?: number;
+  bloques?: JornadaBloqueItem[];
 }
 export interface DiaFormacionItem {
   id: number;
@@ -347,6 +375,7 @@ export interface FichaCaracterizacionRequest {
   dias_formacion_ids?: number[];
   dias_formacion_nombres?: string[];
   dias_formacion?: FichaDiaFormacionItem[];
+  horarios?: FichaDiaFormacionItem[];
   hora_inicio?: string;
   hora_fin?: string;
 }
@@ -373,6 +402,7 @@ export interface FichaCaracterizacionResponse {
   dias_formacion_ids?: number[];
   dias_formacion_nombres?: string[];
   dias_formacion?: FichaDiaFormacionItem[];
+  horarios?: FichaDiaFormacionItem[];
   cantidad_aprendices: number;
 }
 

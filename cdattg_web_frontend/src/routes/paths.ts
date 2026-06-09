@@ -87,3 +87,7 @@ export const permisosPaths = {
   index: '/permisos',
   usuario: (userId: number | string) => `/permisos/${userId}`,
 } as const;
+
+export const administracionPaths = {
+  jornadas: '/administracion/jornadas',
+} as const;

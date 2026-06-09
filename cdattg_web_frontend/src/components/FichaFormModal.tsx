@@ -5,9 +5,9 @@ import {
   construirPayloadFicha,
   formStateFromFicha,
   labelBotonGuardarFicha,
-  normalizeDiaIds,
   validarFormFicha,
 } from '../utils/fichaCaracterizacionForm';
+import { FichaHorariosEditor } from './FichaHorariosEditor';
 import { SelectSearch } from './SelectSearch';
 import { LABEL_INSTRUCTOR_LIDER } from '../constants/instructorLiderLabels';
 import { InstructorSelectAsync } from './InstructorSelectAsync';
@@ -35,6 +35,7 @@ const emptyForm = (programaId = 0): FichaCaracterizacionRequest => ({
   total_horas: undefined,
   status: true,
   dias_formacion_ids: [],
+  horarios: [],
 });
 
 export type FichaFormModalProps = Readonly<{
@@ -126,18 +127,6 @@ export function FichaFormModal({
       cancelled = true;
     };
   }, [open, editing, loadCatalogos]);
-
-  const setDiaChecked = (diaId: number, checked: boolean) => {
-    const idNum = Number(diaId);
-    setForm((f) => {
-      const cur = normalizeDiaIds(f.dias_formacion_ids);
-      if (checked) {
-        if (cur.includes(idNum)) return f;
-        return { ...f, dias_formacion_ids: [...cur, idNum] };
-      }
-      return { ...f, dias_formacion_ids: cur.filter((x) => x !== idNum) };
-    });
-  };
 
   const handleSave = async () => {
     const err = validarFormFicha(form, editingRow);
@@ -303,30 +292,6 @@ export function FichaFormModal({
                   />
                 </div>
               </div>
-              <div>
-                <label htmlFor={`${pid}-jornada`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Jornada de Formación *
-                </label>
-                <div className="mt-1">
-                  <SelectSearch
-                    inputId={`${pid}-jornada`}
-                    options={jornadas.map((j) => ({ value: j.id, label: j.nombre }))}
-                    value={form.jornada_id}
-                    onChange={(v) => {
-                      const jornada = jornadas.find((j) => j.id === v);
-                      setForm((f) => ({
-                        ...f,
-                        jornada_id: v,
-                        hora_inicio: jornada?.hora_inicio?.slice(0, 5) ?? f.hora_inicio,
-                        hora_fin: jornada?.hora_fin?.slice(0, 5) ?? f.hora_fin,
-                      }));
-                    }}
-                    placeholder="Seleccione una jornada..."
-                    isRequired
-                  />
-                </div>
-              </div>
-
               <div className="md:col-span-2">
                 <label htmlFor={`${pid}-ambiente`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Ambiente *
@@ -344,62 +309,20 @@ export function FichaFormModal({
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor={`${pid}-hora-inicio`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Hora inicio formación
-                </label>
-                <input
-                  id={`${pid}-hora-inicio`}
-                  type="time"
-                  value={form.hora_inicio ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, hora_inicio: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                />
-              </div>
-              <div>
-                <label htmlFor={`${pid}-hora-fin`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Hora fin formación
-                </label>
-                <input
-                  id={`${pid}-hora-fin`}
-                  type="time"
-                  value={form.hora_fin ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, hora_fin: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                />
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Horario aplicado a todos los días marcados. Ej.: 06:30–13:00 para jornada mañana con inicio a las 6:30.
-            </p>
-
-            <fieldset className="mt-4 border-0 p-0">
-              <legend className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Días de Formación *
-              </legend>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                Marque los días en que hay formación y pulse Guardar.
-              </p>
-              <div className="flex flex-wrap gap-4">
-                {diasFormacion.map((d) => (
-                  <label key={d.id} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={normalizeDiaIds(form.dias_formacion_ids).includes(
-                        Number(d.id)
-                      )}
-                      onChange={(e) => setDiaChecked(Number(d.id), e.currentTarget.checked)}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-sm text-gray-800 dark:text-gray-200">{d.nombre}</span>
-                  </label>
-                ))}
-                {diasFormacion.length === 0 && (
-                  <span className="text-sm text-gray-500">No hay días cargados o cargando...</span>
-                )}
-              </div>
-            </fieldset>
+            <FichaHorariosEditor
+              horarios={form.horarios ?? form.dias_formacion ?? []}
+              onChange={(horarios) =>
+                setForm((f) => ({
+                  ...f,
+                  horarios,
+                  dias_formacion: horarios,
+                  dias_formacion_ids: [...new Set(horarios.map((h) => h.dia_formacion_id).filter((id) => id > 0))],
+                }))
+              }
+              jornadas={jornadas}
+              diasFormacion={diasFormacion}
+              inputIdPrefix={pid}
+            />
 
             <div className="mt-4 flex items-center gap-2">
               <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ficha Activa *</span>

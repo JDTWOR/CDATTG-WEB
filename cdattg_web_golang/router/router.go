@@ -63,6 +63,7 @@ func SetupRouter() *gin.Engine {
 	_ = handlers.NewCategoriaHandler()
 	_ = handlers.NewMarcaHandler()
 	_ = handlers.NewContratoConvenioHandler()
+	jornadaHandler := handlers.NewJornadaHandler()
 
 	// Rutas públicas
 	api := r.Group("/api")
@@ -193,6 +194,16 @@ func SetupRouter() *gin.Engine {
 			admin.POST("/sync-instructor-roles", middleware.RequirePermission("ficha", permVerFichas), adminHandler.SyncInstructorRoles)
 			admin.POST("/sync-agenda-permissions", middleware.RequireSuperAdminOrAdmin(), adminHandler.SyncAgendaPermissions)
 			// sync-inventario-permissions desactivado (módulo inventario no en uso)
+
+			administracion := protected.Group("/administracion")
+			administracion.Use(middleware.RequireSuperAdminOrAdmin())
+			{
+				administracion.GET("/jornadas", jornadaHandler.List)
+				administracion.POST("/jornadas", jornadaHandler.Create)
+				administracion.PUT("/jornadas/:id", jornadaHandler.Update)
+				administracion.POST("/jornadas/:id/propagar", jornadaHandler.Propagar)
+				administracion.DELETE("/jornadas/:id", jornadaHandler.Delete)
+			}
 
 			// Gestión de permisos y roles (ASIGNAR PERMISOS o SUPER ADMIN para roles)
 			permisos := protected.Group("/permisos")

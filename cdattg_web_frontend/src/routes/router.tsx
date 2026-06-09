@@ -15,6 +15,7 @@ import { inventarioRoutes } from './modules/inventario.routes';
 import { infraestructuraRoutes } from './modules/infraestructura.routes';
 import { vigilanciaRoutes } from './modules/vigilancia.routes';
 import { permisosRoutes } from './modules/permisos.routes';
+import { administracionRoutes } from './modules/administracion.routes';
 
 /**
  * Árbol de rutas (React Router v7 data router).
@@ -39,6 +40,7 @@ export const appRouter = createBrowserRouter([
       ...infraestructuraRoutes,
       ...vigilanciaRoutes,
       ...permisosRoutes,
+      ...administracionRoutes,
     ],
   },
 ]);

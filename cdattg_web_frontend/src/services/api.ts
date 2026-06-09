@@ -40,6 +40,9 @@ import type {
   AmbienteItem,
   ModalidadFormacionItem,
   JornadaItem,
+  JornadaAdminItem,
+  JornadaPropagateResult,
+  JornadaUpdateResponse,
   DiaFormacionItem,
   PaisItem,
   DepartamentoItem,
@@ -365,6 +368,42 @@ class ApiService {
   async getCatalogosJornadas(): Promise<JornadaItem[]> {
     const response = await this.api.get<{ data: JornadaItem[] }>('/catalogos/jornadas');
     return response.data.data;
+  }
+
+  async getAdministracionJornadas(): Promise<JornadaAdminItem[]> {
+    const response = await this.api.get<{ data: JornadaAdminItem[] }>('/administracion/jornadas');
+    return response.data.data;
+  }
+
+  async createAdministracionJornada(data: {
+    nombre: string;
+    minutos_extension_fin?: number;
+    bloques: JornadaAdminItem['bloques'];
+  }): Promise<JornadaAdminItem> {
+    const response = await this.api.post<{ data: JornadaAdminItem }>('/administracion/jornadas', data);
+    return response.data.data;
+  }
+
+  async updateAdministracionJornada(
+    id: number,
+    data: {
+      nombre: string;
+      minutos_extension_fin?: number;
+      bloques: JornadaAdminItem['bloques'];
+      propagar_fichas?: boolean;
+    },
+  ): Promise<JornadaUpdateResponse> {
+    const response = await this.api.put<{ data: JornadaUpdateResponse }>(`/administracion/jornadas/${id}`, data);
+    return response.data.data;
+  }
+
+  async propagarAdministracionJornada(id: number): Promise<JornadaPropagateResult> {
+    const response = await this.api.post<{ data: JornadaPropagateResult }>(`/administracion/jornadas/${id}/propagar`);
+    return response.data.data;
+  }
+
+  async deleteAdministracionJornada(id: number): Promise<void> {
+    await this.api.delete(`/administracion/jornadas/${id}`);
   }
   async getCatalogosDiasFormacion(): Promise<DiaFormacionItem[]> {
     const response = await this.api.get<{ data: DiaFormacionItem[] }>('/catalogos/dias-formacion');

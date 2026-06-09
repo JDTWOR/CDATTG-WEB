@@ -88,7 +88,7 @@ export function FichaDetalleResumen({ ficha, diasLabel, puedeEditarFicha }: Fich
           <ClockIcon className="h-5 w-5 shrink-0 text-gray-400" />
           <div className="min-w-0 flex-1">
             <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Días de formación
+              Programación horaria
             </dt>
             <dd className="text-sm text-gray-900 dark:text-gray-100 break-words">{diasLabel}</dd>
           </div>

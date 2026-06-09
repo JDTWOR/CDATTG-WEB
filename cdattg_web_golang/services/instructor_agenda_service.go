@@ -145,24 +145,30 @@ func (s *InstructorAgendaService) eventosEnRango(
 			continue
 		}
 		hi, hf := s.horarioSvc.horasDiaFicha(ficha, diaID)
-		if hi == "" || hf == "" {
-			continue
+		bloques := s.horarioSvc.bloquesDiaFicha(ficha, diaID)
+		if len(bloques) == 0 {
+			if hi == "" || hf == "" {
+				continue
+			}
+			bloques = []HorarioBloqueInput{{DiaFormacionID: diaID, HoraInicio: hi, HoraFin: hf}}
 		}
-		eventos = append(eventos, dto.InstructorAgendaEvent{
-			Fecha:               d.Format(time.DateOnly),
-			DiaFormacionID:      diaID,
-			DiaNombre:           nombreDiaPorID(diaID),
-			HoraInicio:          normalizeHoraMM(hi),
-			HoraFin:             normalizeHoraMM(hf),
-			FichaID:             ficha.ID,
-			FichaNumero:         ficha.Ficha,
-			ProgramaNombre:      ctx.progNombre,
-			SedeNombre:          ctx.sedeNombre,
-			AmbienteNombre:      ctx.ambienteNombre,
-			InstructorID:        asg.InstructorID,
-			InstructorNombre:    ctx.instNombre,
-			InstructorDocumento: ctx.instDoc,
-		})
+		for _, b := range bloques {
+			eventos = append(eventos, dto.InstructorAgendaEvent{
+				Fecha:               d.Format(time.DateOnly),
+				DiaFormacionID:      diaID,
+				DiaNombre:           nombreDiaPorID(diaID),
+				HoraInicio:          normalizeHoraMM(b.HoraInicio),
+				HoraFin:             normalizeHoraMM(b.HoraFin),
+				FichaID:             ficha.ID,
+				FichaNumero:         ficha.Ficha,
+				ProgramaNombre:      ctx.progNombre,
+				SedeNombre:          ctx.sedeNombre,
+				AmbienteNombre:      ctx.ambienteNombre,
+				InstructorID:        asg.InstructorID,
+				InstructorNombre:    ctx.instNombre,
+				InstructorDocumento: ctx.instDoc,
+			})
+		}
 	}
 	return eventos
 }

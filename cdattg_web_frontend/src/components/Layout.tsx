@@ -99,6 +99,7 @@ const ICONS: Record<string, ReactNode> = {
   'inventario/ordenes/pendientes': <ClockIcon className="w-5 h-5" />,
   'inventario/devoluciones': <ArrowUturnLeftIcon className="w-5 h-5" />,
   permisos: <ShieldCheckIcon className="w-5 h-5" />,
+  'administracion/jornadas': <SunIcon className="w-5 h-5" />,
   'infraestructura/sedes': <BuildingOffice2Icon className="w-5 h-5" />,
   'infraestructura/bloques': <BuildingOffice2Icon className="w-5 h-5" />,
   'infraestructura/pisos': <BuildingOffice2Icon className="w-5 h-5" />,
@@ -139,8 +140,8 @@ export const Layout = ({ children }: LayoutProps) => {
     () =>
       SIDEBAR_ITEMS.filter((item) => {
         if (item.rolesRequired && item.rolesRequired.length > 0) {
-          const matchRequired = item.rolesRequired.some((r) => roles.includes(r));
-          const matchAlsoRole = item.alsoVisibleForRoles?.some((r) => roles.includes(r)) ?? false;
+          const matchRequired = hasAnyRole(roles, item.rolesRequired);
+          const matchAlsoRole = item.alsoVisibleForRoles?.some((r) => hasAnyRole(roles, [r])) ?? false;
           const matchAlsoPerm =
             item.alsoVisibleForPermissions?.some((p) => hasPermission(p)) ?? false;
           if (!matchRequired && !matchAlsoRole && !matchAlsoPerm) return false;
@@ -156,13 +157,21 @@ export const Layout = ({ children }: LayoutProps) => {
     [roles, hasPermission]
   );
 
-  const [expandedSection, setExpandedSection] = useState<string | null>(() =>
-    sectionForPathname(location.pathname, visibleItems)
-  );
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
-    const activeSection = sectionForPathname(location.pathname, visibleItems);
-    if (activeSection) setExpandedSection(activeSection);
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      const activeSection = sectionForPathname(location.pathname, visibleItems);
+      if (activeSection) next.add(activeSection);
+      // Primera carga: mostrar todas las secciones visibles (evita perder ítems en «Administración»).
+      if (prev.size === 0) {
+        for (const s of new Set(visibleItems.map((i) => i.section))) {
+          next.add(s);
+        }
+      }
+      return next;
+    });
   }, [location.pathname, visibleItems]);
 
   const rolesLine = roles.length > 0 ? formatRolesLine(roles) : '';
@@ -479,7 +488,7 @@ export const Layout = ({ children }: LayoutProps) => {
 
           <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-4">
             {sections.map((section, sectionIndex) => {
-              const isExpanded = expandedSection === section;
+              const isExpanded = expandedSections.has(section);
               const sectionHasActiveItem = visibleItems.some(
                 (item) => item.section === section && isNavItemActive(location.pathname, item, visibleItems)
               );
@@ -487,7 +496,14 @@ export const Layout = ({ children }: LayoutProps) => {
                 <div key={section} className={sectionIndex > 0 ? 'mt-2' : ''}>
                   <button
                     type="button"
-                    onClick={() => setExpandedSection(isExpanded ? null : section)}
+                    onClick={() =>
+                      setExpandedSections((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(section)) next.delete(section);
+                        else next.add(section);
+                        return next;
+                      })
+                    }
                     className={`flex w-full items-center justify-between rounded-lg px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider transition-colors touch-manipulation ${
                       sectionHasActiveItem
                         ? 'text-primary-700 dark:text-primary-300'

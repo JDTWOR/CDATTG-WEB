@@ -17,34 +17,56 @@ type JornadaHorarioDefault struct {
 	Fin    string
 }
 
-// DefaultHorariosJornada expone horarios por defecto para catálogos y formularios.
+// DefaultHorariosJornada mantiene compatibilidad; preferir bloques en BD.
 func DefaultHorariosJornada(nombre string) (JornadaHorarioDefault, bool) {
-	def, ok := defaultHorarios[nombre]
-	if !ok {
-		return JornadaHorarioDefault{}, false
+	return JornadaHorarioDefault{}, false
+}
+
+// validarHorarioConExtension comprueba si now está en [hora_inicio, hora_fin + minutos_extension].
+func validarHorarioConExtension(j *models.Jornada, now time.Time) bool {
+	if j == nil {
+		return true
 	}
-	return JornadaHorarioDefault{Inicio: def.inicio, Fin: def.fin}, true
+	if j.ID > 0 {
+		bloques, err := repositories.NewJornadaBloqueRepository().FindByJornadaID(j.ID)
+		if err == nil && len(bloques) > 0 {
+			extMin := extensionMinutosFromJornada(j)
+			inputs := make([]HorarioBloqueInput, len(bloques))
+			for i, b := range bloques {
+				inputs[i] = HorarioBloqueInput{
+					DiaFormacionID: b.DiaFormacionID,
+					HoraInicio:     normalizeHoraMM(b.HoraInicio),
+					HoraFin:        normalizeHoraMM(b.HoraFin),
+				}
+			}
+			diaHoy := WeekdayToDiaFormacionID(now.Weekday())
+			var hoy []HorarioBloqueInput
+			for _, in := range inputs {
+				if in.DiaFormacionID == diaHoy {
+					hoy = append(hoy, in)
+				}
+			}
+			if len(hoy) > 0 {
+				return MomentoEnAlgunBloque(hoy, extMin, now)
+			}
+			return false
+		}
+	}
+	inicio, fin := normalizeHoraMM(j.HoraInicio), normalizeHoraMM(j.HoraFin)
+	if inicio == "" || fin == "" {
+		return true
+	}
+	return validarHorarioRango(inicio, fin, extensionMinutosFromJornada(j), now)
 }
 
-var defaultHorarios = map[string]struct{ inicio, fin string }{
-	"MAÑANA":           {"06:00", "13:00"},
-	"TARDE":            {"13:00", "18:10"},
-	"NOCHE":            {"17:50", "23:10"},
-	"FINES DE SEMANA":  {"06:00", "18:00"},
-	"JORNADA CONTINUA": {"06:00", "18:00"}, // Mañana y tarde (ej. Enfermería): desde inicio mañana hasta fin tarde
+func extensionMinutosFromJornada(j *models.Jornada) int {
+	extMin := 60
+	if j.MinutosExtensionFin != nil && *j.MinutosExtensionFin >= 0 {
+		extMin = *j.MinutosExtensionFin
+	}
+	return extMin
 }
 
-// Minutos después de hora_fin en que aún se permite tomar asistencia / registrar salida (la clase a veces se extiende).
-// Si la jornada tiene MinutosExtensionFin en BD se usa ese valor; si no, este mapa por nombre; si no, 60.
-var defaultExtensionMinutos = map[string]int{
-	"MAÑANA":           60,
-	"TARDE":            60,
-	"NOCHE":            60,
-	"FINES DE SEMANA":  30,
-	"JORNADA CONTINUA": 60, // mañana y tarde: extensión al cierre
-}
-
-// JornadaValidationService valida si la hora actual está dentro del horario de la jornada.
 type JornadaValidationService struct {
 	repo repositories.CatalogoRepository
 }
@@ -75,44 +97,6 @@ func ValidarHorarioJornadaModel(j *models.Jornada) bool {
 // ValidarHorarioJornadaModelAt comprueba si now está dentro del horario de la jornada (incluye extensión).
 func ValidarHorarioJornadaModelAt(j *models.Jornada, now time.Time) bool {
 	return validarHorarioConExtension(j, now)
-}
-
-// validarHorarioConExtension comprueba si now está en [hora_inicio, hora_fin + minutos_extension].
-func validarHorarioConExtension(j *models.Jornada, now time.Time) bool {
-	if j == nil {
-		return true
-	}
-	inicio, fin := j.HoraInicio, j.HoraFin
-	if inicio == "" || fin == "" {
-		if def, ok := defaultHorarios[j.Nombre]; ok {
-			inicio, fin = def.inicio, def.fin
-		} else {
-			return true
-		}
-	}
-	tInicio, err1 := parseHora(inicio)
-	tFin, err2 := parseHora(fin)
-	if err1 != nil || err2 != nil {
-		return true
-	}
-	extMin := 60
-	if j.MinutosExtensionFin != nil && *j.MinutosExtensionFin >= 0 {
-		extMin = *j.MinutosExtensionFin
-	} else if d, ok := defaultExtensionMinutos[j.Nombre]; ok {
-		extMin = d
-	}
-	hoy := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	actual := hoy.Add(time.Duration(now.Hour())*time.Hour + time.Duration(now.Minute())*time.Minute)
-	start := hoy.Add(time.Duration(tInicio.Hour())*time.Hour + time.Duration(tInicio.Minute())*time.Minute)
-	end := hoy.Add(time.Duration(tFin.Hour())*time.Hour + time.Duration(tFin.Minute())*time.Minute)
-	if end.Before(start) {
-		end = end.Add(24 * time.Hour)
-		if actual.Before(start) {
-			actual = actual.Add(24 * time.Hour)
-		}
-	}
-	endEffective := end.Add(time.Duration(extMin) * time.Minute)
-	return !actual.Before(start) && !actual.After(endEffective)
 }
 
 func parseHora(s string) (t time.Time, err error) {
@@ -167,13 +151,9 @@ func HoraInicioMasMinutos(j *models.Jornada, dia time.Time, minutosDespues int) 
 	if j == nil || minutosDespues < 0 {
 		return dia
 	}
-	inicio := j.HoraInicio
+	inicio := normalizeHoraMM(j.HoraInicio)
 	if inicio == "" {
-		if def, ok := defaultHorarios[j.Nombre]; ok {
-			inicio = def.inicio
-		} else {
-			return dia
-		}
+		return dia
 	}
 	tInicio, err := parseHora(inicio)
 	if err != nil {
@@ -190,24 +170,15 @@ func HoraFinEfectiva(j *models.Jornada, dia time.Time) time.Time {
 	if j == nil {
 		return dia.Add(24 * time.Hour)
 	}
-	fin := j.HoraFin
+	fin := normalizeHoraMM(j.HoraFin)
 	if fin == "" {
-		if def, ok := defaultHorarios[j.Nombre]; ok {
-			fin = def.fin
-		} else {
-			return dia.Add(24 * time.Hour)
-		}
+		return dia.Add(24 * time.Hour)
 	}
 	tFin, err := parseHora(fin)
 	if err != nil {
 		return dia.Add(24 * time.Hour)
 	}
-	extMin := 60
-	if j.MinutosExtensionFin != nil && *j.MinutosExtensionFin >= 0 {
-		extMin = *j.MinutosExtensionFin
-	} else if d, ok := defaultExtensionMinutos[j.Nombre]; ok {
-		extMin = d
-	}
+	extMin := extensionMinutosFromJornada(j)
 	base := time.Date(dia.Year(), dia.Month(), dia.Day(), 0, 0, 0, 0, dia.Location())
 	end := base.Add(time.Duration(tFin.Hour())*time.Hour + time.Duration(tFin.Minute())*time.Minute)
 	return end.Add(time.Duration(extMin) * time.Minute)

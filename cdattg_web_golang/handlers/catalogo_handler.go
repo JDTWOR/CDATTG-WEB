@@ -58,27 +58,13 @@ func (h *CatalogoHandler) GetModalidadesFormacion(c *gin.Context) {
 }
 
 func (h *CatalogoHandler) GetJornadas(c *gin.Context) {
-	list, err := h.repo.FindJornadas()
+	svc := services.NewJornadaService()
+	list, err := svc.JornadaCatalogItems()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	resp := make([]dto.JornadaItem, len(list))
-	for i := range list {
-		hi, hf := list[i].HoraInicio, list[i].HoraFin
-		if hi == "" || hf == "" {
-			if def, ok := services.DefaultHorariosJornada(list[i].Nombre); ok {
-				hi, hf = def.Inicio, def.Fin
-			}
-		}
-		resp[i] = dto.JornadaItem{
-			ID:         list[i].ID,
-			Nombre:     list[i].Nombre,
-			HoraInicio: hi,
-			HoraFin:    hf,
-		}
-	}
-	c.JSON(http.StatusOK, gin.H{"data": resp})
+	c.JSON(http.StatusOK, gin.H{"data": list})
 }
 
 func (h *CatalogoHandler) GetDiasFormacion(c *gin.Context) {

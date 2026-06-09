@@ -5,6 +5,7 @@ import {
   DASHBOARD_PATH,
   fichasPaths,
   infraestructuraPaths,
+  administracionPaths,
   permisosPaths,
   PERFIL_PATH,
   personasPaths,
@@ -144,6 +145,14 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     permission: null,
     rolesRequired: ['VIGILANTE', 'SUPER ADMINISTRADOR'],
     iconKey: 'vigilancia/ambientes',
+  },
+  {
+    section: 'Administración',
+    path: administracionPaths.jornadas,
+    label: 'Jornadas de formación',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR'],
+    iconKey: 'administracion/jornadas',
   },
   {
     section: 'Administración',

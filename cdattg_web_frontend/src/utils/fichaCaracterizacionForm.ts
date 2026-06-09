@@ -5,43 +5,35 @@ import type {
   FichaDiaFormacionItem,
   ProgramaFormacionResponse,
 } from '../types';
+import { horariosFromFicha, validarSinSolape } from './fichaCaracterizacionHorarios';
+import { MSG_INSTRUCTOR_LIDER_OBLIGATORIO } from '../constants/instructorLiderLabels';
 
 function sliceHoraInput(value?: string | null): string | undefined {
   if (value == null || value === '') return undefined;
   return value.trim().slice(0, 5);
 }
 
-function horasFromDiasFormacion(dias?: FichaDiaFormacionItem[]): { inicio?: string; fin?: string } {
-  if (!dias?.length) return {};
-  const inicio = sliceHoraInput(dias[0]?.hora_inicio);
-  const fin = sliceHoraInput(dias[0]?.hora_fin);
-  const mismoHorario = dias.every(
-    (d) => sliceHoraInput(d.hora_inicio) === inicio && sliceHoraInput(d.hora_fin) === fin,
-  );
-  if (!mismoHorario || !inicio || !fin) return {};
-  return { inicio, fin };
-}
-
 export function buildDiasFormacionPayload(
-  diasIds: number[],
-  horaInicio?: string,
-  horaFin?: string,
-  existing?: FichaDiaFormacionItem[],
+  horarios: FichaDiaFormacionItem[],
 ): FichaDiaFormacionItem[] | undefined {
-  if (!diasIds.length) return undefined;
-  const byDia = new Map((existing ?? []).map((d) => [d.dia_formacion_id, d]));
-  return diasIds.map((id) => {
-    const prev = byDia.get(id);
-    return {
-      dia_formacion_id: id,
-      hora_inicio: sliceHoraInput(horaInicio) ?? sliceHoraInput(prev?.hora_inicio) ?? '',
-      hora_fin: sliceHoraInput(horaFin) ?? sliceHoraInput(prev?.hora_fin) ?? '',
-    };
-  });
+  if (!horarios.length) return undefined;
+  return horarios.map((h, i) => ({
+    dia_formacion_id: h.dia_formacion_id,
+    hora_inicio: sliceHoraInput(h.hora_inicio) ?? '',
+    hora_fin: sliceHoraInput(h.hora_fin) ?? '',
+    orden: h.orden ?? i,
+    jornada_id: h.jornada_id ?? null,
+  }));
 }
-import { MSG_INSTRUCTOR_LIDER_OBLIGATORIO } from '../constants/instructorLiderLabels';
 
-/** API puede devolver ISO (RFC3339); input type=date exige yyyy-MM-DD */
+export function diasIdsFromHorarios(horarios: FichaDiaFormacionItem[]): number[] {
+  const ids = new Set<number>();
+  for (const h of horarios) {
+    if (h.dia_formacion_id > 0) ids.add(h.dia_formacion_id);
+  }
+  return [...ids];
+}
+
 export function toDateInputString(iso?: string | null): string | undefined {
   if (iso == null || iso === '') return undefined;
   const s = String(iso).trim();
@@ -55,7 +47,7 @@ export function normalizeDiaIds(ids?: (number | string)[] | null): number[] {
 }
 
 export function formStateFromFicha(item: FichaCaracterizacionResponse): FichaCaracterizacionRequest {
-  const horas = horasFromDiasFormacion(item.dias_formacion);
+  const horarios = horariosFromFicha(item);
   return {
     programa_formacion_id: item.programa_formacion_id,
     ficha: item.ficha,
@@ -68,16 +60,15 @@ export function formStateFromFicha(item: FichaCaracterizacionResponse): FichaCar
     jornada_id: item.jornada_id,
     total_horas: item.total_horas,
     status: item.status,
-    dias_formacion_ids: normalizeDiaIds(item.dias_formacion_ids),
-    dias_formacion: item.dias_formacion,
-    hora_inicio: horas.inicio,
-    hora_fin: horas.fin,
+    dias_formacion_ids: diasIdsFromHorarios(horarios),
+    horarios,
+    dias_formacion: horarios,
   };
 }
 
 export function validarFormFicha(
   form: FichaCaracterizacionRequest,
-  editing: FichaCaracterizacionResponse | null
+  editing: FichaCaracterizacionResponse | null,
 ): string | null {
   if (!editing && (!form.instructor_id || form.instructor_id === 0)) {
     return MSG_INSTRUCTOR_LIDER_OBLIGATORIO;
@@ -85,15 +76,20 @@ export function validarFormFicha(
   if (!form.ficha?.trim()) {
     return 'El número de ficha es obligatorio.';
   }
-  return null;
+  const horarios = form.horarios ?? form.dias_formacion ?? [];
+  if (horarios.length === 0) {
+    return 'Debe configurar al menos un bloque horario de formación.';
+  }
+  return validarSinSolape(horarios);
 }
 
 export function construirPayloadFicha(
   form: FichaCaracterizacionRequest,
   editing: FichaCaracterizacionResponse | null,
-  programas: ProgramaFormacionResponse[]
+  programas: ProgramaFormacionResponse[],
 ): FichaCaracterizacionRequest {
-  const diasNorm = normalizeDiaIds(form.dias_formacion_ids);
+  const horarios = form.horarios ?? form.dias_formacion ?? [];
+  const diasNorm = diasIdsFromHorarios(horarios);
   const fechaInicio =
     (form.fecha_inicio?.trim() && toDateInputString(form.fecha_inicio.trim())) ||
     (editing ? toDateInputString(editing.fecha_inicio) : undefined);
@@ -101,12 +97,7 @@ export function construirPayloadFicha(
     (form.fecha_fin?.trim() && toDateInputString(form.fecha_fin.trim())) ||
     (editing ? toDateInputString(editing.fecha_fin) : undefined);
   const programaFormacionId = form.programa_formacion_id || programas[0]?.id || 0;
-  const diasFormacion = buildDiasFormacionPayload(
-    diasNorm,
-    form.hora_inicio,
-    form.hora_fin,
-    form.dias_formacion ?? editing?.dias_formacion,
-  );
+  const horariosPayload = buildDiasFormacionPayload(horarios);
 
   return {
     programa_formacion_id: programaFormacionId,
@@ -121,7 +112,8 @@ export function construirPayloadFicha(
     total_horas: form.total_horas,
     status: form.status,
     dias_formacion_ids: diasNorm,
-    dias_formacion: diasFormacion,
+    dias_formacion: horariosPayload,
+    horarios: horariosPayload,
   };
 }
 
@@ -138,6 +130,8 @@ export function canManageFichas(roles: string[]): boolean {
 }
 
 export function diasIdsFromListItem(item: FichaCaracterizacionResponse): number[] {
+  const horarios = horariosFromFicha(item);
+  if (horarios.length) return diasIdsFromHorarios(horarios);
   const anyItem = item as unknown as Record<string, unknown>;
   const raw =
     item.dias_formacion_ids ??
@@ -149,20 +143,19 @@ export function diasIdsFromListItem(item: FichaCaracterizacionResponse): number[
 }
 
 export function formatDiasEnTabla(item: FichaCaracterizacionResponse, diasFormacion: DiaFormacionItem[]): string {
-  const ids = diasIdsFromListItem(item);
-  const detalle = item.dias_formacion?.filter((d) => d.dia_formacion_id > 0);
-  if (ids.length && detalle?.length) {
-    return ids
-      .map((id) => {
-        const nombre = diasFormacion.find((d) => Number(d.id) === id)?.nombre ?? String(id);
-        const h = detalle.find((d) => d.dia_formacion_id === id);
-        const inicio = sliceHoraInput(h?.hora_inicio);
-        const fin = sliceHoraInput(h?.hora_fin);
+  const horarios = horariosFromFicha(item);
+  if (horarios.length) {
+    return horarios
+      .map((h) => {
+        const nombre = diasFormacion.find((d) => Number(d.id) === h.dia_formacion_id)?.nombre ?? String(h.dia_formacion_id);
+        const inicio = sliceHoraInput(h.hora_inicio);
+        const fin = sliceHoraInput(h.hora_fin);
         if (inicio && fin) return `${nombre} ${inicio}–${fin}`;
         return nombre;
       })
       .join(', ');
   }
+  const ids = diasIdsFromListItem(item);
   const nombresApi = item.dias_formacion_nombres?.filter((n) => n?.trim());
   if (nombresApi?.length) return nombresApi.join(', ');
   if (!ids.length) return '—';
@@ -174,7 +167,7 @@ export function formatDiasEnTabla(item: FichaCaracterizacionResponse, diasFormac
 export function mergeListAfterSave(
   prev: FichaCaracterizacionResponse[],
   saved: FichaCaracterizacionResponse,
-  editing: FichaCaracterizacionResponse | null
+  editing: FichaCaracterizacionResponse | null,
 ): FichaCaracterizacionResponse[] {
   if (editing) {
     return prev.map((row) => (row.id === saved.id ? { ...row, ...saved } : row));

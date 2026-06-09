@@ -87,6 +87,9 @@ func (s *stubFichaDiasRepo) ReplaceByFichaIDWithHorarios(uint, []repositories.Fi
 func (s *stubFichaDiasRepo) FindByFichaID(uint) ([]models.FichaDiasFormacion, error) {
 	return s.dias, nil
 }
+func (s *stubFichaDiasRepo) FindDistinctFichaIDsReferencingJornada(uint) ([]uint, error) {
+	return nil, nil
+}
 
 func testHorarioService(
 	ifc *models.InstructorFichaCaracterizacion,

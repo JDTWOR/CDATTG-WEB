@@ -25,4 +25,7 @@ export interface FichaDiaFormacionItem {
   dia_nombre?: string;
   hora_inicio: string;
   hora_fin: string;
+  orden?: number;
+  jornada_id?: number | null;
+  jornada_nombre?: string;
 }

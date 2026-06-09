@@ -127,6 +127,7 @@ func Migrate() error {
 		&models.Genero{},
 		&models.PersonaCaracterizacion{},
 		&models.Jornada{},
+		&models.JornadaBloque{},
 		&models.Modalidad{},
 
 		// Inventario desactivado: no se migran tablas de inventario

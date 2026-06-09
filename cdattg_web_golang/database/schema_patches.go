@@ -62,16 +62,16 @@ func EnsureSchemaPatches() error {
 
 	// Vincular bloques legacy a plantilla cuando coinciden día+hora y la ficha tiene esa jornada principal.
 	if err := DB.Exec(`
-		UPDATE ficha_dias_formacion fd
+		UPDATE ficha_dias_formacion
 		SET jornada_id = jb.jornada_id
 		FROM jornada_bloques jb
-		INNER JOIN fichas_caracterizacion fc ON fc.id = fd.ficha_id
-		WHERE fd.jornada_id IS NULL
-		  AND fd.deleted_at IS NULL
+		INNER JOIN fichas_caracterizacion fc ON fc.id = ficha_dias_formacion.ficha_id
+		WHERE ficha_dias_formacion.jornada_id IS NULL
+		  AND ficha_dias_formacion.deleted_at IS NULL
 		  AND fc.jornada_id = jb.jornada_id
-		  AND fd.dia_formacion_id = jb.dia_formacion_id
-		  AND LEFT(TRIM(fd.hora_inicio), 5) = jb.hora_inicio
-		  AND LEFT(TRIM(fd.hora_fin), 5) = jb.hora_fin
+		  AND ficha_dias_formacion.dia_formacion_id = jb.dia_formacion_id
+		  AND LEFT(TRIM(ficha_dias_formacion.hora_inicio), 5) = jb.hora_inicio
+		  AND LEFT(TRIM(ficha_dias_formacion.hora_fin), 5) = jb.hora_fin
 	`).Error; err != nil {
 		return err
 	}

@@ -522,9 +522,13 @@ export interface AsistenciaDashboardFichaSinSesion {
 export interface AsistenciaDashboardResponse {
   fecha: string;
   total_aprendices_en_formacion: number;
+  /** Aprendices activos en fichas con formación hoy y jornada activa (o todas las jornadas si fecha histórica) */
+  total_aprendices_esperados?: number;
+  /** Nombres de jornada considerados en el esperado (ej. MAÑANA, JORNADA CONTINUA) */
+  jornadas_activas?: string[];
   pendientes_revision?: number;
   por_ficha: AsistenciaDashboardPorFicha[];
-  /** Fichas del sistema sin ninguna sesión de asistencia en la fecha del resumen */
+  /** Fichas esperadas hoy (día formación + jornada activa) sin sesión de asistencia */
   fichas_sin_asistencia_hoy?: AsistenciaDashboardFichaSinSesion[];
   total_fichas_registradas?: number;
   fichas_con_sesion_hoy?: number;

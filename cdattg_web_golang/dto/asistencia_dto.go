@@ -128,6 +128,10 @@ type AsistenciaDashboardResponse struct {
 	TotalFichasRegistradas int `json:"total_fichas_registradas"`
 	// FichasConSesionHoy cantidad de fichas con al menos una sesión ese día (len(PorFicha))
 	FichasConSesionHoy int `json:"fichas_con_sesion_hoy"`
+	// TotalAprendicesEsperados aprendices activos en fichas con formación hoy y jornada activa (o todas las jornadas si fecha histórica)
+	TotalAprendicesEsperados int `json:"total_aprendices_esperados"`
+	// JornadasActivas nombres de jornada consideradas en el esperado (ej. MAÑANA, JORNADA CONTINUA)
+	JornadasActivas []string `json:"jornadas_activas"`
 }
 
 // AsistenciaDashboardFichaSinSesion ficha sin sesión de asistencia en el día del resumen

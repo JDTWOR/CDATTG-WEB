@@ -746,7 +746,11 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 		return nil, err
 	}
 	pendientes, _ := s.repo.CountPendientesRevisionByFecha(sedeID, fecha)
-	sinSesion, errSin := s.repo.GetFichasSinSesionHoy(sedeID, fecha)
+	esperados, errEsp := calcularDashboardEsperados(s.fichaRepo, s.aprendizRepo, sedeID, fecha)
+	if errEsp != nil {
+		return nil, errEsp
+	}
+	sinSesionDTO, errSin := buildFichasSinSesionEsperadas(esperados, s.repo, fecha)
 	if errSin != nil {
 		return nil, errSin
 	}
@@ -757,9 +761,11 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 	resp := &dto.AsistenciaDashboardResponse{
 		Fecha:                      fecha,
 		TotalAprendicesEnFormacion: total,
+		TotalAprendicesEsperados:   esperados.TotalEsperados,
+		JornadasActivas:            esperados.JornadasActivas,
 		PendientesRevision:         pendientes,
 		PorFicha:                   make([]dto.AsistenciaDashboardPorFicha, len(porFicha)),
-		FichasSinAsistenciaHoy:     make([]dto.AsistenciaDashboardFichaSinSesion, len(sinSesion)),
+		FichasSinAsistenciaHoy:     sinSesionDTO,
 		TotalFichasRegistradas:     int(totalFichas),
 		FichasConSesionHoy:         len(porFicha),
 	}
@@ -772,16 +778,6 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 			SedeNombre:       porFicha[i].SedeNombre,
 			CantidadVinieron: porFicha[i].Cantidad,
 			TotalAprendices:  porFicha[i].TotalAprendices,
-		}
-	}
-	for i := range sinSesion {
-		resp.FichasSinAsistenciaHoy[i] = dto.AsistenciaDashboardFichaSinSesion{
-			FichaID:         sinSesion[i].FichaID,
-			FichaNumero:     sinSesion[i].FichaNumero,
-			ProgramaNombre:  sinSesion[i].ProgramaNombre,
-			JornadaNombre:   sinSesion[i].JornadaNombre,
-			SedeNombre:      sinSesion[i].SedeNombre,
-			TotalAprendices: sinSesion[i].TotalAprendices,
 		}
 	}
 	return resp, nil

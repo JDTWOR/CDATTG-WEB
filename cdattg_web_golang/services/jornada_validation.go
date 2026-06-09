@@ -52,7 +52,12 @@ func (s *JornadaValidationService) ValidarHorarioJornada(jornadaID uint) (bool, 
 
 // ValidarHorarioJornadaModel es igual pero recibe la jornada ya cargada (evita consulta).
 func ValidarHorarioJornadaModel(j *models.Jornada) bool {
-	return validarHorarioConExtension(j, time.Now())
+	return ValidarHorarioJornadaModelAt(j, time.Now())
+}
+
+// ValidarHorarioJornadaModelAt comprueba si now está dentro del horario de la jornada (incluye extensión).
+func ValidarHorarioJornadaModelAt(j *models.Jornada, now time.Time) bool {
+	return validarHorarioConExtension(j, now)
 }
 
 // validarHorarioConExtension comprueba si now está en [hora_inicio, hora_fin + minutos_extension].

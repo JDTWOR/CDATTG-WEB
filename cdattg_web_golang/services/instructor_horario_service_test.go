@@ -48,6 +48,10 @@ func (s *stubFichaRepoHorario) FindByFicha(string) (*models.FichaCaracterizacion
 func (s *stubFichaRepoHorario) FindAll(int, int, *uint, *uint, string) ([]models.FichaCaracterizacion, int64, error) {
 	return nil, 0, nil
 }
+func (s *stubFichaRepoHorario) FindActivasParaFechaConJornada(time.Time, *uint) ([]models.FichaCaracterizacion, error) {
+	return nil, nil
+}
+
 func (s *stubFichaRepoHorario) FindActivasParaHoyConJornada(time.Time) ([]models.FichaCaracterizacion, error) {
 	return nil, nil
 }

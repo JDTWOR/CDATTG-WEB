@@ -236,10 +236,9 @@ export function AdminDashboardView() {
                 Fichas pendientes (sin sesión hoy)
               </h2>
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Fichas activas que aún no tienen una sesión de asistencia creada para el día{' '}
+                Fichas con formación hoy y jornada activa que aún no tienen sesión de asistencia para el día{' '}
                 <span className="font-medium text-gray-800 dark:text-gray-200">{asistenciaDashboard?.fecha ?? '—'}</span>
-                {loading && !asistenciaDashboard ? ' (cargando…)' : ''}. Si solo existe una ficha en el sistema y ya se abrió
-                sesión, este listado quedará vacío.
+                {loading && !asistenciaDashboard ? ' (cargando…)' : ''}.
               </p>
               {asistenciaDashboard != null &&
                 typeof asistenciaDashboard.total_fichas_registradas === 'number' &&
@@ -261,8 +260,8 @@ export function AdminDashboardView() {
           </div>
           {fichasSinAsistenciaHoy.length === 0 ? (
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              No hay fichas pendientes: todas las fichas activas ya tienen al menos una sesión de asistencia para este día,
-              o en el sistema solo hay una ficha y ya se abrió sesión. Revise el resumen numérico arriba.
+              No hay fichas pendientes en la jornada activa: todas las esperadas ya tienen sesión o ninguna jornada está
+              activa en este momento.
             </p>
           ) : (
             <div className="overflow-x-auto max-h-[28rem] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-600">

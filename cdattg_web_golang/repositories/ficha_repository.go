@@ -15,6 +15,8 @@ type FichaRepository interface {
 	FindByFicha(ficha string) (*models.FichaCaracterizacion, error)
 	FindAll(page, pageSize int, programaID *uint, instructorID *uint, search string) ([]models.FichaCaracterizacion, int64, error)
 	FindActivasParaHoyConJornada(hoy time.Time) ([]models.FichaCaracterizacion, error)
+	// FindActivasParaFechaConJornada fichas activas con formación el día de la semana de fecha; sedeID opcional.
+	FindActivasParaFechaConJornada(fecha time.Time, sedeID *uint) ([]models.FichaCaracterizacion, error)
 	Search(query string) ([]models.FichaCaracterizacion, error)
 	Create(ficha *models.FichaCaracterizacion) error
 	Update(ficha *models.FichaCaracterizacion) error
@@ -71,17 +73,25 @@ func (r *fichaRepository) FindByFicha(ficha string) (*models.FichaCaracterizacio
 
 // FindActivasParaHoyConJornada devuelve fichas activas (status=true, fecha_fin >= hoy) que tienen formación el día de la semana de hoy, con Jornada y FichaDiasFormacion cargados.
 func (r *fichaRepository) FindActivasParaHoyConJornada(hoy time.Time) ([]models.FichaCaracterizacion, error) {
-	weekday := int(hoy.Weekday()) // 0=Sunday, 1=Monday, ...
+	return r.FindActivasParaFechaConJornada(hoy, nil)
+}
+
+// FindActivasParaFechaConJornada devuelve fichas activas con formación el día de la semana de fecha.
+func (r *fichaRepository) FindActivasParaFechaConJornada(fecha time.Time, sedeID *uint) ([]models.FichaCaracterizacion, error) {
+	weekday := int(fecha.Weekday()) // 0=Sunday, 1=Monday, ...
 	diaFormacionID := weekday
 	if diaFormacionID == 0 {
 		diaFormacionID = 7
 	}
-	hoyStr := hoy.Format("2006-01-02")
+	fechaStr := fecha.Format("2006-01-02")
+	q := r.db.Where("status = ?", true).
+		Where("(fecha_fin IS NULL OR fecha_fin >= ?)", fechaStr).
+		Where("id IN (SELECT ficha_id FROM ficha_dias_formacion WHERE dia_formacion_id = ? AND deleted_at IS NULL)", diaFormacionID)
+	if sedeID != nil && *sedeID > 0 {
+		q = q.Where("sede_id = ?", *sedeID)
+	}
 	var list []models.FichaCaracterizacion
-	err := r.db.Where("status = ?", true).
-		Where("(fecha_fin IS NULL OR fecha_fin >= ?)", hoyStr).
-		Where("id IN (SELECT ficha_id FROM ficha_dias_formacion WHERE dia_formacion_id = ? AND deleted_at IS NULL)", diaFormacionID).
-		Preload("Jornada").Preload("FichaDiasFormacion").
+	err := q.Preload("Jornada").Preload("ProgramaFormacion").Preload("Sede").Preload("FichaDiasFormacion").
 		Find(&list).Error
 	return list, err
 }

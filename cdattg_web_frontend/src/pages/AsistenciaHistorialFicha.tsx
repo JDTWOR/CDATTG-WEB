@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, type ChangeEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { useBreadcrumbOverride } from '../navigation/breadcrumb';
 import { asistenciaPaths, fichasPaths } from '../routes/paths';
 import { ArrowLeftIcon, ArrowDownTrayIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
@@ -281,6 +282,8 @@ function HistorialObservacionesModal({
 }
 
 export const AsistenciaHistorialFicha = () => {
+  const { pathname } = useLocation();
+  const { setLabel, clearLabel } = useBreadcrumbOverride();
   const { fichaId: fichaIdParam } = useParams<{ fichaId: string }>();
   const fichaId = fichaIdParam ? Number.parseInt(fichaIdParam, 10) : null;
 
@@ -322,6 +325,16 @@ export const AsistenciaHistorialFicha = () => {
     };
     loadFicha();
   }, [fichaId]);
+
+  useEffect(() => {
+    const numero = ficha?.ficha?.trim();
+    if (!numero) {
+      clearLabel(pathname);
+      return;
+    }
+    setLabel(pathname, `Ficha ${numero}`);
+    return () => clearLabel(pathname);
+  }, [ficha?.ficha, pathname, setLabel, clearLabel]);
 
   useEffect(() => {
     if (!fichaId || !Number.isFinite(fichaId) || !fechaValida) {

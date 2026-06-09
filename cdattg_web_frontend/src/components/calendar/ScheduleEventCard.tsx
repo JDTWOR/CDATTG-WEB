@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import type { InstructorAgendaEvent } from '../../types/agenda';
 import { asistenciaFichaPath } from '../../pages/asistencia/asistenciaPaths';
-import { colorClassForInstructor } from './calendarUtils';
+import { colorClassForInstructor, extractHoraHHMM } from './calendarUtils';
 
 type ScheduleEventCardProps = Readonly<{
   event: InstructorAgendaEvent;
@@ -13,10 +13,17 @@ type ScheduleEventCardProps = Readonly<{
   className?: string;
 }>;
 
+function horarioEvento(event: InstructorAgendaEvent): string {
+  const inicio = extractHoraHHMM(event.hora_inicio);
+  const fin = extractHoraHHMM(event.hora_fin);
+  if (!inicio || !fin) return '';
+  return `${inicio}–${fin}`;
+}
+
 function buildEventTitle(event: InstructorAgendaEvent): string {
   const parts = [
     event.ficha_numero,
-    `${event.hora_inicio}–${event.hora_fin}`,
+    horarioEvento(event),
     event.programa_nombre,
     event.instructor_nombre,
   ].filter(Boolean);
@@ -41,7 +48,7 @@ export function ScheduleEventCard({
     >
       {mode === 'ficha' ? (
         <>
-          <div className="line-clamp-1 font-semibold">{event.ficha_numero}</div>
+          <div className="line-clamp-1 font-semibold">{horarioEvento(event)}</div>
           {event.instructor_nombre && (
             <div className="line-clamp-3 flex-1 opacity-90">{event.instructor_nombre}</div>
           )}

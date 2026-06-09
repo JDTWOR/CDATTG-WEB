@@ -86,9 +86,15 @@ type bloqueSemanal struct {
 }
 
 func (s *InstructorHorarioService) horasDiaFicha(ficha *models.FichaCaracterizacion, diaFormacionID uint) (inicio, fin string) {
-	for _, fd := range ficha.FichaDiasFormacion {
+	dias := ficha.FichaDiasFormacion
+	if len(dias) == 0 && ficha != nil && ficha.ID > 0 {
+		if loaded, err := s.fichaDiasRepo.FindByFichaID(ficha.ID); err == nil {
+			dias = loaded
+		}
+	}
+	for _, fd := range dias {
 		if fd.DiaFormacionID == diaFormacionID {
-			inicio, fin = fd.HoraInicio, fd.HoraFin
+			inicio, fin = normalizeHoraMM(fd.HoraInicio), normalizeHoraMM(fd.HoraFin)
 			break
 		}
 	}
@@ -96,7 +102,7 @@ func (s *InstructorHorarioService) horasDiaFicha(ficha *models.FichaCaracterizac
 		return inicio, fin
 	}
 	if ficha.Jornada != nil {
-		inicio, fin = ficha.Jornada.HoraInicio, ficha.Jornada.HoraFin
+		inicio, fin = normalizeHoraMM(ficha.Jornada.HoraInicio), normalizeHoraMM(ficha.Jornada.HoraFin)
 		if inicio != "" && fin != "" {
 			return inicio, fin
 		}
@@ -294,6 +300,56 @@ func fichaSinFechasProgramadas(ficha *models.FichaCaracterizacion) bool {
 	return ficha != nil && ficha.FechaInicio == nil && ficha.FechaFin == nil
 }
 
+const errMsgFueraVigenciaAsignacion = "fuera del periodo de vigencia de la asignación"
+
+func diaMomentoCalendario(momento time.Time) time.Time {
+	return time.Date(momento.Year(), momento.Month(), momento.Day(), 0, 0, 0, 0, momento.Location())
+}
+
+func validarVigenciaMomento(
+	momento time.Time,
+	ficha *models.FichaCaracterizacion,
+	ifc *models.InstructorFichaCaracterizacion,
+) error {
+	vigInicio := intersectarVigencia(ficha.FechaInicio, ifc.FechaInicio)
+	vigFin := intersectarVigenciaFin(ficha.FechaFin, ifc.FechaFin)
+	if !vigenciaAplica(vigInicio, vigFin) {
+		return nil
+	}
+	if !diaDentroDeVigencia(diaMomentoCalendario(momento), vigInicio, vigFin) {
+		return errors.New(errMsgFueraVigenciaAsignacion)
+	}
+	return nil
+}
+
+func validarModoAsignacionTomarAsistencia(
+	ficha *models.FichaCaracterizacion,
+	ifc *models.InstructorFichaCaracterizacion,
+	sinDiasFicha bool,
+	momento time.Time,
+) error {
+	if sinDiasFicha && fichaSinFechasProgramadas(ficha) {
+		return nil
+	}
+	return validarVigenciaMomento(momento, ficha, ifc)
+}
+
+func (s *InstructorHorarioService) validarTomarAsistenciaProgramado(
+	ficha *models.FichaCaracterizacion,
+	ifc *models.InstructorFichaCaracterizacion,
+	diaHoy uint,
+	diasInst []models.InstructorFichaDias,
+	momento time.Time,
+) error {
+	if err := validarVigenciaMomento(momento, ficha, ifc); err != nil {
+		return err
+	}
+	if !instructorTieneDiaProgramado(diaHoy, diasInst) {
+		return errors.New(strings.ToLower(errMsgDiaNoProgramadoInstructor))
+	}
+	return s.validarHorarioAsistencia(ficha, diaHoy, momento)
+}
+
 func extensionMinutosJornada(j *models.Jornada) int {
 	extMin := 60
 	if j == nil {
@@ -339,7 +395,6 @@ func (s *InstructorHorarioService) ValidarPuedeTomarAsistencia(instructorID, fic
 	if !ficha.Status {
 		return errors.New("la ficha está inactiva; no se puede tomar asistencia")
 	}
-	diaHoy := WeekdayToDiaFormacionID(momento.Weekday())
 	diasInst, err := s.instFichaDiasRepo.FindByInstructorAndFicha(instructorID, fichaID)
 	if err != nil {
 		return err
@@ -349,32 +404,16 @@ func (s *InstructorHorarioService) ValidarPuedeTomarAsistencia(instructorID, fic
 		return err
 	}
 	sinDiasFicha := len(fichaDias) == 0
-	// Modo asignación: programación académica de la ficha o del instructor aún no cargada.
-	modoAsignacion := len(diasInst) == 0 || sinDiasFicha
-	if modoAsignacion {
-		if sinDiasFicha && fichaSinFechasProgramadas(ficha) {
-			return nil
-		}
-		vigInicio := intersectarVigencia(ficha.FechaInicio, ifc.FechaInicio)
-		vigFin := intersectarVigenciaFin(ficha.FechaFin, ifc.FechaFin)
-		if vigenciaAplica(vigInicio, vigFin) {
-			diaMomento := time.Date(momento.Year(), momento.Month(), momento.Day(), 0, 0, 0, 0, momento.Location())
-			if !diaDentroDeVigencia(diaMomento, vigInicio, vigFin) {
-				return errors.New("fuera del periodo de vigencia de la asignación")
-			}
-		}
-		return nil
+	if len(diasInst) == 0 || sinDiasFicha {
+		return validarModoAsignacionTomarAsistencia(ficha, ifc, sinDiasFicha, momento)
 	}
-	vigInicio := intersectarVigencia(ficha.FechaInicio, ifc.FechaInicio)
-	vigFin := intersectarVigenciaFin(ficha.FechaFin, ifc.FechaFin)
-	diaMomento := time.Date(momento.Year(), momento.Month(), momento.Day(), 0, 0, 0, 0, momento.Location())
-	if !diaDentroDeVigencia(diaMomento, vigInicio, vigFin) {
-		return errors.New("fuera del periodo de vigencia de la asignación")
-	}
-	if !instructorTieneDiaProgramado(diaHoy, diasInst) {
-		return errors.New(strings.ToLower(errMsgDiaNoProgramadoInstructor))
-	}
-	return s.validarHorarioAsistencia(ficha, diaHoy, momento)
+	return s.validarTomarAsistenciaProgramado(
+		ficha,
+		ifc,
+		WeekdayToDiaFormacionID(momento.Weekday()),
+		diasInst,
+		momento,
+	)
 }
 
 func validarHorarioRango(horaInicio, horaFin string, extMin int, now time.Time) bool {

@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/repositories"
+	"github.com/sena/cdattg-web-golang/services"
 )
 
 type CatalogoHandler struct {
@@ -64,7 +65,18 @@ func (h *CatalogoHandler) GetJornadas(c *gin.Context) {
 	}
 	resp := make([]dto.JornadaItem, len(list))
 	for i := range list {
-		resp[i] = dto.JornadaItem{ID: list[i].ID, Nombre: list[i].Nombre}
+		hi, hf := list[i].HoraInicio, list[i].HoraFin
+		if hi == "" || hf == "" {
+			if def, ok := services.DefaultHorariosJornada(list[i].Nombre); ok {
+				hi, hf = def.Inicio, def.Fin
+			}
+		}
+		resp[i] = dto.JornadaItem{
+			ID:         list[i].ID,
+			Nombre:     list[i].Nombre,
+			HoraInicio: hi,
+			HoraFin:    hf,
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"data": resp})
 }

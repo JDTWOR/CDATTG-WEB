@@ -1,6 +1,8 @@
 package services
 
 import (
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/sena/cdattg-web-golang/models"
@@ -9,6 +11,21 @@ import (
 
 // Horarios por defecto si la jornada no tiene hora_inicio/hora_fin en BD (según doc)
 // MAÑANA: 6:00 - 13:00 (a veces la clase se extiende hasta las 14:00)
+// JornadaHorarioDefault par inicio/fin por nombre de jornada.
+type JornadaHorarioDefault struct {
+	Inicio string
+	Fin    string
+}
+
+// DefaultHorariosJornada expone horarios por defecto para catálogos y formularios.
+func DefaultHorariosJornada(nombre string) (JornadaHorarioDefault, bool) {
+	def, ok := defaultHorarios[nombre]
+	if !ok {
+		return JornadaHorarioDefault{}, false
+	}
+	return JornadaHorarioDefault{Inicio: def.inicio, Fin: def.fin}, true
+}
+
 var defaultHorarios = map[string]struct{ inicio, fin string }{
 	"MAÑANA":           {"06:00", "13:00"},
 	"TARDE":            {"13:00", "18:10"},
@@ -99,7 +116,49 @@ func validarHorarioConExtension(j *models.Jornada, now time.Time) bool {
 }
 
 func parseHora(s string) (t time.Time, err error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}, errors.New("hora vacía")
+	}
+	if t, err = time.Parse("15:04:05", s); err == nil {
+		return t, nil
+	}
 	return time.Parse("15:04", s)
+}
+
+// normalizeHoraMM devuelve HH:MM (hora de pared, sin zona horaria) desde HH:MM, HH:MM:SS o ISO-8601.
+func normalizeHoraMM(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if t, err := parseHora(s); err == nil {
+		return t.Format("15:04")
+	}
+	if idx := strings.Index(s, "T"); idx >= 0 {
+		rest := s[idx+1:]
+		if len(rest) >= 8 && rest[2] == ':' {
+			if t, err := parseHora(rest[:8]); err == nil {
+				return t.Format("15:04")
+			}
+		}
+		if len(rest) >= 5 && rest[2] == ':' {
+			if t, err := parseHora(rest[:5]); err == nil {
+				return t.Format("15:04")
+			}
+		}
+	}
+	if len(s) >= 8 && s[2] == ':' {
+		if t, err := parseHora(s[:8]); err == nil {
+			return t.Format("15:04")
+		}
+	}
+	if len(s) >= 5 && s[2] == ':' {
+		if t, err := parseHora(s[:5]); err == nil {
+			return t.Format("15:04")
+		}
+	}
+	return ""
 }
 
 // HoraInicioMasMinutos devuelve el instante (en la zona de dia) de hora_inicio del día dado más los minutos indicados.

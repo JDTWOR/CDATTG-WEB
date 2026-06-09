@@ -312,7 +312,15 @@ export function FichaFormModal({
                     inputId={`${pid}-jornada`}
                     options={jornadas.map((j) => ({ value: j.id, label: j.nombre }))}
                     value={form.jornada_id}
-                    onChange={(v) => setForm((f) => ({ ...f, jornada_id: v }))}
+                    onChange={(v) => {
+                      const jornada = jornadas.find((j) => j.id === v);
+                      setForm((f) => ({
+                        ...f,
+                        jornada_id: v,
+                        hora_inicio: jornada?.hora_inicio?.slice(0, 5) ?? f.hora_inicio,
+                        hora_fin: jornada?.hora_fin?.slice(0, 5) ?? f.hora_fin,
+                      }));
+                    }}
                     placeholder="Seleccione una jornada..."
                     isRequired
                   />
@@ -335,6 +343,36 @@ export function FichaFormModal({
                 </div>
               </div>
             </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor={`${pid}-hora-inicio`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Hora inicio formación
+                </label>
+                <input
+                  id={`${pid}-hora-inicio`}
+                  type="time"
+                  value={form.hora_inicio ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, hora_inicio: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
+              </div>
+              <div>
+                <label htmlFor={`${pid}-hora-fin`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Hora fin formación
+                </label>
+                <input
+                  id={`${pid}-hora-fin`}
+                  type="time"
+                  value={form.hora_fin ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, hora_fin: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Horario aplicado a todos los días marcados. Ej.: 06:30–13:00 para jornada mañana con inicio a las 6:30.
+            </p>
 
             <fieldset className="mt-4 border-0 p-0">
               <legend className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

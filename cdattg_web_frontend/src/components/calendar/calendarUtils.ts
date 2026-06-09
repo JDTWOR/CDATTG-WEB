@@ -112,7 +112,29 @@ export function formatLocalISO(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-export function parseTimeToMinutes(hhmm: string): number {
+/** Extrae HH:MM de la API sin aplicar zona horaria (horario de pared). */
+export function extractHoraHHMM(raw: unknown): string {
+  if (raw == null) return '';
+  if (typeof raw === 'string') {
+    const text = raw.trim();
+    const wall = text.match(/^(\d{1,2}):(\d{2})/);
+    if (wall) {
+      return `${wall[1].padStart(2, '0')}:${wall[2]}`;
+    }
+    const iso = text.match(/T(\d{1,2}):(\d{2})/);
+    if (iso) {
+      return `${iso[1].padStart(2, '0')}:${iso[2]}`;
+    }
+    return text.slice(0, 5);
+  }
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return extractHoraHHMM(raw.toISOString());
+  }
+  return extractHoraHHMM(String(raw));
+}
+
+export function parseTimeToMinutes(raw: unknown): number {
+  const hhmm = extractHoraHHMM(raw);
   const parts = hhmm.split(':');
   const h = Number.parseInt(parts[0] ?? '0', 10);
   const m = Number.parseInt(parts[1] ?? '0', 10);

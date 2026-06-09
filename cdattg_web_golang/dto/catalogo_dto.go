@@ -21,8 +21,10 @@ type ModalidadFormacionItem struct {
 
 // JornadaItem para selects (tabla jornadas)
 type JornadaItem struct {
-	ID     uint   `json:"id"`
-	Nombre string `json:"nombre"`
+	ID         uint   `json:"id"`
+	Nombre     string `json:"nombre"`
+	HoraInicio string `json:"hora_inicio,omitempty"`
+	HoraFin    string `json:"hora_fin,omitempty"`
 }
 
 // DiaFormacionItem para selects

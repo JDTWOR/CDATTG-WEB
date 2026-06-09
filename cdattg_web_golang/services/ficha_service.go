@@ -523,8 +523,8 @@ func (s *fichaService) fichaToResponse(f models.FichaCaracterizacion, cantidadAp
 		r.DiasFormacionIDs = append(r.DiasFormacionIDs, fd.DiaFormacionID)
 		item := dto.FichaDiaFormacionItem{
 			DiaFormacionID: fd.DiaFormacionID,
-			HoraInicio:     fd.HoraInicio,
-			HoraFin:        fd.HoraFin,
+			HoraInicio:     normalizeHoraMM(fd.HoraInicio),
+			HoraFin:        normalizeHoraMM(fd.HoraFin),
 		}
 		if fd.DiaFormacion != nil {
 			item.DiaNombre = fd.DiaFormacion.Nombre
@@ -596,6 +596,29 @@ func buildFichaDiaInputs(ids []uint, detalle []dto.FichaDiaFormacionItem, hi, hf
 func (s *fichaService) guardarDiasFormacionFicha(fichaID uint, ids []uint, detalle []dto.FichaDiaFormacionItem, jornadaID *uint) error {
 	hi, hf := horasDefaultJornada(jornadaID)
 	inputs := buildFichaDiaInputs(ids, detalle, hi, hf)
+	if len(detalle) == 0 {
+		existing, err := s.fichaDiasRepo.FindByFichaID(fichaID)
+		if err == nil {
+			existingByDia := make(map[uint]models.FichaDiasFormacion, len(existing))
+			for _, fd := range existing {
+				existingByDia[fd.DiaFormacionID] = fd
+			}
+			for i := range inputs {
+				if ex, ok := existingByDia[inputs[i].DiaFormacionID]; ok {
+					if ex.HoraInicio != "" {
+						inputs[i].HoraInicio = normalizeHoraMM(ex.HoraInicio)
+					}
+					if ex.HoraFin != "" {
+						inputs[i].HoraFin = normalizeHoraMM(ex.HoraFin)
+					}
+				}
+			}
+		}
+	}
+	for i := range inputs {
+		inputs[i].HoraInicio = normalizeHoraMM(inputs[i].HoraInicio)
+		inputs[i].HoraFin = normalizeHoraMM(inputs[i].HoraFin)
+	}
 	return s.fichaDiasRepo.ReplaceByFichaIDWithHorarios(fichaID, inputs)
 }
 

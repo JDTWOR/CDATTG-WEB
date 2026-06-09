@@ -2,8 +2,43 @@ import type {
   DiaFormacionItem,
   FichaCaracterizacionRequest,
   FichaCaracterizacionResponse,
+  FichaDiaFormacionItem,
   ProgramaFormacionResponse,
 } from '../types';
+
+function sliceHoraInput(value?: string | null): string | undefined {
+  if (value == null || value === '') return undefined;
+  return value.trim().slice(0, 5);
+}
+
+function horasFromDiasFormacion(dias?: FichaDiaFormacionItem[]): { inicio?: string; fin?: string } {
+  if (!dias?.length) return {};
+  const inicio = sliceHoraInput(dias[0]?.hora_inicio);
+  const fin = sliceHoraInput(dias[0]?.hora_fin);
+  const mismoHorario = dias.every(
+    (d) => sliceHoraInput(d.hora_inicio) === inicio && sliceHoraInput(d.hora_fin) === fin,
+  );
+  if (!mismoHorario || !inicio || !fin) return {};
+  return { inicio, fin };
+}
+
+export function buildDiasFormacionPayload(
+  diasIds: number[],
+  horaInicio?: string,
+  horaFin?: string,
+  existing?: FichaDiaFormacionItem[],
+): FichaDiaFormacionItem[] | undefined {
+  if (!diasIds.length) return undefined;
+  const byDia = new Map((existing ?? []).map((d) => [d.dia_formacion_id, d]));
+  return diasIds.map((id) => {
+    const prev = byDia.get(id);
+    return {
+      dia_formacion_id: id,
+      hora_inicio: sliceHoraInput(horaInicio) ?? sliceHoraInput(prev?.hora_inicio) ?? '',
+      hora_fin: sliceHoraInput(horaFin) ?? sliceHoraInput(prev?.hora_fin) ?? '',
+    };
+  });
+}
 import { MSG_INSTRUCTOR_LIDER_OBLIGATORIO } from '../constants/instructorLiderLabels';
 
 /** API puede devolver ISO (RFC3339); input type=date exige yyyy-MM-DD */
@@ -20,6 +55,7 @@ export function normalizeDiaIds(ids?: (number | string)[] | null): number[] {
 }
 
 export function formStateFromFicha(item: FichaCaracterizacionResponse): FichaCaracterizacionRequest {
+  const horas = horasFromDiasFormacion(item.dias_formacion);
   return {
     programa_formacion_id: item.programa_formacion_id,
     ficha: item.ficha,
@@ -33,6 +69,9 @@ export function formStateFromFicha(item: FichaCaracterizacionResponse): FichaCar
     total_horas: item.total_horas,
     status: item.status,
     dias_formacion_ids: normalizeDiaIds(item.dias_formacion_ids),
+    dias_formacion: item.dias_formacion,
+    hora_inicio: horas.inicio,
+    hora_fin: horas.fin,
   };
 }
 
@@ -62,6 +101,13 @@ export function construirPayloadFicha(
     (form.fecha_fin?.trim() && toDateInputString(form.fecha_fin.trim())) ||
     (editing ? toDateInputString(editing.fecha_fin) : undefined);
   const programaFormacionId = form.programa_formacion_id || programas[0]?.id || 0;
+  const diasFormacion = buildDiasFormacionPayload(
+    diasNorm,
+    form.hora_inicio,
+    form.hora_fin,
+    form.dias_formacion ?? editing?.dias_formacion,
+  );
+
   return {
     programa_formacion_id: programaFormacionId,
     ficha: form.ficha.trim(),
@@ -75,6 +121,7 @@ export function construirPayloadFicha(
     total_horas: form.total_horas,
     status: form.status,
     dias_formacion_ids: diasNorm,
+    dias_formacion: diasFormacion,
   };
 }
 
@@ -102,9 +149,22 @@ export function diasIdsFromListItem(item: FichaCaracterizacionResponse): number[
 }
 
 export function formatDiasEnTabla(item: FichaCaracterizacionResponse, diasFormacion: DiaFormacionItem[]): string {
+  const ids = diasIdsFromListItem(item);
+  const detalle = item.dias_formacion?.filter((d) => d.dia_formacion_id > 0);
+  if (ids.length && detalle?.length) {
+    return ids
+      .map((id) => {
+        const nombre = diasFormacion.find((d) => Number(d.id) === id)?.nombre ?? String(id);
+        const h = detalle.find((d) => d.dia_formacion_id === id);
+        const inicio = sliceHoraInput(h?.hora_inicio);
+        const fin = sliceHoraInput(h?.hora_fin);
+        if (inicio && fin) return `${nombre} ${inicio}–${fin}`;
+        return nombre;
+      })
+      .join(', ');
+  }
   const nombresApi = item.dias_formacion_nombres?.filter((n) => n?.trim());
   if (nombresApi?.length) return nombresApi.join(', ');
-  const ids = diasIdsFromListItem(item);
   if (!ids.length) return '—';
   return ids
     .map((id) => diasFormacion.find((d) => Number(d.id) === id)?.nombre ?? String(id))

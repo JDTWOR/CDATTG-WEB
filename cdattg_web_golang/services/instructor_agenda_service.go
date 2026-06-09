@@ -152,8 +152,8 @@ func (s *InstructorAgendaService) eventosEnRango(
 			Fecha:               d.Format(time.DateOnly),
 			DiaFormacionID:      diaID,
 			DiaNombre:           nombreDiaPorID(diaID),
-			HoraInicio:          hi,
-			HoraFin:             hf,
+			HoraInicio:          normalizeHoraMM(hi),
+			HoraFin:             normalizeHoraMM(hf),
 			FichaID:             ficha.ID,
 			FichaNumero:         ficha.Ficha,
 			ProgramaNombre:      ctx.progNombre,
@@ -184,6 +184,13 @@ func (s *InstructorAgendaService) expandirAsignacion(
 		return nil, err
 	}
 	diaIDs := diaIDsProgramadosInstructor(diasInst)
+	if len(diaIDs) == 0 {
+		for _, fd := range ficha.FichaDiasFormacion {
+			if fd.DiaFormacionID > 0 {
+				diaIDs = append(diaIDs, fd.DiaFormacionID)
+			}
+		}
+	}
 	ctx := s.cargarContextoAgenda(asg, ficha, diaIDs)
 	return s.eventosEnRango(ficha, asg, desde, hasta, ctx), nil
 }

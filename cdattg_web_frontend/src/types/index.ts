@@ -192,6 +192,8 @@ export interface ModalidadFormacionItem {
 export interface JornadaItem {
   id: number;
   nombre: string;
+  hora_inicio?: string;
+  hora_fin?: string;
 }
 export interface DiaFormacionItem {
   id: number;
@@ -344,6 +346,9 @@ export interface FichaCaracterizacionRequest {
   status?: boolean;
   dias_formacion_ids?: number[];
   dias_formacion_nombres?: string[];
+  dias_formacion?: FichaDiaFormacionItem[];
+  hora_inicio?: string;
+  hora_fin?: string;
 }
 
 export interface FichaCaracterizacionResponse {

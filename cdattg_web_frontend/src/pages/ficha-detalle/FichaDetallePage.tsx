@@ -133,6 +133,7 @@ export function FichaDetallePage() {
             setInstructorLiderId(saved.instructor_id ?? 0);
             void loadInstructores();
             void loadAprendices();
+            void agenda.reload();
           }}
         />
       )}

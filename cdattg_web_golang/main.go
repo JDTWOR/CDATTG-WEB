@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/sena/cdattg-web-golang/authz"
 	"github.com/sena/cdattg-web-golang/config"
@@ -9,9 +10,23 @@ import (
 	"github.com/sena/cdattg-web-golang/router"
 )
 
+func initAppLocation() {
+	tz := "America/Bogota"
+	if config.AppConfig != nil && config.AppConfig.Database.TimeZone != "" {
+		tz = config.AppConfig.Database.TimeZone
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		log.Printf("Advertencia: no se pudo cargar zona horaria %q: %v", tz, err)
+		return
+	}
+	time.Local = loc
+}
+
 func main() {
 	// Cargar configuración
 	config.LoadConfig()
+	initAppLocation()
 
 	// Inicializar base de datos
 	if err := database.Initialize(); err != nil {

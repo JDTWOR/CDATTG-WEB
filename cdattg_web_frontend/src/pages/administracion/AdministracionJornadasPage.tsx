@@ -1,9 +1,203 @@
-import { useCallback, useEffect, useState, type ComponentProps } from 'react';
+import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from 'react';
+import {
+  ArrowPathIcon,
+  ClockIcon,
+  MoonIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  SunIcon,
+  TrashIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
+import { DAY_LABELS } from '../../components/calendar/calendarUtils';
 import { apiService } from '../../services/api';
 import { axiosErrorMessage } from '../../utils/httpError';
 import type { DiaFormacionItem, JornadaAdminItem, JornadaBloqueItem } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { hasAnyRole } from '../../utils/roles';
+
+function horaCorta(hora: string): string {
+  return hora.length >= 5 ? hora.slice(0, 5) : hora;
+}
+
+function abreviarDia(diaNombre?: string, diaId?: number): string {
+  if (diaId != null && diaId >= 1 && diaId <= 7) {
+    return DAY_LABELS[diaId - 1];
+  }
+  if (diaNombre) {
+    const n = diaNombre.trim();
+    return n.length > 3 ? n.slice(0, 3) : n;
+  }
+  return '—';
+}
+
+function iconoJornada(nombre: string) {
+  const lower = nombre.toLowerCase();
+  if (lower.includes('noche')) return MoonIcon;
+  if (lower.includes('tarde')) return SunIcon;
+  return ClockIcon;
+}
+
+function etiquetaBotonGuardarJornada(saving: boolean, enEdicion: boolean): string {
+  if (saving) return 'Guardando…';
+  if (enEdicion) return 'Actualizar';
+  return 'Crear';
+}
+
+function filasTablaJornadas(
+  loading: boolean,
+  items: JornadaAdminItem[],
+  renderFila: (item: JornadaAdminItem) => ReactNode,
+): ReactNode {
+  if (loading) {
+    return (
+      <tr>
+        <td colSpan={4} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
+          Cargando plantillas…
+        </td>
+      </tr>
+    );
+  }
+  if (items.length === 0) {
+    return (
+      <tr>
+        <td colSpan={4} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
+          No hay jornadas configuradas. Cree una plantilla arriba para programar fichas.
+        </td>
+      </tr>
+    );
+  }
+  return items.map(renderFila);
+}
+
+function IconActionButton({
+  onClick,
+  title,
+  className,
+  children,
+  disabled,
+}: Readonly<{
+  onClick: () => void;
+  title: string;
+  className: string;
+  children: ReactNode;
+  disabled?: boolean;
+}>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`rounded-lg p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
+      title={title}
+      aria-label={title}
+    >
+      {children}
+    </button>
+  );
+}
+
+function JornadaBloquesChips({ bloques }: Readonly<{ bloques: JornadaBloqueItem[] }>) {
+  if (bloques.length === 0) {
+    return <span className="text-gray-400 dark:text-gray-500">Sin bloques</span>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {bloques.map((b, idx) => (
+        <span
+          key={`${b.dia_formacion_id}-${b.hora_inicio}-${idx}`}
+          className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+        >
+          <span className="font-semibold text-primary-700 dark:text-primary-300">
+            {abreviarDia(b.dia_nombre, b.dia_formacion_id)}
+          </span>
+          <ClockIcon className="h-3 w-3 shrink-0 text-gray-400" aria-hidden />
+          {horaCorta(b.hora_inicio)}–{horaCorta(b.hora_fin)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function actualizarBloqueEnIndice(
+  bloques: JornadaBloqueItem[],
+  idx: number,
+  patch: Partial<JornadaBloqueItem>,
+): JornadaBloqueItem[] {
+  return bloques.map((bloque, i) => (i === idx ? { ...bloque, ...patch } : bloque));
+}
+
+function quitarBloqueEnIndice(bloques: JornadaBloqueItem[], idx: number): JornadaBloqueItem[] {
+  return bloques.filter((_, i) => i !== idx);
+}
+
+function JornadaFormBloquesEditor({
+  bloques,
+  dias,
+  onChange,
+  onAdd,
+}: Readonly<{
+  bloques: JornadaBloqueItem[];
+  dias: DiaFormacionItem[];
+  onChange: (bloques: JornadaBloqueItem[]) => void;
+  onAdd: () => void;
+}>) {
+  const patchBloque = (idx: number, patch: Partial<JornadaBloqueItem>) => {
+    onChange(actualizarBloqueEnIndice(bloques, idx, patch));
+  };
+
+  const removeBloque = (idx: number) => {
+    onChange(quitarBloqueEnIndice(bloques, idx));
+  };
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Bloques horarios</span>
+        <button type="button" onClick={onAdd} className="btn-secondary inline-flex items-center gap-1.5 text-sm">
+          <PlusIcon className="h-4 w-4" aria-hidden />
+          Bloque
+        </button>
+      </div>
+      <div className="space-y-2">
+        {bloques.map((b, idx) => (
+          <div key={`${b.dia_formacion_id}-${idx}`} className="flex flex-wrap items-end gap-2">
+            <select
+              value={b.dia_formacion_id}
+              onChange={(e) => patchBloque(idx, { dia_formacion_id: Number(e.target.value) })}
+              className="rounded border border-gray-300 px-2 py-2 dark:border-gray-600 dark:bg-gray-800"
+            >
+              {dias.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nombre}
+                </option>
+              ))}
+            </select>
+            <input
+              type="time"
+              value={b.hora_inicio}
+              onChange={(e) => patchBloque(idx, { hora_inicio: e.target.value })}
+              className="rounded border border-gray-300 px-2 py-2 dark:border-gray-600 dark:bg-gray-800"
+            />
+            <input
+              type="time"
+              value={b.hora_fin}
+              onChange={(e) => patchBloque(idx, { hora_fin: e.target.value })}
+              className="rounded border border-gray-300 px-2 py-2 dark:border-gray-600 dark:bg-gray-800"
+            />
+            <IconActionButton
+              onClick={() => removeBloque(idx)}
+              title="Quitar bloque"
+              className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+            >
+              <XMarkIcon className="h-5 w-5" aria-hidden />
+            </IconActionButton>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export const AdministracionJornadasPage = () => {
   const { roles } = useAuth();
@@ -116,7 +310,7 @@ export const AdministracionJornadasPage = () => {
   };
 
   const eliminar = (id: number) => {
-    if (!window.confirm('¿Eliminar esta jornada?')) return;
+    if (!globalThis.confirm('¿Eliminar esta jornada?')) return;
     void (async () => {
       try {
         await apiService.deleteAdministracionJornada(id);
@@ -130,7 +324,7 @@ export const AdministracionJornadasPage = () => {
 
   const propagarManual = (id: number, nombre: string) => {
     if (
-      !window.confirm(
+      !globalThis.confirm(
         `¿Propagar la plantilla «${nombre}» a todas las fichas vinculadas? Los bloques personalizados no se modifican.`,
       )
     ) {
@@ -203,63 +397,14 @@ export const AdministracionJornadasPage = () => {
             </div>
           </div>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Bloques horarios</span>
-              <button type="button" onClick={addBloque} className="btn-secondary text-sm">
-                + Bloque
-              </button>
-            </div>
-            <div className="space-y-2">
-              {formBloques.map((b, idx) => (
-                <div key={`${b.dia_formacion_id}-${idx}`} className="flex flex-wrap items-end gap-2">
-                  <select
-                    value={b.dia_formacion_id}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      setFormBloques((prev) => prev.map((x, i) => (i === idx ? { ...x, dia_formacion_id: v } : x)));
-                    }}
-                    className="rounded border border-gray-300 px-2 py-2 dark:border-gray-600 dark:bg-gray-800"
-                  >
-                    {dias.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.nombre}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="time"
-                    value={b.hora_inicio}
-                    onChange={(e) =>
-                      setFormBloques((prev) =>
-                        prev.map((x, i) => (i === idx ? { ...x, hora_inicio: e.target.value } : x)),
-                      )
-                    }
-                    className="rounded border border-gray-300 px-2 py-2 dark:border-gray-600 dark:bg-gray-800"
-                  />
-                  <input
-                    type="time"
-                    value={b.hora_fin}
-                    onChange={(e) =>
-                      setFormBloques((prev) =>
-                        prev.map((x, i) => (i === idx ? { ...x, hora_fin: e.target.value } : x)),
-                      )
-                    }
-                    className="rounded border border-gray-300 px-2 py-2 dark:border-gray-600 dark:bg-gray-800"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setFormBloques((prev) => prev.filter((_, i) => i !== idx))}
-                    className="text-red-600 text-sm"
-                  >
-                    Quitar
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+          <JornadaFormBloquesEditor
+            bloques={formBloques}
+            dias={dias}
+            onChange={setFormBloques}
+            onAdd={addBloque}
+          />
 
-          {editId && (
+          {editId != null && (
             <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
                 type="checkbox"
@@ -267,15 +412,17 @@ export const AdministracionJornadasPage = () => {
                 onChange={(e) => setPropagarFichas(e.currentTarget.checked)}
                 className="rounded border-gray-300"
               />
-              Actualizar fichas que usan esta plantilla (bloques vinculados o legacy coincidentes)
+              <span>
+                Actualizar fichas que usan esta plantilla (bloques vinculados o legacy coincidentes)
+              </span>
             </label>
           )}
 
           <div className="flex gap-2">
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear'}
+              {etiquetaBotonGuardarJornada(saving, editId != null)}
             </button>
-            {editId && (
+            {editId != null && (
               <button type="button" onClick={resetForm} className="btn-secondary">
                 Cancelar edición
               </button>
@@ -284,55 +431,93 @@ export const AdministracionJornadasPage = () => {
         </form>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-600">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50">
-            <tr>
-              <th className="px-4 py-3 text-left font-medium">Nombre</th>
-              <th className="px-4 py-3 text-left font-medium">Extensión (min)</th>
-              <th className="px-4 py-3 text-left font-medium">Bloques</th>
-              <th className="px-4 py-3 text-left font-medium">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      <div className="card overflow-hidden p-0">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-600">
+            <caption className="sr-only">Plantillas de jornadas de formación</caption>
+            <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
-                  Cargando…
-                </td>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Plantilla
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Extensión
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Horarios programados
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Acciones
+                </th>
               </tr>
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
-                  No hay jornadas.
-                </td>
-              </tr>
-            ) : (
-              items.map((j) => (
-                <tr key={j.id} className="border-t border-gray-100 dark:border-gray-700">
-                  <td className="px-4 py-3 font-medium">{j.nombre}</td>
-                  <td className="px-4 py-3">{j.minutos_extension_fin}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                    {j.bloques
-                      .map((b) => `${b.dia_nombre ?? b.dia_formacion_id} ${b.hora_inicio}–${b.hora_fin}`)
-                      .join('; ')}
-                  </td>
-                  <td className="px-4 py-3 space-x-2">
-                    <button type="button" onClick={() => startEdit(j)} className="text-primary-600 hover:underline">
-                      Editar
-                    </button>
-                    <button type="button" onClick={() => propagarManual(j.id, j.nombre)} className="text-amber-700 hover:underline dark:text-amber-400">
-                      Propagar
-                    </button>
-                    <button type="button" onClick={() => eliminar(j.id)} className="text-red-600 hover:underline">
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-600 dark:bg-gray-900">
+              {filasTablaJornadas(loading, items, (j) => {
+                const JornadaIcon = iconoJornada(j.nombre);
+                const enEdicion = editId === j.id;
+                return (
+                  <tr
+                    key={j.id}
+                    className={`transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/60 ${
+                      enEdicion ? 'bg-primary-50/80 ring-1 ring-inset ring-primary-200 dark:bg-primary-900/20 dark:ring-primary-800' : ''
+                    }`}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">
+                          <JornadaIcon className="h-5 w-5" aria-hidden />
+                        </span>
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white">{j.nombre}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {j.bloques.length} bloque{j.bloques.length === 1 ? '' : 's'}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        title="Minutos extra tras el fin del bloque para tomar asistencia"
+                      >
+                        <ClockIcon className="h-3.5 w-3.5 text-gray-400" aria-hidden />
+                        {j.minutos_extension_fin} min
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 max-w-md">
+                      <JornadaBloquesChips bloques={j.bloques} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <IconActionButton
+                          onClick={() => startEdit(j)}
+                          title={`Editar plantilla ${j.nombre}`}
+                          className="text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                        >
+                          <PencilSquareIcon className="h-5 w-5" aria-hidden />
+                        </IconActionButton>
+                        <IconActionButton
+                          onClick={() => propagarManual(j.id, j.nombre)}
+                          title={`Propagar ${j.nombre} a fichas vinculadas`}
+                          className="text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                        >
+                          <ArrowPathIcon className="h-5 w-5" aria-hidden />
+                        </IconActionButton>
+                        <IconActionButton
+                          onClick={() => eliminar(j.id)}
+                          title={`Eliminar plantilla ${j.nombre}`}
+                          className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                        >
+                          <TrashIcon className="h-5 w-5" aria-hidden />
+                        </IconActionButton>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

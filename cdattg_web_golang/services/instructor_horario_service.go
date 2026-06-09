@@ -128,36 +128,57 @@ func (s *InstructorHorarioService) horasDiaFicha(ficha *models.FichaCaracterizac
 	return bloques[0].HoraInicio, bloques[0].HoraFin
 }
 
+func (s *InstructorHorarioService) diaIDsParaBloques(ficha *models.FichaCaracterizacion, diaIDs []uint) []uint {
+	if len(diaIDs) > 0 {
+		return diaIDs
+	}
+	dias := ficha.FichaDiasFormacion
+	if len(dias) == 0 && ficha.ID > 0 {
+		if loaded, err := s.fichaDiasRepo.FindByFichaID(ficha.ID); err == nil {
+			dias = loaded
+		}
+	}
+	seen := make(map[uint]bool)
+	out := make([]uint, 0, len(dias))
+	for _, fd := range dias {
+		if fd.DiaFormacionID > 0 && !seen[fd.DiaFormacionID] {
+			seen[fd.DiaFormacionID] = true
+			out = append(out, fd.DiaFormacionID)
+		}
+	}
+	return out
+}
+
+func appendBloquesHorarioDia(
+	bloques []bloqueSemanal,
+	ficha *models.FichaCaracterizacion,
+	asg models.InstructorFichaCaracterizacion,
+	diaID uint,
+	horarios []HorarioBloqueInput,
+	vigInicio, vigFin *time.Time,
+) []bloqueSemanal {
+	for _, hb := range horarios {
+		bloques = append(bloques, bloqueSemanal{
+			fichaID: asg.FichaID, fichaNum: ficha.Ficha,
+			diaFormacionID: diaID, horaInicio: hb.HoraInicio, horaFin: hb.HoraFin,
+			vigenciaInicio: vigInicio,
+			vigenciaFin:    vigFin,
+		})
+	}
+	return bloques
+}
+
 func (s *InstructorHorarioService) appendBloquesFicha(
 	bloques []bloqueSemanal,
 	ficha *models.FichaCaracterizacion,
 	asg models.InstructorFichaCaracterizacion,
 	diaIDs []uint,
 ) []bloqueSemanal {
-	if len(diaIDs) == 0 {
-		dias := ficha.FichaDiasFormacion
-		if len(dias) == 0 && ficha.ID > 0 {
-			if loaded, err := s.fichaDiasRepo.FindByFichaID(ficha.ID); err == nil {
-				dias = loaded
-			}
-		}
-		seen := make(map[uint]bool)
-		for _, fd := range dias {
-			if fd.DiaFormacionID > 0 && !seen[fd.DiaFormacionID] {
-				seen[fd.DiaFormacionID] = true
-				diaIDs = append(diaIDs, fd.DiaFormacionID)
-			}
-		}
-	}
+	diaIDs = s.diaIDsParaBloques(ficha, diaIDs)
+	vigInicio := intersectarVigencia(ficha.FechaInicio, asg.FechaInicio)
+	vigFin := intersectarVigenciaFin(ficha.FechaFin, asg.FechaFin)
 	for _, diaID := range diaIDs {
-		for _, hb := range s.bloquesDiaFicha(ficha, diaID) {
-			bloques = append(bloques, bloqueSemanal{
-				fichaID: asg.FichaID, fichaNum: ficha.Ficha,
-				diaFormacionID: diaID, horaInicio: hb.HoraInicio, horaFin: hb.HoraFin,
-				vigenciaInicio: intersectarVigencia(ficha.FechaInicio, asg.FechaInicio),
-				vigenciaFin:    intersectarVigenciaFin(ficha.FechaFin, asg.FechaFin),
-			})
-		}
+		bloques = appendBloquesHorarioDia(bloques, ficha, asg, diaID, s.bloquesDiaFicha(ficha, diaID), vigInicio, vigFin)
 	}
 	return bloques
 }

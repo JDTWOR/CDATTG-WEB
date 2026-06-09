@@ -43,3 +43,34 @@ export function mostrarToastErrorAsistencia(mensaje: string): void {
     /* ignorar si el toast se cierra antes de resolver */
   });
 }
+
+export function esMensajeReboteAsistencia(data: AsistenciaAprendizResponse): boolean {
+  if ((data.segundos_restantes_salida ?? 0) > 0) {
+    return true;
+  }
+  const m = (data.mensaje ?? '').toLowerCase();
+  return m.includes('ya registrado') || m.includes('muy poco') || m.includes('mismo qr');
+}
+
+export function mostrarToastInfoAsistencia(mensaje: string): void {
+  Swal.fire({
+    ...toastBase,
+    icon: 'info',
+    title: mensaje,
+    timer: 3000,
+  }).catch(() => {
+    /* ignorar si el toast se cierra antes de resolver */
+  });
+}
+
+export function mostrarToastResultadoDocumento(data: AsistenciaAprendizResponse): void {
+  if (esMensajeReboteAsistencia(data)) {
+    const extra =
+      (data.segundos_restantes_salida ?? 0) > 0
+        ? ` (${data.segundos_restantes_salida} s para salida)`
+        : '';
+    mostrarToastInfoAsistencia((data.mensaje ?? 'Registro reciente del mismo QR') + extra);
+    return;
+  }
+  mostrarToastRegistroAsistencia(data);
+}

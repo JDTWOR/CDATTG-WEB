@@ -19,7 +19,8 @@ export function AsistenciaRegistroQrCard({ page, open, onToggle }: Props) {
       icon={<QrCodeIcon className="h-6 w-6" />}
     >
       <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-        Si el aprendiz ya tiene entrada sin salida hoy en la ficha, se registrará la salida al escanear.
+        Si escanea dos veces seguidas, la entrada se registra una sola vez. Si el aprendiz ya tiene entrada sin
+        salida, el siguiente escaneo marca salida (espere al menos 1 minuto desde la entrada).
       </p>
       <EscanerQR
         key={`qr-${sesionId}`}

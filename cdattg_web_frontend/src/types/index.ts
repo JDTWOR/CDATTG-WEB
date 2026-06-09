@@ -491,6 +491,8 @@ export interface AsistenciaAprendizResponse {
   /** Por documento/QR: "ingreso" | "salida" | "asistencia_completa" */
   tipo_registro?: string;
   mensaje?: string;
+  /** Segundos restantes antes de poder marcar salida (rebote QR/documento). */
+  segundos_restantes_salida?: number;
   /** Tipos de observación predefinidos asociados (varios por registro) */
   tipos_observacion?: TipoObservacionAsistenciaItem[];
 }

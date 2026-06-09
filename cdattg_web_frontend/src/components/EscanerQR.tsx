@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState, type Dispatch, type SetStateAction }
 import { Html5Qrcode } from 'html5-qrcode';
 
 const QR_READER_ID_DEFAULT = 'asistencia-qr-reader';
-const DEBOUNCE_MS = 2000;
+const DEBOUNCE_MS = 3000;
 
 interface EscanerQRProps {
   onEscaneado: (numeroDocumento: string) => void | Promise<void>;
@@ -47,6 +47,11 @@ interface DecodedHandlerContext {
   continuo: boolean;
   ultimoDocumentoRef: { current: { doc: string; at: number } | null };
   registroEnCursoRef: { current: boolean };
+  procesandoLocalRef: { current: boolean };
+}
+
+function registroBloqueado(ctx: DecodedHandlerContext): boolean {
+  return ctx.registroEnCursoRef.current || ctx.procesandoLocalRef.current;
 }
 
 function createDecodedHandler(ctx: DecodedHandlerContext): (decodedText: string) => void {
@@ -62,13 +67,18 @@ function createDecodedHandler(ctx: DecodedHandlerContext): (decodedText: string)
       if (ultimo?.doc === doc && now - ultimo.at < DEBOUNCE_MS) {
         return;
       }
-      if (ctx.registroEnCursoRef.current) {
+      if (registroBloqueado(ctx)) {
         return;
       }
+      ctx.procesandoLocalRef.current = true;
       ctx.ultimoDocumentoRef.current = { doc, at: now };
-      Promise.resolve(ctx.onEscaneadoRef.current(doc)).catch(() => {
-        /* errores manejados en el callback vía toast */
-      });
+      Promise.resolve(ctx.onEscaneadoRef.current(doc))
+        .catch(() => {
+          /* errores manejados en el callback vía toast */
+        })
+        .finally(() => {
+          ctx.procesandoLocalRef.current = false;
+        });
       return;
     }
 
@@ -98,6 +108,7 @@ function EscanerQRInner({
   const readerContainerRef = useRef<HTMLDivElement | null>(null);
   const onEscaneadoRef = useRef(onEscaneado);
   const ultimoDocumentoRef = useRef<{ doc: string; at: number } | null>(null);
+  const procesandoLocalRef = useRef(false);
   const registroEnCursoRef = useRef(registroEnCurso);
   registroEnCursoRef.current = registroEnCurso;
   onEscaneadoRef.current = onEscaneado;
@@ -162,6 +173,7 @@ function EscanerQRInner({
         continuo,
         ultimoDocumentoRef,
         registroEnCursoRef,
+        procesandoLocalRef,
       });
 
       const onScanFailure = (): void => {};

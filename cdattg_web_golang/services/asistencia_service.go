@@ -26,6 +26,13 @@ const (
 
 const plazoEdicionObservacionSesionDias = 5
 
+const (
+	minSegundosEntreIngresoYSalida = 60
+	msgIngresoYaRegistrado         = "Ingreso ya registrado hace unos segundos"
+	msgSalidaQRDemasiadoPronto     = "Entrada registrada. El mismo QR se leyó hace muy poco; para marcar salida espere al menos 1 minuto desde la entrada."
+	errMsgEsperaMinutoSalida       = "debe esperar al menos 1 minuto entre la entrada y la salida"
+)
+
 type AsistenciaService interface {
 	CreateSesion(req dto.AsistenciaRequest) (*dto.AsistenciaResponse, error)
 	EntrarTomarAsistencia(instructorID uint, fichaID uint) (*dto.AsistenciaResponse, error)
@@ -388,10 +395,10 @@ func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest, 
 	if err := s.validarAprendizSinIngresoAbiertoEnFichaHoy(fichaID, req.AprendizID, req.AsistenciaID); err != nil {
 		return nil, err
 	}
-	// Múltiples tramos: solo permitir nuevo ingreso si no hay tramo abierto en esta sesión.
+	// Tramo abierto en esta sesión: idempotencia (escaneos QR duplicados).
 	open, _ := s.repoAA.FindOpenByAsistenciaIDAndAprendizID(req.AsistenciaID, req.AprendizID)
 	if open != nil {
-		return nil, errors.New("debe registrar primero la salida del tramo actual antes de registrar otra entrada")
+		return s.respuestaIngresoAbierto(open, msgIngresoYaRegistrado, 0)
 	}
 	now := time.Now()
 	aa := models.AsistenciaAprendiz{
@@ -470,12 +477,48 @@ func (s *asistenciaService) registrarIngresoOSalidaPorDocumento(
 	}
 }
 
+func segundosRestantesParaSalida(horaIngreso, ahora time.Time) int {
+	faltan := time.Duration(minSegundosEntreIngresoYSalida)*time.Second - ahora.Sub(horaIngreso)
+	if faltan <= 0 {
+		return 0
+	}
+	return int((faltan + time.Second - 1) / time.Second)
+}
+
+func esErrorEsperaMinutoSalida(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), errMsgEsperaMinutoSalida)
+}
+
+func (s *asistenciaService) respuestaIngresoAbierto(
+	aa *models.AsistenciaAprendiz,
+	mensaje string,
+	segundosRestantes int,
+) (*dto.AsistenciaAprendizResponse, error) {
+	if aa == nil || aa.ID == 0 {
+		return nil, errors.New(errMsgRegistroAsistenciaNoEncontrado)
+	}
+	resp, err := s.GetAsistenciaAprendizByID(aa.ID)
+	if err != nil {
+		return nil, err
+	}
+	resp.TipoRegistro = "ingreso"
+	resp.Mensaje = mensaje
+	if segundosRestantes > 0 {
+		resp.SegundosRestantesSalida = segundosRestantes
+	}
+	return resp, nil
+}
+
 func (s *asistenciaService) registrarSalidaPorDocumento(sinSalida *models.AsistenciaAprendiz, instructorFichaID *uint) (*dto.AsistenciaAprendizResponse, error) {
 	if sinSalida == nil {
 		return nil, errors.New("el aprendiz no tiene entrada registrada para marcar salida")
 	}
 	resp, err := s.RegistrarSalida(sinSalida.ID, instructorFichaID)
 	if err != nil {
+		if esErrorEsperaMinutoSalida(err) && sinSalida.HoraIngreso != nil {
+			rest := segundosRestantesParaSalida(*sinSalida.HoraIngreso, time.Now())
+			return s.respuestaIngresoAbierto(sinSalida, msgSalidaQRDemasiadoPronto, rest)
+		}
 		return nil, err
 	}
 	resp.TipoRegistro = "salida"
@@ -532,9 +575,8 @@ func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint, instructo
 		return nil, errors.New("ya tiene hora de salida registrada")
 	}
 	now := time.Now()
-	const minSegundosEntreIngresoYSalida = 60
 	if now.Sub(*aa.HoraIngreso) < minSegundosEntreIngresoYSalida*time.Second {
-		return nil, errors.New("debe esperar al menos 1 minuto entre la entrada y la salida")
+		return nil, errors.New(errMsgEsperaMinutoSalida)
 	}
 	aa.HoraSalida = &now
 	aa.InstructorFichaIDRegistroSalida = instructorFichaIDRegistroSalida

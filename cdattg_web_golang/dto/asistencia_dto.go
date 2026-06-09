@@ -78,6 +78,8 @@ type AsistenciaAprendizResponse struct {
 	// TipoRegistro: "ingreso", "salida" o "asistencia_completa" (por documento/QR)
 	TipoRegistro string `json:"tipo_registro,omitempty"`
 	Mensaje      string `json:"mensaje,omitempty"`
+	// SegundosRestantesSalida: en rebote QR/documento antes de poder marcar salida (regla 1 min).
+	SegundosRestantesSalida int `json:"segundos_restantes_salida,omitempty"`
 	// Quién registró ingreso/salida (auditoría)
 	InstructorFichaIDRegistroIngreso *uint  `json:"instructor_ficha_id_registro_ingreso,omitempty"`
 	InstructorFichaIDRegistroSalida  *uint  `json:"instructor_ficha_id_registro_salida,omitempty"`

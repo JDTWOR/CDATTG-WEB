@@ -14,7 +14,7 @@ import {
   inferirAccionPorDocumento,
   summaryRegistros,
 } from './asistenciaUtils';
-import { mostrarToastErrorAsistencia, mostrarToastRegistroAsistencia } from './asistenciaToast';
+import { mostrarToastErrorAsistencia, mostrarToastResultadoDocumento } from './asistenciaToast';
 import type { AsistenciaModalsModel } from './asistenciaModalsTypes';
 
 type UseAsistenciaRegistroParams = Readonly<{
@@ -239,7 +239,7 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual }
       const data = await apiService.registrarIngresoAsistenciaPorDocumento(sesionActual.id, doc);
       setDocumentoManual('');
       upsertAsistenciaAprendizEnSesion(data);
-      mostrarToastRegistroAsistencia(data);
+      mostrarToastResultadoDocumento(data);
     } catch (e: unknown) {
       const mensaje = axiosErrorMessage(e, 'Error al registrar asistencia');
       setErrorRegistroManual(mensaje);

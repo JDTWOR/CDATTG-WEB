@@ -157,21 +157,13 @@ export const Layout = ({ children }: LayoutProps) => {
     [roles, hasPermission]
   );
 
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => new Set());
+  const [expandedSection, setExpandedSection] = useState<string | null>(() =>
+    sectionForPathname(location.pathname, visibleItems)
+  );
 
   useEffect(() => {
-    setExpandedSections((prev) => {
-      const next = new Set(prev);
-      const activeSection = sectionForPathname(location.pathname, visibleItems);
-      if (activeSection) next.add(activeSection);
-      // Primera carga: mostrar todas las secciones visibles (evita perder ítems en «Administración»).
-      if (prev.size === 0) {
-        for (const s of new Set(visibleItems.map((i) => i.section))) {
-          next.add(s);
-        }
-      }
-      return next;
-    });
+    const activeSection = sectionForPathname(location.pathname, visibleItems);
+    if (activeSection) setExpandedSection(activeSection);
   }, [location.pathname, visibleItems]);
 
   const rolesLine = roles.length > 0 ? formatRolesLine(roles) : '';
@@ -488,7 +480,7 @@ export const Layout = ({ children }: LayoutProps) => {
 
           <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-4">
             {sections.map((section, sectionIndex) => {
-              const isExpanded = expandedSections.has(section);
+              const isExpanded = expandedSection === section;
               const sectionHasActiveItem = visibleItems.some(
                 (item) => item.section === section && isNavItemActive(location.pathname, item, visibleItems)
               );
@@ -496,14 +488,7 @@ export const Layout = ({ children }: LayoutProps) => {
                 <div key={section} className={sectionIndex > 0 ? 'mt-2' : ''}>
                   <button
                     type="button"
-                    onClick={() =>
-                      setExpandedSections((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(section)) next.delete(section);
-                        else next.add(section);
-                        return next;
-                      })
-                    }
+                    onClick={() => setExpandedSection(isExpanded ? null : section)}
                     className={`flex w-full items-center justify-between rounded-lg px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider transition-colors touch-manipulation ${
                       sectionHasActiveItem
                         ? 'text-primary-700 dark:text-primary-300'

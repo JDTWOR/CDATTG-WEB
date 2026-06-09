@@ -361,14 +361,14 @@ func (s *fichaService) persistirAsignacionInstructor(
 	if len(diasIDs) == 0 {
 		diasIDs = fichaDiasDefault
 	}
-	if len(diasIDs) == 0 {
-		return fmt.Errorf("instructor %d: debe asignar al menos un día de formación", it.InstructorID)
-	}
-	if err := s.horarioSvc.ValidarDiasSubsetFicha(fichaID, diasIDs); err != nil {
-		return fmt.Errorf("instructor %d: %w", it.InstructorID, err)
-	}
-	if err := s.horarioSvc.ValidarColisionAlAsignar(it.InstructorID, fichaID, diasIDs, fechaInicio, fechaFin, true); err != nil {
-		return err
+	// Sin días: permitido mientras coordinación no cargue programación (requerimiento dirección).
+	if len(diasIDs) > 0 {
+		if err := s.horarioSvc.ValidarDiasSubsetFicha(fichaID, diasIDs); err != nil {
+			return fmt.Errorf("instructor %d: %w", it.InstructorID, err)
+		}
+		if err := s.horarioSvc.ValidarColisionAlAsignar(it.InstructorID, fichaID, diasIDs, fechaInicio, fechaFin, true); err != nil {
+			return err
+		}
 	}
 	ex, err := s.instFichaRepo.FindByFichaIDAndInstructorID(fichaID, it.InstructorID)
 	if err == nil {

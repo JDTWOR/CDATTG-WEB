@@ -1,4 +1,6 @@
+import { createElement } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
+import { RouteLoadingFallback } from '../components/RouteLoadingFallback';
 import { ProtectedLayout } from './layouts/ProtectedLayout';
 import { authRoutes } from './modules/auth.routes';
 import { homeRoutes } from './modules/home.routes';
@@ -23,6 +25,7 @@ export const appRouter = createBrowserRouter([
   ...authRoutes,
   {
     Component: ProtectedLayout,
+    hydrateFallbackElement: createElement(RouteLoadingFallback),
     children: [
       ...homeRoutes,
       ...personasRoutes,

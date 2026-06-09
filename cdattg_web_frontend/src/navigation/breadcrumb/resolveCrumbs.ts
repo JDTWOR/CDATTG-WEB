@@ -1,8 +1,6 @@
 import { DASHBOARD_PATH } from '../../routes/paths';
 import type { AppUiMatch, BreadcrumbCrumb, BreadcrumbHandleValue } from './types';
 
-const INICIO: BreadcrumbCrumb = { label: 'Inicio', to: DASHBOARD_PATH };
-
 export function resolveBreadcrumbSegments(
   value: BreadcrumbHandleValue | undefined,
   params: Record<string, string | undefined>,
@@ -15,6 +13,7 @@ export function resolveBreadcrumbSegments(
 export function crumbsFromMatches(
   matches: AppUiMatch[],
   overrides: Record<string, string> = {},
+  inicioTo: string = DASHBOARD_PATH,
 ): BreadcrumbCrumb[] {
   const segments = matches.flatMap((match) =>
     resolveBreadcrumbSegments(
@@ -23,12 +22,17 @@ export function crumbsFromMatches(
     ),
   );
 
+  const inicio: BreadcrumbCrumb = { label: 'Inicio', to: inicioTo };
+  const pathname = matches.at(-1)?.pathname ?? '';
+
   if (segments.length === 0) {
-    return [INICIO];
+    return pathname === inicioTo ? [] : [inicio];
   }
 
-  const crumbs = [INICIO, ...segments];
-  const pathname = matches.at(-1)?.pathname ?? '';
+  let crumbs = [inicio, ...segments];
+  if (crumbs[0]?.to && pathname === crumbs[0].to) {
+    crumbs = crumbs.slice(1);
+  }
   const override =
     overrides[pathname] ??
     Object.entries(overrides).find(([key]) => pathname === key || pathname.startsWith(`${key}/`))?.[1];

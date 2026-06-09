@@ -1,19 +1,28 @@
+import { useMemo } from 'react';
 import { Link, useLocation, useMatches } from 'react-router-dom';
 import {
   crumbsFromMatches,
   useBreadcrumbOverrides,
   type AppUiMatch,
 } from '../../navigation/breadcrumb';
+import { useAuth } from '../../context/AuthContext';
+import { getInicioNavigationPath } from '../../utils/roles';
 
 const HIDE_PREFIXES = ['/login'];
 
 export function AppBreadcrumb() {
   const { pathname } = useLocation();
+  const { roles, permissions } = useAuth();
   const overrides = useBreadcrumbOverrides();
   const matches = useMatches() as AppUiMatch[];
 
+  const inicioTo = useMemo(
+    () => getInicioNavigationPath(roles, permissions, pathname),
+    [roles, permissions, pathname],
+  );
+
   const hidden = HIDE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  const crumbs = crumbsFromMatches(matches, overrides);
+  const crumbs = crumbsFromMatches(matches, overrides, inicioTo);
 
   if (hidden || !crumbs.length) return null;
 

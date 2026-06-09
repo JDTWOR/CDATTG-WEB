@@ -1,8 +1,13 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeftIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../../context/AuthContext';
 import { asistenciaPaths } from '../../routes/paths';
+import { getInicioNavigationPath } from '../../utils/roles';
 
 export function AsistenciaSinFichasView() {
+  const { roles, permissions } = useAuth();
+  const volverTo = getInicioNavigationPath(roles, permissions, asistenciaPaths.index);
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Asistencia</h1>
@@ -14,9 +19,12 @@ export function AsistenciaSinFichasView() {
         <p className="mb-6 max-w-md text-gray-600 dark:text-gray-400">
           Contacta al administrador para que te asigne las fichas correspondientes.
         </p>
-        <Link to={asistenciaPaths.index} className="inline-flex items-center gap-2 font-medium text-primary-600 hover:text-primary-700">
-          <ArrowLeftIcon className="h-5 w-5" />
-          Volver
+        <Link
+          to={volverTo}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 font-medium text-white hover:bg-primary-700 transition-colors"
+        >
+          <ArrowLeftIcon className="h-5 w-5" aria-hidden />
+          Volver al inicio
         </Link>
       </div>
     </div>

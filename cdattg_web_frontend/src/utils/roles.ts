@@ -45,3 +45,18 @@ export function getHomeRouteForUser(roles: string[], permissions: string[]): str
 export function canAccessMainDashboard(roles: string[]): boolean {
   return hasAnyRole(roles, [...DASHBOARD_ROLES]);
 }
+
+/** Destino de «Inicio» / «Volver» cuando la home del usuario coincide con la ruta actual (evita enlace circular). */
+export function getInicioNavigationPath(
+  roles: string[],
+  permissions: string[],
+  pathname: string,
+): string {
+  const home = getHomeRouteForUser(roles, permissions);
+  const enSeccionHome = pathname === home || (home.length > 1 && pathname.startsWith(`${home}/`));
+  if (!enSeccionHome) return home;
+
+  if (canAccessMainDashboard(roles)) return '/dashboard';
+  if (permissions.includes('*') || permissions.includes('VER FICHAS')) return '/fichas';
+  return '/perfil';
+}

@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
-import { CalendarDaysIcon, ChartBarIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, CalendarDaysIcon, ChartBarIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../../context/AuthContext';
 import { asistenciaPaths, fichasPaths } from '../../routes/paths';
+import { getInicioNavigationPath } from '../../utils/roles';
 import { FichaCaracterizacionCard } from '../../components/FichaCaracterizacionCard';
 import { ASIST_MODAL_IDS_ROOT } from './asistenciaConstants';
 import { AsistenciaModals } from './AsistenciaModals';
@@ -9,6 +11,8 @@ import type { AsistenciaFichasPageState } from './useAsistenciaFichasCatalog';
 type Props = Readonly<{ page: AsistenciaFichasPageState }>;
 
 export function AsistenciaFichasListView({ page }: Props) {
+  const { roles, permissions } = useAuth();
+  const volverTo = getInicioNavigationPath(roles, permissions, asistenciaPaths.index);
   const {
     fichas,
     error,
@@ -29,7 +33,13 @@ export function AsistenciaFichasListView({ page }: Props) {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Asistencia</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">Tomar asistencia por ficha e instructor</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {volverTo !== asistenciaPaths.index && (
+            <Link to={volverTo} className="btn-secondary inline-flex items-center gap-2">
+              <ArrowLeftIcon className="h-5 w-5" aria-hidden />
+              Volver al inicio
+            </Link>
+          )}
           <Link to={asistenciaPaths.historial.index} className="btn-secondary inline-flex items-center gap-2">
             <CalendarDaysIcon className="h-5 w-5" />
             Historial

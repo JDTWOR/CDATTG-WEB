@@ -43,7 +43,7 @@ export function ScheduleEventCard({
 
   return (
     <div
-      className={`absolute left-1 right-1 z-10 flex h-full flex-col gap-0.5 overflow-hidden rounded border px-2 py-1.5 text-xs leading-snug text-white ${color} ${className}`}
+      className={`absolute left-1 right-1 z-10 flex h-full flex-col gap-0.5 overflow-hidden rounded border px-2 py-1.5 text-xs leading-snug text-white xl:gap-1 xl:px-2.5 xl:py-2 xl:text-sm 2xl:px-3 2xl:py-2.5 2xl:text-base ${color} ${className}`}
       style={style}
       title={buildEventTitle(event)}
     >
@@ -63,7 +63,7 @@ export function ScheduleEventCard({
           {puedeTomarAsistencia && (
             <Link
               to={asistenciaFichaPath(event.ficha_id)}
-              className="mt-auto block rounded bg-white/20 px-1 py-0.5 text-center text-[10px] hover:bg-white/30"
+              className="mt-auto block rounded bg-white/20 px-1 py-0.5 text-center text-[10px] hover:bg-white/30 xl:px-1.5 xl:py-1 xl:text-xs 2xl:text-sm"
               onClick={(e) => e.stopPropagation()}
             >
               Tomar asistencia

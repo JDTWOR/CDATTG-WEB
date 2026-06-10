@@ -49,6 +49,28 @@
     @apply bg-white rounded-lg shadow-md p-6 dark:bg-gray-800 dark:shadow-gray-900/50;
   }
 
+  /** Contenedor centrado para páginas (evita estiramiento en TV/monitores ultra anchos). */
+  .page-container {
+    @apply mx-auto w-full max-w-7xl 2xl:max-w-[85rem];
+  }
+
+  /** Calendario semanal: columnas fijas en pantallas grandes, legible a distancia. */
+  .schedule-grid-cols {
+    grid-template-columns: 3.5rem repeat(7, minmax(0, 1fr));
+  }
+
+  @media (min-width: 1280px) {
+    .schedule-grid-cols {
+      grid-template-columns: 4rem repeat(7, minmax(7.5rem, 9rem));
+    }
+  }
+
+  @media (min-width: 1920px) {
+    .schedule-grid-cols {
+      grid-template-columns: 4.5rem repeat(7, 9.5rem);
+    }
+  }
+
   /** Padding inferior para barras del navegador móvil (Chrome/Safari bottom bar). */
   .safe-bottom {
     padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));

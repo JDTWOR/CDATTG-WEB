@@ -34,12 +34,9 @@ export function WeekScheduleTimeGrid({
   const gridHeight = gridBodyHeightPx(gridRange);
 
   return (
-    <div className="max-h-[70vh] overflow-auto">
-      <div className="min-w-[48rem]">
-        <div
-          className="grid border-b border-gray-200 dark:border-gray-600"
-          style={{ gridTemplateColumns: '3.5rem repeat(7, minmax(0, 1fr))' }}
-        >
+    <div className="flex justify-center overflow-x-auto overflow-y-auto max-h-[min(70vh,52rem)] 2xl:max-h-[min(75vh,56rem)]">
+      <div className="w-fit min-w-[48rem] max-w-full px-1 pb-1">
+        <div className="schedule-grid-cols grid border-b border-gray-200 dark:border-gray-600">
           <div className="border-r border-gray-200 bg-gray-50/80 dark:border-gray-600 dark:bg-gray-900/30" />
           {days.map((d, i) => {
             const iso = formatLocalISO(d);
@@ -47,18 +44,22 @@ export function WeekScheduleTimeGrid({
             return (
               <div
                 key={iso}
-                className={`border-r border-gray-200 px-1 py-2 text-center last:border-r-0 dark:border-gray-600 ${
+                className={`border-r border-gray-200 px-1 py-2 text-center last:border-r-0 dark:border-gray-600 xl:px-2 xl:py-3 ${
                   isToday ? 'bg-primary-50/60 dark:bg-primary-900/15' : 'bg-gray-50/50 dark:bg-gray-900/20'
                 }`}
               >
                 <div
-                  className={`text-xs font-semibold ${
+                  className={`text-xs font-semibold xl:text-sm 2xl:text-base ${
                     isToday ? 'text-primary-700 dark:text-primary-300' : 'text-gray-600 dark:text-gray-400'
                   }`}
                 >
                   {DAY_LABELS[i]}
                 </div>
-                <div className={`text-lg font-bold ${isToday ? 'text-primary-800 dark:text-primary-200' : ''}`}>
+                <div
+                  className={`text-lg font-bold xl:text-xl 2xl:text-2xl ${
+                    isToday ? 'text-primary-800 dark:text-primary-200' : ''
+                  }`}
+                >
                   {d.getDate()}
                 </div>
               </div>
@@ -67,9 +68,8 @@ export function WeekScheduleTimeGrid({
         </div>
 
         <div
-          className="grid"
+          className="schedule-grid-cols grid"
           style={{
-            gridTemplateColumns: '3.5rem repeat(7, minmax(0, 1fr))',
             height: gridHeight,
           }}
         >
@@ -77,7 +77,7 @@ export function WeekScheduleTimeGrid({
             {hourTicks.map((tick) => (
               <div
                 key={tick.hour}
-                className="absolute right-1 -translate-y-1/2 text-[10px] font-medium text-gray-500 dark:text-gray-400"
+                className="absolute right-1 -translate-y-1/2 text-[10px] font-medium text-gray-500 dark:text-gray-400 xl:text-xs 2xl:text-sm"
                 style={{ top: `${tick.topPercent}%` }}
               >
                 {tick.label}

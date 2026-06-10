@@ -6,7 +6,7 @@ import { getInicioNavigationPath } from '../../utils/roles';
 
 export function AsistenciaSinFichasView() {
   const { roles, permissions } = useAuth();
-  const volverTo = getInicioNavigationPath(roles, permissions, asistenciaPaths.index);
+  const volverTo = getInicioNavigationPath(roles, permissions, asistenciaPaths.fichas);
 
   return (
     <div className="space-y-6">

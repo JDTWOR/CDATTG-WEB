@@ -652,9 +652,9 @@ export const AsistenciaDashboard = () => {
           No tiene permiso para acceder al dashboard de asistencia (requiere rol de Superadministrador o Bienestar al
           Aprendiz).
         </p>
-        <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center gap-2">
+        <Link to={asistenciaPaths.fichas} className="btn-secondary inline-flex items-center gap-2">
           <ArrowLeftIcon className="w-5 h-5" aria-hidden />
-          Volver a Asistencia
+          Tomar asistencia
         </Link>
       </div>
     );
@@ -679,7 +679,7 @@ export const AsistenciaDashboard = () => {
               En vivo
             </span>
           )}
-          <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center gap-2">
+          <Link to={asistenciaPaths.fichas} className="btn-secondary inline-flex items-center gap-2">
             <ArrowLeftIcon className="w-5 h-5" aria-hidden />
             Tomar asistencia
           </Link>

@@ -2,7 +2,10 @@ import { memo, useEffect, useRef, useState, type Dispatch, type SetStateAction }
 import { Html5Qrcode } from 'html5-qrcode';
 
 const QR_READER_ID_DEFAULT = 'asistencia-qr-reader';
+/** Mismo documento: ignorar relecturas del QR mientras la cámara apunta al código. */
 const DEBOUNCE_MS = 3000;
+/** Pausa de cámara tras cada lectura (evita doble registro). */
+const PAUSA_TRAS_ESCANEO_MS = 3000;
 
 interface EscanerQRProps {
   onEscaneado: (numeroDocumento: string) => void | Promise<void>;
@@ -48,10 +51,40 @@ interface DecodedHandlerContext {
   ultimoDocumentoRef: { current: { doc: string; at: number } | null };
   registroEnCursoRef: { current: boolean };
   procesandoLocalRef: { current: boolean };
+  bloqueadoHastaRef: { current: number };
+  setProcesandoLectura: Dispatch<SetStateAction<boolean>>;
 }
 
 function registroBloqueado(ctx: DecodedHandlerContext): boolean {
-  return ctx.registroEnCursoRef.current || ctx.procesandoLocalRef.current;
+  if (ctx.registroEnCursoRef.current || ctx.procesandoLocalRef.current) {
+    return true;
+  }
+  return Date.now() < ctx.bloqueadoHastaRef.current;
+}
+
+function pausarEscanner(html5Qr: Html5Qrcode): void {
+  try {
+    html5Qr.pause(true);
+  } catch {
+    /* ignorar si la cámara ya se detuvo */
+  }
+}
+
+function reanudarEscanner(html5Qr: Html5Qrcode): void {
+  try {
+    html5Qr.resume();
+  } catch {
+    /* ignorar si la cámara ya se detuvo */
+  }
+}
+
+function liberarEscaneoContinuo(ctx: DecodedHandlerContext): void {
+  ctx.bloqueadoHastaRef.current = Date.now() + PAUSA_TRAS_ESCANEO_MS;
+  globalThis.setTimeout(() => {
+    reanudarEscanner(ctx.html5Qr);
+    ctx.setProcesandoLectura(false);
+    ctx.procesandoLocalRef.current = false;
+  }, PAUSA_TRAS_ESCANEO_MS);
 }
 
 function createDecodedHandler(ctx: DecodedHandlerContext): (decodedText: string) => void {
@@ -62,22 +95,27 @@ function createDecodedHandler(ctx: DecodedHandlerContext): (decodedText: string)
     }
 
     if (ctx.continuo) {
+      if (registroBloqueado(ctx)) {
+        return;
+      }
+
       const now = Date.now();
       const ultimo = ctx.ultimoDocumentoRef.current;
       if (ultimo?.doc === doc && now - ultimo.at < DEBOUNCE_MS) {
         return;
       }
-      if (registroBloqueado(ctx)) {
-        return;
-      }
+
       ctx.procesandoLocalRef.current = true;
       ctx.ultimoDocumentoRef.current = { doc, at: now };
+      ctx.setProcesandoLectura(true);
+      pausarEscanner(ctx.html5Qr);
+
       Promise.resolve(ctx.onEscaneadoRef.current(doc))
         .catch(() => {
           /* errores manejados en el callback vía toast */
         })
         .finally(() => {
-          ctx.procesandoLocalRef.current = false;
+          liberarEscaneoContinuo(ctx);
         });
       return;
     }
@@ -104,11 +142,13 @@ function EscanerQRInner({
   const [error, setError] = useState<string | null>(null);
   const [permisos, setPermisos] = useState<boolean | null>(null);
   const [camaraActiva, setCamaraActiva] = useState(false);
+  const [procesandoLectura, setProcesandoLectura] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const readerContainerRef = useRef<HTMLDivElement | null>(null);
   const onEscaneadoRef = useRef(onEscaneado);
   const ultimoDocumentoRef = useRef<{ doc: string; at: number } | null>(null);
   const procesandoLocalRef = useRef(false);
+  const bloqueadoHastaRef = useRef(0);
   const registroEnCursoRef = useRef(registroEnCurso);
   registroEnCursoRef.current = registroEnCurso;
   onEscaneadoRef.current = onEscaneado;
@@ -174,6 +214,8 @@ function EscanerQRInner({
         ultimoDocumentoRef,
         registroEnCursoRef,
         procesandoLocalRef,
+        bloqueadoHastaRef,
+        setProcesandoLectura,
       });
 
       const onScanFailure = (): void => {};
@@ -181,7 +223,7 @@ function EscanerQRInner({
       try {
         await html5Qr.start(
           cameraId,
-          { fps: 8, qrbox: { width: 220, height: 220 } },
+          { fps: 4, qrbox: { width: 220, height: 220 }, disableFlip: true },
           onDecodedSuccess,
           onScanFailure,
         );
@@ -232,12 +274,21 @@ function EscanerQRInner({
                 Permisos de cámara denegados. Use el registro manual por documento.
               </div>
             )}
-            <div className="flex justify-center">
+            <div className="relative flex justify-center">
               <div
                 ref={readerContainerRef}
                 id={readerId}
                 className="qr-scanner-reader mx-auto min-h-[240px] w-full max-w-sm overflow-hidden rounded-lg bg-gray-900"
               />
+              {procesandoLectura ? (
+                <div
+                  className="pointer-events-none absolute inset-x-0 top-0 mx-auto flex min-h-[240px] w-full max-w-sm flex-col items-center justify-center rounded-lg bg-black/65 px-4 text-center text-white"
+                  aria-live="polite"
+                >
+                  <span className="text-sm font-semibold">Procesando registro…</span>
+                  <span className="mt-1 text-xs text-gray-200">Pausa de 3 segundos</span>
+                </div>
+              ) : null}
             </div>
             <button
               type="button"

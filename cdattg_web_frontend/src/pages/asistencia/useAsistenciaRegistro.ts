@@ -12,18 +12,30 @@ import {
   computeBulkCounts,
   groupRegistrosByAprendiz,
   inferirAccionPorDocumento,
+  normalizarDocumentoEscaneado,
   summaryRegistros,
 } from './asistenciaUtils';
-import { mostrarToastErrorAsistencia, mostrarToastResultadoDocumento } from './asistenciaToast';
+import {
+  mostrarToastErrorAsistencia,
+  mostrarToastResultadoDocumento,
+  mostrarToastErrorRegistroDocumento,
+  confirmEliminarRegistroAsistencia,
+} from './asistenciaToast';
+import {
+  extraerMensajeErrorRegistroAsistencia,
+  interpretarMensajeRegistroAsistencia,
+  interpretarRespuestaRegistroAsistencia,
+} from './asistenciaRegistroMensajes';
 import type { AsistenciaModalsModel } from './asistenciaModalsTypes';
 
 type UseAsistenciaRegistroParams = Readonly<{
   fichaId: number;
   sesionActual: AsistenciaResponse | null;
   setSesionActual: React.Dispatch<React.SetStateAction<AsistenciaResponse | null>>;
+  puedeEliminarRegistro?: boolean;
 }>;
 
-export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual }: UseAsistenciaRegistroParams) {
+export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual, puedeEliminarRegistro = false }: UseAsistenciaRegistroParams) {
   const [aprendicesFicha, setAprendicesFicha] = useState<AprendizResponse[]>([]);
   const [aprendicesEnSesion, setAprendicesEnSesion] = useState<AsistenciaAprendizResponse[]>([]);
   const [loadingAprendices, setLoadingAprendices] = useState(false);
@@ -43,7 +55,11 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual }
   const [busquedaAprendiz, setBusquedaAprendiz] = useState('');
   const [busyAprendizIds, setBusyAprendizIds] = useState<Set<number>>(() => new Set());
   const [bulkProcesando, setBulkProcesando] = useState(false);
+  const [eliminandoRegistroIds, setEliminandoRegistroIds] = useState<Set<number>>(() => new Set());
   const registroDocumentoEnCurso = useRef(false);
+  const ultimoRegistroDocumentoRef = useRef<{ doc: string; at: number } | null>(null);
+  const REGISTRO_DOC_DEBOUNCE_MS = 3000;
+  const REGISTRO_DOC_COOLDOWN_MS = 3000;
 
   const upsertAsistenciaAprendizEnSesion = useCallback((actualizado: AsistenciaAprendizResponse) => {
     if (!actualizado) return;
@@ -148,6 +164,28 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual }
     [busyAprendizIds, setAprendizBusy, upsertAsistenciaAprendizEnSesion],
   );
 
+  const handleEliminarRegistro = useCallback(
+    async (asistenciaAprendizId: number, aprendizNombre: string, tramoLabel: string) => {
+      if (!puedeEliminarRegistro || eliminandoRegistroIds.has(asistenciaAprendizId)) return;
+      const confirmado = await confirmEliminarRegistroAsistencia(aprendizNombre, tramoLabel);
+      if (!confirmado) return;
+      setEliminandoRegistroIds((prev) => new Set(prev).add(asistenciaAprendizId));
+      try {
+        await apiService.eliminarRegistroAsistencia(asistenciaAprendizId);
+        setAprendicesEnSesion((prev) => prev.filter((aa) => aa.id !== asistenciaAprendizId));
+      } catch (e: unknown) {
+        mostrarToastErrorAsistencia(axiosErrorMessage(e, 'Error al eliminar registro'));
+      } finally {
+        setEliminandoRegistroIds((prev) => {
+          const next = new Set(prev);
+          next.delete(asistenciaAprendizId);
+          return next;
+        });
+      }
+    },
+    [puedeEliminarRegistro, eliminandoRegistroIds],
+  );
+
   const onAbrirObservacionesModal = useCallback(
     (payload: {
       asistenciaId: number;
@@ -229,9 +267,19 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual }
   };
 
   const handleRegistrarPorDocumento = async (numeroDocumento: string) => {
-    const doc = numeroDocumento.trim();
-    if (!sesionActual || !doc || registroDocumentoEnCurso.current) return;
+    const doc = normalizarDocumentoEscaneado(numeroDocumento);
+    if (!sesionActual || !doc) return;
+
+    const now = Date.now();
+    if (registroDocumentoEnCurso.current) return;
+
+    const ultimo = ultimoRegistroDocumentoRef.current;
+    if (ultimo?.doc === doc && now - ultimo.at < REGISTRO_DOC_DEBOUNCE_MS) {
+      return;
+    }
+
     registroDocumentoEnCurso.current = true;
+    ultimoRegistroDocumentoRef.current = { doc, at: now };
     setErrorRegistroManual('');
     setMensajeRegistroManual('');
     setRegistrandoManual(true);
@@ -239,14 +287,38 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual }
       const data = await apiService.registrarIngresoAsistenciaPorDocumento(sesionActual.id, doc);
       setDocumentoManual('');
       upsertAsistenciaAprendizEnSesion(data);
-      mostrarToastResultadoDocumento(data);
+      const interpretado = interpretarRespuestaRegistroAsistencia(data);
+      if (interpretado.clase === 'aviso') {
+        setErrorRegistroManual('');
+        setMensajeRegistroManual((data.mensaje ?? '').trim() || interpretado.detalle);
+      } else {
+        setMensajeRegistroManual('');
+      }
+      try {
+        mostrarToastResultadoDocumento(data);
+      } catch {
+        /* el registro ya se guardó; no propagar fallo del toast */
+      }
     } catch (e: unknown) {
-      const mensaje = axiosErrorMessage(e, 'Error al registrar asistencia');
-      setErrorRegistroManual(mensaje);
-      mostrarToastErrorAsistencia(mensaje);
+      const mensaje = extraerMensajeErrorRegistroAsistencia(e);
+      const interpretado = interpretarMensajeRegistroAsistencia(mensaje);
+      try {
+        mostrarToastErrorRegistroDocumento(mensaje);
+      } catch {
+        /* ignorar fallo al mostrar toast de error */
+      }
+      if (interpretado.clase === 'aviso') {
+        setErrorRegistroManual('');
+        setMensajeRegistroManual(interpretado.detalle);
+        return;
+      }
+      setMensajeRegistroManual('');
+      setErrorRegistroManual(interpretado.detalle);
     } finally {
       setRegistrandoManual(false);
-      registroDocumentoEnCurso.current = false;
+      globalThis.setTimeout(() => {
+        registroDocumentoEnCurso.current = false;
+      }, REGISTRO_DOC_COOLDOWN_MS);
     }
   };
 
@@ -389,6 +461,9 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual }
     handleBulkSalida,
     handleRegistroManualSubmit,
     toggleSeleccionarTodosFiltrados,
+    puedeEliminarRegistro,
+    eliminandoRegistroIds,
+    handleEliminarRegistro,
   };
 }
 

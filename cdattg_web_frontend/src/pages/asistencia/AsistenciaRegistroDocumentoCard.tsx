@@ -75,7 +75,16 @@ export function AsistenciaRegistroDocumentoCard({ page, open, onToggle }: Props)
           {etiquetaBoton}
         </button>
       </form>
-      {page.errorRegistroManual ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{page.errorRegistroManual}</p> : null}
+      {page.mensajeRegistroManual ? (
+        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          {page.mensajeRegistroManual}
+        </p>
+      ) : null}
+      {page.errorRegistroManual ? (
+        <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+          {page.errorRegistroManual}
+        </p>
+      ) : null}
     </AsistenciaCollapsibleCard>
   );
 }

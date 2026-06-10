@@ -24,7 +24,7 @@ export function AsistenciaSesionPage() {
           {page.errorEntrada || 'No se pudo abrir la sesión de asistencia.'}
         </div>
         <Link
-          to={asistenciaPaths.index}
+          to={asistenciaPaths.fichas}
           className="inline-flex items-center gap-2 font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
         >
           <ArrowLeftIcon className="h-5 w-5" />

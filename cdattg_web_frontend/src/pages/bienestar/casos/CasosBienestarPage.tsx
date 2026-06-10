@@ -14,7 +14,7 @@ export function CasosBienestarPage() {
     return (
       <div className="space-y-6">
         <p className="text-red-600 dark:text-red-400">{page.permissionError}</p>
-        <Link to={asistenciaPaths.dashboard} className="btn-secondary inline-flex items-center gap-2">
+        <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center gap-2">
           <ArrowLeftIcon className="h-5 w-5" aria-hidden />
           Volver al Dashboard
         </Link>
@@ -35,7 +35,7 @@ export function CasosBienestarPage() {
             oficina de bienestar.
           </p>
         </div>
-        <Link to={asistenciaPaths.dashboard} className="btn-secondary inline-flex items-center gap-2">
+        <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center gap-2">
           <ArrowLeftIcon className="h-5 w-5" aria-hidden />
           Volver al Dashboard
         </Link>

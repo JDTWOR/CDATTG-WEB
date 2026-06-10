@@ -2,14 +2,24 @@ import type { AprendizResponse, AsistenciaAprendizResponse } from '../../types';
 
 export type AccionRegistroDocumento = 'ingreso' | 'salida';
 
+/** Normaliza texto leído del QR (solo dígitos si hay suficientes). */
+export function normalizarDocumentoEscaneado(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  const soloDigitos = trimmed.replace(/\D/g, '');
+  return soloDigitos.length >= 5 ? soloDigitos : trimmed;
+}
+
 export function inferirAccionPorDocumento(
   documento: string,
   aprendicesFicha: AprendizResponse[],
   registroPorAprendizId: Map<number, AsistenciaAprendizResponse[]>,
 ): AccionRegistroDocumento | null {
-  const doc = documento.trim();
+  const doc = normalizarDocumentoEscaneado(documento);
   if (!doc) return null;
-  const aprendiz = aprendicesFicha.find((a) => (a.persona_documento ?? '').trim() === doc);
+  const aprendiz = aprendicesFicha.find(
+    (a) => normalizarDocumentoEscaneado(a.persona_documento ?? '') === doc,
+  );
   if (!aprendiz) return null;
   const { open } = summaryRegistros(registroPorAprendizId.get(aprendiz.id) ?? []);
   return open ? 'salida' : 'ingreso';
@@ -111,6 +121,19 @@ export function buildRangoText(firstIngreso: string | null, lastSalida: string |
   if (lastSalida) return `${left} → ${lastSalida}`;
   if (open) return `${left} → —`;
   return left;
+}
+
+function formatHoraRegistro(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function formatTramoRegistro(registro: AsistenciaAprendizResponse): string {
+  const ingreso = formatHoraRegistro(registro.hora_ingreso);
+  const salida = registro.hora_salida ? formatHoraRegistro(registro.hora_salida) : '—';
+  return `${ingreso} → ${salida}`;
 }
 
 export function mensajeRegistroPorTipo(data: { mensaje?: string | null; tipo_registro?: string }): string {

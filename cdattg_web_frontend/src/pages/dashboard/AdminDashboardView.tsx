@@ -389,14 +389,14 @@ export function AdminDashboardView() {
       <div className="card">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Accesos directos</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center justify-center">
+          <Link to={asistenciaPaths.fichas} className="btn-secondary inline-flex items-center justify-center">
             Tomar asistencia
           </Link>
           <Link to={asistenciaPaths.historial.index} className="btn-secondary inline-flex items-center justify-center">
             <CalendarDaysIcon className="w-5 h-5 mr-2" aria-hidden />
             Historial asistencias
           </Link>
-          <Link to={asistenciaPaths.dashboard} className="btn-secondary inline-flex items-center justify-center">
+          <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center justify-center">
             Dashboard asistencia
           </Link>
           <Link to={bienestarPaths.casos.index} className="btn-secondary inline-flex items-center justify-center">

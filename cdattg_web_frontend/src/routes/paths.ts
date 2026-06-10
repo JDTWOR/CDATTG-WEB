@@ -28,12 +28,14 @@ export const fichasPaths = {
 
 export const asistenciaPaths = {
   index: '/asistencia',
+  /** Alias semántico: el dashboard vive en el index del módulo. */
+  dashboard: '/asistencia',
+  fichas: '/asistencia/fichas',
   sesion: (fichaId: number | string) => `/asistencia/fichas/${fichaId}/sesion`,
   historial: {
     index: '/asistencia/historial',
     ficha: (fichaId: number | string) => `/asistencia/historial/fichas/${fichaId}`,
   },
-  dashboard: '/asistencia/dashboard',
   tiposObservacion: '/asistencia/tipos-observacion',
 } as const;
 

@@ -29,10 +29,7 @@ COPY --from=builder /app/cdattg-api .
 COPY --from=builder /app/seed .
 COPY --from=builder /app/authz ./authz
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Directorio para reportes PDF (el volumen lo montará; entrypoint asigna permisos)
-RUN mkdir -p /app/storage/asistencia_pdfs
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh && mkdir -p /app/storage/asistencia_pdfs
 
 EXPOSE 8080
 

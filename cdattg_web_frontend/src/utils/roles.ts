@@ -37,7 +37,7 @@ export function getHomeRouteForUser(roles: string[], permissions: string[]): str
     }
     const canAsistencia =
       permissions.includes('*') || permissions.includes('VER ASISTENCIA');
-    return canAsistencia ? '/asistencia' : '/fichas';
+    return canAsistencia ? '/asistencia/fichas' : '/fichas';
   }
   return '/perfil';
 }

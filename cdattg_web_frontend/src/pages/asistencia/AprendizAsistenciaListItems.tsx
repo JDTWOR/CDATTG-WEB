@@ -3,11 +3,13 @@ import {
   ArrowRightStartOnRectangleIcon,
   ArrowLeftEndOnRectangleIcon,
   PencilSquareIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import type { AprendizResponse, AsistenciaAprendizResponse, TipoObservacionAsistenciaItem } from '../../types';
 import {
   buildRangoText,
   estadoAprendizVisual,
+  formatTramoRegistro,
   sameRegistrosList,
   summaryRegistros,
 } from './asistenciaUtils';
@@ -33,7 +35,52 @@ type AprendizAsistenciaHandlers = Readonly<{
     observaciones: string;
     tiposObservacion?: TipoObservacionAsistenciaItem[];
   }) => void;
+  puedeEliminarRegistro?: boolean;
+  eliminandoRegistroIds?: Set<number>;
+  onEliminarRegistro?: (asistenciaAprendizId: number, aprendizNombre: string, tramoLabel: string) => void;
 }>;
+
+function BotonesEliminarRegistroAdmin({
+  registros,
+  aprendizNombre,
+  puedeEliminarRegistro,
+  eliminandoRegistroIds,
+  onEliminarRegistro,
+  className,
+}: Readonly<{
+  registros: AsistenciaAprendizResponse[];
+  aprendizNombre: string;
+  puedeEliminarRegistro?: boolean;
+  eliminandoRegistroIds?: Set<number>;
+  onEliminarRegistro?: (asistenciaAprendizId: number, aprendizNombre: string, tramoLabel: string) => void;
+  className: string;
+}>) {
+  if (!puedeEliminarRegistro || !onEliminarRegistro) return null;
+  const tramos = registros.filter((r) => r.hora_ingreso);
+  if (tramos.length === 0) return null;
+
+  return (
+    <>
+      {tramos.map((registro) => {
+        const tramoLabel = formatTramoRegistro(registro);
+        const eliminando = eliminandoRegistroIds?.has(registro.id) ?? false;
+        return (
+          <button
+            key={registro.id}
+            type="button"
+            disabled={eliminando}
+            onClick={() => onEliminarRegistro(registro.id, aprendizNombre, tramoLabel)}
+            className={className}
+            title={`Eliminar registro ${tramoLabel} (admin)`}
+            aria-label={`Eliminar registro ${tramoLabel}`}
+          >
+            <TrashIcon className="h-5 w-5" />
+          </button>
+        );
+      })}
+    </>
+  );
+}
 
 function BotonResolverEstado({
   requiereRevisionRecord,
@@ -77,6 +124,10 @@ function AccionesTarjetaIndividual({
   onRegistrarSalida,
   onAbrirEstado,
   onAbrirObservaciones,
+  registros,
+  puedeEliminarRegistro,
+  eliminandoRegistroIds,
+  onEliminarRegistro,
 }: Readonly<{
   aprendiz: AprendizResponse;
   asistenciaId: number | null;
@@ -90,6 +141,10 @@ function AccionesTarjetaIndividual({
   onRegistrarSalida: (asistenciaAprendizId: number) => void;
   onAbrirEstado: AprendizAsistenciaHandlers['onAbrirEstado'];
   onAbrirObservaciones: AprendizAsistenciaHandlers['onAbrirObservaciones'];
+  registros: AsistenciaAprendizResponse[];
+  puedeEliminarRegistro?: boolean;
+  eliminandoRegistroIds?: Set<number>;
+  onEliminarRegistro?: AprendizAsistenciaHandlers['onEliminarRegistro'];
 }>) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-gray-700">
@@ -137,6 +192,14 @@ function AccionesTarjetaIndividual({
           <PencilSquareIcon className="h-5 w-5" />
         </button>
       )}
+      <BotonesEliminarRegistroAdmin
+        registros={registros}
+        aprendizNombre={aprendiz.persona_nombre ?? 'Aprendiz'}
+        puedeEliminarRegistro={puedeEliminarRegistro}
+        eliminandoRegistroIds={eliminandoRegistroIds}
+        onEliminarRegistro={onEliminarRegistro}
+        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300 touch-manipulation"
+      />
     </div>
   );
 }
@@ -183,6 +246,9 @@ export function TarjetaAprendizAsistencia({
   onRegistrarSalida,
   onAbrirEstado,
   onAbrirObservaciones,
+  puedeEliminarRegistro,
+  eliminandoRegistroIds,
+  onEliminarRegistro,
 }: AprendizAsistenciaHandlers) {
   const esGrupal = modoLista === 'grupal';
   const { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord } = summaryRegistros(registros);
@@ -260,6 +326,10 @@ export function TarjetaAprendizAsistencia({
             onRegistrarSalida={onRegistrarSalida}
             onAbrirEstado={onAbrirEstado}
             onAbrirObservaciones={onAbrirObservaciones}
+            registros={registros}
+            puedeEliminarRegistro={puedeEliminarRegistro}
+            eliminandoRegistroIds={eliminandoRegistroIds}
+            onEliminarRegistro={onEliminarRegistro}
           />
         }
       />
@@ -281,6 +351,9 @@ export const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia(props
     onRegistrarSalida,
     onAbrirEstado,
     onAbrirObservaciones,
+    puedeEliminarRegistro,
+    eliminandoRegistroIds,
+    onEliminarRegistro,
   } = props;
   const esGrupal = modoLista === 'grupal';
   const { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord } = summaryRegistros(registros);
@@ -369,6 +442,14 @@ export const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia(props
               <PencilSquareIcon className="h-7 w-7" />
             </button>
             )}
+            <BotonesEliminarRegistroAdmin
+              registros={registros}
+              aprendizNombre={aprendiz.persona_nombre ?? 'Aprendiz'}
+              puedeEliminarRegistro={puedeEliminarRegistro}
+              eliminandoRegistroIds={eliminandoRegistroIds}
+              onEliminarRegistro={onEliminarRegistro}
+              className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
+            />
           </div>
         </td>
       )}
@@ -383,10 +464,13 @@ export const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia(props
     prev.modoLista === next.modoLista &&
     prev.selected === next.selected &&
     prev.busy === next.busy &&
+    prev.puedeEliminarRegistro === next.puedeEliminarRegistro &&
+    prev.eliminandoRegistroIds === next.eliminandoRegistroIds &&
     prev.onToggleSelect === next.onToggleSelect &&
     prev.onRegistrarIngreso === next.onRegistrarIngreso &&
     prev.onRegistrarSalida === next.onRegistrarSalida &&
     prev.onAbrirEstado === next.onAbrirEstado &&
-    prev.onAbrirObservaciones === next.onAbrirObservaciones
+    prev.onAbrirObservaciones === next.onAbrirObservaciones &&
+    prev.onEliminarRegistro === next.onEliminarRegistro
   );
 });

@@ -15,6 +15,7 @@ const (
 	routeAmbientes  = "/ambientes"
 	routeBloques    = "/bloques"
 	routePisos      = "/pisos"
+	routeJornadas   = "/jornadas"
 
 	permVerPersonas     = "VER PERSONAS"
 	permCrearPersona    = "CREAR PERSONA"
@@ -111,7 +112,7 @@ func SetupRouter() *gin.Engine {
 				catalogos.GET(routeSedes, catalogoHandler.GetSedes)
 				catalogos.GET(routeAmbientes, catalogoHandler.GetAmbientes)
 				catalogos.GET("/modalidades-formacion", catalogoHandler.GetModalidadesFormacion)
-				catalogos.GET("/jornadas", catalogoHandler.GetJornadas)
+				catalogos.GET(routeJornadas, catalogoHandler.GetJornadas)
 				catalogos.GET("/dias-formacion", catalogoHandler.GetDiasFormacion)
 			}
 			catalogosPersona := protected.Group("/catalogos")
@@ -179,6 +180,7 @@ func SetupRouter() *gin.Engine {
 			asistencias.POST("/ingreso-por-documento", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.RegistrarIngresoPorDocumento)
 			asistencias.PUT("/:id/observaciones-sesion", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.ActualizarObservacionesSesion)
 			asistencias.PUT("/aprendiz/:asistenciaAprendizId/salida", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.RegistrarSalida)
+			asistencias.DELETE("/aprendiz/:asistenciaAprendizId", middleware.RequireSuperAdminOrAdmin(), asistenciaHandler.EliminarRegistroAprendiz)
 			asistencias.PUT("/aprendiz/:asistenciaAprendizId/observaciones", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.ActualizarObservaciones)
 			asistencias.PUT("/aprendiz/:asistenciaAprendizId/estado", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.AjustarEstadoAprendiz)
 			// Catálogo de tipos de observación: solo requiere estar autenticado (no hay id de sesión para fallback de instructor)
@@ -198,11 +200,11 @@ func SetupRouter() *gin.Engine {
 			administracion := protected.Group("/administracion")
 			administracion.Use(middleware.RequireSuperAdminOrAdmin())
 			{
-				administracion.GET("/jornadas", jornadaHandler.List)
-				administracion.POST("/jornadas", jornadaHandler.Create)
-				administracion.PUT("/jornadas/:id", jornadaHandler.Update)
-				administracion.POST("/jornadas/:id/propagar", jornadaHandler.Propagar)
-				administracion.DELETE("/jornadas/:id", jornadaHandler.Delete)
+				administracion.GET(routeJornadas, jornadaHandler.List)
+				administracion.POST(routeJornadas, jornadaHandler.Create)
+				administracion.PUT(routeJornadas+"/:id", jornadaHandler.Update)
+				administracion.POST(routeJornadas+"/:id/propagar", jornadaHandler.Propagar)
+				administracion.DELETE(routeJornadas+"/:id", jornadaHandler.Delete)
 			}
 
 			// Gestión de permisos y roles (ASIGNAR PERMISOS o SUPER ADMIN para roles)

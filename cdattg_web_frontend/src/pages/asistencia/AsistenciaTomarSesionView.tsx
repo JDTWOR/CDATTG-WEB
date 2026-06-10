@@ -23,6 +23,8 @@ function SesionFichaCard({ page }: Readonly<{ page: AsistenciaSesionPageState }>
   return (
     <FichaCaracterizacionCard
       ficha={fichaSeleccionada}
+      collapsible
+      defaultOpen={false}
       footerLeft={
         <span className="text-sm text-gray-600 dark:text-gray-400">
           {page.enSesionCount} de {page.aprendicesFicha.length} con registro en sesión

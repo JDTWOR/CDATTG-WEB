@@ -23,6 +23,9 @@ export function AsistenciaAprendicesListaSesion({ page, modoLista, busqueda = tr
     handleRegistrarSalida,
     onAbrirEstadoModal,
     onAbrirObservacionesModal,
+    puedeEliminarRegistro,
+    eliminandoRegistroIds,
+    handleEliminarRegistro,
     busquedaAprendiz,
     setBusquedaAprendiz,
   } = page;
@@ -58,6 +61,9 @@ export function AsistenciaAprendicesListaSesion({ page, modoLista, busqueda = tr
     onRegistrarSalida: (aaId: number) => handleRegistrarSalida(aaId, aprendiz.id),
     onAbrirEstado: onAbrirEstadoModal,
     onAbrirObservaciones: onAbrirObservacionesModal,
+    puedeEliminarRegistro,
+    eliminandoRegistroIds,
+    onEliminarRegistro: handleEliminarRegistro,
   });
 
   return (

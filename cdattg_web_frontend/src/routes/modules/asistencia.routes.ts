@@ -9,6 +9,15 @@ export const asistenciaRoutes: RouteObject = {
   children: [
     {
       index: true,
+      handle: { breadcrumb: { label: 'Dashboard' } },
+      lazy: async () => {
+        const { AsistenciaModuleIndex } = await import('../../pages/asistencia/AsistenciaModuleIndex');
+        return { Component: AsistenciaModuleIndex };
+      },
+    },
+    {
+      path: 'fichas',
+      handle: { breadcrumb: { label: 'Tomar asistencia', to: asistenciaPaths.fichas } },
       lazy: async () => {
         const { AsistenciaIndex } = await import('../../pages/asistencia/AsistenciaIndex');
         return { Component: AsistenciaIndex };
@@ -49,10 +58,9 @@ export const asistenciaRoutes: RouteObject = {
     },
     {
       path: 'dashboard',
-      handle: { breadcrumb: { label: 'Dashboard' } },
       lazy: async () => {
-        const { AsistenciaDashboard } = await import('../../pages/AsistenciaDashboard');
-        return { Component: AsistenciaDashboard };
+        const { AsistenciaDashboardRedirect } = await import('../../pages/asistencia/AsistenciaDashboardRedirect');
+        return { Component: AsistenciaDashboardRedirect };
       },
     },
     {

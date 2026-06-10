@@ -117,11 +117,11 @@ export function extractHoraHHMM(raw: unknown): string {
   if (raw == null) return '';
   if (typeof raw === 'string') {
     const text = raw.trim();
-    const wall = text.match(/^(\d{1,2}):(\d{2})/);
+    const wall = /^(\d{1,2}):(\d{2})/.exec(text);
     if (wall) {
       return `${wall[1].padStart(2, '0')}:${wall[2]}`;
     }
-    const iso = text.match(/T(\d{1,2}):(\d{2})/);
+    const iso = /T(\d{1,2}):(\d{2})/.exec(text);
     if (iso) {
       return `${iso[1].padStart(2, '0')}:${iso[2]}`;
     }
@@ -130,7 +130,10 @@ export function extractHoraHHMM(raw: unknown): string {
   if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
     return extractHoraHHMM(raw.toISOString());
   }
-  return extractHoraHHMM(String(raw));
+  if (typeof raw === 'number' || typeof raw === 'boolean' || typeof raw === 'bigint') {
+    return extractHoraHHMM(String(raw));
+  }
+  return '';
 }
 
 export function parseTimeToMinutes(raw: unknown): number {
@@ -139,6 +142,43 @@ export function parseTimeToMinutes(raw: unknown): number {
   const h = Number.parseInt(parts[0] ?? '0', 10);
   const m = Number.parseInt(parts[1] ?? '0', 10);
   return h * 60 + m;
+}
+
+/** Minutos después de hora_fin en que aún cuenta como ventana activa (alineado con backend). */
+export const EXTENSION_FIN_JORNADA_MIN = 60;
+
+export function minutosDelDia(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+/**
+ * Indica si `now` cae en [hora_inicio, hora_fin + extensión] del evento (horario de pared).
+ * Espejo de validarHorarioRango en el backend.
+ */
+export function eventoEnHorarioActual(
+  event: Pick<InstructorAgendaEvent, 'hora_inicio' | 'hora_fin'>,
+  now: Date = new Date(),
+  extMin = EXTENSION_FIN_JORNADA_MIN,
+): boolean {
+  const inicioStr = extractHoraHHMM(event.hora_inicio);
+  const finStr = extractHoraHHMM(event.hora_fin);
+  if (!inicioStr || !finStr) {
+    return false;
+  }
+
+  let actual = minutosDelDia(now);
+  const start = parseTimeToMinutes(inicioStr);
+  let end = parseTimeToMinutes(finStr);
+
+  if (end < start) {
+    end += 24 * 60;
+    if (actual < start) {
+      actual += 24 * 60;
+    }
+  }
+
+  const endEffective = end + extMin;
+  return actual >= start && actual <= endEffective;
 }
 
 export function weekDaysFromStart(weekStart: Date): Date[] {

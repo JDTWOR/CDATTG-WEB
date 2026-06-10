@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"errors"
 	"time"
 
 	"github.com/sena/cdattg-web-golang/database"
@@ -18,6 +19,8 @@ const (
 
 type AsistenciaAprendizRepository interface {
 	Create(a *models.AsistenciaAprendiz) error
+	// CreateIngresoIdempotente crea ingreso solo si no hay tramo abierto en la sesión (transacción).
+	CreateIngresoIdempotente(a *models.AsistenciaAprendiz) (*models.AsistenciaAprendiz, bool, error)
 	FindByID(id uint) (*models.AsistenciaAprendiz, error)
 	FindByAsistenciaID(asistenciaID uint) ([]models.AsistenciaAprendiz, error)
 	FindByAsistenciaIDAndAprendizID(asistenciaID, aprendizID uint) (*models.AsistenciaAprendiz, error)
@@ -30,6 +33,7 @@ type AsistenciaAprendizRepository interface {
 	FindPendientesRevisionByInstructorAndFecha(instructorID uint, fecha string) ([]models.AsistenciaAprendiz, error)
 	Update(a *models.AsistenciaAprendiz) error
 	ReplaceTiposObservacion(aa *models.AsistenciaAprendiz, tipos []models.TipoObservacionAsistencia) error
+	Delete(id uint) error
 }
 
 type asistenciaAprendizRepository struct {
@@ -42,6 +46,35 @@ func NewAsistenciaAprendizRepository() AsistenciaAprendizRepository {
 
 func (r *asistenciaAprendizRepository) Create(a *models.AsistenciaAprendiz) error {
 	return r.db.Create(a).Error
+}
+
+func (r *asistenciaAprendizRepository) CreateIngresoIdempotente(a *models.AsistenciaAprendiz) (*models.AsistenciaAprendiz, bool, error) {
+	var result *models.AsistenciaAprendiz
+	created := false
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		var open models.AsistenciaAprendiz
+		err := tx.Where(
+			"asistencia_id = ? AND aprendiz_ficha_id = ? AND hora_ingreso IS NOT NULL AND hora_salida IS NULL",
+			a.AsistenciaID, a.AprendizFichaID,
+		).First(&open).Error
+		if err == nil {
+			result = &open
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err := tx.Create(a).Error; err != nil {
+			return err
+		}
+		result = a
+		created = true
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	return result, created, nil
 }
 
 func (r *asistenciaAprendizRepository) FindByID(id uint) (*models.AsistenciaAprendiz, error) {
@@ -160,4 +193,17 @@ func (r *asistenciaAprendizRepository) Update(a *models.AsistenciaAprendiz) erro
 
 func (r *asistenciaAprendizRepository) ReplaceTiposObservacion(aa *models.AsistenciaAprendiz, tipos []models.TipoObservacionAsistencia) error {
 	return r.db.Model(aa).Association("TiposObservacion").Replace(tipos)
+}
+
+func (r *asistenciaAprendizRepository) Delete(id uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var m models.AsistenciaAprendiz
+		if err := tx.First(&m, id).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&m).Association("TiposObservacion").Clear(); err != nil {
+			return err
+		}
+		return tx.Delete(&m).Error
+	})
 }

@@ -67,4 +67,14 @@
     flex-direction: column;
     align-items: center;
   }
+
+  /** Oculta el aviso en inglés "Scanner paused" de html5-qrcode; usamos overlay propio en español. */
+  .qr-scanner-reader [id$='__header_message'],
+  .qr-scanner-reader [id$='__status_span'] {
+    display: none !important;
+  }
+
+  .swal2-toast .swal-asistencia-motivo {
+    text-align: left;
+  }
 }

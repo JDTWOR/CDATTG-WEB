@@ -12,7 +12,7 @@ type Props = Readonly<{ page: AsistenciaFichasPageState }>;
 
 export function AsistenciaFichasListView({ page }: Props) {
   const { roles, permissions } = useAuth();
-  const volverTo = getInicioNavigationPath(roles, permissions, asistenciaPaths.index);
+  const volverTo = getInicioNavigationPath(roles, permissions, asistenciaPaths.fichas);
   const {
     fichas,
     error,
@@ -34,7 +34,7 @@ export function AsistenciaFichasListView({ page }: Props) {
           <p className="mt-2 text-gray-600 dark:text-gray-400">Tomar asistencia por ficha e instructor</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {volverTo !== asistenciaPaths.index && (
+          {volverTo !== asistenciaPaths.fichas && (
             <Link to={volverTo} className="btn-secondary inline-flex items-center gap-2">
               <ArrowLeftIcon className="h-5 w-5" aria-hidden />
               Volver al inicio
@@ -45,7 +45,7 @@ export function AsistenciaFichasListView({ page }: Props) {
             Historial
           </Link>
           {isSuperAdmin && (
-            <Link to={asistenciaPaths.dashboard} className="btn-secondary inline-flex items-center gap-2">
+            <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center gap-2">
               <ChartBarIcon className="h-5 w-5" />
               Dashboard
             </Link>

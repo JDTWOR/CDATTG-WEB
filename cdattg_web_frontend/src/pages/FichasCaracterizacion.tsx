@@ -2,18 +2,13 @@ import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } 
 import { Link } from 'react-router-dom';
 import { DASHBOARD_PATH, fichasPaths } from '../routes/paths';
 import { asistenciaFichaPath } from './asistencia/asistenciaPaths';
-import { LABEL_INSTRUCTOR_LIDER } from '../constants/instructorLiderLabels';
 import {
   DocumentTextIcon,
   ExclamationTriangleIcon,
   ArrowLeftIcon,
   MagnifyingGlassIcon,
-  AcademicCapIcon,
-  UsersIcon,
   CalendarDaysIcon,
   PlusIcon,
-  PencilSquareIcon,
-  TrashIcon,
   ArrowUpTrayIcon,
   ArrowDownTrayIcon,
   EyeIcon,
@@ -25,7 +20,8 @@ import { SelectSearch } from '../components/SelectSearch';
 import { ModalAsignarFicha } from '../components/ModalAsignarFicha';
 import { FichaFormModal } from '../components/FichaFormModal';
 import { FichaCaracterizacionCard } from '../components/FichaCaracterizacionCard';
-import { formatDiasEnTabla, mergeListAfterSave } from '../utils/fichaCaracterizacionForm';
+import { FichasAdminTable } from './fichas/FichasAdminTable';
+import { mergeListAfterSave } from '../utils/fichaCaracterizacionForm';
 import { canProgramarInstructores } from '../utils/programacionPermissions';
 import type {
   FichaCaracterizacionResponse,
@@ -388,22 +384,29 @@ export const FichasCaracterizacion = () => {
   // Vista admin: tabla y gestión completa
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Fichas de caracterización</h1>
-          <p className="mt-2 text-gray-600">Gestión de fichas por programa de formación</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white sm:text-3xl">Fichas de caracterización</h1>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 sm:mt-2 sm:text-base">
+            Gestión de fichas por programa de formación
+            {!loading && total > 0 ? (
+              <span className="ml-2 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                {total} {total === 1 ? 'ficha' : 'fichas'}
+              </span>
+            ) : null}
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={handleExportAllFichas} disabled={exportLoading} className="btn-secondary disabled:opacity-50">
-            <ArrowDownTrayIcon className="w-5 h-5 mr-2 inline" />
-            {exportLoading ? 'Exportando...' : 'Exportar todas las fichas'}
+            <ArrowDownTrayIcon className="mr-2 inline h-5 w-5" />
+            {exportLoading ? 'Exportando...' : 'Exportar'}
           </button>
           <button onClick={openImportModal} className="btn-secondary">
-            <ArrowUpTrayIcon className="w-5 h-5 mr-2 inline" />
-            Importar fichas
+            <ArrowUpTrayIcon className="mr-2 inline h-5 w-5" />
+            Importar
           </button>
           <button onClick={openCreate} className="btn-primary">
-            <PlusIcon className="w-5 h-5 mr-2 inline" />
+            <PlusIcon className="mr-2 inline h-5 w-5" />
             Nueva ficha
           </button>
         </div>
@@ -467,118 +470,25 @@ export const FichasCaracterizacion = () => {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card !p-0 overflow-hidden">
         {loading ? (
-          <div className="text-center py-12 text-gray-600 dark:text-gray-400">Cargando...</div>
+          <div className="py-16 text-center text-gray-600 dark:text-gray-400">Cargando fichas...</div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-                <thead className="bg-gray-50 dark:bg-gray-700/50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ficha</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Programa</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{LABEL_INSTRUCTOR_LIDER}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sede</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase max-w-[220px]">
-                      Días de formación
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ambiente</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Aprendices</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estado</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-32">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
-                  {list.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                        No hay fichas registradas
-                      </td>
-                    </tr>
-                  ) : (
-                    list.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{item.ficha}</td>
-                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{item.programa_formacion_nombre || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{item.instructor_nombre || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{item.sede_nombre ?? '-'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 max-w-[220px] whitespace-normal break-words">
-                          {formatDiasEnTabla(item, diasFormacion)}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-[200px] whitespace-normal break-words">
-                          {item.ambiente_nombre?.trim() || 'POR DEFINIR'}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{item.cantidad_aprendices}</td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`px-2 py-1 text-xs rounded-full ${
-                              item.status ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
-                            }`}
-                          >
-                            {item.status ? 'Activa' : 'Inactiva'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Link
-                              to={fichasPaths.detalle(item.id)}
-                              className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
-                              title="Ver ficha"
-                            >
-                              <EyeIcon className="w-5 h-5" />
-                            </Link>
-                            {puedeProgramarInstructores && (
-                              <Link
-                                to={`${fichasPaths.detalle(item.id)}?tab=programacion`}
-                                className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
-                                title="Programar instructores"
-                              >
-                                <CalendarDaysIcon className="w-5 h-5" />
-                              </Link>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setModalAsignar({ ficha: item, tipo: 'instructores' })}
-                              className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
-                              title="Asignar instructores"
-                            >
-                              <AcademicCapIcon className="w-5 h-5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setModalAsignar({ ficha: item, tipo: 'aprendices' })}
-                              className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
-                              title="Asignar aprendices"
-                            >
-                              <UsersIcon className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => openEdit(item)}
-                              className="p-2 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
-                              title="Editar"
-                            >
-                              <PencilSquareIcon className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(item.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                              title="Eliminar"
-                            >
-                              <TrashIcon className="w-5 h-5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className="p-4 sm:p-6">
+              <FichasAdminTable
+                list={list}
+                diasFormacion={diasFormacion}
+                puedeProgramarInstructores={puedeProgramarInstructores}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                onAsignar={setModalAsignar}
+              />
             </div>
             {totalPages > 1 && (
-              <div className="mt-4 flex justify-between items-center">
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Página {page} de {totalPages} ({total} total)
+              <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-600 sm:px-6">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Página {page} de {totalPages} · {total} fichas
                 </span>
                 <div className="flex gap-2">
                   <button

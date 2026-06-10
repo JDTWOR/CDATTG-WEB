@@ -150,7 +150,7 @@ export const AsistenciaHistorial = () => {
               : 'Consulte por fecha qué aprendices asistieron o no a cada ficha. Solo puede ver el historial de las fichas en las que está asignado.'}
           </p>
         </div>
-        <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center gap-2">
+        <Link to={asistenciaPaths.fichas} className="btn-secondary inline-flex items-center gap-2">
           <ClipboardDocumentListIcon className="w-5 h-5" aria-hidden />
           Tomar asistencia
         </Link>
@@ -206,7 +206,7 @@ export const AsistenciaHistorial = () => {
               ? 'No hay fichas registradas'
               : 'No tiene fichas asignadas como instructor. Solo puede ver el historial de las fichas en las que está asignado.'}
           </p>
-          <Link to={asistenciaPaths.index} className="btn-primary mt-4 inline-flex">
+          <Link to={asistenciaPaths.fichas} className="btn-primary mt-4 inline-flex">
             Ir a tomar asistencia
           </Link>
         </div>

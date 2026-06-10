@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useBreadcrumbOverride } from '../../navigation/breadcrumb';
+import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
 import { axiosErrorMessage } from '../../utils/httpError';
+import { canManageFichas } from '../../utils/fichaCaracterizacionForm';
 import type { AsistenciaResponse, FichaCaracterizacionResponse } from '../../types';
-import { parseAsistenciaFichaIdParam } from './asistenciaPaths';
+import { parseAsistenciaFichaIdParam, asistenciaPaths } from './asistenciaPaths';
 import { useAsistenciaRegistro } from './useAsistenciaRegistro';
 
 export function useAsistenciaSesion() {
@@ -13,6 +15,8 @@ export function useAsistenciaSesion() {
   const { setLabel, clearLabel } = useBreadcrumbOverride();
   const { fichaId: fichaIdParam } = useParams<{ fichaId: string }>();
   const fichaId = parseAsistenciaFichaIdParam(fichaIdParam);
+  const { roles } = useAuth();
+  const puedeEliminarRegistro = useMemo(() => canManageFichas(roles), [roles]);
 
   const [fichaSeleccionada, setFichaSeleccionada] = useState<FichaCaracterizacionResponse | null>(null);
   const [sesionActual, setSesionActual] = useState<AsistenciaResponse | null>(null);
@@ -24,6 +28,7 @@ export function useAsistenciaSesion() {
     fichaId: fichaId ?? 0,
     sesionActual,
     setSesionActual,
+    puedeEliminarRegistro,
   });
 
   useEffect(() => {
@@ -69,7 +74,7 @@ export function useAsistenciaSesion() {
   }, [fichaSeleccionada?.ficha, pathname, setLabel, clearLabel]);
 
   const handleVolverAFichas = () => {
-    navigate('/asistencia');
+    navigate(asistenciaPaths.fichas);
   };
 
   const showTomarSesion = Boolean(

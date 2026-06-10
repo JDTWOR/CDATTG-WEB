@@ -41,7 +41,7 @@ export function InstructorDashboardPage() {
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{loading ? '…' : fichasUnicas}</p>
         </div>
         <div className="card flex flex-col justify-center gap-2">
-          <Link to={asistenciaPaths.index} className="btn-primary inline-flex items-center justify-center gap-2 text-sm">
+          <Link to={asistenciaPaths.fichas} className="btn-primary inline-flex items-center justify-center gap-2 text-sm">
             <CalendarDaysIcon className="h-5 w-5" />
             Tomar asistencia
           </Link>

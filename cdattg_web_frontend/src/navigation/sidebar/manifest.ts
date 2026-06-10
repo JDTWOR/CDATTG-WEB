@@ -70,8 +70,8 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
   },
   {
     section: 'Control y seguimiento',
-    path: asistenciaPaths.index,
-    label: 'Asistencia',
+    path: asistenciaPaths.fichas,
+    label: 'Tomar asistencia',
     permission: 'VER ASISTENCIA',
     iconKey: 'asistencia',
   },
@@ -84,8 +84,8 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
   },
   {
     section: 'Control y seguimiento',
-    path: asistenciaPaths.dashboard,
-    label: 'Dashboard Asistencia',
+    path: asistenciaPaths.index,
+    label: 'Dashboard asistencia',
     permission: null,
     rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
     iconKey: 'asistencia/dashboard',

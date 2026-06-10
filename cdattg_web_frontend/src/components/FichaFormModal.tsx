@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { DocumentTextIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
 import {
@@ -7,10 +8,8 @@ import {
   labelBotonGuardarFicha,
   validarFormFicha,
 } from '../utils/fichaCaracterizacionForm';
-import { FichaHorariosEditor } from './FichaHorariosEditor';
-import { SelectSearch } from './SelectSearch';
-import { LABEL_INSTRUCTOR_LIDER } from '../constants/instructorLiderLabels';
-import { InstructorSelectAsync } from './InstructorSelectAsync';
+import { toDisplayTitle } from '../utils/fichaListDisplay';
+import { FichaFormModalFields } from './FichaFormModalFields';
 import type {
   AmbienteItem,
   DiaFormacionItem,
@@ -41,10 +40,8 @@ const emptyForm = (programaId = 0): FichaCaracterizacionRequest => ({
 export type FichaFormModalProps = Readonly<{
   open: boolean;
   onClose: () => void;
-  /** null = crear nueva ficha */
   editing: FichaCaracterizacionResponse | null;
   onSaved: (saved: FichaCaracterizacionResponse) => void;
-  /** Prefijo para ids de inputs (accesibilidad) */
   inputIdPrefix?: string;
 }>;
 
@@ -153,207 +150,110 @@ export function FichaFormModal({
   if (!open) return null;
 
   const pid = inputIdPrefix;
+  const isEditing = editingRow !== null;
+  const programaLabel = programas.find((p) => p.id === form.programa_formacion_id);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
         type="button"
-        className="absolute inset-0 z-0 bg-black/50"
+        className="absolute inset-0 z-0 bg-black/50 backdrop-blur-[1px]"
         aria-label="Cerrar ventana"
         onClick={onClose}
       />
       <dialog
         open
-        className="relative z-10 m-0 my-8 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+        className="relative z-10 m-0 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-0 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
         aria-labelledby={`${pid}-title`}
       >
-        <h2 id={`${pid}-title`} className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-          {editingRow ? 'Editar ficha' : 'Crear ficha'}
-        </h2>
-
-        {loadingForm ? (
-          <p className="py-8 text-center text-gray-500 dark:text-gray-400">Cargando formulario…</p>
-        ) : (
-          <>
-            {formError && (
-              <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
-                {formError}
-              </div>
-            )}
-            {catalogError && (
-              <div className="mb-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100 px-4 py-3 rounded-lg text-sm">
-                {catalogError} Recargue la página o contacte al administrador si el problema continúa.
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor={`${pid}-ficha`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Número de Ficha *
-                </label>
-                <input
-                  id={`${pid}-ficha`}
-                  type="text"
-                  placeholder="Ej: 123456"
-                  value={form.ficha}
-                  onChange={(e) => setForm((f) => ({ ...f, ficha: e.target.value }))}
-                  className="input-field mt-1 w-full"
-                />
-              </div>
-              <div>
-                <label htmlFor={`${pid}-programa`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Programa de Formación *
-                </label>
-                <div className="mt-1">
-                  <SelectSearch
-                    inputId={`${pid}-programa`}
-                    options={programas.map((p) => ({ value: p.id, label: `${p.codigo} - ${p.nombre}` }))}
-                    value={form.programa_formacion_id === 0 ? undefined : form.programa_formacion_id}
-                    onChange={(v) => setForm((f) => ({ ...f, programa_formacion_id: v ?? 0 }))}
-                    placeholder="Seleccione un programa..."
-                    isRequired
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor={`${pid}-fecha-inicio`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Fecha de Inicio *
-                </label>
-                <input
-                  id={`${pid}-fecha-inicio`}
-                  type="date"
-                  value={form.fecha_inicio ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, fecha_inicio: e.target.value || undefined }))}
-                  className="input-field mt-1 w-full"
-                />
-              </div>
-              <div>
-                <label htmlFor={`${pid}-fecha-fin`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Fecha de Fin *
-                </label>
-                <input
-                  id={`${pid}-fecha-fin`}
-                  type="date"
-                  value={form.fecha_fin ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, fecha_fin: e.target.value || undefined }))}
-                  className="input-field mt-1 w-full"
-                />
-              </div>
-
-              <div>
-                <label htmlFor={`${pid}-sede`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Sede *
-                </label>
-                <div className="mt-1">
-                  <SelectSearch
-                    inputId={`${pid}-sede`}
-                    options={sedes.map((s) => ({ value: s.id, label: s.nombre }))}
-                    value={form.sede_id}
-                    onChange={(v) => setForm((f) => ({ ...f, sede_id: v }))}
-                    placeholder="Seleccione una sede..."
-                    isRequired
-                  />
-                </div>
-              </div>
-              <div>
-                <label htmlFor={`${pid}-instructor`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {LABEL_INSTRUCTOR_LIDER} *
-                </label>
-                <div className="mt-1">
-                  <InstructorSelectAsync
-                    inputId={`${pid}-instructor`}
-                    value={form.instructor_id ?? undefined}
-                    onChange={(v) => setForm((f) => ({ ...f, instructor_id: v }))}
-                    placeholder="Buscar por nombre o documento..."
-                    isRequired
-                    defaultLabel={editingRow?.instructor_nombre}
-                  />
-                </div>
-                {!editingRow && (
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    La asignación del instructor líder se realiza en el momento de crear la ficha.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor={`${pid}-modalidad`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Modalidad de Formación *
-                </label>
-                <div className="mt-1">
-                  <SelectSearch
-                    inputId={`${pid}-modalidad`}
-                    options={modalidades.map((m) => ({ value: m.id, label: m.nombre }))}
-                    value={form.modalidad_formacion_id}
-                    onChange={(v) => setForm((f) => ({ ...f, modalidad_formacion_id: v }))}
-                    placeholder="Seleccione una modalidad..."
-                    isRequired
-                  />
-                </div>
-              </div>
-              <div className="md:col-span-2">
-                <label htmlFor={`${pid}-ambiente`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Ambiente *
-                </label>
-                <div className="mt-1">
-                  <SelectSearch
-                    inputId={`${pid}-ambiente`}
-                    options={ambientes.map((a) => ({ value: a.id, label: a.nombre }))}
-                    value={form.ambiente_id}
-                    onChange={(v) => setForm((f) => ({ ...f, ambiente_id: v }))}
-                    placeholder="Seleccione un ambiente..."
-                    isRequired
-                  />
-                </div>
-              </div>
-            </div>
-
-            <FichaHorariosEditor
-              horarios={form.horarios ?? form.dias_formacion ?? []}
-              onChange={(horarios) =>
-                setForm((f) => ({
-                  ...f,
-                  horarios,
-                  dias_formacion: horarios,
-                  dias_formacion_ids: [...new Set(horarios.map((h) => h.dia_formacion_id).filter((id) => id > 0))],
-                }))
-              }
-              jornadas={jornadas}
-              diasFormacion={diasFormacion}
-              inputIdPrefix={pid}
-            />
-
-            <div className="mt-4 flex items-center gap-2">
-              <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ficha Activa *</span>
-              <button
-                id={`${pid}-status`}
-                type="button"
-                role="switch"
-                aria-checked={form.status ?? true}
-                onClick={() => setForm((f) => ({ ...f, status: !(f.status ?? true) }))}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-                  form.status ?? true ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-600'
-                }`}
-              >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <DocumentTextIcon className="h-6 w-6 shrink-0 text-primary-600 dark:text-primary-400" aria-hidden />
+              <h2 id={`${pid}-title`} className="text-lg font-bold text-gray-900 dark:text-white sm:text-xl">
+                {isEditing ? 'Editar ficha' : 'Nueva ficha'}
+              </h2>
+              {isEditing ? (
+                <span className="rounded-md bg-primary-100 px-2 py-0.5 font-mono text-sm font-semibold text-primary-800 dark:bg-primary-900/50 dark:text-primary-200">
+                  {editingRow.ficha}
+                </span>
+              ) : null}
+              {isEditing ? (
                 <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
-                    form.status ?? true ? 'translate-x-5' : 'translate-x-1'
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    form.status
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                      : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
                   }`}
-                />
-              </button>
-              <span className="text-sm text-gray-600 dark:text-gray-400">{form.status ?? true ? 'Sí' : 'No'}</span>
+                >
+                  {form.status ? 'Activa' : 'Inactiva'}
+                </span>
+              ) : null}
             </div>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {isEditing
+                ? toDisplayTitle(programaLabel?.nombre ?? editingRow.programa_formacion_nombre)
+                : 'Complete los datos de caracterización y la programación horaria.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+            aria-label="Cerrar"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
 
-            <div className="mt-6 flex justify-center gap-3">
-              <button type="button" onClick={onClose} className="btn-secondary" disabled={saving}>
-                Cancelar
-              </button>
-              <button type="button" onClick={() => void handleSave()} className="btn-primary" disabled={saving}>
-                {labelBotonGuardarFicha(saving, editingRow)}
-              </button>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {loadingForm ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-16">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+              <p className="text-sm text-gray-500 dark:text-gray-400">Cargando formulario…</p>
             </div>
-          </>
+          ) : (
+            <>
+              {formError ? (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+                  {formError}
+                </div>
+              ) : null}
+              {catalogError ? (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100">
+                  {catalogError} Recargue la página o contacte al administrador si el problema continúa.
+                </div>
+              ) : null}
+              <FichaFormModalFields
+                pid={pid}
+                form={form}
+                setForm={setForm}
+                editingRow={editingRow}
+                programas={programas}
+                sedes={sedes}
+                ambientes={ambientes}
+                modalidades={modalidades}
+                jornadas={jornadas}
+                diasFormacion={diasFormacion}
+              />
+            </>
+          )}
+        </div>
+
+        {loadingForm ? null : (
+          <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4 dark:border-gray-700 dark:bg-gray-900/50 sm:flex-row sm:justify-end">
+            <button type="button" onClick={onClose} className="btn-secondary w-full sm:w-auto" disabled={saving}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              className="btn-primary w-full sm:w-auto"
+              disabled={saving}
+            >
+              {labelBotonGuardarFicha(saving, editingRow)}
+            </button>
+          </div>
         )}
       </dialog>
     </div>

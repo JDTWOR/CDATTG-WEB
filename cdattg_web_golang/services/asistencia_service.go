@@ -16,6 +16,7 @@ const (
 	errMsgSesionYaFinalizada             = "LA SESIÓN YA ESTÁ FINALIZADA"
 	errMsgObservacionFueraDePlazo        = "LA OBSERVACIÓN SOLO SE PUEDE EDITAR HASTA 5 DÍAS DESPUÉS DE CERRAR LA SESIÓN"
 	errMsgRegistroAsistenciaNoEncontrado = "REGISTRO DE ASISTENCIA NO ENCONTRADO"
+	errMsgIDInvalido                     = "id inválido"
 	errMsgFechaInvalida                  = "FECHA INVÁLIDA, USE YYYY-MM-DD"
 	errMsgYaExisteSesionActiva           = "YA EXISTE UNA SESIÓN DE ASISTENCIA ACTIVA PARA ESTA FICHA. FINALÍCELA ANTES DE CREAR OTRA"
 	errMsgNoEstaCreadoComoInstructor     = "NO ESTÁ CREADO COMO INSTRUCTOR DE ESTA FICHA"
@@ -28,10 +29,19 @@ const plazoEdicionObservacionSesionDias = 5
 
 const (
 	minSegundosEntreIngresoYSalida = 60
-	msgIngresoYaRegistrado         = "Ingreso ya registrado hace unos segundos"
-	msgSalidaQRDemasiadoPronto     = "Entrada registrada. El mismo QR se leyó hace muy poco; para marcar salida espere al menos 1 minuto desde la entrada."
-	errMsgEsperaMinutoSalida       = "debe esperar al menos 1 minuto entre la entrada y la salida"
+	msgIngresoYaRegistrado   = "Entrada ya registrada para este aprendiz en esta sesión. No se guardó de nuevo para evitar un registro duplicado."
+	errMsgEsperaMinutoSalida = "debe esperar al menos 1 minuto entre la entrada y la salida"
 )
+
+func mensajeSalidaQRDemasiadoPronto(segundosRestantes int) string {
+	if segundosRestantes > 0 {
+		return fmt.Sprintf(
+			"Entrada ya registrada. Para marcar salida con el mismo QR debe esperar %d segundos más (mínimo 1 minuto desde la entrada).",
+			segundosRestantes,
+		)
+	}
+	return "Entrada ya registrada. Ya puede escanear de nuevo para marcar la salida."
+}
 
 type AsistenciaService interface {
 	CreateSesion(req dto.AsistenciaRequest) (*dto.AsistenciaResponse, error)
@@ -51,6 +61,7 @@ type AsistenciaService interface {
 	CrearTipoObservacionAsistencia(req dto.TipoObservacionAsistenciaCreateRequest) (*dto.TipoObservacionAsistenciaItem, error)
 	ActualizarTipoObservacionAsistencia(id uint, req dto.TipoObservacionAsistenciaUpdateRequest) (*dto.TipoObservacionAsistenciaItem, error)
 	EliminarTipoObservacionAsistencia(id uint) error
+	EliminarRegistroAprendiz(asistenciaAprendizID uint) error
 	GetDashboard(sedeID *uint, fecha string) (*dto.AsistenciaDashboardResponse, error)
 	GetCasosBienestar(sedeID *uint, dias, minFallas int) (*dto.CasosBienestarResponse, error)
 	GetDetalleInasistenciasAprendiz(fichaNumero string, aprendizID uint, dias int, sedeNombre string) (*dto.CasoBienestarAprendizDetalleResponse, error)
@@ -408,10 +419,14 @@ func (s *asistenciaService) RegistrarIngreso(req dto.AsistenciaAprendizRequest, 
 		AprendizFichaID:                  req.AprendizID,
 		HoraIngreso:                      &now,
 	}
-	if err := s.repoAA.Create(&aa); err != nil {
+	createdAA, created, err := s.repoAA.CreateIngresoIdempotente(&aa)
+	if err != nil {
 		return nil, fmt.Errorf("error al registrar ingreso: %w", err)
 	}
-	return s.GetAsistenciaAprendizByID(aa.ID)
+	if !created {
+		return s.respuestaIngresoAbierto(createdAA, msgIngresoYaRegistrado, 0)
+	}
+	return s.GetAsistenciaAprendizByID(createdAA.ID)
 }
 
 func (s *asistenciaService) sesionActivaPorID(asistenciaID uint) (*models.Asistencia, error) {
@@ -454,29 +469,6 @@ func (s *asistenciaService) tramoAbiertoAprendizEnFichaHoy(fichaID, aprendizID u
 	return sinSalida
 }
 
-func accionAutomaticaPorEstado(sinSalida *models.AsistenciaAprendiz) string {
-	if sinSalida != nil {
-		return "salida"
-	}
-	return "ingreso"
-}
-
-func (s *asistenciaService) registrarIngresoOSalidaPorDocumento(
-	accion string,
-	asistenciaID, aprendizID uint,
-	sinSalida *models.AsistenciaAprendiz,
-	instructorFichaID *uint,
-) (*dto.AsistenciaAprendizResponse, error) {
-	switch strings.TrimSpace(strings.ToLower(accion)) {
-	case "salida":
-		return s.registrarSalidaPorDocumento(sinSalida, instructorFichaID)
-	case "ingreso":
-		return s.registrarIngresoPorDocumentoAccion(asistenciaID, aprendizID, sinSalida, instructorFichaID)
-	default:
-		return nil, errors.New("acción inválida; use ingreso o salida")
-	}
-}
-
 func segundosRestantesParaSalida(horaIngreso, ahora time.Time) int {
 	faltan := time.Duration(minSegundosEntreIngresoYSalida)*time.Second - ahora.Sub(horaIngreso)
 	if faltan <= 0 {
@@ -517,7 +509,7 @@ func (s *asistenciaService) registrarSalidaPorDocumento(sinSalida *models.Asiste
 	if err != nil {
 		if esErrorEsperaMinutoSalida(err) && sinSalida.HoraIngreso != nil {
 			rest := segundosRestantesParaSalida(*sinSalida.HoraIngreso, time.Now())
-			return s.respuestaIngresoAbierto(sinSalida, msgSalidaQRDemasiadoPronto, rest)
+			return s.respuestaIngresoAbierto(sinSalida, mensajeSalidaQRDemasiadoPronto(rest), rest)
 		}
 		return nil, err
 	}
@@ -555,9 +547,14 @@ func (s *asistenciaService) RegistrarIngresoPorDocumento(req dto.AsistenciaIngre
 	if err != nil {
 		return nil, err
 	}
-	sinSalida := s.tramoAbiertoAprendizEnFichaHoy(fichaID, aprendizID)
-	accion := accionAutomaticaPorEstado(sinSalida)
-	return s.registrarIngresoOSalidaPorDocumento(accion, req.AsistenciaID, aprendizID, sinSalida, instructorFichaIDRegistroIngreso)
+	if sinSalida := s.tramoAbiertoAprendizEnFichaHoy(fichaID, aprendizID); sinSalida != nil {
+		if sinSalida.HoraIngreso != nil && time.Since(*sinSalida.HoraIngreso) < minSegundosEntreIngresoYSalida*time.Second {
+			rest := segundosRestantesParaSalida(*sinSalida.HoraIngreso, time.Now())
+			return s.respuestaIngresoAbierto(sinSalida, mensajeSalidaQRDemasiadoPronto(rest), rest)
+		}
+		return s.registrarSalidaPorDocumento(sinSalida, instructorFichaIDRegistroIngreso)
+	}
+	return s.registrarIngresoPorDocumentoAccion(req.AsistenciaID, aprendizID, nil, instructorFichaIDRegistroIngreso)
 }
 
 func (s *asistenciaService) RegistrarSalida(asistenciaAprendizID uint, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error) {
@@ -689,7 +686,7 @@ func (s *asistenciaService) CrearTipoObservacionAsistencia(req dto.TipoObservaci
 
 func (s *asistenciaService) ActualizarTipoObservacionAsistencia(id uint, req dto.TipoObservacionAsistenciaUpdateRequest) (*dto.TipoObservacionAsistenciaItem, error) {
 	if id == 0 {
-		return nil, errors.New("id inválido")
+		return nil, errors.New(errMsgIDInvalido)
 	}
 	item, err := s.tipoObsRepo.FindByID(id)
 	if err != nil {
@@ -718,7 +715,7 @@ func (s *asistenciaService) ActualizarTipoObservacionAsistencia(id uint, req dto
 
 func (s *asistenciaService) EliminarTipoObservacionAsistencia(id uint) error {
 	if id == 0 {
-		return errors.New("id inválido")
+		return errors.New(errMsgIDInvalido)
 	}
 	item, err := s.tipoObsRepo.FindByID(id)
 	if err != nil {
@@ -726,6 +723,20 @@ func (s *asistenciaService) EliminarTipoObservacionAsistencia(id uint) error {
 	}
 	item.Activo = false
 	return s.tipoObsRepo.Update(item)
+}
+
+func (s *asistenciaService) EliminarRegistroAprendiz(asistenciaAprendizID uint) error {
+	if asistenciaAprendizID == 0 {
+		return errors.New(errMsgIDInvalido)
+	}
+	aa, err := s.repoAA.FindByID(asistenciaAprendizID)
+	if err != nil {
+		return errors.New(errMsgRegistroAsistenciaNoEncontrado)
+	}
+	if aa.Asistencia != nil && aa.Asistencia.IsFinished {
+		return errors.New(errMsgSesionYaFinalizada)
+	}
+	return s.repoAA.Delete(asistenciaAprendizID)
 }
 
 func (s *asistenciaService) ListAprendicesEnSesion(asistenciaID uint) ([]dto.AsistenciaAprendizResponse, error) {

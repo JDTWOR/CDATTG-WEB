@@ -9,3 +9,6 @@ docs/deployment/conexiones-externas.md
 # Excel temporales / datos locales
 *.xlsx
 *.xls
+
+backups/
+scripts/

@@ -831,6 +831,10 @@ class ApiService {
     await this.api.delete(`/asistencias/tipos-observacion/${id}`);
   }
 
+  async eliminarRegistroAsistencia(asistenciaAprendizId: number): Promise<void> {
+    await this.api.delete(`/asistencias/aprendiz/${asistenciaAprendizId}`);
+  }
+
   async crearOActualizarObservacionesAsistencia(
     asistenciaId: number,
     aprendizId: number,

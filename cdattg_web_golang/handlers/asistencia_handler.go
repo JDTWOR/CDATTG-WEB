@@ -372,6 +372,20 @@ func (h *AsistenciaHandler) EliminarTipoObservacionAsistencia(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// EliminarRegistroAprendiz elimina un tramo de asistencia de un aprendiz (solo superadmin/admin).
+func (h *AsistenciaHandler) EliminarRegistroAprendiz(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("asistenciaAprendizId"), 10, 32)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	if err := h.svc.EliminarRegistroAprendiz(uint(id)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (h *AsistenciaHandler) ListAprendicesEnSesion(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {

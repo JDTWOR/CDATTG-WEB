@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import type { InstructorAgendaEvent } from '../../types/agenda';
 import { asistenciaFichaPath } from '../../pages/asistencia/asistenciaPaths';
-import { colorClassForInstructor, extractHoraHHMM } from './calendarUtils';
+import { colorClassForInstructor, eventoEnHorarioActual, extractHoraHHMM } from './calendarUtils';
 
 type ScheduleEventCardProps = Readonly<{
   event: InstructorAgendaEvent;
@@ -39,6 +39,7 @@ export function ScheduleEventCard({
   className = '',
 }: ScheduleEventCardProps) {
   const color = colorClassForInstructor(event.instructor_id, mode, instructorColorMap);
+  const puedeTomarAsistencia = isToday && mode === 'instructor' && eventoEnHorarioActual(event);
 
   return (
     <div
@@ -59,7 +60,7 @@ export function ScheduleEventCard({
           {event.programa_nombre && (
             <div className="line-clamp-2 flex-1 opacity-90">{event.programa_nombre}</div>
           )}
-          {isToday && (
+          {puedeTomarAsistencia && (
             <Link
               to={asistenciaFichaPath(event.ficha_id)}
               className="mt-auto block rounded bg-white/20 px-1 py-0.5 text-center text-[10px] hover:bg-white/30"

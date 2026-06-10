@@ -1,4 +1,5 @@
 import type { DiaFormacionItem, FichaCaracterizacionResponse } from '../types';
+import { extractHoraHHMM } from '../components/calendar/calendarUtils';
 import { diasIdsFromListItem } from './fichaCaracterizacionForm';
 import { horariosFromFicha } from './fichaCaracterizacionHorarios';
 
@@ -68,8 +69,8 @@ export function buildHorarioResumenFicha(
   const entries = horarios
     .map((h) => {
       const nombre = h.dia_nombre ?? diasCatalog.find((d) => d.id === h.dia_formacion_id)?.nombre ?? '';
-      const inicio = h.hora_inicio?.slice(0, 5) ?? '';
-      const fin = h.hora_fin?.slice(0, 5) ?? '';
+      const inicio = extractHoraHHMM(h.hora_inicio);
+      const fin = extractHoraHHMM(h.hora_fin);
       const idx = diasCatalog.findIndex((d) => d.id === h.dia_formacion_id);
       return {
         nombre,

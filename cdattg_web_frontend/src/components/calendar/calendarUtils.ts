@@ -63,7 +63,7 @@ export function computeGridTimeRangeFromEvents(
     if (end > maxEnd) maxEnd = end;
   }
 
-  const startMinutes = Math.max(0, minStart - marginMinutes);
+  const startMinutes = Math.max(GRID_START_HOUR * 60, minStart - marginMinutes);
   const endMinutes = Math.min(24 * 60, maxEnd + marginMinutes);
 
   if (endMinutes <= startMinutes) {

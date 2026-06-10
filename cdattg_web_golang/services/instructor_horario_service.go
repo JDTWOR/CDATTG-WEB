@@ -111,6 +111,23 @@ func (s *InstructorHorarioService) bloquesDiaFicha(ficha *models.FichaCaracteriz
 	if len(out) > 0 {
 		return out
 	}
+	jornadaID := ficha.JornadaID
+	if jornadaID == nil && ficha.Jornada != nil {
+		id := ficha.Jornada.ID
+		jornadaID = &id
+	}
+	if jornadaID != nil && *jornadaID > 0 {
+		if plantilla, err := BloquesJornadaPlantilla(*jornadaID); err == nil {
+			for _, b := range plantilla {
+				if b.DiaFormacionID == diaFormacionID {
+					out = append(out, b)
+				}
+			}
+			if len(out) > 0 {
+				return out
+			}
+		}
+	}
 	if ficha.Jornada != nil {
 		hi, hf := normalizeHoraMM(ficha.Jornada.HoraInicio), normalizeHoraMM(ficha.Jornada.HoraFin)
 		if hi != "" && hf != "" {

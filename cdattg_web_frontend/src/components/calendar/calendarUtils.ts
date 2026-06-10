@@ -112,6 +112,53 @@ export function formatLocalISO(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+export function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+export function endOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
+
+/** Duración de un bloque horario en minutos (horario de pared). */
+export function duracionBloqueMinutos(horaInicio: unknown, horaFin: unknown): number {
+  const inicioStr = extractHoraHHMM(horaInicio);
+  const finStr = extractHoraHHMM(horaFin);
+  if (!inicioStr || !finStr) {
+    return 0;
+  }
+  const start = parseTimeToMinutes(inicioStr);
+  let end = parseTimeToMinutes(finStr);
+  if (end < start) {
+    end += 24 * 60;
+  }
+  return Math.max(0, end - start);
+}
+
+export function totalMinutosProgramados(
+  eventos: Pick<InstructorAgendaEvent, 'hora_inicio' | 'hora_fin'>[],
+): number {
+  return eventos.reduce((acc, ev) => acc + duracionBloqueMinutos(ev.hora_inicio, ev.hora_fin), 0);
+}
+
+/** Ej.: "42 h", "42 h 30 min". */
+export function formatHorasProgramadas(totalMinutos: number): string {
+  if (totalMinutos <= 0) {
+    return '0 h';
+  }
+  const h = Math.floor(totalMinutos / 60);
+  const m = totalMinutos % 60;
+  if (m === 0) {
+    return `${h} h`;
+  }
+  return `${h} h ${m} min`;
+}
+
+export function formatMesAnioLabel(d: Date): string {
+  const raw = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(d);
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 /** Extrae HH:MM de la API sin aplicar zona horaria (horario de pared). */
 export function extractHoraHHMM(raw: unknown): string {
   if (raw == null) return '';

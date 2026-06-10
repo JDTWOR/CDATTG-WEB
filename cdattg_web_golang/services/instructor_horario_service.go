@@ -366,6 +366,13 @@ func fichaSinFechasProgramadas(ficha *models.FichaCaracterizacion) bool {
 
 const errMsgFueraVigenciaAsignacion = "fuera del periodo de vigencia de la asignación"
 
+func formatFechaVigencia(t *time.Time) string {
+	if t == nil {
+		return "sin límite"
+	}
+	return t.Format("02/01/2006")
+}
+
 func diaMomentoCalendario(momento time.Time) time.Time {
 	return time.Date(momento.Year(), momento.Month(), momento.Day(), 0, 0, 0, 0, momento.Location())
 }
@@ -381,7 +388,13 @@ func validarVigenciaMomento(
 		return nil
 	}
 	if !diaDentroDeVigencia(diaMomentoCalendario(momento), vigInicio, vigFin) {
-		return errors.New(errMsgFueraVigenciaAsignacion)
+		return fmt.Errorf(
+			"%s (vigencia efectiva: %s a %s; fecha: %s)",
+			errMsgFueraVigenciaAsignacion,
+			formatFechaVigencia(vigInicio),
+			formatFechaVigencia(vigFin),
+			diaMomentoCalendario(momento).Format("02/01/2006"),
+		)
 	}
 	return nil
 }

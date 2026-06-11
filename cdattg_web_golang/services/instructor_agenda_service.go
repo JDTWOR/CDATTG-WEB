@@ -3,6 +3,7 @@ package services
 import (
 	"time"
 
+	"github.com/sena/cdattg-web-golang/config"
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
@@ -101,9 +102,10 @@ func (s *InstructorAgendaService) cargarContextoAgenda(
 	ficha *models.FichaCaracterizacion,
 	diaIDs []uint,
 ) agendaContexto {
+	fichaInicio, fichaFin := config.FechasVigenciaFicha(ficha)
 	ctx := agendaContexto{
-		vigInicio: intersectarVigencia(ficha.FechaInicio, asg.FechaInicio),
-		vigFin:    intersectarVigenciaFin(ficha.FechaFin, asg.FechaFin),
+		vigInicio: intersectarVigencia(fichaInicio, asg.FechaInicio),
+		vigFin:    intersectarVigenciaFin(fichaFin, asg.FechaFin),
 		diaSet:    make(map[uint]bool, len(diaIDs)),
 	}
 	for _, id := range diaIDs {

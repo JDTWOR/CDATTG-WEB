@@ -3,6 +3,7 @@ package repositories
 import (
 	"time"
 
+	"github.com/sena/cdattg-web-golang/config"
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/models"
 	"gorm.io/gorm"
@@ -66,12 +67,14 @@ func (r *instructorFichaRepository) FindByInstructorID(instructorID uint) ([]mod
 func (r *instructorFichaRepository) CountActiveFichasByInstructorID(instructorID uint) (int, error) {
 	var count int64
 	hoy := time.Now().Format("2006-01-02")
-	err := r.db.Table("instructor_fichas_caracterizacion").
+	q := r.db.Table("instructor_fichas_caracterizacion").
 		Joins("INNER JOIN fichas_caracterizacion f ON f.id = instructor_fichas_caracterizacion.ficha_id").
 		Where("instructor_fichas_caracterizacion.instructor_id = ?", instructorID).
-		Where("f.status = ?", true).
-		Where("(f.fecha_fin IS NULL OR f.fecha_fin >= ?)", hoy).
-		Count(&count).Error
+		Where("f.status = ?", true)
+	if !config.IgnorarVigenciaFicha() {
+		q = q.Where("(f.fecha_fin IS NULL OR f.fecha_fin >= ?)", hoy)
+	}
+	err := q.Count(&count).Error
 	if err != nil {
 		return 0, err
 	}

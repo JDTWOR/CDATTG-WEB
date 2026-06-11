@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sena/cdattg-web-golang/config"
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/models"
 	"gorm.io/gorm"
@@ -84,9 +85,11 @@ func (r *fichaRepository) FindActivasParaFechaConJornada(fecha time.Time, sedeID
 		diaFormacionID = 7
 	}
 	fechaStr := fecha.Format("2006-01-02")
-	q := r.db.Where("status = ?", true).
-		Where("(fecha_fin IS NULL OR fecha_fin >= ?)", fechaStr).
-		Where("id IN (SELECT ficha_id FROM ficha_dias_formacion WHERE dia_formacion_id = ? AND deleted_at IS NULL)", diaFormacionID)
+	q := r.db.Where("status = ?", true)
+	if !config.IgnorarVigenciaFicha() {
+		q = q.Where("(fecha_fin IS NULL OR fecha_fin >= ?)", fechaStr)
+	}
+	q = q.Where("id IN (SELECT ficha_id FROM ficha_dias_formacion WHERE dia_formacion_id = ? AND deleted_at IS NULL)", diaFormacionID)
 	if sedeID != nil && *sedeID > 0 {
 		q = q.Where("sede_id = ?", *sedeID)
 	}

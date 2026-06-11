@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sena/cdattg-web-golang/config"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
 )
@@ -85,56 +86,91 @@ type bloqueSemanal struct {
 	vigenciaFin    *time.Time
 }
 
-func (s *InstructorHorarioService) bloquesDiaFicha(ficha *models.FichaCaracterizacion, diaFormacionID uint) []HorarioBloqueInput {
-	dias := ficha.FichaDiasFormacion
-	if len(dias) == 0 && ficha != nil && ficha.ID > 0 {
-		if loaded, err := s.fichaDiasRepo.FindByFichaID(ficha.ID); err == nil {
-			dias = loaded
-		}
+func fichaDiaToBloqueInput(fd models.FichaDiasFormacion) (HorarioBloqueInput, bool) {
+	hi, hf := normalizeHoraMM(fd.HoraInicio), normalizeHoraMM(fd.HoraFin)
+	if hi == "" || hf == "" {
+		return HorarioBloqueInput{}, false
 	}
+	return HorarioBloqueInput{
+		DiaFormacionID: fd.DiaFormacionID,
+		HoraInicio:     hi,
+		HoraFin:        hf,
+		JornadaID:      fd.JornadaID,
+		Orden:          fd.Orden,
+	}, true
+}
+
+func bloquesFromFichaDias(dias []models.FichaDiasFormacion, diaFormacionID uint) []HorarioBloqueInput {
 	var out []HorarioBloqueInput
 	for _, fd := range dias {
 		if fd.DiaFormacionID != diaFormacionID {
 			continue
 		}
-		hi, hf := normalizeHoraMM(fd.HoraInicio), normalizeHoraMM(fd.HoraFin)
-		if hi != "" && hf != "" {
-			out = append(out, HorarioBloqueInput{
-				DiaFormacionID: fd.DiaFormacionID,
-				HoraInicio:     hi,
-				HoraFin:        hf,
-				JornadaID:      fd.JornadaID,
-				Orden:          fd.Orden,
-			})
+		if b, ok := fichaDiaToBloqueInput(fd); ok {
+			out = append(out, b)
 		}
 	}
-	if len(out) > 0 {
-		return out
+	return out
+}
+
+func jornadaIDFromFicha(ficha *models.FichaCaracterizacion) *uint {
+	if ficha == nil {
+		return nil
 	}
-	jornadaID := ficha.JornadaID
-	if jornadaID == nil && ficha.Jornada != nil {
-		id := ficha.Jornada.ID
-		jornadaID = &id
-	}
-	if jornadaID != nil && *jornadaID > 0 {
-		if plantilla, err := BloquesJornadaPlantilla(*jornadaID); err == nil {
-			for _, b := range plantilla {
-				if b.DiaFormacionID == diaFormacionID {
-					out = append(out, b)
-				}
-			}
-			if len(out) > 0 {
-				return out
-			}
-		}
+	if ficha.JornadaID != nil {
+		return ficha.JornadaID
 	}
 	if ficha.Jornada != nil {
-		hi, hf := normalizeHoraMM(ficha.Jornada.HoraInicio), normalizeHoraMM(ficha.Jornada.HoraFin)
-		if hi != "" && hf != "" {
-			return []HorarioBloqueInput{{DiaFormacionID: diaFormacionID, HoraInicio: hi, HoraFin: hf}}
-		}
+		id := ficha.Jornada.ID
+		return &id
 	}
 	return nil
+}
+
+func bloquesPlantillaDia(jornadaID, diaFormacionID uint) []HorarioBloqueInput {
+	plantilla, err := BloquesJornadaPlantilla(jornadaID)
+	if err != nil {
+		return nil
+	}
+	var out []HorarioBloqueInput
+	for _, b := range plantilla {
+		if b.DiaFormacionID == diaFormacionID {
+			out = append(out, b)
+		}
+	}
+	return out
+}
+
+func bloqueFallbackJornadaCabecera(ficha *models.FichaCaracterizacion, diaFormacionID uint) []HorarioBloqueInput {
+	if ficha == nil || ficha.Jornada == nil {
+		return nil
+	}
+	hi, hf := normalizeHoraMM(ficha.Jornada.HoraInicio), normalizeHoraMM(ficha.Jornada.HoraFin)
+	if hi == "" || hf == "" {
+		return nil
+	}
+	return []HorarioBloqueInput{{DiaFormacionID: diaFormacionID, HoraInicio: hi, HoraFin: hf}}
+}
+
+func (s *InstructorHorarioService) bloquesDiaFicha(ficha *models.FichaCaracterizacion, diaFormacionID uint) []HorarioBloqueInput {
+	if ficha == nil {
+		return nil
+	}
+	dias := ficha.FichaDiasFormacion
+	if len(dias) == 0 && ficha.ID > 0 {
+		if loaded, err := s.fichaDiasRepo.FindByFichaID(ficha.ID); err == nil {
+			dias = loaded
+		}
+	}
+	if out := bloquesFromFichaDias(dias, diaFormacionID); len(out) > 0 {
+		return out
+	}
+	if jid := jornadaIDFromFicha(ficha); jid != nil && *jid > 0 {
+		if out := bloquesPlantillaDia(*jid, diaFormacionID); len(out) > 0 {
+			return out
+		}
+	}
+	return bloqueFallbackJornadaCabecera(ficha, diaFormacionID)
 }
 
 func (s *InstructorHorarioService) horasDiaFicha(ficha *models.FichaCaracterizacion, diaFormacionID uint) (inicio, fin string) {
@@ -192,8 +228,9 @@ func (s *InstructorHorarioService) appendBloquesFicha(
 	diaIDs []uint,
 ) []bloqueSemanal {
 	diaIDs = s.diaIDsParaBloques(ficha, diaIDs)
-	vigInicio := intersectarVigencia(ficha.FechaInicio, asg.FechaInicio)
-	vigFin := intersectarVigenciaFin(ficha.FechaFin, asg.FechaFin)
+	fichaInicio, fichaFin := config.FechasVigenciaFicha(ficha)
+	vigInicio := intersectarVigencia(fichaInicio, asg.FechaInicio)
+	vigFin := intersectarVigenciaFin(fichaFin, asg.FechaFin)
 	for _, diaID := range diaIDs {
 		bloques = appendBloquesHorarioDia(bloques, ficha, asg, diaID, s.bloquesDiaFicha(ficha, diaID), vigInicio, vigFin)
 	}
@@ -297,8 +334,9 @@ func (s *InstructorHorarioService) ValidarColisionAlAsignar(instructorID, fichaI
 	if err != nil || ficha == nil {
 		return errors.New(msgFichaNoEncontrada)
 	}
-	vigInicio := intersectarVigencia(ficha.FechaInicio, &fechaInicio)
-	vigFin := intersectarVigenciaFin(ficha.FechaFin, &fechaFin)
+	fichaInicio, fichaFin := config.FechasVigenciaFicha(ficha)
+	vigInicio := intersectarVigencia(fichaInicio, &fechaInicio)
+	vigFin := intersectarVigenciaFin(fichaFin, &fechaFin)
 	for _, diaID := range diasIDs {
 		for _, hb := range s.bloquesDiaFicha(ficha, diaID) {
 			if errCol := colisionaConBloquesExistentes(diaID, hb.HoraInicio, hb.HoraFin, vigInicio, vigFin, existing, ficha.Ficha); errCol != nil {
@@ -382,8 +420,9 @@ func validarVigenciaMomento(
 	ficha *models.FichaCaracterizacion,
 	ifc *models.InstructorFichaCaracterizacion,
 ) error {
-	vigInicio := intersectarVigencia(ficha.FechaInicio, ifc.FechaInicio)
-	vigFin := intersectarVigenciaFin(ficha.FechaFin, ifc.FechaFin)
+	fichaInicio, fichaFin := config.FechasVigenciaFicha(ficha)
+	vigInicio := intersectarVigencia(fichaInicio, ifc.FechaInicio)
+	vigFin := intersectarVigenciaFin(fichaFin, ifc.FechaFin)
 	if !vigenciaAplica(vigInicio, vigFin) {
 		return nil
 	}

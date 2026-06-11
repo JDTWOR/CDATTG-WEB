@@ -45,11 +45,12 @@ type InventarioConfig struct {
 
 // NegocioConfig reglas de negocio configurables (según reglas_negocio.md)
 type NegocioConfig struct {
-	MaxFichasActivas            int  // Máximo de fichas activas por instructor (normativa, ej. 5)
-	ExperienciaMinimaAnios      int  // Años de experiencia mínimos para asignar (ej. 1)
-	HorasMaxSemana              int  // Horas máximas por semana por instructor (ej. 48)
-	ValidarCargaHoraria         bool // Si se valida la carga horaria semanal
+	MaxFichasActivas              int  // Máximo de fichas activas por instructor (normativa, ej. 5)
+	ExperienciaMinimaAnios        int  // Años de experiencia mínimos para asignar (ej. 1)
+	HorasMaxSemana                int  // Horas máximas por semana por instructor (ej. 48)
+	ValidarCargaHoraria           bool // Si se valida la carga horaria semanal
 	ValidarEspecialidadInstructor bool // Si se exige que el instructor tenga la especialidad (red de conocimiento) del programa; por ahora desactivado, activar a futuro
+	IgnorarVigenciaFicha          bool // Si true, no filtra ni valida por fecha_inicio/fecha_fin de fichas_caracterizacion (datos desactualizados en BD)
 }
 
 type DatabaseConfig struct {
@@ -112,11 +113,12 @@ func LoadConfig() {
 			AllowCredentials: getEnvAsBool("CORS_ALLOW_CREDENTIALS", true),
 		},
 		Negocio: NegocioConfig{
-			MaxFichasActivas:            getEnvAsInt("NEGOCIO_MAX_FICHAS_ACTIVAS", 5),
-			ExperienciaMinimaAnios:      getEnvAsInt("NEGOCIO_EXPERIENCIA_MIN_ANIOS", 0),
-			HorasMaxSemana:              getEnvAsInt("NEGOCIO_HORAS_MAX_SEMANA", 48),
-			ValidarCargaHoraria:         getEnvAsBool("NEGOCIO_VALIDAR_CARGA_HORARIA", false),
+			MaxFichasActivas:              getEnvAsInt("NEGOCIO_MAX_FICHAS_ACTIVAS", 5),
+			ExperienciaMinimaAnios:        getEnvAsInt("NEGOCIO_EXPERIENCIA_MIN_ANIOS", 0),
+			HorasMaxSemana:                getEnvAsInt("NEGOCIO_HORAS_MAX_SEMANA", 48),
+			ValidarCargaHoraria:           getEnvAsBool("NEGOCIO_VALIDAR_CARGA_HORARIA", false),
 			ValidarEspecialidadInstructor: getEnvAsBool("NEGOCIO_VALIDAR_ESPECIALIDAD_INSTRUCTOR", false),
+			IgnorarVigenciaFicha:          getEnvAsBool("NEGOCIO_IGNORAR_VIGENCIA_FICHA", true),
 		},
 		Inventario: InventarioConfig{
 			UmbralMinimo:       getEnvAsInt("INVENTARIO_UMBRAL_MINIMO", 10),

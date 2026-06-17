@@ -33,8 +33,8 @@ export function FichaDetalleInstructoresTab({
   setFechaInicio,
   fechaFin,
   setFechaFin,
-  instructoresDisponibles,
   instructoresSeleccionados,
+  nombresInstructoresSeleccionados,
   diasFichaDisponibles,
   toggleDiaInstructor,
   addInstructorToForm,
@@ -196,8 +196,8 @@ export function FichaDetalleInstructoresTab({
           setFechaInicio={setFechaInicio}
           fechaFin={fechaFin}
           setFechaFin={setFechaFin}
-          instructoresDisponibles={instructoresDisponibles}
           instructoresSeleccionados={instructoresSeleccionados}
+          nombresInstructoresSeleccionados={nombresInstructoresSeleccionados}
           diasFichaDisponibles={diasFichaDisponibles}
           toggleDiaInstructor={toggleDiaInstructor}
           addInstructorToForm={addInstructorToForm}

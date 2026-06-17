@@ -3,14 +3,13 @@ import { apiService } from '../../../services/api';
 import { axiosErrorMessage } from '../../../utils/httpError';
 import {
   MSG_ERROR_IDENTIFICAR_INSTRUCTOR_LIDER,
-  MSG_SELECCIONE_INSTRUCTOR_LIDER,
+  MSG_SELECCIONE_INSTRUCTOR_LIDER_PRIMERO,
 } from '../../../constants/instructorLiderLabels';
 import type {
   AsignarInstructoresRequest,
   FichaCaracterizacionResponse,
   InstructorFichaItem,
   InstructorFichaResponse,
-  InstructorItem,
   DiaFormacionItem,
   TrasladarDiaInstructorRequest,
 } from '../../../types';
@@ -23,7 +22,6 @@ import { hoyISO, toggleDiaEnInstructores, vigenciaInstructorDefault } from '../f
 type UseFichaInstructoresParams = Readonly<{
   fichaId: number;
   ficha: FichaCaracterizacionResponse | null;
-  defaultDiasIds: number[];
   diasFichaDisponibles: DiaFormacionItem[];
   loadFicha: () => Promise<void>;
   reloadAgenda: () => Promise<void>;
@@ -32,16 +30,15 @@ type UseFichaInstructoresParams = Readonly<{
 export function useFichaInstructores({
   fichaId,
   ficha,
-  defaultDiasIds,
   diasFichaDisponibles,
   loadFicha,
   reloadAgenda,
 }: UseFichaInstructoresParams) {
   const [instructores, setInstructores] = useState<InstructorFichaResponse[]>([]);
-  const [instructoresDisponibles, setInstructoresDisponibles] = useState<InstructorItem[]>([]);
   const [showFormInstructores, setShowFormInstructores] = useState(false);
   const [instructorLiderId, setInstructorLiderId] = useState(0);
   const [instructoresSeleccionados, setInstructoresSeleccionados] = useState<InstructorFichaItem[]>([]);
+  const [nombresInstructoresSeleccionados, setNombresInstructoresSeleccionados] = useState<Record<number, string>>({});
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
   const [programandoInstructorId, setProgramandoInstructorId] = useState<number | null>(null);
@@ -65,6 +62,18 @@ export function useFichaInstructores({
     }
   }, [ficha?.instructor_id]);
 
+  useEffect(() => {
+    if (!showFormInstructores) return;
+    const vigencia = vigenciaInstructorDefault({}, ficha);
+    setFechaInicio(vigencia.inicio);
+    setFechaFin(vigencia.fin);
+    setInstructoresSeleccionados([]);
+    setNombresInstructoresSeleccionados({});
+    if (ficha?.instructor_id) {
+      setInstructorLiderId(ficha.instructor_id);
+    }
+  }, [showFormInstructores, ficha]);
+
   const loadInstructores = useCallback(async () => {
     if (!fichaId) return;
     try {
@@ -75,33 +84,33 @@ export function useFichaInstructores({
     }
   }, [fichaId]);
 
-  const loadInstructoresDisponibles = useCallback(async () => {
-    try {
-      const res = await apiService.getInstructores(1, 10000);
-      setInstructoresDisponibles(res.data);
-    } catch {
-      setInstructoresDisponibles([]);
-    }
-  }, []);
-
   const handleAsignarInstructores = async () => {
-    if (instructoresSeleccionados.length === 0 || !instructorLiderId) {
-      alert(MSG_SELECCIONE_INSTRUCTOR_LIDER);
+    if (instructoresSeleccionados.length === 0) {
+      alert('Agregue al menos un instructor a la lista.');
+      return;
+    }
+    let liderId = instructorLiderId;
+    if (!liderId && instructoresSeleccionados.length === 1) {
+      liderId = instructoresSeleccionados[0].instructor_id;
+    }
+    if (!liderId) {
+      alert(MSG_SELECCIONE_INSTRUCTOR_LIDER_PRIMERO);
       return;
     }
     const req: AsignarInstructoresRequest = {
-      instructor_lider_id: instructorLiderId,
+      instructor_lider_id: liderId,
       instructores: instructoresSeleccionados.map((i) => ({
         instructor_id: i.instructor_id,
         fecha_inicio: fechaInicio || hoyISO(),
         fecha_fin: fechaFin || hoyISO(),
-        dias_formacion_ids: i.dias_formacion_ids?.length ? i.dias_formacion_ids : defaultDiasIds,
+        dias_formacion_ids: i.dias_formacion_ids ?? [],
       })),
     };
     try {
       await apiService.asignarInstructores(fichaId, req);
       setShowFormInstructores(false);
       setInstructoresSeleccionados([]);
+      setNombresInstructoresSeleccionados({});
       await loadInstructores();
       await loadFicha();
     } catch (err: unknown) {
@@ -109,17 +118,22 @@ export function useFichaInstructores({
     }
   };
 
-  const addInstructorToForm = (instructorId: number) => {
+  const addInstructorToForm = (instructorId: number, nombre: string) => {
+    if (instructores.some((i) => i.instructor_id === instructorId)) return;
     if (instructoresSeleccionados.some((i) => i.instructor_id === instructorId)) return;
+    setNombresInstructoresSeleccionados((prev) => ({ ...prev, [instructorId]: nombre }));
     setInstructoresSeleccionados((prev) => [
       ...prev,
       {
         instructor_id: instructorId,
         fecha_inicio: fechaInicio || hoyISO(),
         fecha_fin: fechaFin || hoyISO(),
-        dias_formacion_ids: [...defaultDiasIds],
+        dias_formacion_ids: [],
       },
     ]);
+    if (!instructorLiderId && instructores.length === 0 && instructoresSeleccionados.length === 0) {
+      setInstructorLiderId(instructorId);
+    }
   };
 
   const toggleDiaInstructor = (instructorId: number, diaId: number) => {
@@ -128,6 +142,14 @@ export function useFichaInstructores({
 
   const removeInstructorFromForm = (instructorId: number) => {
     setInstructoresSeleccionados((prev) => prev.filter((i) => i.instructor_id !== instructorId));
+    setNombresInstructoresSeleccionados((prev) => {
+      const next = { ...prev };
+      delete next[instructorId];
+      return next;
+    });
+    if (instructorLiderId === instructorId) {
+      setInstructorLiderId(ficha?.instructor_id ?? 0);
+    }
   };
 
   const onIniciarProgramacion = useCallback(
@@ -294,8 +316,8 @@ export function useFichaInstructores({
     setFechaInicio,
     fechaFin,
     setFechaFin,
-    instructoresDisponibles,
     instructoresSeleccionados,
+    nombresInstructoresSeleccionados,
     diasFichaDisponibles,
     toggleDiaInstructor,
     addInstructorToForm,
@@ -333,7 +355,6 @@ export function useFichaInstructores({
     guardandoTraslado,
     handleDesasignarInstructor,
     loadInstructores,
-    loadInstructoresDisponibles,
   };
 }
 

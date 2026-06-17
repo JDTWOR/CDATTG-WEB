@@ -44,14 +44,13 @@ export function FichaDetallePage() {
   const instructoresModel = useFichaInstructores({
     fichaId,
     ficha: data.ficha,
-    defaultDiasIds: data.defaultDiasIds,
     diasFichaDisponibles: data.diasFichaDisponibles,
     loadFicha: data.loadFicha,
     reloadAgenda: agenda.reload,
   });
 
   const { ficha, setFicha, loading, setLoading, error, isValidFichaId, diasLabel, loadFicha } = data;
-  const { loadInstructores, loadInstructoresDisponibles, setInstructorLiderId } = instructoresModel;
+  const { loadInstructores, setInstructorLiderId } = instructoresModel;
   const { loadAprendices, loadPersonas } = aprendicesModel;
 
   useFichaDetallePage({
@@ -62,7 +61,6 @@ export function FichaDetallePage() {
     loadFicha,
     loadInstructores,
     loadAprendices,
-    loadInstructoresDisponibles,
     loadPersonas,
   });
 

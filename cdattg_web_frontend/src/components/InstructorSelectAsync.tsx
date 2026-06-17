@@ -72,6 +72,8 @@ const selectStyles: StylesConfig<SelectOption, false> = {
 interface InstructorSelectAsyncProps {
   value: number | undefined;
   onChange: (value: number | undefined) => void;
+  /** Opcional: etiqueta completa al elegir una opción (p. ej. para mostrar en listas). */
+  onOptionChange?: (option: SelectOption | null) => void;
   placeholder?: string;
   isDisabled?: boolean;
   isRequired?: boolean;
@@ -79,6 +81,8 @@ interface InstructorSelectAsyncProps {
   defaultLabel?: string;
   /** Para asociar <label htmlFor="..."> al input interno de react-select */
   inputId?: string;
+  /** IDs que no deben aparecer en resultados (ya asignados o en la selección). */
+  excludeIds?: number[];
 }
 
 /**
@@ -88,11 +92,13 @@ interface InstructorSelectAsyncProps {
 export function InstructorSelectAsync({
   value,
   onChange,
+  onOptionChange,
   placeholder = 'Buscar por nombre o documento...',
   isDisabled = false,
   isRequired = false,
   defaultLabel,
   inputId,
+  excludeIds = [],
 }: Readonly<InstructorSelectAsyncProps>) {
   const [selectedOption, setSelectedOption] = useState<SelectOption | null>(null);
 
@@ -104,14 +110,18 @@ export function InstructorSelectAsync({
     }
   }, [value, defaultLabel]);
 
+  const excludeKey = excludeIds.join(',');
   const loadOptions = useCallback(async (inputValue: string): Promise<SelectOption[]> => {
     const search = inputValue.trim();
     const res = await apiService.getInstructores(1, 50, search || undefined);
-    return res.data.map((i) => ({
-      value: i.id,
-      label: i.numero_documento ? `${i.nombre} - ${i.numero_documento}` : i.nombre,
-    }));
-  }, []);
+    const excluded = new Set(excludeIds);
+    return res.data
+      .filter((i) => !excluded.has(i.id))
+      .map((i) => ({
+        value: i.id,
+        label: i.numero_documento ? `${i.nombre} - ${i.numero_documento}` : i.nombre,
+      }));
+  }, [excludeKey, excludeIds]);
 
   return (
     <div className="react-select-wrapper w-full">
@@ -123,6 +133,7 @@ export function InstructorSelectAsync({
         onChange={(opt) => {
           setSelectedOption(opt ?? null);
           onChange(opt?.value);
+          onOptionChange?.(opt ?? null);
         }}
         placeholder={placeholder}
         isDisabled={isDisabled}

@@ -8,7 +8,6 @@ type UseFichaDetallePageArgs = Readonly<{
   loadFicha: () => Promise<void>;
   loadInstructores: () => Promise<void>;
   loadAprendices: () => Promise<void>;
-  loadInstructoresDisponibles: () => Promise<void>;
   loadPersonas: () => Promise<void>;
 }>;
 
@@ -20,7 +19,6 @@ export function useFichaDetallePage({
   loadFicha,
   loadInstructores,
   loadAprendices,
-  loadInstructoresDisponibles,
   loadPersonas,
 }: UseFichaDetallePageArgs) {
   useEffect(() => {
@@ -29,23 +27,10 @@ export function useFichaDetallePage({
       return;
     }
     setLoading(true);
-    Promise.all([
-      loadFicha(),
-      loadInstructores(),
-      loadAprendices(),
-      loadInstructoresDisponibles(),
-      loadPersonas(),
-    ]).finally(() => setLoading(false));
-  }, [
-    fichaId,
-    isValidFichaId,
-    loadFicha,
-    loadInstructores,
-    loadAprendices,
-    loadInstructoresDisponibles,
-    loadPersonas,
-    setLoading,
-  ]);
+    Promise.all([loadFicha(), loadInstructores(), loadAprendices(), loadPersonas()]).finally(() =>
+      setLoading(false),
+    );
+  }, [fichaId, isValidFichaId, loadFicha, loadInstructores, loadAprendices, loadPersonas, setLoading]);
 
   useEffect(() => {
     if (!isValidFichaId) return;

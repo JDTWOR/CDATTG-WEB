@@ -1,4 +1,6 @@
 import type { FichaCaracterizacionResponse } from '../types';
+import type { InstructorAgendaEvent } from '../types/agenda';
+import { eventoEnHorarioActual, formatLocalISO } from '../components/calendar/calendarUtils';
 
 /** Mismo mapeo que WeekdayToDiaFormacionID en backend Go: 1=lunes … 6=sábado, 7=domingo. */
 export function weekdayToDiaFormacionId(date: Date): number {
@@ -27,4 +29,76 @@ export function getHorarioHoy(
 
   const rango = formatHoraRango(match.hora_inicio, match.hora_fin);
   return rango || null;
+}
+
+/** Ficha sin días ni fechas de programación (modo legacy en backend). */
+export function fichaPermiteAsistenciaLegacy(ficha: FichaCaracterizacionResponse): boolean {
+  const sinDias = !ficha.dias_formacion?.length && !ficha.dias_formacion_ids?.length;
+  const sinFechas = !ficha.fecha_inicio && !ficha.fecha_fin;
+  return sinDias && sinFechas;
+}
+
+export function fichaEnHorarioAsistencia(
+  fichaId: number,
+  eventosHoy: InstructorAgendaEvent[],
+  now: Date = new Date(),
+): boolean {
+  const hoy = formatLocalISO(now);
+  return eventosHoy.some(
+    (evento) =>
+      evento.ficha_id === fichaId && evento.fecha === hoy && eventoEnHorarioActual(evento, now),
+  );
+}
+
+/** Bloques de agenda del instructor para la ficha en la fecha de referencia. */
+export function eventosFichaEnFecha(
+  fichaId: number,
+  eventos: InstructorAgendaEvent[],
+  refDate: Date = new Date(),
+): InstructorAgendaEvent[] {
+  const iso = formatLocalISO(refDate);
+  return eventos.filter((evento) => evento.ficha_id === fichaId && evento.fecha === iso);
+}
+
+/** Horario programado del instructor para la ficha hoy (según agenda, no solo días de la ficha). */
+export function getHorarioHoyInstructor(
+  fichaId: number,
+  eventosHoy: InstructorAgendaEvent[],
+  now: Date = new Date(),
+): string | null {
+  const bloques = eventosFichaEnFecha(fichaId, eventosHoy, now)
+    .map((evento) => formatHoraRango(evento.hora_inicio, evento.hora_fin))
+    .filter(Boolean);
+  if (bloques.length === 0) return null;
+  return bloques.join(', ');
+}
+
+/** Indica si el instructor puede entrar a tomar asistencia en este momento. */
+export function puedeTomarAsistenciaAhora(
+  ficha: FichaCaracterizacionResponse,
+  eventosHoy: InstructorAgendaEvent[],
+  now: Date = new Date(),
+): boolean {
+  if (fichaPermiteAsistenciaLegacy(ficha)) {
+    return true;
+  }
+  return fichaEnHorarioAsistencia(ficha.id, eventosHoy, now);
+}
+
+/** Texto auxiliar cuando el botón de asistencia no está disponible. */
+export function mensajeEstadoAsistenciaFicha(
+  ficha: FichaCaracterizacionResponse,
+  eventosHoy: InstructorAgendaEvent[],
+  now: Date = new Date(),
+): string {
+  if (puedeTomarAsistenciaAhora(ficha, eventosHoy, now)) {
+    return '';
+  }
+
+  const horarioInstructor = getHorarioHoyInstructor(ficha.id, eventosHoy, now);
+  if (horarioInstructor) {
+    return `Disponible en horario ${horarioInstructor}`;
+  }
+
+  return 'Sin clase programada hoy';
 }

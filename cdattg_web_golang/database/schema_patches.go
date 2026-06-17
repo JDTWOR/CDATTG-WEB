@@ -1,6 +1,10 @@
 package database
 
-import "log"
+import (
+	"log"
+
+	"github.com/sena/cdattg-web-golang/models"
+)
 
 // EnsureSchemaPatches aplica cambios incrementales de esquema sin ejecutar Migrate() completo.
 func EnsureSchemaPatches() error {
@@ -142,6 +146,15 @@ func EnsureSchemaPatches() error {
 	`).Error; err != nil {
 		return err
 	}
+
+	if err := DB.AutoMigrate(
+		&models.InstructorFichaTrasladoFecha{},
+		&models.DiaFestivo{},
+		&models.DiaSinFormacionSede{},
+	); err != nil {
+		return err
+	}
+	log.Println("Esquema: instructor_ficha_traslado_fechas, dias_festivos y dias_sin_formacion_sede verificados")
 
 	return nil
 }

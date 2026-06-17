@@ -43,6 +43,7 @@ func RunAll() error {
 		RunUsersSeeder,
 		RunSyncInstructorRolesSeeder,
 		RunTiposObservacionAsistenciaSeeder,
+		RunFestivosColombiaSeeder,
 	}
 	for _, run := range steps {
 		if err := run(db); err != nil {

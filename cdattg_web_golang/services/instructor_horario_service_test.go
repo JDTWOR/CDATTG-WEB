@@ -7,6 +7,7 @@ import (
 
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
+	"gorm.io/gorm"
 )
 
 type stubInstFichaRepo struct {
@@ -91,6 +92,18 @@ func (s *stubFichaDiasRepo) FindDistinctFichaIDsReferencingJornada(uint) ([]uint
 	return nil, nil
 }
 
+type stubTrasladoFechaRepo struct{}
+
+func (s *stubTrasladoFechaRepo) CreateBatch(*gorm.DB, []models.InstructorFichaTrasladoFecha) error {
+	return nil
+}
+func (s *stubTrasladoFechaRepo) FindByFichaInRange(uint, time.Time, time.Time) ([]models.InstructorFichaTrasladoFecha, error) {
+	return nil, nil
+}
+func (s *stubTrasladoFechaRepo) ExistsFechaOcupada(uint, []time.Time) (bool, error) {
+	return false, nil
+}
+
 func testHorarioService(
 	ifc *models.InstructorFichaCaracterizacion,
 	ficha *models.FichaCaracterizacion,
@@ -102,6 +115,8 @@ func testHorarioService(
 		fichaRepo:         &stubFichaRepoHorario{ficha: ficha},
 		instFichaDiasRepo: &stubInstFichaDiasRepo{dias: diasInst},
 		fichaDiasRepo:     &stubFichaDiasRepo{dias: fichaDias},
+		trasladoFechaRepo: &stubTrasladoFechaRepo{},
+		calendarioSvc:     NewCalendarioFormacionService(),
 	}
 }
 
@@ -179,3 +194,4 @@ var _ repositories.InstructorFichaRepository = (*stubInstFichaRepo)(nil)
 var _ repositories.FichaRepository = (*stubFichaRepoHorario)(nil)
 var _ repositories.InstructorFichaDiasRepository = (*stubInstFichaDiasRepo)(nil)
 var _ repositories.FichaDiasRepository = (*stubFichaDiasRepo)(nil)
+var _ repositories.InstructorFichaTrasladoFechaRepository = (*stubTrasladoFechaRepo)(nil)

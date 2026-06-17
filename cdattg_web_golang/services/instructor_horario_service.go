@@ -23,7 +23,9 @@ type InstructorHorarioService struct {
 	fichaDiasRepo     repositories.FichaDiasRepository
 	instFichaRepo     repositories.InstructorFichaRepository
 	instFichaDiasRepo repositories.InstructorFichaDiasRepository
+	trasladoFechaRepo repositories.InstructorFichaTrasladoFechaRepository
 	catalogoRepo      repositories.CatalogoRepository
+	calendarioSvc     *CalendarioFormacionService
 }
 
 func NewInstructorHorarioService() *InstructorHorarioService {
@@ -32,7 +34,9 @@ func NewInstructorHorarioService() *InstructorHorarioService {
 		fichaDiasRepo:     repositories.NewFichaDiasRepository(),
 		instFichaRepo:     repositories.NewInstructorFichaRepository(),
 		instFichaDiasRepo: repositories.NewInstructorFichaDiasRepository(),
+		trasladoFechaRepo: repositories.NewInstructorFichaTrasladoFechaRepository(),
 		catalogoRepo:      repositories.NewCatalogoRepository(),
+		calendarioSvc:     NewCalendarioFormacionService(),
 	}
 }
 
@@ -347,6 +351,11 @@ func (s *InstructorHorarioService) ValidarColisionAlAsignar(instructorID, fichaI
 	return nil
 }
 
+func (s *InstructorHorarioService) ValidarColisionEnFecha(instructorID, fichaID, diaID uint, fecha time.Time) error {
+	f := fechaCalendario(fecha)
+	return s.ValidarColisionAlAsignar(instructorID, fichaID, []uint{diaID}, f, f, true)
+}
+
 func nombreDia(diaID uint) string {
 	names := map[uint]string{1: "lunes", 2: "martes", 3: "miércoles", 4: "jueves", 5: "viernes", 6: "sábado", 7: "domingo"}
 	if n, ok := names[diaID]; ok {
@@ -496,29 +505,66 @@ func (s *InstructorHorarioService) validarHorarioAsistencia(ficha *models.FichaC
 	return nil
 }
 
-func (s *InstructorHorarioService) ValidarPuedeTomarAsistencia(instructorID, fichaID uint, momento time.Time) error {
+type contextoTomarAsistencia struct {
+	ficha        *models.FichaCaracterizacion
+	ifc          *models.InstructorFichaCaracterizacion
+	diasInst     []models.InstructorFichaDias
+	sinDiasFicha bool
+}
+
+func (s *InstructorHorarioService) cargarContextoTomarAsistencia(instructorID, fichaID uint) (*contextoTomarAsistencia, error) {
 	ifc, err := s.instFichaRepo.FindByFichaIDAndInstructorID(fichaID, instructorID)
 	if err != nil || ifc == nil {
-		return errors.New(errMsgNoEstaCreadoComoInstructor)
+		return nil, errors.New(errMsgNoEstaCreadoComoInstructor)
 	}
 	ficha, err := s.fichaRepo.FindByID(fichaID)
 	if err != nil || ficha == nil {
-		return errors.New(msgFichaNoEncontrada)
+		return nil, errors.New(msgFichaNoEncontrada)
 	}
 	if !ficha.Status {
-		return errors.New("la ficha está inactiva; no se puede tomar asistencia")
+		return nil, errors.New("la ficha está inactiva; no se puede tomar asistencia")
 	}
 	diasInst, err := s.instFichaDiasRepo.FindByInstructorAndFicha(instructorID, fichaID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fichaDias, err := s.fichaDiasRepo.FindByFichaID(fichaID)
 	if err != nil {
+		return nil, err
+	}
+	return &contextoTomarAsistencia{
+		ficha:        ficha,
+		ifc:          ifc,
+		diasInst:     diasInst,
+		sinDiasFicha: len(fichaDias) == 0,
+	}, nil
+}
+
+func (s *InstructorHorarioService) validarAsistenciaDiaPrestado(
+	ficha *models.FichaCaracterizacion,
+	ifc *models.InstructorFichaCaracterizacion,
+	diaPrestado uint,
+	momento time.Time,
+) error {
+	if err := validarVigenciaMomento(momento, ficha, ifc); err != nil {
 		return err
 	}
-	sinDiasFicha := len(fichaDias) == 0
-	if len(diasInst) == 0 || sinDiasFicha {
-		return validarModoAsignacionTomarAsistencia(ficha, ifc, sinDiasFicha, momento)
+	return s.validarHorarioAsistencia(ficha, diaPrestado, momento)
+}
+
+func (s *InstructorHorarioService) validarTomarAsistenciaTraslados(
+	ficha *models.FichaCaracterizacion,
+	ifc *models.InstructorFichaCaracterizacion,
+	instructorID uint,
+	diasInst []models.InstructorFichaDias,
+	traslados []models.InstructorFichaTrasladoFecha,
+	momento time.Time,
+) error {
+	if diaPrestado, ok := instructorSesionPrestadaTraslado(traslados, instructorID, momento); ok {
+		return s.validarAsistenciaDiaPrestado(ficha, ifc, diaPrestado, momento)
+	}
+	if instructorCedeSesionTraslado(traslados, instructorID, momento) {
+		return errors.New(strings.ToLower(errMsgDiaNoProgramadoInstructor))
 	}
 	return s.validarTomarAsistenciaProgramado(
 		ficha,
@@ -527,6 +573,33 @@ func (s *InstructorHorarioService) ValidarPuedeTomarAsistencia(instructorID, fic
 		diasInst,
 		momento,
 	)
+}
+
+func (s *InstructorHorarioService) ValidarPuedeTomarAsistencia(instructorID, fichaID uint, momento time.Time) error {
+	if s.calendarioSvc.EsDiaFestivoColombia(momento) {
+		return errors.New("hoy es festivo nacional; no hay formación programada")
+	}
+	ctx, err := s.cargarContextoTomarAsistencia(instructorID, fichaID)
+	if err != nil {
+		return err
+	}
+	if ctx.ficha.SedeID != nil && *ctx.ficha.SedeID > 0 {
+		if ok, motivo := s.calendarioSvc.MotivoDiaSinFormacionSede(*ctx.ficha.SedeID, momento); ok {
+			msg := strings.ToLower("día sin formación en la sede")
+			if strings.TrimSpace(motivo) != "" {
+				msg = strings.ToLower(motivo)
+			}
+			return errors.New(msg)
+		}
+	}
+	if len(ctx.diasInst) == 0 || ctx.sinDiasFicha {
+		return validarModoAsignacionTomarAsistencia(ctx.ficha, ctx.ifc, ctx.sinDiasFicha, momento)
+	}
+	traslados, err := s.trasladoFechaRepo.FindByFichaInRange(fichaID, fechaCalendario(momento), fechaCalendario(momento))
+	if err != nil {
+		return err
+	}
+	return s.validarTomarAsistenciaTraslados(ctx.ficha, ctx.ifc, instructorID, ctx.diasInst, traslados, momento)
 }
 
 func validarHorarioRango(horaInicio, horaFin string, extMin int, now time.Time) bool {

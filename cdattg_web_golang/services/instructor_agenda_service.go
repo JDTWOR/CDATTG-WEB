@@ -14,6 +14,7 @@ type InstructorAgendaService struct {
 	fichaRepo         repositories.FichaRepository
 	instFichaRepo     repositories.InstructorFichaRepository
 	instFichaDiasRepo repositories.InstructorFichaDiasRepository
+	trasladoFechaRepo repositories.InstructorFichaTrasladoFechaRepository
 	instRepo          repositories.InstructorRepository
 	horarioSvc        *InstructorHorarioService
 }
@@ -23,6 +24,7 @@ func NewInstructorAgendaService() *InstructorAgendaService {
 		fichaRepo:         repositories.NewFichaRepository(),
 		instFichaRepo:     repositories.NewInstructorFichaRepository(),
 		instFichaDiasRepo: repositories.NewInstructorFichaDiasRepository(),
+		trasladoFechaRepo: repositories.NewInstructorFichaTrasladoFechaRepository(),
 		instRepo:          repositories.NewInstructorRepository(),
 		horarioSvc:        NewInstructorHorarioService(),
 	}
@@ -135,41 +137,20 @@ func (s *InstructorAgendaService) eventosEnRango(
 	asg models.InstructorFichaCaracterizacion,
 	desde, hasta time.Time,
 	ctx agendaContexto,
+	traslados []models.InstructorFichaTrasladoFecha,
 ) []dto.InstructorAgendaEvent {
 	var eventos []dto.InstructorAgendaEvent
 	for d := desde; !d.After(hasta); d = d.AddDate(0, 0, 1) {
 		diaID := WeekdayToDiaFormacionID(d.Weekday())
-		if !ctx.diaSet[diaID] {
-			continue
-		}
 		diaMomento := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, d.Location())
 		if !diaDentroDeVigencia(diaMomento, ctx.vigInicio, ctx.vigFin) {
 			continue
 		}
-		hi, hf := s.horarioSvc.horasDiaFicha(ficha, diaID)
-		bloques := s.horarioSvc.bloquesDiaFicha(ficha, diaID)
-		if len(bloques) == 0 {
-			if hi == "" || hf == "" {
-				continue
-			}
-			bloques = []HorarioBloqueInput{{DiaFormacionID: diaID, HoraInicio: hi, HoraFin: hf}}
+		if ctx.diaSet[diaID] && !instructorCedeSesionTraslado(traslados, asg.InstructorID, d) {
+			eventos = appendEventosDiaFicha(eventos, ficha, asg, d, diaID, ctx, s.horarioSvc)
 		}
-		for _, b := range bloques {
-			eventos = append(eventos, dto.InstructorAgendaEvent{
-				Fecha:               d.Format(time.DateOnly),
-				DiaFormacionID:      diaID,
-				DiaNombre:           nombreDiaPorID(diaID),
-				HoraInicio:          normalizeHoraMM(b.HoraInicio),
-				HoraFin:             normalizeHoraMM(b.HoraFin),
-				FichaID:             ficha.ID,
-				FichaNumero:         ficha.Ficha,
-				ProgramaNombre:      ctx.progNombre,
-				SedeNombre:          ctx.sedeNombre,
-				AmbienteNombre:      ctx.ambienteNombre,
-				InstructorID:        asg.InstructorID,
-				InstructorNombre:    ctx.instNombre,
-				InstructorDocumento: ctx.instDoc,
-			})
+		if diaPrestado, ok := instructorSesionPrestadaTraslado(traslados, asg.InstructorID, d); ok {
+			eventos = appendEventosDiaFicha(eventos, ficha, asg, d, diaPrestado, ctx, s.horarioSvc)
 		}
 	}
 	return eventos
@@ -200,5 +181,9 @@ func (s *InstructorAgendaService) expandirAsignacion(
 		}
 	}
 	ctx := s.cargarContextoAgenda(asg, ficha, diaIDs)
-	return s.eventosEnRango(ficha, asg, desde, hasta, ctx), nil
+	traslados, err := s.trasladoFechaRepo.FindByFichaInRange(ficha.ID, desde, hasta)
+	if err != nil {
+		return nil, err
+	}
+	return s.eventosEnRango(ficha, asg, desde, hasta, ctx, traslados), nil
 }

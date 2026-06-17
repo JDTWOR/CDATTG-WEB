@@ -104,6 +104,9 @@ func Migrate() error {
 		&models.DiasFormacion{},
 		&models.FichaDiasFormacion{},
 		&models.InstructorFichaDias{},
+		&models.InstructorFichaTrasladoFecha{},
+		&models.DiaFestivo{},
+		&models.DiaSinFormacionSede{},
 		
 		// Asignaciones
 		&models.AsignacionInstructor{},

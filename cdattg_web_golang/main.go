@@ -7,6 +7,7 @@ import (
 	"github.com/sena/cdattg-web-golang/authz"
 	"github.com/sena/cdattg-web-golang/config"
 	"github.com/sena/cdattg-web-golang/database"
+	"github.com/sena/cdattg-web-golang/database/seeders"
 	"github.com/sena/cdattg-web-golang/router"
 )
 
@@ -34,6 +35,9 @@ func main() {
 	}
 	if err := database.EnsureSchemaPatches(); err != nil {
 		log.Fatal("Error aplicando parches de esquema:", err)
+	}
+	if err := seeders.RunFestivosColombiaSeeder(database.GetDB()); err != nil {
+		log.Fatal("Error sembrando festivos Colombia:", err)
 	}
 
 	// Inicializar Casbin (carga políticas desde BD)

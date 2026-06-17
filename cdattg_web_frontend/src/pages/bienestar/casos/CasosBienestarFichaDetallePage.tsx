@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeftIcon, ExclamationTriangleIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ChartBarIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { bienestarPaths } from '../bienestarPaths';
 import { CasosBienestarAprendicesFilters } from './components/CasosBienestarAprendicesFilters';
 import { CasosBienestarAprendicesTable } from './components/CasosBienestarAprendicesTable';
@@ -20,7 +20,7 @@ export function CasosBienestarFichaDetallePage() {
           className="btn-secondary inline-flex items-center gap-2"
         >
           <ArrowLeftIcon className="h-5 w-5" aria-hidden />
-          Volver a Casos de Bienestar
+          Volver al listado de casos
         </Link>
       </div>
     );
@@ -28,28 +28,42 @@ export function CasosBienestarFichaDetallePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white">
-            <ExclamationTriangleIcon className="h-8 w-8 text-amber-500" aria-hidden />
-            Ficha {page.fichaNumero} - Casos de bienestar
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-3xl">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Seguimiento de asistencia · Ficha {page.fichaNumero}
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Detalle de aprendices con indicadores de riesgo de deserción en esta ficha.
+            Listado de aprendices que reúnen los criterios de alerta por inasistencias reiteradas, orientado
+            a la gestión del equipo de Bienestar al Aprendiz.
           </p>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Período: últimos {page.dias} días · Mínimo de inasistencias: {page.minFallas}+
+          <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+            <div>
+              <dt className="inline font-medium text-gray-700 dark:text-gray-300">Ventana de análisis: </dt>
+              <dd className="inline">últimos {page.dias} días</dd>
+            </div>
+            <div>
+              <dt className="inline font-medium text-gray-700 dark:text-gray-300">Umbral de alerta: </dt>
+              <dd className="inline">{page.minFallas} o más inasistencias</dd>
+            </div>
+            {page.sedeNombre && (
+              <div>
+                <dt className="inline font-medium text-gray-700 dark:text-gray-300">Sede: </dt>
+                <dd className="inline">{page.sedeNombre}</dd>
+              </div>
+            )}
+          </dl>
+          <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-500">
+            Metodología: se evalúan únicamente sesiones registradas en días con formación programada según el
+            calendario de la ficha. Se excluyen festivos nacionales y suspensiones de formación por sede (PARO).
           </p>
-          {page.sedeNombre && (
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Sede: {page.sedeNombre}</p>
-          )}
         </div>
         <Link
           to={bienestarPaths.casos.index}
-          className="btn-secondary inline-flex items-center gap-2"
+          className="btn-secondary inline-flex shrink-0 items-center gap-2"
         >
           <ArrowLeftIcon className="h-5 w-5" aria-hidden />
-          Volver a Casos de Bienestar
+          Volver al listado
         </Link>
       </div>
 
@@ -62,43 +76,54 @@ export function CasosBienestarFichaDetallePage() {
         </div>
       )}
 
+      {page.pdfError && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+        >
+          {page.pdfError}
+        </div>
+      )}
+
       {page.loading ? (
-        <div className="card p-8 text-center text-gray-500 dark:text-gray-400">
-          Cargando casos de la ficha...
+        <div className="card p-8 text-center text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
+          Cargando información de seguimiento…
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="card flex items-center gap-4 p-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
+            <div className="card flex items-center gap-4 p-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/50">
                 <UserGroupIcon className="h-6 w-6 text-amber-600 dark:text-amber-400" aria-hidden />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Aprendices en riesgo</p>
-                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{page.casosFichaTotal}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Aprendices en seguimiento</p>
+                <p className="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                  {page.casosFichaTotal}
+                </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Últimos {page.dias} días, con {page.minFallas}+ inasistencias
+                  Con {page.minFallas} o más inasistencias en los últimos {page.dias} días
                 </p>
                 {page.busquedaActiva && page.casosFichaTotal > 0 && (
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Mostrando {page.casosFicha.length} de {page.casosFichaTotal} aprendices
+                    Visualizando {page.casosFicha.length} de {page.casosFichaTotal} registros
                   </p>
                 )}
               </div>
             </div>
-            <div className="card flex items-center gap-4 p-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700">
-                <ExclamationTriangleIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" aria-hidden />
+            <div className="card flex items-center gap-4 p-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700">
+                <ChartBarIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" aria-hidden />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Resumen de inasistencias</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Consolidado del período</p>
                 <p className="text-sm text-gray-900 dark:text-white">
-                  Total sesiones analizadas:{' '}
-                  <span className="font-semibold">{page.totalSesiones}</span>
+                  Sesiones evaluadas:{' '}
+                  <span className="font-semibold tabular-nums">{page.totalSesiones}</span>
                 </p>
                 <p className="text-sm text-gray-900 dark:text-white">
-                  Total inasistencias:{' '}
-                  <span className="font-semibold text-amber-600 dark:text-amber-400">
+                  Inasistencias acumuladas:{' '}
+                  <span className="font-semibold tabular-nums text-amber-600 dark:text-amber-400">
                     {page.totalInasistencias}
                   </span>
                 </p>
@@ -114,15 +139,23 @@ export function CasosBienestarFichaDetallePage() {
           )}
 
           <div className="card overflow-hidden">
-            <h2 className="mb-4 px-4 pt-4 text-lg font-semibold text-gray-900 dark:text-white">
-              Aprendices de la ficha {page.fichaNumero} a tener en cuenta
-            </h2>
+            <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Registro de aprendices en alerta
+              </h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Consulte el detalle de inasistencias o descargue el reporte PDF individual por aprendiz.
+              </p>
+            </div>
             <CasosBienestarAprendicesTable
               fichaNumero={page.fichaNumero ?? ''}
               casos={page.casosFicha}
               casosTotal={page.casosFichaTotal}
+              minFallas={page.minFallas}
               busquedaActiva={page.busquedaActiva}
+              pdfDescargandoId={page.pdfDescargandoId}
               onVerDetalle={(c) => void page.abrirDetalleAprendiz(c)}
+              onDescargarPdf={(c) => void page.descargarReportePdfAprendiz(c)}
             />
           </div>
         </>
@@ -134,6 +167,16 @@ export function CasosBienestarFichaDetallePage() {
           loading={page.detalleLoading}
           error={page.detalleError}
           inasistencias={page.detalleInasistencias}
+          dias={page.dias}
+          minFallas={page.minFallas}
+          periodo={page.detallePeriodo}
+          pdfDescargando={page.pdfDescargandoId === page.aprendizDetalle.aprendiz_id}
+          onDescargarPdf={() =>
+            void page.descargarReportePdfAprendiz(page.aprendizDetalle!, {
+              inasistencias: page.detalleInasistencias,
+              periodo: page.detallePeriodo,
+            })
+          }
           onClose={page.cerrarDetalleAprendiz}
         />
       )}

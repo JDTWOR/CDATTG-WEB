@@ -4,6 +4,7 @@ import { apiService } from '../../../../services/api';
 import { axiosErrorMessage } from '../../../../utils/httpError';
 import { useAuth } from '../../../../context/AuthContext';
 import { canViewCasosBienestar, MENSAJE_SIN_PERMISO_CASOS_BIENESTAR } from '../casosBienestarPermissions';
+import { generarReportePdfAprendiz } from '../casosBienestarReportePdf';
 import { casosDeFicha, filtrarCasosAprendiz } from '../casosBienestarUtils';
 import type { CasoBienestarItem, InasistenciaDetalleItem } from '../../../../types';
 import { useCasosBienestar } from './useCasosBienestar';
@@ -25,6 +26,11 @@ export function useCasosBienestarFichaDetalle() {
   const [detalleLoading, setDetalleLoading] = useState(false);
   const [detalleError, setDetalleError] = useState('');
   const [detalleInasistencias, setDetalleInasistencias] = useState<InasistenciaDetalleItem[]>([]);
+  const [detallePeriodo, setDetallePeriodo] = useState<{ fecha_inicio: string; fecha_fin: string } | null>(
+    null,
+  );
+  const [pdfDescargandoId, setPdfDescargandoId] = useState<number | null>(null);
+  const [pdfError, setPdfError] = useState('');
 
   const { data, loading, error, setError, setLoading } = useCasosBienestar({
     enabled: canView && Boolean(fichaNumero),
@@ -71,12 +77,14 @@ export function useCasosBienestarFichaDetalle() {
       setDetalleLoading(true);
       setDetalleError('');
       setDetalleInasistencias([]);
+      setDetallePeriodo(null);
       try {
         const res = await apiService.getCasoBienestarAprendizDetalle(fichaNumero, aprendiz.aprendiz_id, {
           dias,
           sede: sedeNombreParam || undefined,
         });
         setDetalleInasistencias(res.inasistencias ?? []);
+        setDetallePeriodo({ fecha_inicio: res.fecha_inicio, fecha_fin: res.fecha_fin });
       } catch (e: unknown) {
         setDetalleError(axiosErrorMessage(e, 'No se pudo cargar el detalle de inasistencias.'));
       } finally {
@@ -88,7 +96,50 @@ export function useCasosBienestarFichaDetalle() {
 
   const cerrarDetalleAprendiz = useCallback(() => {
     setAprendizDetalle(null);
+    setDetallePeriodo(null);
   }, []);
+
+  const descargarReportePdfAprendiz = useCallback(
+    async (
+      aprendiz: CasoBienestarItem,
+      datosCache?: {
+        inasistencias: InasistenciaDetalleItem[];
+        periodo: { fecha_inicio: string; fecha_fin: string } | null;
+      },
+    ) => {
+      if (!fichaNumero || pdfDescargandoId != null) return;
+      setPdfError('');
+      setPdfDescargandoId(aprendiz.aprendiz_id);
+      try {
+        let inasistencias = datosCache?.inasistencias;
+        let periodo = datosCache?.periodo ?? null;
+
+        if (!inasistencias) {
+          const res = await apiService.getCasoBienestarAprendizDetalle(fichaNumero, aprendiz.aprendiz_id, {
+            dias,
+            sede: sedeNombreParam || undefined,
+          });
+          inasistencias = res.inasistencias ?? [];
+          periodo = { fecha_inicio: res.fecha_inicio, fecha_fin: res.fecha_fin };
+        }
+
+        generarReportePdfAprendiz({
+          aprendiz,
+          inasistencias,
+          dias,
+          minFallas,
+          periodo,
+        });
+      } catch (e: unknown) {
+        setPdfError(
+          axiosErrorMessage(e, 'No fue posible generar el reporte PDF. Intente nuevamente.'),
+        );
+      } finally {
+        setPdfDescargandoId(null);
+      }
+    },
+    [fichaNumero, dias, minFallas, sedeNombreParam, pdfDescargandoId],
+  );
 
   return {
     canView,
@@ -111,8 +162,12 @@ export function useCasosBienestarFichaDetalle() {
     detalleLoading,
     detalleError,
     detalleInasistencias,
+    detallePeriodo,
     abrirDetalleAprendiz,
     cerrarDetalleAprendiz,
+    descargarReportePdfAprendiz,
+    pdfDescargandoId,
+    pdfError,
   };
 }
 

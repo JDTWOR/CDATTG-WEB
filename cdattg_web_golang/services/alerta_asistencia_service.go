@@ -17,10 +17,10 @@ import (
 
 // AlertaAsistenciaService verifica fichas que no han iniciado toma de asistencia y notifica por correo a coordinadores.
 type AlertaAsistenciaService struct {
-	fichaRepo     repositories.FichaRepository
+	fichaRepo      repositories.FichaRepository
 	asistenciaRepo repositories.AsistenciaRepository
-	alertaRepo    repositories.AlertaAsistenciaRepository
-	userRepo      repositories.UserRepository
+	alertaRepo     repositories.AlertaAsistenciaRepository
+	userRepo       repositories.UserRepository
 }
 
 // NewAlertaAsistenciaService crea el servicio.
@@ -81,30 +81,47 @@ func minutosAlertaDesdeConfig(m int) int {
 	return m
 }
 
-// notifyFichaSiAplica envía correo y registra log si la ficha cumple condiciones de alerta.
-func (s *AlertaAsistenciaService) notifyFichaSiAplica(f *models.FichaCaracterizacion, now, hoy time.Time, fechaStr string, minutosDespues int, emails []string) {
+func fichaPendienteAlertaAsistencia(
+	s *AlertaAsistenciaService,
+	f *models.FichaCaracterizacion,
+	now, hoy time.Time,
+	fechaStr string,
+	minutosDespues int,
+) bool {
 	if f.JornadaID == nil || f.Jornada == nil {
-		return
+		return false
 	}
 	limite := HoraInicioMasMinutos(f.Jornada, hoy, minutosDespues)
 	if now.Before(limite) {
-		return
+		return false
 	}
 	ids, errSes := s.asistenciaRepo.FindIDsByFichaIDAndFecha(f.ID, fechaStr)
 	if errSes != nil || len(ids) > 0 {
-		return
+		return false
 	}
 	existe, errEx := s.alertaRepo.ExistsByFichaIDAndFecha(f.ID, hoy)
-	if errEx != nil || existe {
-		return
-	}
+	return errEx == nil && !existe
+}
+
+func cuerpoCorreoAlertaAsistencia(f *models.FichaCaracterizacion, fechaStr string, minutosDespues int) (string, string) {
 	nombreJornada := f.Jornada.Nombre
 	if nombreJornada == "" {
 		nombreJornada = "N/A"
 	}
 	asunto := fmt.Sprintf("[CDATTG] Ficha %s no ha iniciado toma de asistencia", f.Ficha)
-	cuerpo := fmt.Sprintf("Se informa que la ficha %s (jornada %s) no ha registrado inicio de toma de asistencia el día %s, pasados %d minutos desde el inicio de la jornada.\n\nFicha: %s\nJornada: %s\nFecha: %s",
-		f.Ficha, nombreJornada, fechaStr, minutosDespues, f.Ficha, nombreJornada, fechaStr)
+	cuerpo := fmt.Sprintf(
+		"Se informa que la ficha %s (jornada %s) no ha registrado inicio de toma de asistencia el día %s, pasados %d minutos desde el inicio de la jornada.\n\nFicha: %s\nJornada: %s\nFecha: %s",
+		f.Ficha, nombreJornada, fechaStr, minutosDespues, f.Ficha, nombreJornada, fechaStr,
+	)
+	return asunto, cuerpo
+}
+
+// notifyFichaSiAplica envía correo y registra log si la ficha cumple condiciones de alerta.
+func (s *AlertaAsistenciaService) notifyFichaSiAplica(f *models.FichaCaracterizacion, now, hoy time.Time, fechaStr string, minutosDespues int, emails []string) {
+	if !fichaPendienteAlertaAsistencia(s, f, now, hoy, fechaStr, minutosDespues) {
+		return
+	}
+	asunto, cuerpo := cuerpoCorreoAlertaAsistencia(f, fechaStr, minutosDespues)
 	if errSend := utils.SendMail(emails, asunto, cuerpo); errSend != nil {
 		log.Printf("Alerta asistencia: error enviando correo para ficha %s: %v", f.Ficha, errSend)
 		return
@@ -113,6 +130,17 @@ func (s *AlertaAsistenciaService) notifyFichaSiAplica(f *models.FichaCaracteriza
 	if errCreate := s.alertaRepo.Create(&models.AlertaAsistenciaLog{FichaID: f.ID, Fecha: hoy}); errCreate != nil {
 		log.Printf("Alerta asistencia: error registrando log para ficha %s: %v", f.Ficha, errCreate)
 	}
+}
+
+func emailCoordinadorValido(email string, seen map[string]bool) (string, bool) {
+	email = strings.TrimSpace(email)
+	if email == "" || seen[email] {
+		return "", false
+	}
+	if strings.HasSuffix(strings.ToLower(email), "@sena.local") {
+		return "", false
+	}
+	return email, true
 }
 
 func (s *AlertaAsistenciaService) emailsCoordinadores() []string {
@@ -133,11 +161,8 @@ func (s *AlertaAsistenciaService) emailsCoordinadores() []string {
 		if err != nil || u == nil || !u.Status {
 			continue
 		}
-		email := strings.TrimSpace(u.Email)
-		if email == "" || seen[email] {
-			continue
-		}
-		if strings.HasSuffix(strings.ToLower(email), "@sena.local") {
+		email, ok := emailCoordinadorValido(u.Email, seen)
+		if !ok {
 			continue
 		}
 		seen[email] = true

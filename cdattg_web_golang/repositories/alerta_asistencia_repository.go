@@ -22,15 +22,19 @@ func NewAlertaAsistenciaRepository() AlertaAsistenciaRepository {
 	return &alertaAsistenciaRepository{db: database.GetDB()}
 }
 
+func alertaFechaInicioDia(fecha time.Time) time.Time {
+	return time.Date(fecha.Year(), fecha.Month(), fecha.Day(), 0, 0, 0, 0, fecha.Location())
+}
+
 func (r *alertaAsistenciaRepository) ExistsByFichaIDAndFecha(fichaID uint, fecha time.Time) (bool, error) {
 	var count int64
-	fechaDate := time.Date(fecha.Year(), fecha.Month(), fecha.Day(), 0, 0, 0, 0, fecha.Location())
+	fechaDate := alertaFechaInicioDia(fecha)
 	if err := r.db.Model(&models.AlertaAsistenciaLog{}).Where("ficha_id = ? AND fecha = ?", fichaID, fechaDate).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
 }
 
-func (r *alertaAsistenciaRepository) Create(log *models.AlertaAsistenciaLog) error {
-	return r.db.Create(log).Error
+func (r *alertaAsistenciaRepository) Create(entry *models.AlertaAsistenciaLog) error {
+	return r.db.Create(entry).Error
 }

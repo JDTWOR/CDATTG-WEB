@@ -34,6 +34,11 @@ export function CasosBienestarPage() {
             Aprendices con indicadores de riesgo de deserción: inasistencias repetidas para seguimiento por la
             oficina de bienestar.
           </p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+            Solo cuentan sesiones en días con formación programada para la ficha e instructor. Se excluyen festivos
+            nacionales, días sin formación de la sede (PARO) y sesiones fuera del calendario (ej. sábado sin
+            programación).
+          </p>
         </div>
         <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center gap-2">
           <ArrowLeftIcon className="h-5 w-5" aria-hidden />

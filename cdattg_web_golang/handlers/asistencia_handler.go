@@ -511,7 +511,7 @@ func (h *AsistenciaHandler) GetCasosBienestar(c *gin.Context) {
 			dias = n
 		}
 	}
-	minFallas := 1
+	minFallas := 3
 	if s := c.Query("min_fallas"); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n >= 0 {
 			minFallas = n

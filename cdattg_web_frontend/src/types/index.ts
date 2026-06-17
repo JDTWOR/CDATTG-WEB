@@ -626,6 +626,10 @@ export interface CasoBienestarItem {
   ficha_numero: string;
   programa_nombre?: string;
   sede_nombre: string;
+  jornada_nombre?: string;
+  instructor_nombre?: string;
+  ambiente_nombre?: string;
+  modalidad_formacion_nombre?: string;
   total_sesiones: number;
   asistencias_efectivas: number;
   inasistencias: number;

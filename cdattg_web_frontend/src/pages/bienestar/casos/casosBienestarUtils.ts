@@ -4,6 +4,10 @@ export type GrupoCasosPorFicha = {
   ficha_numero: string;
   programa_nombre: string;
   sede_nombre: string;
+  jornada_nombre?: string;
+  instructor_nombre?: string;
+  ambiente_nombre?: string;
+  modalidad_formacion_nombre?: string;
   casos: CasoBienestarItem[];
   totalInasistencias: number;
   totalSesiones: number;
@@ -25,6 +29,10 @@ export function agruparCasosPorFicha(casos: CasoBienestarItem[]): GrupoCasosPorF
           ficha_numero: caso.ficha_numero,
           programa_nombre: caso.programa_nombre || '',
           sede_nombre: caso.sede_nombre,
+          jornada_nombre: caso.jornada_nombre,
+          instructor_nombre: caso.instructor_nombre,
+          ambiente_nombre: caso.ambiente_nombre,
+          modalidad_formacion_nombre: caso.modalidad_formacion_nombre,
           casos: [],
           totalInasistencias: 0,
           totalSesiones: 0,
@@ -49,6 +57,10 @@ export function grupoCasosToFichaCard(grupo: GrupoCasosPorFicha): FichaCaracteri
     ficha: grupo.ficha_numero,
     programa_formacion_nombre: grupo.programa_nombre,
     sede_nombre: grupo.sede_nombre,
+    jornada_nombre: grupo.jornada_nombre,
+    instructor_nombre: grupo.instructor_nombre,
+    ambiente_nombre: grupo.ambiente_nombre,
+    modalidad_formacion_nombre: grupo.modalidad_formacion_nombre,
     cantidad_aprendices: grupo.casos.length,
     status: true,
   };
@@ -103,4 +115,15 @@ export function casosDeFicha(
       c.ficha_numero === fichaNumero &&
       (!sedeNombreParam || (c.sede_nombre || '') === sedeNombreParam),
   );
+}
+
+export function porcentajeAsistenciaAprendiz(caso: CasoBienestarItem): number {
+  if (caso.total_sesiones <= 0) return 0;
+  return Math.round((caso.asistencias_efectivas / caso.total_sesiones) * 100);
+}
+
+export function nivelAlertaInasistencias(inasistencias: number, minFallas: number): 'alto' | 'medio' | 'base' {
+  if (inasistencias >= minFallas + 3) return 'alto';
+  if (inasistencias >= minFallas + 1) return 'medio';
+  return 'base';
 }

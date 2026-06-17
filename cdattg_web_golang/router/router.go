@@ -16,6 +16,7 @@ const (
 	routeBloques    = "/bloques"
 	routePisos      = "/pisos"
 	routeJornadas   = "/jornadas"
+	routeDiasSinFormacion = "/dias-sin-formacion"
 
 	permVerPersonas     = "VER PERSONAS"
 	permCrearPersona    = "CREAR PERSONA"
@@ -65,6 +66,7 @@ func SetupRouter() *gin.Engine {
 	_ = handlers.NewMarcaHandler()
 	_ = handlers.NewContratoConvenioHandler()
 	jornadaHandler := handlers.NewJornadaHandler()
+	diaSinFormacionHandler := handlers.NewDiaSinFormacionSedeHandler()
 
 	// Rutas públicas
 	api := r.Group("/api")
@@ -206,6 +208,11 @@ func SetupRouter() *gin.Engine {
 				administracion.PUT(routeJornadas+"/:id", jornadaHandler.Update)
 				administracion.POST(routeJornadas+"/:id/propagar", jornadaHandler.Propagar)
 				administracion.DELETE(routeJornadas+"/:id", jornadaHandler.Delete)
+
+				administracion.GET(routeDiasSinFormacion, diaSinFormacionHandler.List)
+				administracion.POST(routeDiasSinFormacion, diaSinFormacionHandler.Create)
+				administracion.PUT(routeDiasSinFormacion+"/:id", diaSinFormacionHandler.Update)
+				administracion.DELETE(routeDiasSinFormacion+"/:id", diaSinFormacionHandler.Delete)
 			}
 
 			// Gestión de permisos y roles (ASIGNAR PERMISOS o SUPER ADMIN para roles)

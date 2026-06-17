@@ -10,4 +10,14 @@ export const administracionRoutes: RouteObject[] = [
       return { Component: AdministracionJornadasPage };
     },
   },
+  {
+    path: administracionPaths.diasSinFormacion,
+    handle: { breadcrumb: { label: 'Días sin formación' } },
+    lazy: async () => {
+      const { AdministracionDiasSinFormacionPage } = await import(
+        '../../pages/administracion/AdministracionDiasSinFormacionPage'
+      );
+      return { Component: AdministracionDiasSinFormacionPage };
+    },
+  },
 ];

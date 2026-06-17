@@ -215,6 +215,16 @@ export interface JornadaUpdateResponse extends JornadaAdminItem {
   propagacion?: JornadaPropagateResult;
 }
 
+export interface DiaSinFormacionSedeItem {
+  id: number;
+  sede_id: number;
+  sede_nombre?: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  motivo: string;
+  created_at?: string;
+}
+
 export interface JornadaItem {
   id: number;
   nombre: string;

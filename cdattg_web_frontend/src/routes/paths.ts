@@ -92,4 +92,5 @@ export const permisosPaths = {
 
 export const administracionPaths = {
   jornadas: '/administracion/jornadas',
+  diasSinFormacion: '/administracion/dias-sin-formacion',
 } as const;

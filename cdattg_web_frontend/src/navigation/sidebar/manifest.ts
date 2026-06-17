@@ -156,6 +156,14 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
   },
   {
     section: 'Administración',
+    path: administracionPaths.diasSinFormacion,
+    label: 'Días sin formación',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR'],
+    iconKey: 'administracion/dias-sin-formacion',
+  },
+  {
+    section: 'Administración',
     path: permisosPaths.index,
     label: 'Permisos y roles',
     permission: 'ASIGNAR PERMISOS',

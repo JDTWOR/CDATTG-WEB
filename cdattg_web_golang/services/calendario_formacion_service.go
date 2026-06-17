@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sena/cdattg-web-golang/config"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
 )
@@ -163,6 +164,9 @@ func (s *CalendarioFormacionService) EsSesionFormacionValida(fichaID, instructor
 	ifc, err := s.instFichaRepo.FindByFichaIDAndInstructorID(fichaID, instructorID)
 	if err != nil || ifc == nil {
 		return false
+	}
+	if config.RelaxarRestriccionAsistencia() {
+		return true
 	}
 	fichaDias, err := s.fichaDiasRepo.FindByFichaID(fichaID)
 	if err != nil {

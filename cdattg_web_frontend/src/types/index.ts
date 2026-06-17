@@ -507,6 +507,10 @@ export interface UpdateInstructorRequest {
 }
 
 // Asistencia
+export interface AsistenciaReglasResponse {
+  relaxar_restriccion_asistencia: boolean;
+}
+
 export interface AsistenciaRequest {
   instructor_ficha_id: number;
   fecha: string; // YYYY-MM-DD

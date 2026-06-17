@@ -592,6 +592,9 @@ func (s *InstructorHorarioService) ValidarPuedeTomarAsistencia(instructorID, fic
 			return errors.New(msg)
 		}
 	}
+	if config.RelaxarRestriccionAsistencia() {
+		return nil
+	}
 	if len(ctx.diasInst) == 0 || ctx.sinDiasFicha {
 		return validarModoAsignacionTomarAsistencia(ctx.ficha, ctx.ifc, ctx.sinDiasFicha, momento)
 	}

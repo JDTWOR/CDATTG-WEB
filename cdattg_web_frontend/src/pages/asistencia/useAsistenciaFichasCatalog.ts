@@ -19,6 +19,7 @@ export function useAsistenciaFichasCatalog() {
   const [fichas, setFichas] = useState<FichaCaracterizacionResponse[]>([]);
   const [fichasLoading, setFichasLoading] = useState(true);
   const [eventosHoy, setEventosHoy] = useState<InstructorAgendaEvent[]>([]);
+  const [relaxarRestriccionAsistencia, setRelaxarRestriccionAsistencia] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [error, setError] = useState('');
   const [errorSesionMsg] = useState('');
@@ -54,10 +55,20 @@ export function useAsistenciaFichasCatalog() {
     }
   }, []);
 
+  const fetchReglas = useCallback(async () => {
+    try {
+      const reglas = await apiService.getAsistenciaReglas();
+      setRelaxarRestriccionAsistencia(reglas.relaxar_restriccion_asistencia);
+    } catch {
+      setRelaxarRestriccionAsistencia(false);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchFichas();
     void fetchAgendaHoy();
-  }, [fetchFichas, fetchAgendaHoy]);
+    void fetchReglas();
+  }, [fetchFichas, fetchAgendaHoy, fetchReglas]);
 
   useEffect(() => {
     const id = globalThis.setInterval(() => setNow(new Date()), ASISTENCIA_TICK_MS);
@@ -65,8 +76,9 @@ export function useAsistenciaFichasCatalog() {
   }, []);
 
   const puedeTomarAsistencia = useCallback(
-    (ficha: FichaCaracterizacionResponse) => puedeTomarAsistenciaAhora(ficha, eventosHoy, now),
-    [eventosHoy, now],
+    (ficha: FichaCaracterizacionResponse) =>
+      puedeTomarAsistenciaAhora(ficha, eventosHoy, now, relaxarRestriccionAsistencia),
+    [eventosHoy, now, relaxarRestriccionAsistencia],
   );
 
   useEffect(() => {
@@ -125,6 +137,7 @@ export function useAsistenciaFichasCatalog() {
 
   return {
     isSuperAdmin,
+    relaxarRestriccionAsistencia,
     fichas,
     eventosHoy,
     fichasLoading,

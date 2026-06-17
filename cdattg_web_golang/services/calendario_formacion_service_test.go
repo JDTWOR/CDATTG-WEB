@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sena/cdattg-web-golang/config"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
 )
@@ -54,6 +55,70 @@ func TestDiaIDsProgramadosConFallback_UsaDiasFicha(t *testing.T) {
 	got := diaIDsProgramadosConFallback(nil, fichaDias)
 	if len(got) != 1 || got[0] != 6 {
 		t.Fatalf("esperaba sábado en fallback, got %#v", got)
+	}
+}
+
+func TestEsSesionFormacionValida_RelaxarPermiteSinDiaProgramado(t *testing.T) {
+	prev := config.AppConfig
+	t.Cleanup(func() { config.AppConfig = prev })
+	config.AppConfig = &config.Config{
+		Negocio: config.NegocioConfig{RelaxarRestriccionAsistencia: true},
+	}
+
+	inicio := time.Date(2025, 1, 1, 0, 0, 0, 0, time.Local)
+	fin := time.Date(2026, 12, 31, 0, 0, 0, 0, time.Local)
+	ficha := &models.FichaCaracterizacion{
+		UserAuditModel: models.UserAuditModel{BaseModel: models.BaseModel{ID: 10}},
+		Status:         true,
+		FechaInicio:    &inicio,
+		FechaFin:       &fin,
+	}
+	ifc := &models.InstructorFichaCaracterizacion{InstructorID: 1, FichaID: 10, FechaInicio: &inicio, FechaFin: &fin}
+	svc := &CalendarioFormacionService{
+		fichaRepo:             &stubFichaRepoHorario{ficha: ficha},
+		instFichaRepo:         &stubInstFichaRepo{ifc: ifc},
+		fichaDiasRepo:         &stubFichaDiasRepoCal{dias: []models.FichaDiasFormacion{{DiaFormacionID: 1}}},
+		instFichaDiasRepo:     &stubInstFichaDiasRepo{dias: []models.InstructorFichaDias{{DiaFormacionID: 1}}},
+		trasladoFechaRepo:     &stubTrasladoFechaRepo{},
+		festivosCache:         make(map[string]bool),
+		sinFormacionSedeCache: make(map[uint]map[string]string),
+	}
+	miercoles := time.Date(2026, 6, 3, 0, 0, 0, 0, time.Local)
+	svc.festivosCache[miercoles.Format(time.DateOnly)] = false
+	if !svc.EsSesionFormacionValida(10, 1, miercoles) {
+		t.Fatal("con relax debe ser válida aunque no sea día programado")
+	}
+}
+
+func TestEsSesionFormacionValida_SinRelaxRechazaDiaNoProgramado(t *testing.T) {
+	prev := config.AppConfig
+	t.Cleanup(func() { config.AppConfig = prev })
+	config.AppConfig = &config.Config{
+		Negocio: config.NegocioConfig{RelaxarRestriccionAsistencia: false},
+	}
+
+	inicio := time.Date(2025, 1, 1, 0, 0, 0, 0, time.Local)
+	fin := time.Date(2026, 12, 31, 0, 0, 0, 0, time.Local)
+	ficha := &models.FichaCaracterizacion{
+		UserAuditModel: models.UserAuditModel{BaseModel: models.BaseModel{ID: 10}},
+		Status:         true,
+		FechaInicio:    &inicio,
+		FechaFin:       &fin,
+	}
+	ifc := &models.InstructorFichaCaracterizacion{InstructorID: 1, FichaID: 10, FechaInicio: &inicio, FechaFin: &fin}
+	svc := &CalendarioFormacionService{
+		fichaRepo:             &stubFichaRepoHorario{ficha: ficha},
+		instFichaRepo:         &stubInstFichaRepo{ifc: ifc},
+		fichaDiasRepo:         &stubFichaDiasRepoCal{dias: []models.FichaDiasFormacion{{DiaFormacionID: 1}, {DiaFormacionID: 3}}},
+		instFichaDiasRepo:     &stubInstFichaDiasRepo{dias: []models.InstructorFichaDias{{DiaFormacionID: 1}}},
+		trasladoFechaRepo:     &stubTrasladoFechaRepo{},
+		festivosCache:         make(map[string]bool),
+		sinFormacionSedeCache: make(map[uint]map[string]string),
+	}
+	miercoles := time.Date(2026, 6, 3, 0, 0, 0, 0, time.Local)
+	svc.festivosCache[miercoles.Format(time.DateOnly)] = false
+	if svc.EsSesionFormacionValida(10, 1, miercoles) {
+		t.Fatal("sin relax no debe validar sesión en día no programado")
 	}
 }
 

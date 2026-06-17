@@ -51,6 +51,7 @@ type NegocioConfig struct {
 	ValidarCargaHoraria           bool // Si se valida la carga horaria semanal
 	ValidarEspecialidadInstructor bool // Si se exige que el instructor tenga la especialidad (red de conocimiento) del programa; por ahora desactivado, activar a futuro
 	IgnorarVigenciaFicha          bool // Si true, no filtra ni valida por fecha_inicio/fecha_fin de fichas_caracterizacion (datos desactualizados en BD)
+	RelaxarRestriccionAsistencia  bool // Modo transitorio: instructor asignado puede tomar asistencia sin restricción de día/horario (festivos y PARO sede se respetan)
 }
 
 type DatabaseConfig struct {
@@ -119,6 +120,7 @@ func LoadConfig() {
 			ValidarCargaHoraria:           getEnvAsBool("NEGOCIO_VALIDAR_CARGA_HORARIA", false),
 			ValidarEspecialidadInstructor: getEnvAsBool("NEGOCIO_VALIDAR_ESPECIALIDAD_INSTRUCTOR", false),
 			IgnorarVigenciaFicha:          getEnvAsBool("NEGOCIO_IGNORAR_VIGENCIA_FICHA", true),
+			RelaxarRestriccionAsistencia:  getEnvAsBool("NEGOCIO_RELAXAR_RESTRICCION_ASISTENCIA", false),
 		},
 		Inventario: InventarioConfig{
 			UmbralMinimo:       getEnvAsInt("INVENTARIO_UMBRAL_MINIMO", 10),

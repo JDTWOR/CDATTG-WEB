@@ -29,6 +29,7 @@ import type {
   CreateInstructorRequest,
   UpdateInstructorRequest,
   AsistenciaRequest,
+  AsistenciaReglasResponse,
   AsistenciaResponse,
   AsistenciaAprendizRequest,
   AsistenciaAprendizResponse,
@@ -735,6 +736,11 @@ class ApiService {
   }
 
   // Asistencias
+  async getAsistenciaReglas(): Promise<AsistenciaReglasResponse> {
+    const response = await this.api.get<AsistenciaReglasResponse>('/asistencias/reglas');
+    return response.data;
+  }
+
   /** Entrar a tomar asistencia: obtiene o crea la sesión del instructor actual para la ficha. Sin elegir instructor. */
   async entrarTomarAsistencia(fichaId: number): Promise<AsistenciaResponse> {
     const response = await this.api.post<AsistenciaResponse>('/asistencias/entrar-tomar-asistencia', { ficha_id: fichaId });

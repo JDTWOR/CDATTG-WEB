@@ -7,6 +7,11 @@ type EntrarTomarAsistenciaRequest struct {
 	FichaID uint `json:"ficha_id" binding:"required"`
 }
 
+// AsistenciaReglasResponse expone reglas de negocio de asistencia al frontend.
+type AsistenciaReglasResponse struct {
+	RelaxarRestriccionAsistencia bool `json:"relaxar_restriccion_asistencia"`
+}
+
 // AsistenciaRequest crear sesión de asistencia
 type AsistenciaRequest struct {
 	InstructorFichaID uint       `json:"instructor_ficha_id" binding:"required"`

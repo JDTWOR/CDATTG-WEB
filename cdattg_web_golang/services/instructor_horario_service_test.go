@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sena/cdattg-web-golang/config"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
 	"gorm.io/gorm"
@@ -141,7 +142,47 @@ func TestValidarPuedeTomarAsistencia_LegacySinDiasProgramados(t *testing.T) {
 	}
 }
 
+func setRelaxarRestriccionAsistencia(t *testing.T, enabled bool) {
+	t.Helper()
+	prev := config.AppConfig
+	t.Cleanup(func() { config.AppConfig = prev })
+	if prev == nil {
+		config.AppConfig = &config.Config{
+			Negocio: config.NegocioConfig{RelaxarRestriccionAsistencia: enabled},
+		}
+		return
+	}
+	copy := *prev
+	copy.Negocio.RelaxarRestriccionAsistencia = enabled
+	config.AppConfig = &copy
+}
+
+func TestValidarPuedeTomarAsistencia_RelaxarPermiteSinDiaHoy(t *testing.T) {
+	setRelaxarRestriccionAsistencia(t, true)
+
+	inicio := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	fin := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+	momento := time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC) // miércoles
+
+	svc := testHorarioService(
+		&models.InstructorFichaCaracterizacion{InstructorID: 1, FichaID: 6, FechaInicio: &inicio, FechaFin: &fin},
+		&models.FichaCaracterizacion{
+			UserAuditModel: models.UserAuditModel{BaseModel: models.BaseModel{ID: 6}},
+			Status:         true,
+			FechaInicio:    &inicio,
+			FechaFin:       &fin,
+		},
+		[]models.InstructorFichaDias{{DiaFormacionID: 1}}, // solo lunes
+		[]models.FichaDiasFormacion{{DiaFormacionID: 1}, {DiaFormacionID: 3}},
+	)
+	svc.calendarioSvc.festivosCache[fechaCalendario(momento).Format(time.DateOnly)] = false
+	if err := svc.ValidarPuedeTomarAsistencia(1, 6, momento); err != nil {
+		t.Fatalf("con relax debe permitir sin día programado hoy, got %v", err)
+	}
+}
+
 func TestValidarPuedeTomarAsistencia_ConDiasSinDiaHoy(t *testing.T) {
+	setRelaxarRestriccionAsistencia(t, false)
 	inicio := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	fin := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
 	momento := time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC) // miércoles = 3

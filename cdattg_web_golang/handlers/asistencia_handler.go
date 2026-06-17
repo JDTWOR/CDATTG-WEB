@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sena/cdattg-web-golang/config"
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/models"
@@ -96,6 +97,13 @@ func (h *AsistenciaHandler) EntrarTomarAsistencia(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+// GetReglas expone reglas de negocio de asistencia (p. ej. bypass temporal por día/horario).
+func (h *AsistenciaHandler) GetReglas(c *gin.Context) {
+	c.JSON(http.StatusOK, dto.AsistenciaReglasResponse{
+		RelaxarRestriccionAsistencia: config.RelaxarRestriccionAsistencia(),
+	})
 }
 
 func (h *AsistenciaHandler) GetByID(c *gin.Context) {

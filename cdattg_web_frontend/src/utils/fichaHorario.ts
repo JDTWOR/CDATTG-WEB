@@ -78,7 +78,11 @@ export function puedeTomarAsistenciaAhora(
   ficha: FichaCaracterizacionResponse,
   eventosHoy: InstructorAgendaEvent[],
   now: Date = new Date(),
+  relaxarRestriccionAsistencia = false,
 ): boolean {
+  if (relaxarRestriccionAsistencia) {
+    return true;
+  }
   if (fichaPermiteAsistenciaLegacy(ficha)) {
     return true;
   }
@@ -90,8 +94,9 @@ export function mensajeEstadoAsistenciaFicha(
   ficha: FichaCaracterizacionResponse,
   eventosHoy: InstructorAgendaEvent[],
   now: Date = new Date(),
+  relaxarRestriccionAsistencia = false,
 ): string {
-  if (puedeTomarAsistenciaAhora(ficha, eventosHoy, now)) {
+  if (puedeTomarAsistenciaAhora(ficha, eventosHoy, now, relaxarRestriccionAsistencia)) {
     return '';
   }
 

@@ -23,12 +23,16 @@ export function AsistenciaFichasListView({ page }: Props) {
     pendientesRevision,
     loading,
     isSuperAdmin,
+    relaxarRestriccionAsistencia,
     puedeTomarAsistencia,
     eventosHoy,
     now,
     handleTomarAsistencia,
     onAbrirEstadoModal,
   } = page;
+
+  const mensajeEstado = (ficha: (typeof fichas)[number]) =>
+    mensajeEstadoAsistenciaFicha(ficha, eventosHoy, now, relaxarRestriccionAsistencia);
 
   return (
     <div className="space-y-6">
@@ -113,7 +117,7 @@ export function AsistenciaFichasListView({ page }: Props) {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {fichas.map((item) => {
           const enHorario = puedeTomarAsistencia(item);
-          const estadoMsg = enHorario ? '' : mensajeEstadoAsistenciaFicha(item, eventosHoy, now);
+          const estadoMsg = enHorario ? '' : mensajeEstado(item);
 
           return (
           <FichaCaracterizacionCard

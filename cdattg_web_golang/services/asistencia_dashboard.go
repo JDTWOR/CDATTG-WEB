@@ -61,6 +61,7 @@ func calcularDashboardEsperados(
 	aprendizRepo repositories.AprendizRepository,
 	sedeID *uint,
 	fecha string,
+	filtrarPorHorarioJornada bool,
 ) (*dashboardEsperadosCalc, error) {
 	loc := dashboardLoadLocation()
 	refTime := time.Now().In(loc)
@@ -75,7 +76,7 @@ func calcularDashboardEsperados(
 		return nil, err
 	}
 
-	filtered, jornadas := filtrarFichasEsperadasDashboard(fichas, refTime, esHoy)
+	filtered, jornadas := filtrarFichasEsperadasDashboard(fichas, refTime, esHoy && filtrarPorHorarioJornada)
 	ids := make([]uint, len(filtered))
 	for i := range filtered {
 		ids[i] = filtered[i].ID
@@ -140,7 +141,7 @@ func filtrarPorFichaEsperadas(
 			continue
 		}
 		filtered = append(filtered, porFicha[i])
-		totalVinieron += porFicha[i].Cantidad
+		totalVinieron += porFicha[i].CantidadEnFormacion
 	}
 	return filtered, totalVinieron
 }

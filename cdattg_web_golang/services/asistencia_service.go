@@ -209,8 +209,11 @@ func (s *asistenciaService) CreateSesion(req dto.AsistenciaRequest) (*dto.Asiste
 	if errIFC != nil || ifc == nil {
 		return nil, errors.New(errMsgNoEstaCreadoComoInstructor)
 	}
-	if errVal := s.horarioSvc.ValidarPuedeTomarAsistencia(ifc.InstructorID, ifc.FichaID, time.Now()); errVal != nil {
+	if errVal := s.horarioSvc.ValidarPuedeTomarAsistencia(ifc.InstructorID, ifc.FichaID, fecha); errVal != nil {
 		return nil, errVal
+	}
+	if !s.horarioSvc.calendarioSvc.EsSesionFormacionValida(ifc.FichaID, ifc.InstructorID, fecha) {
+		return nil, errors.New("la fecha no corresponde a un día de formación programado para este instructor en la ficha")
 	}
 	// Regla: solo una sesión activa por instructor-ficha
 	activa, _ := s.repo.FindActivaByInstructorFichaID(req.InstructorFichaID)
@@ -757,39 +760,51 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 		return nil, err
 	}
 	pendientes, _ := s.repo.CountPendientesRevisionByFecha(sedeID, fecha)
-	esperados, errEsp := calcularDashboardEsperados(s.fichaRepo, s.aprendizRepo, sedeID, fecha)
+	esperados, errEsp := calcularDashboardEsperados(s.fichaRepo, s.aprendizRepo, sedeID, fecha, true)
 	if errEsp != nil {
 		return nil, errEsp
 	}
-	porFicha, totalEnFormacion := filtrarPorFichaEsperadas(porFichaRaw, esperados)
-	sinSesionDTO, errSin := buildFichasSinSesionEsperadas(esperados, s.repo, fecha)
+	formacionDia, errFormacion := calcularDashboardEsperados(s.fichaRepo, s.aprendizRepo, sedeID, fecha, false)
+	if errFormacion != nil {
+		return nil, errFormacion
+	}
+	porFichaActivas, totalEnFormacion := filtrarPorFichaEsperadas(porFichaRaw, esperados)
+	porFicha, _ := filtrarPorFichaEsperadas(porFichaRaw, formacionDia)
+	sinSesionDTO, errSin := buildFichasSinSesionEsperadas(formacionDia, s.repo, fecha)
 	if errSin != nil {
 		return nil, errSin
+	}
+	sinSesionActivas, errSinAct := buildFichasSinSesionEsperadas(esperados, s.repo, fecha)
+	if errSinAct != nil {
+		return nil, errSinAct
 	}
 	var totalFichas int64
 	if n, errC := s.fichaRepo.CountAll(sedeID); errC == nil {
 		totalFichas = n
 	}
 	resp := &dto.AsistenciaDashboardResponse{
-		Fecha:                      fecha,
-		TotalAprendicesEnFormacion: totalEnFormacion,
-		TotalAprendicesEsperados:   esperados.TotalEsperados,
-		JornadasActivas:            esperados.JornadasActivas,
-		PendientesRevision:         pendientes,
-		PorFicha:                   make([]dto.AsistenciaDashboardPorFicha, len(porFicha)),
-		FichasSinAsistenciaHoy:     sinSesionDTO,
-		TotalFichasRegistradas:     int(totalFichas),
-		FichasConSesionHoy:         len(porFicha),
+		Fecha:                          fecha,
+		TotalAprendicesEnFormacion:     totalEnFormacion,
+		TotalAprendicesEsperados:       esperados.TotalEsperados,
+		JornadasActivas:                esperados.JornadasActivas,
+		JornadasDisponibles:            formacionDia.JornadasActivas,
+		PendientesRevision:             pendientes,
+		PorFicha:                       make([]dto.AsistenciaDashboardPorFicha, len(porFicha)),
+		FichasSinAsistenciaHoy:         sinSesionDTO,
+		FichasSinSesionJornadaActiva:   len(sinSesionActivas),
+		TotalFichasRegistradas:         int(totalFichas),
+		FichasConSesionHoy:             len(porFichaActivas),
 	}
 	for i := range porFicha {
 		resp.PorFicha[i] = dto.AsistenciaDashboardPorFicha{
-			FichaID:          porFicha[i].FichaID,
-			FichaNumero:      porFicha[i].FichaNumero,
-			ProgramaNombre:   porFicha[i].ProgramaNombre,
-			JornadaNombre:    porFicha[i].JornadaNombre,
-			SedeNombre:       porFicha[i].SedeNombre,
-			CantidadVinieron: porFicha[i].Cantidad,
-			TotalAprendices:  porFicha[i].TotalAprendices,
+			FichaID:             porFicha[i].FichaID,
+			FichaNumero:         porFicha[i].FichaNumero,
+			ProgramaNombre:      porFicha[i].ProgramaNombre,
+			JornadaNombre:       porFicha[i].JornadaNombre,
+			SedeNombre:          porFicha[i].SedeNombre,
+			CantidadVinieron:    porFicha[i].CantidadVinieron,
+			CantidadEnFormacion: porFicha[i].CantidadEnFormacion,
+			TotalAprendices:     porFicha[i].TotalAprendices,
 		}
 	}
 	return resp, nil
@@ -800,14 +815,14 @@ func (s *asistenciaService) GetCasosBienestar(sedeID *uint, dias, minFallas int)
 		dias = 30
 	}
 	if minFallas <= 0 {
-		minFallas = 1
+		minFallas = 3
 	}
 	fechaFin := time.Now()
 	fechaInicio := fechaFin.AddDate(0, 0, -dias)
 	fechaInicioStr := fechaInicio.Format(time.DateOnly)
 	fechaFinStr := fechaFin.Format(time.DateOnly)
 
-	rows, err := s.repo.GetCasosBienestar(sedeID, fechaInicioStr, fechaFinStr, minFallas)
+	rows, err := NewCasosBienestarCalculator().Calcular(sedeID, fechaInicioStr, fechaFinStr, minFallas)
 	if err != nil {
 		return nil, err
 	}
@@ -824,6 +839,10 @@ func (s *asistenciaService) GetCasosBienestar(sedeID *uint, dias, minFallas int)
 			FichaNumero:          rows[i].FichaNumero,
 			ProgramaNombre:       rows[i].ProgramaNombre,
 			SedeNombre:           rows[i].SedeNombre,
+			JornadaNombre:        rows[i].JornadaNombre,
+			InstructorNombre:     rows[i].InstructorNombre,
+			AmbienteNombre:       rows[i].AmbienteNombre,
+			ModalidadNombre:      rows[i].ModalidadNombre,
 			TotalSesiones:        rows[i].TotalSesiones,
 			AsistenciasEfectivas: rows[i].AsistenciasEfectivas,
 			Inasistencias:        rows[i].Inasistencias,
@@ -856,7 +875,7 @@ func (s *asistenciaService) GetDetalleInasistenciasAprendiz(fichaNumero string, 
 	fechaInicioStr := fechaInicio.Format(time.DateOnly)
 	fechaFinStr := fechaFin.Format(time.DateOnly)
 
-	rows, err := s.repo.GetDetalleInasistenciasAprendiz(fichaNumero, aprendizID, fechaInicioStr, fechaFinStr, sedeNombre)
+	rows, err := NewCasosBienestarCalculator().CalcularDetalle(fichaNumero, aprendizID, fechaInicioStr, fechaFinStr, sedeNombre)
 	if err != nil {
 		return nil, err
 	}

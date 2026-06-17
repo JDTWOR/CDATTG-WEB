@@ -503,6 +503,12 @@ export const AsistenciaHistorialFicha = () => {
     });
   }, [aprendices, aprendicesPorSesion, sesiones]);
 
+  const resumenAsistencia = useMemo(() => {
+    const total = filas.length;
+    const asistieron = filas.filter((f) => f.asistio).length;
+    return { total, asistieron };
+  }, [filas]);
+
   const fechaMaxHoy = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const sesionesConObservaciones = useMemo(
     () => sesiones.filter((s) => (s.observaciones ?? '').trim().length > 0),
@@ -833,6 +839,18 @@ export const AsistenciaHistorialFicha = () => {
             Exportar Excel
           </button>
         )}
+        {!loading && resumenAsistencia.total > 0 && (
+          <div
+            className="inline-flex items-baseline gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 dark:border-gray-600 dark:bg-gray-800"
+            aria-live="polite"
+          >
+            <span className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+              {resumenAsistencia.asistieron.toLocaleString('es-CO')} /{' '}
+              {resumenAsistencia.total.toLocaleString('es-CO')}
+            </span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">asistieron</span>
+          </div>
+        )}
       </div>
 
       {!loading && (
@@ -1033,10 +1051,31 @@ export const AsistenciaHistorialFicha = () => {
       )}
       {!loading && (
         <div className="card overflow-hidden p-0">
+          {resumenAsistencia.total > 0 && (
+            <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-600">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="font-semibold tabular-nums">
+                  {resumenAsistencia.asistieron.toLocaleString('es-CO')} de{' '}
+                  {resumenAsistencia.total.toLocaleString('es-CO')}
+                </span>{' '}
+                aprendices asistieron el{' '}
+                {new Date(`${fecha}T12:00:00`).toLocaleDateString('es-CO', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+                .
+              </p>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <caption className="sr-only">
-                Asistencia del día por aprendiz para la ficha seleccionada
+                Asistencia del día por aprendiz para la ficha seleccionada.{' '}
+                {resumenAsistencia.total > 0
+                  ? `${resumenAsistencia.asistieron} de ${resumenAsistencia.total} asistieron.`
+                  : ''}
               </caption>
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-800 text-left">

@@ -586,6 +586,10 @@ export interface AsistenciaDashboardResponse {
   total_aprendices_esperados?: number;
   /** Nombres de jornada considerados en el esperado (ej. MAÑANA, JORNADA CONTINUA) */
   jornadas_activas?: string[];
+  /** Todas las jornadas con formación en la fecha (opciones del filtro) */
+  jornadas_disponibles?: string[];
+  /** Fichas sin sesión solo en jornada activa (métrica de card) */
+  fichas_sin_sesion_jornada_activa?: number;
   pendientes_revision?: number;
   por_ficha: AsistenciaDashboardPorFicha[];
   /** Fichas esperadas hoy (día formación + jornada activa) sin sesión de asistencia */
@@ -634,6 +638,8 @@ export interface AsistenciaDashboardPorFicha {
   sede_nombre: string;
   jornada_nombre?: string;
   cantidad_vinieron: number;
+  /** Aprendices con ingreso y sin salida registrada (en formación ahora) */
+  cantidad_en_formacion?: number;
   total_aprendices?: number;
 }
 

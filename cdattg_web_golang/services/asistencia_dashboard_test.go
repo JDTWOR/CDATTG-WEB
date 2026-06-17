@@ -93,8 +93,8 @@ func TestFiltrarFichasEsperadasDashboard_fechaHistoricaSinFiltroHorario(t *testi
 
 func TestFiltrarPorFichaEsperadas_excluyeJornadaNoActiva(t *testing.T) {
 	rows := []repositories.DashboardFichaRow{
-		{FichaID: 1, FichaNumero: "111", Cantidad: 10, TotalAprendices: 20},
-		{FichaID: 2, FichaNumero: "222", Cantidad: 50, TotalAprendices: 60},
+		{FichaID: 1, FichaNumero: "111", CantidadVinieron: 15, CantidadEnFormacion: 10, TotalAprendices: 20},
+		{FichaID: 2, FichaNumero: "222", CantidadVinieron: 55, CantidadEnFormacion: 50, TotalAprendices: 60},
 	}
 	esperados := &dashboardEsperadosCalc{
 		FichasEsperadas: []models.FichaCaracterizacion{fichaTest(1, "111", jornadaManana())},

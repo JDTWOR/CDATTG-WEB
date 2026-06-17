@@ -28,9 +28,9 @@ const DASH_JORNADA_ID = 'asistencia-dashboard-filtro-jornada';
 const PAGE_SIZE = 20;
 
 function textoResumenCasosBienestar(count: number): string {
-  if (count === 0) return 'Ningún caso detectado con el criterio actual.';
-  if (count === 1) return '1 caso detectado.';
-  return `${count} casos detectados.`;
+  if (count === 0) return 'Sin aprendices que cumplan el umbral configurado (≥3 inasistencias / 30 días).';
+  if (count === 1) return '1 aprendiz en umbral de riesgo por inasistencias.';
+  return `${count} aprendices en umbral de riesgo por inasistencias.`;
 }
 
 function formatearJornadasActivas(jornadas: string[] | undefined): string {
@@ -61,11 +61,73 @@ function filtrarFilasFicha<T extends { ficha_numero?: string; programa_nombre?: 
   );
 }
 
+type DashboardMetricas = {
+  vinieron: number;
+  enFormacion: number;
+  totalConSesion: number;
+  totalEsperado: number;
+  fichasConSesion: number;
+  fichasSinSesion: number;
+  jornadasTexto: string;
+};
+
+function agregarTotalesConSesion(rows: AsistenciaDashboardPorFicha[]): {
+  vinieron: number;
+  enFormacion: number;
+  totalAprendices: number;
+} {
+  return rows.reduce(
+    (acc, row) => ({
+      vinieron: acc.vinieron + (row.cantidad_vinieron ?? 0),
+      enFormacion: acc.enFormacion + (row.cantidad_en_formacion ?? 0),
+      totalAprendices: acc.totalAprendices + (row.total_aprendices ?? 0),
+    }),
+    { vinieron: 0, enFormacion: 0, totalAprendices: 0 },
+  );
+}
+
+function filasPorJornada<T extends { jornada_nombre?: string }>(rows: T[], jornadaFilter: string): T[] {
+  if (!jornadaFilter) return rows;
+  return rows.filter((row) => (row.jornada_nombre ?? '') === jornadaFilter);
+}
+
+function calcularMetricasDashboard(
+  data: AsistenciaDashboardResponse,
+  porFicha: AsistenciaDashboardPorFicha[],
+  sinSesion: AsistenciaDashboardFichaSinSesion[],
+  jornadaFilter: string,
+): DashboardMetricas {
+  const conSesion = filasPorJornada(porFicha, jornadaFilter);
+  const sinS = filasPorJornada(sinSesion, jornadaFilter);
+  const totalesConSesion = agregarTotalesConSesion(conSesion);
+  const totalSinSesion = sinS.reduce((sum, row) => sum + (row.total_aprendices ?? 0), 0);
+
+  return {
+    vinieron: totalesConSesion.vinieron,
+    enFormacion: totalesConSesion.enFormacion,
+    totalConSesion: totalesConSesion.totalAprendices,
+    totalEsperado: totalesConSesion.totalAprendices + totalSinSesion,
+    fichasConSesion: conSesion.length,
+    fichasSinSesion: sinS.length,
+    jornadasTexto: jornadaFilter || formatearJornadasActivas(data.jornadas_disponibles),
+  };
+}
+
+function jornadaInicialDesdeApi(data: AsistenciaDashboardResponse): string {
+  const activas = data.jornadas_activas ?? [];
+  if (activas.length === 1) return activas[0];
+  return '';
+}
+
 function useJornadasDisponibles(
+  jornadasApi: string[] | undefined,
   porFicha: AsistenciaDashboardPorFicha[],
   sinSesion: AsistenciaDashboardFichaSinSesion[],
 ): string[] {
   return useMemo(() => {
+    if (jornadasApi?.length) {
+      return [...jornadasApi].sort((a, b) => a.localeCompare(b, 'es'));
+    }
     const set = new Set<string>();
     porFicha.forEach((row) => {
       if (row.jornada_nombre) set.add(row.jornada_nombre);
@@ -74,7 +136,7 @@ function useJornadasDisponibles(
       if (row.jornada_nombre) set.add(row.jornada_nombre);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [porFicha, sinSesion]);
+  }, [jornadasApi, porFicha, sinSesion]);
 }
 
 type FiltrosDashboardProps = Readonly<{
@@ -96,7 +158,7 @@ function FiltrosDashboard({
     <div className="flex flex-col sm:flex-row gap-4 items-end sm:items-center bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600 mb-4">
       <div className="w-full sm:w-auto flex-1 min-w-[250px]">
         <label htmlFor={DASH_SEARCH_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Buscar ficha
+          Búsqueda de ficha
         </label>
         <div className="relative">
           <MagnifyingGlassIcon
@@ -107,7 +169,7 @@ function FiltrosDashboard({
             id={DASH_SEARCH_ID}
             type="search"
             autoComplete="off"
-            placeholder="Buscar por código de ficha o programa..."
+            placeholder="Código de ficha o nombre de programa…"
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-shadow"
@@ -116,7 +178,7 @@ function FiltrosDashboard({
       </div>
       <div className="w-full sm:w-auto min-w-[250px]">
         <label htmlFor={DASH_JORNADA_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Filtrar por jornada
+          Jornada de formación
         </label>
         <select
           id={DASH_JORNADA_ID}
@@ -213,57 +275,72 @@ function AsistenciaDashboardDataView({
   pageSinSesion,
   setPageSinSesion,
 }: AsistenciaDashboardDataViewProps) {
-  const real = data.total_aprendices_en_formacion;
-  const esperado = data.total_aprendices_esperados ?? 0;
-  const jornadasTexto = formatearJornadasActivas(data.jornadas_activas);
-  const fichasConSesion = data.fichas_con_sesion_hoy ?? data.por_ficha.length;
-  const fichasSinSesion = data.fichas_sin_asistencia_hoy?.length ?? 0;
-  const porcentaje = esperado > 0 ? ((real / esperado) * 100).toFixed(1) : null;
+  const metricas = calcularMetricasDashboard(data, data.por_ficha, data.fichas_sin_asistencia_hoy ?? [], jornadaFilter);
+  const vinieron = metricas.vinieron;
+  const enFormacion = metricas.enFormacion;
+  const totalConSesion = metricas.totalConSesion;
+  const totalEsperado = metricas.totalEsperado;
+  const jornadasTexto = metricas.jornadasTexto;
+  const fichasConSesion = metricas.fichasConSesion;
+  const fichasSinSesion = metricas.fichasSinSesion;
+  const porcentajeVinieron = totalConSesion > 0 ? ((vinieron / totalConSesion) * 100).toFixed(1) : null;
+  const scopeJornadaLabel = jornadaFilter || jornadasTexto || 'todas las jornadas programadas';
 
-  const totalesConSesion = fichasConSesionFiltradas.reduce(
-    (acc, row) => ({
-      vinieron: acc.vinieron + (row.cantidad_vinieron ?? 0),
-      enFichasConSesion: acc.enFichasConSesion + (row.total_aprendices ?? 0),
-    }),
-    { vinieron: 0, enFichasConSesion: 0 },
-  );
+  const totalesConSesion = agregarTotalesConSesion(fichasConSesionFiltradas);
 
   return (
     <>
+      <FiltrosDashboard
+        searchQuery={searchQuery}
+        onSearchQueryChange={onSearchQueryChange}
+        jornadaFilter={jornadaFilter}
+        onJornadaFilterChange={onJornadaFilterChange}
+        jornadasDisponibles={jornadasDisponibles}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="card">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fecha</p>
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fecha de corte</p>
           <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">{data.fecha}</p>
         </div>
 
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Aprendices en formación hoy</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Asistencia efectiva</p>
               <p className="text-3xl font-bold text-primary-600 dark:text-primary-400 mt-1 tabular-nums">
-                {esperado > 0 ? (
+                {totalConSesion > 0 ? (
                   <>
-                    {real.toLocaleString('es-CO')}
+                    {vinieron.toLocaleString('es-CO')}
                     <span className="text-lg font-semibold text-gray-500 dark:text-gray-400">
                       {' '}
-                      / {esperado.toLocaleString('es-CO')}
+                      / {totalConSesion.toLocaleString('es-CO')}
                     </span>
                   </>
                 ) : (
-                  real.toLocaleString('es-CO')
+                  vinieron.toLocaleString('es-CO')
                 )}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {esperado > 0 ? (
+                {totalConSesion > 0 ? (
                   <>
-                    En formación ahora
-                    {porcentaje != null && ` (${porcentaje}%)`}
-                    {jornadasTexto ? ` · jornadas activas: ${jornadasTexto}` : ''}
+                    Ratio sobre matrícula activa en fichas con sesión abierta
+                    {porcentajeVinieron != null && ` (${porcentajeVinieron}%)`}
+                    {scopeJornadaLabel ? ` · ámbito: ${scopeJornadaLabel}` : ''}
+                    {enFormacion !== vinieron && (
+                      <> · {enFormacion.toLocaleString('es-CO')} con ingreso sin salida</>
+                    )}
                   </>
                 ) : (
-                  'Ninguna jornada activa en este momento'
+                  `Sin sesiones abiertas en el ámbito: ${scopeJornadaLabel}`
                 )}
               </p>
+              {fichasSinSesion > 0 && totalEsperado > totalConSesion && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Matrícula activa proyectada: {totalEsperado.toLocaleString('es-CO')} aprendices
+                  ({fichasSinSesion} ficha{fichasSinSesion === 1 ? '' : 's'} sin apertura de sesión)
+                </p>
+              )}
             </div>
             <div className="w-14 h-14 bg-primary-100 dark:bg-primary-900/50 rounded-lg flex items-center justify-center">
               <UserGroupIcon className="w-7 h-7 text-primary-600 dark:text-primary-400" aria-hidden />
@@ -274,7 +351,7 @@ function AsistenciaDashboardDataView({
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fichas con sesión (jornada activa)</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fichas con sesión abierta</p>
               <p className="text-3xl font-bold text-green-600 dark:text-green-400 mt-1 tabular-nums">{fichasConSesion}</p>
             </div>
             <div className="w-14 h-14 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center">
@@ -286,7 +363,7 @@ function AsistenciaDashboardDataView({
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fichas sin sesión (jornada activa)</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Fichas sin apertura de sesión</p>
               <p className="text-3xl font-bold text-amber-600 dark:text-amber-400 mt-1 tabular-nums">{fichasSinSesion}</p>
             </div>
             <div className="w-14 h-14 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center">
@@ -298,13 +375,12 @@ function AsistenciaDashboardDataView({
 
       <div className="card py-3 px-4">
         <p className="text-sm text-gray-700 dark:text-gray-300">
-          <span className="font-medium">Resumen de cobertura:</span>{' '}
-          <span className="tabular-nums">{data.total_fichas_registradas ?? '—'}</span> fichas activas ·{' '}
-          <span className="tabular-nums text-green-700 dark:text-green-400">{fichasConSesion}</span> con sesión hoy ·{' '}
-          <span className="tabular-nums text-amber-700 dark:text-amber-300">{fichasSinSesion}</span> pendientes en
-          jornada activa ·{' '}
+          <span className="font-medium">Cobertura operativa ({scopeJornadaLabel}):</span>{' '}
+          <span className="tabular-nums">{data.total_fichas_registradas ?? '—'}</span> fichas activas en sistema ·{' '}
+          <span className="tabular-nums text-green-700 dark:text-green-400">{fichasConSesion}</span> con sesión registrada ·{' '}
+          <span className="tabular-nums text-amber-700 dark:text-amber-300">{fichasSinSesion}</span> sin apertura ·{' '}
           <span className="tabular-nums text-amber-600 dark:text-amber-400">{data.pendientes_revision ?? 0}</span>{' '}
-          pendientes de revisión
+          marcaciones pendientes de revisión
         </p>
       </div>
 
@@ -316,10 +392,10 @@ function AsistenciaDashboardDataView({
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Casos a tener en cuenta (Bienestar al Aprendiz)
+                Seguimiento de riesgo — Bienestar al Aprendiz
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Aprendices con 3 o más inasistencias en los últimos 30 días para seguimiento y prevención de deserción.
+                Aprendices con ≥3 inasistencias efectivas en ventana móvil de 30 días (criterio de alerta temprana).
               </p>
               {casosBienestarCount !== null && (
                 <p className="text-sm font-medium text-amber-700 dark:text-amber-300 mt-2">
@@ -333,37 +409,28 @@ function AsistenciaDashboardDataView({
             className="btn-primary inline-flex items-center justify-center gap-2 shrink-0"
           >
             <ExclamationTriangleIcon className="w-5 h-5" aria-hidden />
-            Ver casos a tener en cuenta
+            Ver módulo de casos
           </Link>
         </div>
       </div>
 
       <div className="card">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-          Fichas con sesión (jornada activa)
+          Fichas con sesión registrada
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Solo fichas con formación hoy y jornada en curso que ya abrieron sesión el {data.fecha}
-          {jornadasTexto ? ` (${jornadasTexto})` : ''}. No se listan fichas de otras jornadas (ej. noche en horario de
-          mañana).
+          Fichas con formación programada el {data.fecha} y al menos una sesión de asistencia abierta
+          {jornadaFilter ? ` · jornada ${jornadaFilter}` : ''}.
         </p>
-
-        <FiltrosDashboard
-          searchQuery={searchQuery}
-          onSearchQueryChange={onSearchQueryChange}
-          jornadaFilter={jornadaFilter}
-          onJornadaFilterChange={onJornadaFilterChange}
-          jornadasDisponibles={jornadasDisponibles}
-        />
 
         {fichasConSesionFiltradas.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400">
-            Ninguna ficha de la jornada activa tiene sesión de asistencia abierta.
+            Ningún registro coincide con los criterios de búsqueda o jornada seleccionados.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-              <caption className="sr-only">Fichas con sesión en jornada activa</caption>
+              <caption className="sr-only">Fichas con sesión de asistencia registrada en el ámbito filtrado</caption>
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -379,7 +446,7 @@ function AsistenciaDashboardDataView({
                     Sede
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Vinieron hoy
+                    Asist. / Matrícula
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-28">
                     Acción
@@ -410,20 +477,17 @@ function AsistenciaDashboardDataView({
               <tfoot className="bg-gray-50 dark:bg-gray-700/50 border-t-2 border-gray-200 dark:border-gray-600">
                 <tr>
                   <td colSpan={4} className="px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Total en fichas con sesión (jornada activa)
+                    Total sesión abierta
+                    {jornadaFilter ? ` · ${jornadaFilter}` : ''}
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900 dark:text-white tabular-nums">
                     {totalesConSesion.vinieron.toLocaleString('es-CO')} /{' '}
-                    {totalesConSesion.enFichasConSesion.toLocaleString('es-CO')}
+                    {totalesConSesion.totalAprendices.toLocaleString('es-CO')}
                   </td>
                   <td />
                 </tr>
               </tfoot>
             </table>
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              La card superior compara en formación ahora ({real.toLocaleString('es-CO')}) frente al esperado en toda la
-              jornada activa ({esperado.toLocaleString('es-CO')}), incluidas fichas que aún no abrieron sesión.
-            </p>
           </div>
         )}
         <PaginacionTabla
@@ -436,30 +500,21 @@ function AsistenciaDashboardDataView({
 
       <div className="card border-amber-200 dark:border-amber-800">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-          Fichas sin sesión de asistencia hoy
+          Fichas pendientes de apertura de sesión
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Fichas con formación programada hoy y jornada activa en este momento que aún no tienen sesión de asistencia
-          para el día {data.fecha}.
-          {jornadasTexto ? ` Jornadas consideradas: ${jornadasTexto}.` : ''}
+          Fichas con formación programada el {data.fecha} sin registro de sesión de asistencia
+          {jornadaFilter ? ` · jornada ${jornadaFilter}` : ''}.
         </p>
-
-        <FiltrosDashboard
-          searchQuery={searchQuery}
-          onSearchQueryChange={onSearchQueryChange}
-          jornadaFilter={jornadaFilter}
-          onJornadaFilterChange={onJornadaFilterChange}
-          jornadasDisponibles={jornadasDisponibles}
-        />
 
         {fichasSinSesionFiltradas.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400">
-            Todas las fichas esperadas en la jornada activa ya tienen sesión, o ninguna jornada está activa ahora.
+            Cobertura completa en el ámbito filtrado, o sin coincidencias en la búsqueda.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-              <caption className="sr-only">Fichas sin sesión de asistencia en jornada activa</caption>
+              <caption className="sr-only">Fichas sin apertura de sesión de asistencia en el ámbito filtrado</caption>
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -475,7 +530,7 @@ function AsistenciaDashboardDataView({
                     Sede
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Aprendices
+                    Matrícula activa
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-36">
                     Acción
@@ -497,7 +552,7 @@ function AsistenciaDashboardDataView({
                         to={asistenciaPaths.sesion(row.ficha_id)}
                         className="text-primary-600 dark:text-primary-400 hover:underline text-xs font-medium"
                       >
-                        Tomar asistencia
+                        Registrar asistencia
                       </Link>
                     </td>
                   </tr>
@@ -520,7 +575,7 @@ function AsistenciaDashboardDataView({
             <DocumentMagnifyingGlassIcon className="w-7 h-7 text-amber-600 dark:text-amber-400" aria-hidden />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pendientes de revisión (hoy)</p>
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Marcaciones pendientes de revisión</p>
             <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
               {data.pendientes_revision}
             </p>
@@ -540,6 +595,7 @@ export const AsistenciaDashboard = () => {
   const [casosBienestarCount, setCasosBienestarCount] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [jornadaFilter, setJornadaFilter] = useState('');
+  const jornadaInicializadaRef = useRef(false);
   const [pageConSesion, setPageConSesion] = useState(1);
   const [pageSinSesion, setPageSinSesion] = useState(1);
   const wsRef = useRef<WebSocket | null>(null);
@@ -555,6 +611,10 @@ export const AsistenciaDashboard = () => {
         apiService.getCasosBienestar({ dias: 30, min_fallas: 3 }).catch(() => ({ casos: [] })),
       ]);
       setData(res);
+      if (!jornadaInicializadaRef.current) {
+        setJornadaFilter(jornadaInicialDesdeApi(res));
+        jornadaInicializadaRef.current = true;
+      }
       setCasosBienestarCount(Array.isArray(casosRes?.casos) ? casosRes.casos.length : 0);
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } }).response?.status;
@@ -569,13 +629,8 @@ export const AsistenciaDashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (!canViewBienestar) {
-      setLoading(false);
-      setError('No tiene permiso para acceder al dashboard de asistencia.');
-      return;
-    }
     fetchDashboard();
-  }, [canViewBienestar, fetchDashboard]);
+  }, [fetchDashboard]);
 
   useEffect(() => {
     if (!canViewBienestar || !token) return;
@@ -620,7 +675,7 @@ export const AsistenciaDashboard = () => {
 
   const porFicha = data?.por_ficha ?? [];
   const sinSesion = data?.fichas_sin_asistencia_hoy ?? [];
-  const jornadasDisponibles = useJornadasDisponibles(porFicha, sinSesion);
+  const jornadasDisponibles = useJornadasDisponibles(data?.jornadas_disponibles, porFicha, sinSesion);
 
   const fichasConSesionFiltradas = useMemo(
     () => filtrarFilasFicha(porFicha, searchQuery, jornadaFilter),
@@ -645,21 +700,6 @@ export const AsistenciaDashboard = () => {
     return fichasSinSesionFiltradas.slice(start, start + PAGE_SIZE);
   }, [fichasSinSesionFiltradas, pageSinSesion]);
 
-  if (!canViewBienestar) {
-    return (
-      <div className="space-y-6">
-        <p className="text-red-600 dark:text-red-400">
-          No tiene permiso para acceder al dashboard de asistencia (requiere rol de Superadministrador o Bienestar al
-          Aprendiz).
-        </p>
-        <Link to={asistenciaPaths.fichas} className="btn-secondary inline-flex items-center gap-2">
-          <ArrowLeftIcon className="w-5 h-5" aria-hidden />
-          Tomar asistencia
-        </Link>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -669,19 +709,19 @@ export const AsistenciaDashboard = () => {
             Dashboard de Asistencia
           </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Cobertura en tiempo real según jornada activa (mañana, tarde, noche o jornada continua)
+            Indicadores de cobertura de asistencia por jornada de formación. Los totales responden al filtro de jornada seleccionado.
           </p>
         </div>
         <div className="flex items-center gap-2">
           {wsConnected && (
             <span className="inline-flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
               <SignalIcon className="w-4 h-4" aria-hidden />
-              En vivo
+              Sincronización en tiempo real
             </span>
           )}
           <Link to={asistenciaPaths.fichas} className="btn-secondary inline-flex items-center gap-2">
             <ArrowLeftIcon className="w-5 h-5" aria-hidden />
-            Tomar asistencia
+            Registrar asistencia
           </Link>
         </div>
       </div>

@@ -132,6 +132,10 @@ type AsistenciaDashboardResponse struct {
 	TotalAprendicesEsperados int `json:"total_aprendices_esperados"`
 	// JornadasActivas nombres de jornada consideradas en el esperado (ej. MAÑANA, JORNADA CONTINUA)
 	JornadasActivas []string `json:"jornadas_activas"`
+	// JornadasDisponibles todas las jornadas con formación en la fecha (para filtro del dashboard)
+	JornadasDisponibles []string `json:"jornadas_disponibles"`
+	// FichasSinSesionJornadaActiva fichas sin sesión solo en jornada activa (métrica de card)
+	FichasSinSesionJornadaActiva int `json:"fichas_sin_sesion_jornada_activa"`
 }
 
 // AsistenciaDashboardFichaSinSesion ficha sin sesión de asistencia en el día del resumen
@@ -151,8 +155,9 @@ type AsistenciaDashboardPorFicha struct {
 	ProgramaNombre   string `json:"programa_nombre"`
 	JornadaNombre    string `json:"jornada_nombre"`
 	SedeNombre       string `json:"sede_nombre"`
-	CantidadVinieron int    `json:"cantidad_vinieron"`
-	TotalAprendices  int    `json:"total_aprendices"`
+	CantidadVinieron     int `json:"cantidad_vinieron"`
+	CantidadEnFormacion  int `json:"cantidad_en_formacion"`
+	TotalAprendices      int `json:"total_aprendices"`
 }
 
 // CasosBienestarResponse lista de aprendices con indicadores de riesgo (para oficina de bienestar)
@@ -171,6 +176,10 @@ type CasoBienestarItem struct {
 	FichaNumero          string `json:"ficha_numero"`
 	ProgramaNombre       string `json:"programa_nombre"`
 	SedeNombre           string `json:"sede_nombre"`
+	JornadaNombre        string `json:"jornada_nombre,omitempty"`
+	InstructorNombre     string `json:"instructor_nombre,omitempty"`
+	AmbienteNombre       string `json:"ambiente_nombre,omitempty"`
+	ModalidadNombre      string `json:"modalidad_formacion_nombre,omitempty"`
 	TotalSesiones        int    `json:"total_sesiones"`
 	AsistenciasEfectivas int    `json:"asistencias_efectivas"`
 	Inasistencias        int    `json:"inasistencias"`

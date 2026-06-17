@@ -326,6 +326,9 @@ func colisionaConBloquesExistentes(
 }
 
 func (s *InstructorHorarioService) ValidarColisionAlAsignar(instructorID, fichaID uint, diasIDs []uint, fechaInicio, fechaFin time.Time, excluirFichaActual bool) error {
+	if config.RelaxarColisionHorarioInstructor() {
+		return nil
+	}
 	excluir := uint(0)
 	if excluirFichaActual {
 		excluir = fichaID

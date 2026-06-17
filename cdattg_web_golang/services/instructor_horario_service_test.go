@@ -142,6 +142,29 @@ func TestValidarPuedeTomarAsistencia_LegacySinDiasProgramados(t *testing.T) {
 	}
 }
 
+func setRelaxarColisionHorarioInstructor(t *testing.T, enabled bool) {
+	t.Helper()
+	prev := config.AppConfig
+	t.Cleanup(func() { config.AppConfig = prev })
+	if prev == nil {
+		config.AppConfig = &config.Config{
+			Negocio: config.NegocioConfig{RelaxarColisionHorarioInstructor: enabled},
+		}
+		return
+	}
+	copy := *prev
+	copy.Negocio.RelaxarColisionHorarioInstructor = enabled
+	config.AppConfig = &copy
+}
+
+func TestValidarColisionAlAsignar_RelaxarOmiteValidacion(t *testing.T) {
+	setRelaxarColisionHorarioInstructor(t, true)
+	svc := &InstructorHorarioService{}
+	if err := svc.ValidarColisionAlAsignar(1, 6, []uint{1}, time.Now(), time.Now(), true); err != nil {
+		t.Fatalf("con relax debe omitir colisión, got %v", err)
+	}
+}
+
 func setRelaxarRestriccionAsistencia(t *testing.T, enabled bool) {
 	t.Helper()
 	prev := config.AppConfig

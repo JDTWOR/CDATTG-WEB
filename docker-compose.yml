@@ -48,6 +48,7 @@ services:
       CORS_ALLOW_CREDENTIALS: "true"
       ENV: production
       NEGOCIO_RELAXAR_RESTRICCION_ASISTENCIA: ${NEGOCIO_RELAXAR_RESTRICCION_ASISTENCIA:-false}
+      NEGOCIO_RELAXAR_COLISION_HORARIO_INSTRUCTOR: ${NEGOCIO_RELAXAR_COLISION_HORARIO_INSTRUCTOR:-false}
     volumes:
       - backend_storage:/app/storage
     ports:

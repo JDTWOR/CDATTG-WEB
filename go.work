@@ -1,0 +1,3 @@
+go 1.24.0
+
+use ./cdattg_web_golang

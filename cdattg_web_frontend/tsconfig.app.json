@@ -7,6 +7,12 @@
     "module": "ESNext",
     "types": ["vite/client"],
     "skipLibCheck": true,
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "jspdf": ["node_modules/jspdf/types/index.d.ts"],
+      "jspdf-autotable": ["node_modules/jspdf-autotable/dist/index.d.ts"]
+    },
 
     /* Bundler mode */
     "moduleResolution": "bundler",

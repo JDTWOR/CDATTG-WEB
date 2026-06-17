@@ -5,6 +5,7 @@
 docs/deployment/conexiones-externas.md
 *.log
 .cursor/
+.vscode/
 
 # Excel temporales / datos locales
 *.xlsx

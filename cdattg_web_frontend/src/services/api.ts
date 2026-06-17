@@ -22,6 +22,7 @@ import type {
   FichaCaracterizacionResponse,
   InstructorItem,
   AsignarInstructoresRequest,
+  TrasladarDiaInstructorRequest,
   InstructorFichaResponse,
   AprendizRequest,
   AprendizResponse,
@@ -583,6 +584,10 @@ class ApiService {
 
   async desasignarInstructor(fichaId: number, instructorId: number): Promise<void> {
     await this.api.delete(`/fichas-caracterizacion/${fichaId}/instructores/${instructorId}`);
+  }
+
+  async trasladarDiaInstructor(fichaId: number, data: TrasladarDiaInstructorRequest): Promise<void> {
+    await this.api.post(`/fichas-caracterizacion/${fichaId}/instructores/traslado-dia`, data);
   }
 
   async getInstructorAgenda(desde: string, hasta: string): Promise<InstructorAgendaResponse> {

@@ -244,6 +244,34 @@ func (h *FichaHandler) DesasignarInstructor(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Instructor desasignado correctamente"})
 }
 
+func (h *FichaHandler) TrasladarDiaInstructor(c *gin.Context) {
+	fichaID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgIDInvalido})
+		return
+	}
+	var req dto.TrasladarDiaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
+		return
+	}
+	userIDVal, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuario no autenticado"})
+		return
+	}
+	userID, ok := userIDVal.(uint)
+	if !ok || userID == 0 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Identidad de usuario inválida"})
+		return
+	}
+	if err := h.svc.TrasladarDiaInstructor(uint(fichaID), userID, req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Traslado de día aplicado correctamente"})
+}
+
 func (h *FichaHandler) ListAprendices(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {

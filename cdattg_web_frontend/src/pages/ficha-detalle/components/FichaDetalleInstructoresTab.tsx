@@ -9,6 +9,7 @@ import type { FichaInstructoresTabModel } from '../hooks/useFichaInstructores';
 import { DiasInstructorLabel } from './DiasInstructorLabel';
 import { FichaDetalleAsignarInstructoresForm } from './FichaDetalleAsignarInstructoresForm';
 import { FichaDetalleInstructorProgramacionPanel } from './FichaDetalleInstructorProgramacionPanel';
+import { FichaDetalleTrasladoDiaModal } from './FichaDetalleTrasladoDiaModal';
 
 type FichaDetalleInstructoresTabProps = Readonly<
   FichaInstructoresTabModel & {
@@ -51,6 +52,25 @@ export function FichaDetalleInstructoresTab({
   onGuardarProgramacionInstructor,
   guardandoProgramacion,
   handleDesasignarInstructor,
+  showTrasladoModal,
+  abrirTraslado,
+  cerrarTraslado,
+  trasladoOrigenInstructorId,
+  setTrasladoOrigenInstructorId,
+  trasladoOrigenDiaId,
+  setTrasladoOrigenDiaId,
+  trasladoDestinoInstructorId,
+  setTrasladoDestinoInstructorId,
+  trasladoDestinoDiaId,
+  setTrasladoDestinoDiaId,
+  trasladoMotivo,
+  setTrasladoMotivo,
+  trasladoModo,
+  setTrasladoModo,
+  trasladoParesFechas,
+  setTrasladoParesFechas,
+  guardarTraslado,
+  guardandoTraslado,
 }: FichaDetalleInstructoresTabProps) {
   if (!ficha) return null;
 
@@ -59,9 +79,14 @@ export function FichaDetalleInstructoresTab({
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Instructores asignados a esta ficha</h2>
         {puedeProgramarInstructores && (
-          <button type="button" onClick={() => setShowFormInstructores(true)} className="btn-primary">
-            Asignar instructores
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setShowFormInstructores(true)} className="btn-primary">
+              Asignar instructores
+            </button>
+            <button type="button" onClick={abrirTraslado} className="btn-secondary">
+              Trasladar día
+            </button>
+          </div>
         )}
       </div>
       {puedeProgramarInstructores && (
@@ -181,6 +206,28 @@ export function FichaDetalleInstructoresTab({
           onCancel={() => setShowFormInstructores(false)}
         />
       )}
+      <FichaDetalleTrasladoDiaModal
+        open={showTrasladoModal}
+        instructores={instructores}
+        diasFichaDisponibles={diasFichaDisponibles}
+        modo={trasladoModo}
+        setModo={setTrasladoModo}
+        paresFechas={trasladoParesFechas}
+        setParesFechas={setTrasladoParesFechas}
+        origenInstructorId={trasladoOrigenInstructorId}
+        setOrigenInstructorId={setTrasladoOrigenInstructorId}
+        origenDiaId={trasladoOrigenDiaId}
+        setOrigenDiaId={setTrasladoOrigenDiaId}
+        destinoInstructorId={trasladoDestinoInstructorId}
+        setDestinoInstructorId={setTrasladoDestinoInstructorId}
+        destinoDiaId={trasladoDestinoDiaId}
+        setDestinoDiaId={setTrasladoDestinoDiaId}
+        motivo={trasladoMotivo}
+        setMotivo={setTrasladoMotivo}
+        guardando={guardandoTraslado}
+        onCancel={cerrarTraslado}
+        onConfirm={guardarTraslado}
+      />
     </div>
   );
 }

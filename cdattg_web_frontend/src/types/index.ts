@@ -431,6 +431,21 @@ export interface AsignarInstructoresRequest {
   instructores: InstructorFichaItem[];
 }
 
+export interface TrasladoParFechaRequest {
+  fecha_origen: string;
+  fecha_destino: string;
+}
+
+export interface TrasladarDiaInstructorRequest {
+  modo: 'permanente' | 'fechas';
+  instructor_origen_id: number;
+  dia_origen_id: number;
+  instructor_destino_id: number;
+  dia_destino_id: number;
+  motivo: string;
+  pares_fechas?: TrasladoParFechaRequest[];
+}
+
 export interface InstructorFichaResponse {
   id: number;
   instructor_id: number;

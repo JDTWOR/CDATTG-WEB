@@ -12,7 +12,12 @@ import type {
   InstructorFichaResponse,
   InstructorItem,
   DiaFormacionItem,
+  TrasladarDiaInstructorRequest,
 } from '../../../types';
+import {
+  crearTrasladoParFechaDraft,
+  type TrasladoModo,
+} from '../components/FichaDetalleTrasladoDiaModal';
 import { hoyISO, toggleDiaEnInstructores, vigenciaInstructorDefault } from '../fichaDetalleUtils';
 
 type UseFichaInstructoresParams = Readonly<{
@@ -44,6 +49,15 @@ export function useFichaInstructores({
   const [programacionFechaInicioDraft, setProgramacionFechaInicioDraft] = useState('');
   const [programacionFechaFinDraft, setProgramacionFechaFinDraft] = useState('');
   const [guardandoProgramacion, setGuardandoProgramacion] = useState(false);
+  const [showTrasladoModal, setShowTrasladoModal] = useState(false);
+  const [trasladoOrigenInstructorId, setTrasladoOrigenInstructorId] = useState(0);
+  const [trasladoOrigenDiaId, setTrasladoOrigenDiaId] = useState(0);
+  const [trasladoDestinoInstructorId, setTrasladoDestinoInstructorId] = useState(0);
+  const [trasladoDestinoDiaId, setTrasladoDestinoDiaId] = useState(0);
+  const [trasladoMotivo, setTrasladoMotivo] = useState('');
+  const [trasladoModo, setTrasladoModo] = useState<TrasladoModo>('fechas');
+  const [trasladoParesFechas, setTrasladoParesFechas] = useState([crearTrasladoParFechaDraft()]);
+  const [guardandoTraslado, setGuardandoTraslado] = useState(false);
 
   useEffect(() => {
     if (ficha?.instructor_id != null) {
@@ -196,6 +210,79 @@ export function useFichaInstructores({
     }
   };
 
+  const abrirTraslado = () => {
+    setShowTrasladoModal(true);
+  };
+
+  const cerrarTraslado = () => {
+    if (guardandoTraslado) return;
+    setShowTrasladoModal(false);
+    setTrasladoOrigenInstructorId(0);
+    setTrasladoOrigenDiaId(0);
+    setTrasladoDestinoInstructorId(0);
+    setTrasladoDestinoDiaId(0);
+    setTrasladoMotivo('');
+    setTrasladoModo('fechas');
+    setTrasladoParesFechas([crearTrasladoParFechaDraft()]);
+  };
+
+  const guardarTraslado = async () => {
+    if (!trasladoOrigenInstructorId || !trasladoDestinoInstructorId) {
+      alert('Seleccione instructor origen e instructor destino.');
+      return;
+    }
+    if (!trasladoOrigenDiaId || !trasladoDestinoDiaId) {
+      alert('Seleccione día origen y día destino.');
+      return;
+    }
+    if (
+      trasladoOrigenInstructorId === trasladoDestinoInstructorId &&
+      trasladoOrigenDiaId === trasladoDestinoDiaId
+    ) {
+      alert('El traslado no puede mantener instructor y día iguales.');
+      return;
+    }
+    if (!trasladoMotivo.trim()) {
+      alert('Debe registrar un motivo para el traslado.');
+      return;
+    }
+    if (trasladoModo === 'fechas') {
+      const paresValidos = trasladoParesFechas.filter(
+        (par) => par.fecha_origen.trim() && par.fecha_destino.trim(),
+      );
+      if (paresValidos.length === 0) {
+        alert('Indique al menos un par de fechas origen y destino.');
+        return;
+      }
+    }
+    const payload: TrasladarDiaInstructorRequest = {
+      modo: trasladoModo,
+      instructor_origen_id: trasladoOrigenInstructorId,
+      dia_origen_id: trasladoOrigenDiaId,
+      instructor_destino_id: trasladoDestinoInstructorId,
+      dia_destino_id: trasladoDestinoDiaId,
+      motivo: trasladoMotivo.trim(),
+      pares_fechas:
+        trasladoModo === 'fechas'
+          ? trasladoParesFechas
+              .filter((par) => par.fecha_origen.trim() && par.fecha_destino.trim())
+              .map(({ fecha_origen, fecha_destino }) => ({ fecha_origen, fecha_destino }))
+          : undefined,
+    };
+    setGuardandoTraslado(true);
+    try {
+      await apiService.trasladarDiaInstructor(fichaId, payload);
+      await loadInstructores();
+      await loadFicha();
+      void reloadAgenda();
+      cerrarTraslado();
+    } catch (err: unknown) {
+      alert(axiosErrorMessage(err, 'Error al trasladar día de formación'));
+    } finally {
+      setGuardandoTraslado(false);
+    }
+  };
+
   return {
     ficha,
     instructores,
@@ -225,6 +312,25 @@ export function useFichaInstructores({
     onToggleDiaProgramacion,
     onGuardarProgramacionInstructor,
     guardandoProgramacion,
+    showTrasladoModal,
+    abrirTraslado,
+    cerrarTraslado,
+    trasladoOrigenInstructorId,
+    setTrasladoOrigenInstructorId,
+    trasladoOrigenDiaId,
+    setTrasladoOrigenDiaId,
+    trasladoDestinoInstructorId,
+    setTrasladoDestinoInstructorId,
+    trasladoDestinoDiaId,
+    setTrasladoDestinoDiaId,
+    trasladoMotivo,
+    setTrasladoMotivo,
+    trasladoModo,
+    setTrasladoModo,
+    trasladoParesFechas,
+    setTrasladoParesFechas,
+    guardarTraslado,
+    guardandoTraslado,
     handleDesasignarInstructor,
     loadInstructores,
     loadInstructoresDisponibles,

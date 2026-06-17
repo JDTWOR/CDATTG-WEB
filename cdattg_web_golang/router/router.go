@@ -141,6 +141,7 @@ func SetupRouter() *gin.Engine {
 				fichas.GET("/:id/instructores", middleware.RequirePermissionListInstructoresFicha(), fichaHandler.ListInstructores)
 				fichas.GET("/:id/agenda", middleware.RequirePermission("ficha", permProgramarInstructores), agendaHandler.GetAgendaFicha)
 				fichas.POST("/:id/instructores", middleware.RequirePermission("ficha", permProgramarInstructores), fichaHandler.AsignarInstructores)
+				fichas.POST("/:id/instructores/traslado-dia", middleware.RequirePermission("ficha", permProgramarInstructores), fichaHandler.TrasladarDiaInstructor)
 				fichas.DELETE("/:id/instructores/:instructorId", middleware.RequirePermission("ficha", permProgramarInstructores), fichaHandler.DesasignarInstructor)
 				fichas.GET(routeIDAprendices, middleware.RequirePermissionListAprendicesFicha(), fichaHandler.ListAprendices)
 				fichas.POST(routeIDAprendices, middleware.RequirePermission("ficha", permGestionarAprendicesFicha), fichaHandler.AsignarAprendices)

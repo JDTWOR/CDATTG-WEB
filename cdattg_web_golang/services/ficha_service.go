@@ -1,14 +1,17 @@
 package services
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
+	"gorm.io/gorm"
 )
 
 const (
@@ -28,6 +31,7 @@ type FichaService interface {
 	Delete(id uint) error
 	ListInstructores(fichaID uint) ([]dto.InstructorFichaResponse, error)
 	AsignarInstructores(fichaID uint, req dto.AsignarInstructoresRequest) error
+	TrasladarDiaInstructor(fichaID, actorUserID uint, req dto.TrasladarDiaRequest) error
 	DesasignarInstructor(fichaID, instructorID uint) error
 	ListAprendices(fichaID uint) ([]dto.AprendizResponse, error)
 	AsignarAprendices(fichaID uint, personas []uint) error
@@ -40,6 +44,7 @@ type fichaService struct {
 	progRepo          repositories.ProgramaFormacionRepository
 	instFichaRepo     repositories.InstructorFichaRepository
 	instFichaDiasRepo repositories.InstructorFichaDiasRepository
+	trasladoFechaRepo repositories.InstructorFichaTrasladoFechaRepository
 	aprendizRepo      repositories.AprendizRepository
 	fichaDiasRepo     repositories.FichaDiasRepository
 	horarioSvc        *InstructorHorarioService
@@ -51,6 +56,7 @@ func NewFichaService() FichaService {
 		progRepo:          repositories.NewProgramaFormacionRepository(),
 		instFichaRepo:     repositories.NewInstructorFichaRepository(),
 		instFichaDiasRepo: repositories.NewInstructorFichaDiasRepository(),
+		trasladoFechaRepo: repositories.NewInstructorFichaTrasladoFechaRepository(),
 		aprendizRepo:      repositories.NewAprendizRepository(),
 		fichaDiasRepo:     repositories.NewFichaDiasRepository(),
 		horarioSvc:        NewInstructorHorarioService(),
@@ -415,6 +421,281 @@ func (s *fichaService) guardarDiasInstructor(instructorID, fichaID uint, diasIDs
 func (s *fichaService) DesasignarInstructor(fichaID, instructorID uint) error {
 	_ = s.instFichaDiasRepo.DeleteByInstructorAndFicha(instructorID, fichaID)
 	return s.instFichaRepo.DeleteByFichaIDAndInstructorID(fichaID, instructorID)
+}
+
+type trasladoAuditDetalle struct {
+	Modo                string    `json:"modo"`
+	FichaID             uint      `json:"ficha_id"`
+	InstructorOrigenID  uint      `json:"instructor_origen_id"`
+	InstructorDestinoID uint      `json:"instructor_destino_id"`
+	DiaOrigenID         uint      `json:"dia_origen_id"`
+	DiaDestinoID        uint      `json:"dia_destino_id"`
+	ParesFechas         []dto.TrasladoParFecha `json:"pares_fechas,omitempty"`
+	DiasOrigenAntes     []uint    `json:"dias_origen_antes"`
+	DiasOrigenDespues   []uint    `json:"dias_origen_despues"`
+	DiasDestinoAntes    []uint    `json:"dias_destino_antes"`
+	DiasDestinoDespues  []uint    `json:"dias_destino_despues"`
+	Motivo              string    `json:"motivo"`
+	FechaAccion         time.Time `json:"fecha_accion"`
+}
+
+func (s *fichaService) TrasladarDiaInstructor(fichaID, actorUserID uint, req dto.TrasladarDiaRequest) error {
+	if err := validarRequestTraslado(req); err != nil {
+		return err
+	}
+	if normalizarModoTraslado(req.Modo) == TrasladoModoFechas {
+		return s.trasladarDiaPorFechas(fichaID, actorUserID, req)
+	}
+	ctx, err := s.cargarContextoTraslado(fichaID, req)
+	if err != nil {
+		return err
+	}
+	if err := s.validarTrasladoConHorario(fichaID, req, ctx); err != nil {
+		return err
+	}
+	return s.persistirTrasladoPermanenteConAuditoria(fichaID, actorUserID, req, ctx)
+}
+
+type trasladoContexto struct {
+	ifcOrigen    *models.InstructorFichaCaracterizacion
+	ifcDestino   *models.InstructorFichaCaracterizacion
+	diasOrigen   []uint
+	diasDestino  []uint
+	nuevoOrigen  []uint
+	nuevoDestino []uint
+}
+
+func validarRequestTraslado(req dto.TrasladarDiaRequest) error {
+	if req.InstructorOrigenID == 0 || req.InstructorDestinoID == 0 {
+		return errors.New("los instructores de origen y destino son obligatorios")
+	}
+	if req.DiaOrigenID == 0 || req.DiaDestinoID == 0 {
+		return errors.New("los días de origen y destino son obligatorios")
+	}
+	if req.InstructorOrigenID == req.InstructorDestinoID && req.DiaOrigenID == req.DiaDestinoID {
+		return errors.New("el traslado no puede mantener instructor y día iguales")
+	}
+	if strings.TrimSpace(req.Motivo) == "" {
+		return errors.New("el motivo del traslado es obligatorio")
+	}
+	if normalizarModoTraslado(req.Modo) == TrasladoModoFechas && len(req.ParesFechas) == 0 {
+		return errors.New("debe indicar al menos un par de fechas para el traslado")
+	}
+	return nil
+}
+
+func (s *fichaService) cargarContextoTraslado(fichaID uint, req dto.TrasladarDiaRequest) (*trasladoContexto, error) {
+	ficha, err := s.fichaRepo.FindByID(fichaID)
+	if err != nil || ficha == nil {
+		return nil, errors.New(msgFichaNoEncontrada)
+	}
+	ifcOrigen, err := s.instFichaRepo.FindByFichaIDAndInstructorID(fichaID, req.InstructorOrigenID)
+	if err != nil || ifcOrigen == nil {
+		return nil, errors.New("el instructor origen no está asignado a la ficha")
+	}
+	ifcDestino, err := s.instFichaRepo.FindByFichaIDAndInstructorID(fichaID, req.InstructorDestinoID)
+	if err != nil || ifcDestino == nil {
+		return nil, errors.New("el instructor destino no está asignado a la ficha")
+	}
+	diasOrigenRec, err := s.instFichaDiasRepo.FindByInstructorAndFicha(req.InstructorOrigenID, fichaID)
+	if err != nil {
+		return nil, err
+	}
+	diasDestinoRec, err := s.instFichaDiasRepo.FindByInstructorAndFicha(req.InstructorDestinoID, fichaID)
+	if err != nil {
+		return nil, err
+	}
+	diasOrigen := uniqueDiaIDsFromRecords(diasOrigenRec)
+	diasDestino := uniqueDiaIDsFromRecords(diasDestinoRec)
+	if !containsUint(diasOrigen, req.DiaOrigenID) {
+		return nil, fmt.Errorf("el instructor origen no tiene asignado el día %d en la ficha", req.DiaOrigenID)
+	}
+	if !containsUint(diasDestino, req.DiaDestinoID) {
+		return nil, fmt.Errorf("el instructor destino no tiene asignado el día %d en la ficha", req.DiaDestinoID)
+	}
+	return &trasladoContexto{
+		ifcOrigen:    ifcOrigen,
+		ifcDestino:   ifcDestino,
+		diasOrigen:   diasOrigen,
+		diasDestino:  diasDestino,
+		nuevoOrigen:  addDia(removeDia(diasOrigen, req.DiaOrigenID), req.DiaDestinoID),
+		nuevoDestino: addDia(removeDia(diasDestino, req.DiaDestinoID), req.DiaOrigenID),
+	}, nil
+}
+
+func (s *fichaService) validarTrasladoConHorario(fichaID uint, req dto.TrasladarDiaRequest, ctx *trasladoContexto) error {
+	if err := s.horarioSvc.ValidarDiasSubsetFicha(fichaID, ctx.nuevoOrigen); err != nil {
+		return err
+	}
+	if err := s.horarioSvc.ValidarDiasSubsetFicha(fichaID, ctx.nuevoDestino); err != nil {
+		return err
+	}
+	fechaInicioOrigen, fechaFinOrigen := rangeVigenciaAsignacion(ctx.ifcOrigen)
+	fechaInicioDestino, fechaFinDestino := rangeVigenciaAsignacion(ctx.ifcDestino)
+	if err := s.horarioSvc.ValidarColisionAlAsignar(req.InstructorOrigenID, fichaID, ctx.nuevoOrigen, fechaInicioOrigen, fechaFinOrigen, true); err != nil {
+		return err
+	}
+	return s.horarioSvc.ValidarColisionAlAsignar(req.InstructorDestinoID, fichaID, ctx.nuevoDestino, fechaInicioDestino, fechaFinDestino, true)
+}
+
+func (s *fichaService) persistirTrasladoPermanenteConAuditoria(fichaID, actorUserID uint, req dto.TrasladarDiaRequest, ctx *trasladoContexto) error {
+	return database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := replaceDiasInstructorTx(tx, fichaID, req.InstructorOrigenID, ctx.nuevoOrigen); err != nil {
+			return err
+		}
+		if err := replaceDiasInstructorTx(tx, fichaID, req.InstructorDestinoID, ctx.nuevoDestino); err != nil {
+			return err
+		}
+		return crearLogTraslado(tx, actorUserID, fichaID, req, ctx, nil)
+	})
+}
+
+func (s *fichaService) trasladarDiaPorFechas(fichaID, actorUserID uint, req dto.TrasladarDiaRequest) error {
+	if _, err := s.cargarContextoTraslado(fichaID, req); err != nil {
+		return err
+	}
+	pares, err := validarParesFechasTraslado(req)
+	if err != nil {
+		return err
+	}
+	fechasConsulta := make([]time.Time, 0, len(pares)*2)
+	for i := range pares {
+		pares[i].FichaID = fichaID
+		pares[i].ActorUserID = actorUserID
+		fechasConsulta = append(fechasConsulta, pares[i].FechaOrigen, pares[i].FechaDestino)
+	}
+	ocupada, err := s.trasladoFechaRepo.ExistsFechaOcupada(fichaID, fechasConsulta)
+	if err != nil {
+		return err
+	}
+	if ocupada {
+		return errors.New("una o más fechas ya tienen un traslado registrado en esta ficha")
+	}
+	for _, par := range pares {
+		if err := s.horarioSvc.ValidarColisionEnFecha(req.InstructorDestinoID, fichaID, req.DiaOrigenID, par.FechaOrigen); err != nil {
+			return fmt.Errorf("colisión en fecha origen %s: %w", par.FechaOrigen.Format(time.DateOnly), err)
+		}
+		if err := s.horarioSvc.ValidarColisionEnFecha(req.InstructorOrigenID, fichaID, req.DiaDestinoID, par.FechaDestino); err != nil {
+			return fmt.Errorf("colisión en fecha destino %s: %w", par.FechaDestino.Format(time.DateOnly), err)
+		}
+	}
+	return database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := s.trasladoFechaRepo.CreateBatch(tx, pares); err != nil {
+			return err
+		}
+		return crearLogTraslado(tx, actorUserID, fichaID, req, nil, pares)
+	})
+}
+
+func crearLogTraslado(
+	tx *gorm.DB,
+	actorUserID, fichaID uint,
+	req dto.TrasladarDiaRequest,
+	ctx *trasladoContexto,
+	pares []models.InstructorFichaTrasladoFecha,
+) error {
+	detalle := trasladoAuditDetalle{
+		Modo:                normalizarModoTraslado(req.Modo),
+		FichaID:             fichaID,
+		InstructorOrigenID:  req.InstructorOrigenID,
+		InstructorDestinoID: req.InstructorDestinoID,
+		DiaOrigenID:         req.DiaOrigenID,
+		DiaDestinoID:        req.DiaDestinoID,
+		ParesFechas:         req.ParesFechas,
+		Motivo:              strings.TrimSpace(req.Motivo),
+		FechaAccion:         time.Now(),
+	}
+	if ctx != nil {
+		detalle.DiasOrigenAntes = ctx.diasOrigen
+		detalle.DiasOrigenDespues = ctx.nuevoOrigen
+		detalle.DiasDestinoAntes = ctx.diasDestino
+		detalle.DiasDestinoDespues = ctx.nuevoDestino
+	}
+	if len(pares) > 0 {
+		detalle.ParesFechas = make([]dto.TrasladoParFecha, len(pares))
+		for i, p := range pares {
+			detalle.ParesFechas[i] = dto.TrasladoParFecha{
+				FechaOrigen:  p.FechaOrigen.Format(time.DateOnly),
+				FechaDestino: p.FechaDestino.Format(time.DateOnly),
+			}
+		}
+	}
+	payload, _ := json.Marshal(detalle)
+	log := models.RegistroActividades{
+		UserID:      actorUserID,
+		Accion:      "TRASLADO_DIA_INSTRUCTOR",
+		Tabla:       "instructor_ficha_dias",
+		RegistroID:  nil,
+		Detalles:    string(payload),
+		FechaAccion: time.Now(),
+	}
+	return tx.Create(&log).Error
+}
+
+func uniqueDiaIDsFromRecords(rows []models.InstructorFichaDias) []uint {
+	seen := make(map[uint]bool, len(rows))
+	out := make([]uint, 0, len(rows))
+	for _, r := range rows {
+		if r.DiaFormacionID == 0 || seen[r.DiaFormacionID] {
+			continue
+		}
+		seen[r.DiaFormacionID] = true
+		out = append(out, r.DiaFormacionID)
+	}
+	return out
+}
+
+func removeDia(list []uint, target uint) []uint {
+	out := make([]uint, 0, len(list))
+	for _, id := range list {
+		if id != target {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func addDia(list []uint, day uint) []uint {
+	if day == 0 || containsUint(list, day) {
+		return list
+	}
+	return append(list, day)
+}
+
+func rangeVigenciaAsignacion(ifc *models.InstructorFichaCaracterizacion) (time.Time, time.Time) {
+	now := time.Now()
+	inicio := now
+	fin := now
+	if ifc != nil && ifc.FechaInicio != nil {
+		inicio = *ifc.FechaInicio
+	}
+	if ifc != nil && ifc.FechaFin != nil {
+		fin = *ifc.FechaFin
+	}
+	if fin.Before(inicio) {
+		fin = inicio
+	}
+	return inicio, fin
+}
+
+func replaceDiasInstructorTx(tx *gorm.DB, fichaID, instructorID uint, diasIDs []uint) error {
+	if err := tx.Where("instructor_id = ? AND ficha_id = ?", instructorID, fichaID).Delete(&models.InstructorFichaDias{}).Error; err != nil {
+		return fmt.Errorf("error al limpiar días del instructor: %w", err)
+	}
+	for _, d := range diasIDs {
+		if d == 0 {
+			continue
+		}
+		rec := models.InstructorFichaDias{
+			InstructorID:   instructorID,
+			FichaID:        fichaID,
+			DiaFormacionID: d,
+		}
+		if err := tx.Create(&rec).Error; err != nil {
+			return fmt.Errorf("error al guardar días del instructor: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *fichaService) ListAprendices(fichaID uint) ([]dto.AprendizResponse, error) {

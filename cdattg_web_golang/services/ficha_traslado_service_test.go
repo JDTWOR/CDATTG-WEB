@@ -91,6 +91,57 @@ func TestValidarParesFechasTraslado_RechazaDiaSemanaIncorrecto(t *testing.T) {
 	}
 }
 
+func TestFechaCalendario_AlineaUTCDePostgresConLocal(t *testing.T) {
+	loc, err := time.LoadLocation("America/Bogota")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fromDB := time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC)
+	loopDay := time.Date(2026, 6, 17, 0, 0, 0, 0, loc)
+	if !fechaCalendario(fromDB).Equal(fechaCalendario(loopDay)) {
+		t.Fatalf("misma fecha civil debe coincidir: db=%v loop=%v", fechaCalendario(fromDB), fechaCalendario(loopDay))
+	}
+}
+
+func TestInstructorCedeSesionTraslado_FechaUTCEnBD(t *testing.T) {
+	loc, err := time.LoadLocation("America/Bogota")
+	if err != nil {
+		t.Fatal(err)
+	}
+	traslados := []models.InstructorFichaTrasladoFecha{{
+		InstructorOrigenID:  69,
+		InstructorDestinoID: 74,
+		DiaOrigenID:         3,
+		DiaDestinoID:        5,
+		FechaOrigen:         time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC),
+		FechaDestino:        time.Date(2026, 6, 19, 0, 0, 0, 0, time.UTC),
+	}}
+	diaOrigen := time.Date(2026, 6, 17, 0, 0, 0, 0, loc)
+	if !instructorCedeSesionTraslado(traslados, 69, diaOrigen) {
+		t.Fatal("origen debe ceder el miércoles 2026-06-17")
+	}
+	if !instructorSesionPrestadaTrasladoMatch(traslados, 74, diaOrigen, 3) {
+		t.Fatal("destino debe recibir sesión del día origen el 2026-06-17")
+	}
+	diaDestino := time.Date(2026, 6, 19, 0, 0, 0, 0, loc)
+	if !instructorCedeSesionTraslado(traslados, 74, diaDestino) {
+		t.Fatal("destino debe ceder el viernes 2026-06-19")
+	}
+	if !instructorSesionPrestadaTrasladoMatch(traslados, 69, diaDestino, 5) {
+		t.Fatal("origen debe recibir sesión del día destino el 2026-06-19")
+	}
+}
+
+func instructorSesionPrestadaTrasladoMatch(
+	traslados []models.InstructorFichaTrasladoFecha,
+	instructorID uint,
+	fecha time.Time,
+	wantDia uint,
+) bool {
+	dia, ok := instructorSesionPrestadaTraslado(traslados, instructorID, fecha)
+	return ok && dia == wantDia
+}
+
 func TestRangeVigenciaAsignacion(t *testing.T) {
 	inicio := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	fin := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)

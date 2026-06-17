@@ -24,8 +24,22 @@ func normalizarModoTraslado(modo string) string {
 	}
 }
 
+// fechaCalendario normaliza a medianoche local usando el día civil de la fecha.
+// Las columnas DATE de Postgres llegan vía GORM como UTC 00:00; hay que leer
+// año/mes/día sin convertir zona, para que coincidan con el loop de agenda en Local.
 func fechaCalendario(t time.Time) time.Time {
-	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	if t.IsZero() {
+		return t
+	}
+	loc := time.Local
+	y, m, d := t.Date()
+	if t.Location() == time.UTC {
+		y, m, d = t.UTC().Date()
+	} else {
+		t = t.In(loc)
+		y, m, d = t.Date()
+	}
+	return time.Date(y, m, d, 0, 0, 0, 0, loc)
 }
 
 func parseFechaTrasladoInput(s string) (time.Time, error) {

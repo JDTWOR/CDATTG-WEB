@@ -3,6 +3,7 @@ import { ArrowLeftIcon, CalendarDaysIcon, ChartBarIcon, EyeIcon } from '@heroico
 import { useAuth } from '../../context/AuthContext';
 import { asistenciaPaths, fichasPaths } from '../../routes/paths';
 import { getInicioNavigationPath } from '../../utils/roles';
+import { getHorarioHoyInstructor, mensajeEstadoAsistenciaFicha } from '../../utils/fichaHorario';
 import { FichaCaracterizacionCard } from '../../components/FichaCaracterizacionCard';
 import { ASIST_MODAL_IDS_ROOT } from './asistenciaConstants';
 import { AsistenciaModals } from './AsistenciaModals';
@@ -22,6 +23,9 @@ export function AsistenciaFichasListView({ page }: Props) {
     pendientesRevision,
     loading,
     isSuperAdmin,
+    puedeTomarAsistencia,
+    eventosHoy,
+    now,
     handleTomarAsistencia,
     onAbrirEstadoModal,
   } = page;
@@ -107,11 +111,16 @@ export function AsistenciaFichasListView({ page }: Props) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {fichas.map((item) => (
+        {fichas.map((item) => {
+          const enHorario = puedeTomarAsistencia(item);
+          const estadoMsg = enHorario ? '' : mensajeEstadoAsistenciaFicha(item, eventosHoy, now);
+
+          return (
           <FichaCaracterizacionCard
             key={item.id}
             ficha={item}
             showHorarioHoy
+            horarioHoyLabel={getHorarioHoyInstructor(item.id, eventosHoy, now)}
             actions={
               <>
                 <Link
@@ -121,19 +130,26 @@ export function AsistenciaFichasListView({ page }: Props) {
                   <EyeIcon className="h-4 w-4" />
                   Ver ficha
                 </Link>
-                <button
-                  type="button"
-                  onClick={() => handleTomarAsistencia(item.id)}
-                  disabled={loading}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-                >
-                  <CalendarDaysIcon className="h-4 w-4" />
-                  {loading ? 'Entrando…' : 'Tomar asistencia'}
-                </button>
+                {enHorario ? (
+                  <button
+                    type="button"
+                    onClick={() => handleTomarAsistencia(item.id)}
+                    disabled={loading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    <CalendarDaysIcon className="h-4 w-4" />
+                    {loading ? 'Entrando…' : 'Tomar asistencia'}
+                  </button>
+                ) : (
+                  <span className="inline-flex max-w-[12rem] items-center rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                    {estadoMsg}
+                  </span>
+                )}
               </>
             }
           />
-        ))}
+          );
+        })}
       </div>
       <AsistenciaModals page={page} estadoFieldIds={ASIST_MODAL_IDS_ROOT} />
     </div>

@@ -20,6 +20,8 @@ type Props = Readonly<{
   showStatusBadge?: boolean;
   /** Muestra hora_inicio–hora_fin del día actual si la ficha tiene clase hoy. */
   showHorarioHoy?: boolean;
+  /** Si se define, reemplaza el horario derivado de dias_formacion (p. ej. agenda del instructor). */
+  horarioHoyLabel?: string | null;
   /** Contenido bajo la info académica (estado de sesión, métricas, etc.). */
   extra?: ReactNode;
   /** Reemplaza el contador de aprendices en el pie izquierdo. */
@@ -171,6 +173,7 @@ export function FichaCaracterizacionCard({
   ficha,
   showStatusBadge = false,
   showHorarioHoy = false,
+  horarioHoyLabel,
   extra,
   footerLeft,
   actions,
@@ -180,7 +183,10 @@ export function FichaCaracterizacionCard({
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
   const sedeAmbiente = [ficha.sede_nombre, ficha.ambiente_nombre].filter(Boolean).join(' / ') || '–';
-  const horarioHoy = showHorarioHoy ? getHorarioHoy(ficha) : null;
+  let horarioHoy: string | null = null;
+  if (showHorarioHoy) {
+    horarioHoy = horarioHoyLabel === undefined ? getHorarioHoy(ficha) : horarioHoyLabel;
+  }
   const expanded = !collapsible || open;
   const borderClass =
     collapsible && open ? 'border-primary-300 dark:border-primary-600' : 'border-gray-200 dark:border-gray-600';

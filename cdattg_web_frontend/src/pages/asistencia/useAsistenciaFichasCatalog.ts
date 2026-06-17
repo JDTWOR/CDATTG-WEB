@@ -4,16 +4,22 @@ import { apiService } from '../../services/api';
 import { axiosErrorMessage } from '../../utils/httpError';
 import { useAuth } from '../../context/AuthContext';
 import type { FichaCaracterizacionResponse, AsistenciaAprendizResponse } from '../../types';
+import type { InstructorAgendaEvent } from '../../types/agenda';
+import { formatLocalISO } from '../../components/calendar/calendarUtils';
+import { puedeTomarAsistenciaAhora } from '../../utils/fichaHorario';
 import { asistenciaFichaPath } from './asistenciaPaths';
 import type { AsistenciaEstadoModalState } from './asistenciaModalsTypes';
 
 const noop = () => undefined;
+const ASISTENCIA_TICK_MS = 60_000;
 
 export function useAsistenciaFichasCatalog() {
   const navigate = useNavigate();
   const { roles } = useAuth();
   const [fichas, setFichas] = useState<FichaCaracterizacionResponse[]>([]);
   const [fichasLoading, setFichasLoading] = useState(true);
+  const [eventosHoy, setEventosHoy] = useState<InstructorAgendaEvent[]>([]);
+  const [now, setNow] = useState(() => new Date());
   const [error, setError] = useState('');
   const [errorSesionMsg] = useState('');
   const [estadoModal, setEstadoModal] = useState<AsistenciaEstadoModalState | null>(null);
@@ -38,9 +44,30 @@ export function useAsistenciaFichasCatalog() {
     }
   }, []);
 
+  const fetchAgendaHoy = useCallback(async () => {
+    try {
+      const hoy = formatLocalISO(new Date());
+      const res = await apiService.getInstructorAgenda(hoy, hoy);
+      setEventosHoy(res.eventos ?? []);
+    } catch {
+      setEventosHoy([]);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchFichas();
-  }, [fetchFichas]);
+    void fetchAgendaHoy();
+  }, [fetchFichas, fetchAgendaHoy]);
+
+  useEffect(() => {
+    const id = globalThis.setInterval(() => setNow(new Date()), ASISTENCIA_TICK_MS);
+    return () => globalThis.clearInterval(id);
+  }, []);
+
+  const puedeTomarAsistencia = useCallback(
+    (ficha: FichaCaracterizacionResponse) => puedeTomarAsistenciaAhora(ficha, eventosHoy, now),
+    [eventosHoy, now],
+  );
 
   useEffect(() => {
     const loadPendientes = async () => {
@@ -99,8 +126,11 @@ export function useAsistenciaFichasCatalog() {
   return {
     isSuperAdmin,
     fichas,
+    eventosHoy,
     fichasLoading,
     showSinFichas,
+    puedeTomarAsistencia,
+    now,
     error,
     errorSesionMsg,
     loading: false,

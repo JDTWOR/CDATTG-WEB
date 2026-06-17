@@ -11,6 +11,7 @@ type ScheduleEventCardProps = Readonly<{
   instructorColorMap?: Map<number, string>;
   style?: CSSProperties;
   className?: string;
+  compact?: boolean;
 }>;
 
 function horarioEvento(event: InstructorAgendaEvent): string {
@@ -37,13 +38,20 @@ export function ScheduleEventCard({
   instructorColorMap,
   style,
   className = '',
+  compact = false,
 }: ScheduleEventCardProps) {
   const color = colorClassForInstructor(event.instructor_id, mode, instructorColorMap);
   const puedeTomarAsistencia = isToday && mode === 'instructor' && eventoEnHorarioActual(event);
+  const cardClass = compact
+    ? 'absolute left-0.5 right-0.5 z-10 flex h-full flex-col gap-0 overflow-hidden rounded border px-1 py-0.5 text-[10px] leading-tight text-white'
+    : 'absolute left-1 right-1 z-10 flex h-full flex-col gap-0.5 overflow-hidden rounded border px-2 py-1.5 text-xs leading-snug text-white xl:gap-1 xl:px-2.5 xl:py-2 xl:text-sm 2xl:px-3 2xl:py-2.5 2xl:text-base';
+  const actionLinkClass = compact
+    ? 'mt-auto block rounded bg-white/20 px-0.5 py-0 text-center text-[9px] hover:bg-white/30'
+    : 'mt-auto block rounded bg-white/20 px-1 py-0.5 text-center text-[10px] hover:bg-white/30 xl:px-1.5 xl:py-1 xl:text-xs 2xl:text-sm';
 
   return (
     <div
-      className={`absolute left-1 right-1 z-10 flex h-full flex-col gap-0.5 overflow-hidden rounded border px-2 py-1.5 text-xs leading-snug text-white xl:gap-1 xl:px-2.5 xl:py-2 xl:text-sm 2xl:px-3 2xl:py-2.5 2xl:text-base ${color} ${className}`}
+      className={`${cardClass} ${color} ${className}`}
       style={style}
       title={buildEventTitle(event)}
     >
@@ -63,7 +71,7 @@ export function ScheduleEventCard({
           {puedeTomarAsistencia && (
             <Link
               to={asistenciaFichaPath(event.ficha_id)}
-              className="mt-auto block rounded bg-white/20 px-1 py-0.5 text-center text-[10px] hover:bg-white/30 xl:px-1.5 xl:py-1 xl:text-xs 2xl:text-sm"
+              className={actionLinkClass}
               onClick={(e) => e.stopPropagation()}
             >
               Tomar asistencia

@@ -11,6 +11,8 @@ type WeekScheduleCalendarProps = Readonly<{
   mode: 'instructor' | 'ficha';
   loading?: boolean;
   error?: string;
+  /** Ocupa el alto disponible del contenedor padre (dashboard instructor). */
+  fillViewport?: boolean;
 }>;
 
 export function WeekScheduleCalendar({
@@ -20,6 +22,7 @@ export function WeekScheduleCalendar({
   mode,
   loading,
   error,
+  fillViewport = false,
 }: WeekScheduleCalendarProps) {
   const gridRange = useMemo(
     () => computeGridTimeRangeFromEvents(events),
@@ -31,9 +34,13 @@ export function WeekScheduleCalendar({
     [events, mode],
   );
 
+  const shellClass = fillViewport
+    ? 'flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-600 dark:bg-gray-800/80'
+    : 'overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-600 dark:bg-gray-800/80';
+
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-600 dark:bg-gray-800/80">
-      <WeekScheduleToolbar weekStart={weekStart} onWeekChange={onWeekChange} />
+    <div className={shellClass}>
+      <WeekScheduleToolbar weekStart={weekStart} onWeekChange={onWeekChange} compact={fillViewport} />
       {error && (
         <p className="border-b border-gray-200 px-4 py-2 text-sm text-red-600 dark:border-gray-600 dark:text-red-400">
           {error}
@@ -48,6 +55,7 @@ export function WeekScheduleCalendar({
           mode={mode}
           gridRange={gridRange}
           instructorColorMap={instructorColorMap}
+          fillViewport={fillViewport}
         />
       )}
     </div>

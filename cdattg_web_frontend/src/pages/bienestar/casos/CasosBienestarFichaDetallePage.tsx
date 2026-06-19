@@ -3,6 +3,7 @@ import { ArrowLeftIcon, ChartBarIcon, UserGroupIcon } from '@heroicons/react/24/
 import { bienestarPaths } from '../bienestarPaths';
 import { CasosBienestarAprendicesFilters } from './components/CasosBienestarAprendicesFilters';
 import { CasosBienestarAprendicesTable } from './components/CasosBienestarAprendicesTable';
+import { CasosBienestarCriteriosCard } from './components/CasosBienestarCriteriosCard';
 import { CasosBienestarInasistenciasModal } from './components/CasosBienestarInasistenciasModal';
 import { useCasosBienestarFichaDetalle } from './hooks/useCasosBienestarFichaDetalle';
 
@@ -37,22 +38,12 @@ export function CasosBienestarFichaDetallePage() {
             Listado de aprendices que reúnen los criterios de alerta por inasistencias reiteradas, orientado
             a la gestión del equipo de Bienestar al Aprendiz.
           </p>
-          <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
-            <div>
-              <dt className="inline font-medium text-gray-700 dark:text-gray-300">Ventana de análisis: </dt>
-              <dd className="inline">últimos {page.dias} días</dd>
-            </div>
-            <div>
-              <dt className="inline font-medium text-gray-700 dark:text-gray-300">Umbral de alerta: </dt>
-              <dd className="inline">{page.minFallas} o más inasistencias</dd>
-            </div>
-            {page.sedeNombre && (
-              <div>
-                <dt className="inline font-medium text-gray-700 dark:text-gray-300">Sede: </dt>
-                <dd className="inline">{page.sedeNombre}</dd>
-              </div>
-            )}
-          </dl>
+          {page.sedeNombre && (
+            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+              <span className="font-medium text-gray-700 dark:text-gray-300">Sede: </span>
+              {page.sedeNombre}
+            </p>
+          )}
           <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-500">
             Metodología: se evalúan únicamente sesiones registradas en días con formación programada según el
             calendario de la ficha. Se excluyen festivos nacionales y suspensiones de formación por sede (PARO).
@@ -66,6 +57,13 @@ export function CasosBienestarFichaDetallePage() {
           Volver al listado
         </Link>
       </div>
+
+      <CasosBienestarCriteriosCard
+        dias={page.dias}
+        minFallas={page.minFallas}
+        onDiasChange={page.setDias}
+        onMinFallasChange={page.setMinFallas}
+      />
 
       {page.error && (
         <div

@@ -12,7 +12,7 @@ import { useCasosBienestar } from './useCasosBienestar';
 export function useCasosBienestarFichaDetalle() {
   const { roles } = useAuth();
   const { fichaNumero } = useParams<{ fichaNumero: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const canView = canViewCasosBienestar(roles);
 
   const diasParam = Number(searchParams.get('dias') || '');
@@ -20,6 +20,34 @@ export function useCasosBienestarFichaDetalle() {
   const dias = Number.isFinite(diasParam) && diasParam > 0 ? diasParam : 30;
   const minFallas = Number.isFinite(minFallasParam) && minFallasParam > 0 ? minFallasParam : 3;
   const sedeNombreParam = searchParams.get('sede') || '';
+
+  const setDias = useCallback(
+    (value: number) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('dias', String(value));
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setMinFallas = useCallback(
+    (value: number) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('min_fallas', String(value));
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
   const [searchQuery, setSearchQuery] = useState('');
   const [aprendizDetalle, setAprendizDetalle] = useState<CasoBienestarItem | null>(null);
@@ -146,7 +174,9 @@ export function useCasosBienestarFichaDetalle() {
     permissionError: MENSAJE_SIN_PERMISO_CASOS_BIENESTAR,
     fichaNumero,
     dias,
+    setDias,
     minFallas,
+    setMinFallas,
     sedeNombre,
     searchQuery,
     setSearchQuery,

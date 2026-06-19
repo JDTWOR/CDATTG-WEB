@@ -33,7 +33,10 @@ func RunRolePermissionSeeder(db *gorm.DB) error {
 	if err := syncAgendaPermissions(e); err != nil {
 		return err
 	}
-	if err := seedVerPersonaForRoles(e, []string{"APRENDIZ", "VISITANTE", "ASPIRANTE", "PROVEEDOR"}); err != nil {
+	if err := seedVerPersonaForRoles(e, []string{"VISITANTE", "ASPIRANTE", "PROVEEDOR"}); err != nil {
+		return err
+	}
+	if err := seedAprendizPermissions(e); err != nil {
 		return err
 	}
 
@@ -87,7 +90,7 @@ func seedInstructorPermissions(e *casbin.Enforcer) error {
 	if err := addPermissionsForObject(e, "INSTRUCTOR", authz.ObjAsistencia, instructorAsistencia); err != nil {
 		return err
 	}
-	if _, err := authz.AddPermissionForRole(e, "INSTRUCTOR", authz.ObjPersona, "VER PERSONA"); err != nil {
+	if _, err := authz.AddPermissionForRole(e, "INSTRUCTOR", authz.ObjPersona, authz.ActVerPersona); err != nil {
 		return err
 	}
 	return nil
@@ -119,9 +122,35 @@ func SyncAgendaPermissionsToRoles(db *gorm.DB) error {
 	return e.SavePolicy()
 }
 
+func seedAprendizPermissions(e *casbin.Enforcer) error {
+	if _, err := authz.AddPermissionForRole(e, "APRENDIZ", authz.ObjPersona, authz.ActVerPersona); err != nil {
+		return err
+	}
+	if _, err := authz.AddPermissionForRole(e, "APRENDIZ", authz.ObjAsistencia, "VER MIS INASISTENCIAS"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// SyncAprendizPermissionsToRoles aplica permisos Casbin de aprendiz y sincroniza roles (idempotente).
+func SyncAprendizPermissionsToRoles(db *gorm.DB) error {
+	log.Println("Sincronizando permisos y roles de aprendiz...")
+	e, err := authz.GetEnforcer(db)
+	if err != nil {
+		return err
+	}
+	if err := seedAprendizPermissions(e); err != nil {
+		return err
+	}
+	if err := e.SavePolicy(); err != nil {
+		return err
+	}
+	return RunSyncAprendizRolesSeeder(db)
+}
+
 func seedVerPersonaForRoles(e *casbin.Enforcer, roleNames []string) error {
 	for _, roleName := range roleNames {
-		if _, err := authz.AddPermissionForRole(e, roleName, authz.ObjPersona, "VER PERSONA"); err != nil {
+		if _, err := authz.AddPermissionForRole(e, roleName, authz.ObjPersona, authz.ActVerPersona); err != nil {
 			return err
 		}
 	}

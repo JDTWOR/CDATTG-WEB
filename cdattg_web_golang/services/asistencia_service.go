@@ -65,6 +65,7 @@ type AsistenciaService interface {
 	GetDashboard(sedeID *uint, fecha string) (*dto.AsistenciaDashboardResponse, error)
 	GetCasosBienestar(sedeID *uint, dias, minFallas int) (*dto.CasosBienestarResponse, error)
 	GetDetalleInasistenciasAprendiz(fichaNumero string, aprendizID uint, dias int, sedeNombre string) (*dto.CasoBienestarAprendizDetalleResponse, error)
+	GetMisInasistencias(personaID uint, dias int) (*dto.MisInasistenciasResponse, error)
 	AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error)
 	ListPendientesRevision(instructorID uint, fecha string) ([]dto.AsistenciaAprendizResponse, error)
 	FinalizarSesionesVencidas()
@@ -894,6 +895,47 @@ func (s *asistenciaService) GetDetalleInasistenciasAprendiz(fichaNumero string, 
 		}
 	}
 	return resp, nil
+}
+
+const errMsgAprendizActivoNoEncontrado = "no está matriculado como aprendiz activo"
+
+func (s *asistenciaService) GetMisInasistencias(personaID uint, dias int) (*dto.MisInasistenciasResponse, error) {
+	if personaID == 0 {
+		return nil, errors.New(errMsgAprendizActivoNoEncontrado)
+	}
+	aprendiz, err := s.aprendizRepo.FindActivoByPersonaID(personaID)
+	if err != nil || aprendiz == nil {
+		return nil, errors.New(errMsgAprendizActivoNoEncontrado)
+	}
+	fichaNumero := ""
+	programaNombre := ""
+	sedeNombre := ""
+	if aprendiz.FichaCaracterizacion != nil {
+		fichaNumero = aprendiz.FichaCaracterizacion.Ficha
+		if aprendiz.FichaCaracterizacion.ProgramaFormacion != nil {
+			programaNombre = aprendiz.FichaCaracterizacion.ProgramaFormacion.Nombre
+		}
+		if aprendiz.FichaCaracterizacion.Sede != nil {
+			sedeNombre = aprendiz.FichaCaracterizacion.Sede.Nombre
+		}
+	}
+	if strings.TrimSpace(fichaNumero) == "" {
+		return nil, errors.New("ficha de caracterización no encontrada para el aprendiz")
+	}
+	detalle, err := s.GetDetalleInasistenciasAprendiz(fichaNumero, aprendiz.ID, dias, sedeNombre)
+	if err != nil {
+		return nil, err
+	}
+	return &dto.MisInasistenciasResponse{
+		AprendizID:         aprendiz.ID,
+		FichaNumero:        detalle.FichaNumero,
+		ProgramaNombre:     programaNombre,
+		SedeNombre:         sedeNombre,
+		FechaInicio:        detalle.FechaInicio,
+		FechaFin:           detalle.FechaFin,
+		TotalInasistencias: len(detalle.Inasistencias),
+		Inasistencias:      detalle.Inasistencias,
+	}, nil
 }
 
 func (s *asistenciaService) GetAsistenciaAprendizByID(id uint) (*dto.AsistenciaAprendizResponse, error) {

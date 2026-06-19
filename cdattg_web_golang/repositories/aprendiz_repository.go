@@ -19,6 +19,7 @@ type AprendizRepository interface {
 	FindByFichaID(fichaID uint) ([]models.Aprendiz, error)
 	FindByPersonaIDAndFichaID(personaID, fichaID uint) (*models.Aprendiz, error)
 	FindByPersonaID(personaID uint) (*models.Aprendiz, error)
+	FindActivoByPersonaID(personaID uint) (*models.Aprendiz, error)
 	FindAll(page, pageSize int, fichaID *uint, search string) ([]models.Aprendiz, int64, error)
 	Create(a *models.Aprendiz) error
 	Update(a *models.Aprendiz) error
@@ -64,6 +65,19 @@ func (r *aprendizRepository) FindByPersonaIDAndFichaID(personaID, fichaID uint) 
 func (r *aprendizRepository) FindByPersonaID(personaID uint) (*models.Aprendiz, error) {
 	var a models.Aprendiz
 	if err := r.db.Where("persona_id = ?", personaID).First(&a).Error; err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+func (r *aprendizRepository) FindActivoByPersonaID(personaID uint) (*models.Aprendiz, error) {
+	var a models.Aprendiz
+	if err := r.db.Where("persona_id = ? AND estado = ?", personaID, true).
+		Order("updated_at DESC").
+		Preload("Persona").
+		Preload(aprendizPreloadFichaPrograma).
+		Preload(aprendizPreloadFichaSedeRegional).
+		First(&a).Error; err != nil {
 		return nil, err
 	}
 	return &a, nil

@@ -206,6 +206,18 @@ type CasoBienestarAprendizDetalleResponse struct {
 	Inasistencias []InasistenciaDetalleItem `json:"inasistencias"`
 }
 
+// MisInasistenciasResponse detalle de inasistencias del aprendiz autenticado.
+type MisInasistenciasResponse struct {
+	AprendizID         uint                      `json:"aprendiz_id"`
+	FichaNumero        string                    `json:"ficha_numero"`
+	ProgramaNombre     string                    `json:"programa_nombre,omitempty"`
+	SedeNombre         string                    `json:"sede_nombre,omitempty"`
+	FechaInicio        string                    `json:"fecha_inicio"`
+	FechaFin           string                    `json:"fecha_fin"`
+	TotalInasistencias int                       `json:"total_inasistencias"`
+	Inasistencias      []InasistenciaDetalleItem `json:"inasistencias"`
+}
+
 // InstructorPendienteItem resume cuántos aprendices tiene un instructor con registros "por corregir" (requiere_revision=true) en el período analizado.
 type InstructorPendienteItem struct {
 	InstructorID                uint   `json:"instructor_id"`

@@ -42,6 +42,7 @@ func RunAll() error {
 		RunPersonaSeeder,
 		RunUsersSeeder,
 		RunSyncInstructorRolesSeeder,
+		RunSyncAprendizRolesSeeder,
 		RunTiposObservacionAsistenciaSeeder,
 		RunFestivosColombiaSeeder,
 	}

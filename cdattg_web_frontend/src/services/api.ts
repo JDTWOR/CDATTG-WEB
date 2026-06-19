@@ -38,6 +38,7 @@ import type {
   AsistenciaDashboardResponse,
   CasosBienestarResponse,
   CasoBienestarAprendizDetalleResponse,
+  MisInasistenciasResponse,
   SedeItem,
   AmbienteItem,
   ModalidadFormacionItem,
@@ -786,6 +787,12 @@ class ApiService {
       `/asistencias/dashboard/casos-bienestar/ficha/${encodeURIComponent(fichaNumero)}/aprendiz/${aprendizId}/detalle`,
       { params }
     );
+    return response.data;
+  }
+
+  /** Inasistencias del aprendiz autenticado (resuelto por persona_id del JWT). */
+  async getMisInasistencias(params?: { dias?: number }): Promise<MisInasistenciasResponse> {
+    const response = await this.api.get<MisInasistenciasResponse>('/asistencias/mis-inasistencias', { params });
     return response.data;
   }
 

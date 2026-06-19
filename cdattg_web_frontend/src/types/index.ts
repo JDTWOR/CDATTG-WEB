@@ -623,6 +623,17 @@ export interface CasoBienestarAprendizDetalleResponse {
   inasistencias: InasistenciaDetalleItem[];
 }
 
+export interface MisInasistenciasResponse {
+  aprendiz_id: number;
+  ficha_numero: string;
+  programa_nombre?: string;
+  sede_nombre?: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  total_inasistencias: number;
+  inasistencias: InasistenciaDetalleItem[];
+}
+
 export interface CasoBienestarItem {
   aprendiz_id: number;
   persona_nombre: string;

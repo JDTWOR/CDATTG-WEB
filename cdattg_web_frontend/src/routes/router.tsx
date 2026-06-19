@@ -16,6 +16,7 @@ import { infraestructuraRoutes } from './modules/infraestructura.routes';
 import { vigilanciaRoutes } from './modules/vigilancia.routes';
 import { permisosRoutes } from './modules/permisos.routes';
 import { administracionRoutes } from './modules/administracion.routes';
+import { aprendizRoutes } from './modules/aprendiz.routes';
 
 /**
  * Árbol de rutas (React Router v7 data router).
@@ -29,6 +30,7 @@ export const appRouter = createBrowserRouter([
     hydrateFallbackElement: createElement(RouteLoadingFallback),
     children: [
       ...homeRoutes,
+      ...aprendizRoutes,
       ...personasRoutes,
       ...instructoresRoutes,
       ...aprendicesRoutes,

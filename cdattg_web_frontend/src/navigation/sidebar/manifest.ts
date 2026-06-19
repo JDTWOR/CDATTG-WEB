@@ -1,5 +1,6 @@
 import {
   aprendicesPaths,
+  aprendizPaths,
   asistenciaPaths,
   bienestarPaths,
   DASHBOARD_PATH,
@@ -22,6 +23,15 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     label: 'Mi perfil',
     permission: null,
     iconKey: 'perfil',
+  },
+  {
+    section: 'Inicio',
+    path: aprendizPaths.misInasistencias,
+    label: 'Mis inasistencias',
+    permission: null,
+    rolesRequired: ['APRENDIZ'],
+    alsoVisibleForPermissions: ['VER MIS INASISTENCIAS'],
+    iconKey: 'asistencia/mis-inasistencias',
   },
   {
     section: 'Inicio',

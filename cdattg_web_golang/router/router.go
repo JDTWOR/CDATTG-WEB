@@ -24,6 +24,7 @@ const (
 	permCrearInstructor = "CREAR INSTRUCTOR"
 	permTomarAsistencia = "TOMAR ASISTENCIA"
 	permVerAsistencia          = "VER ASISTENCIA"
+	permVerMisInasistencias    = "VER MIS INASISTENCIAS"
 	permProgramarInstructores  = "PROGRAMAR INSTRUCTORES"
 	permGestionarAprendicesFicha = "GESTIONAR APRENDICES FICHA"
 	permVerMiAgenda            = "VER MI AGENDA"
@@ -169,6 +170,7 @@ func SetupRouter() *gin.Engine {
 			asistencias.GET("/dashboard", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.GetDashboard)
 			asistencias.GET("/dashboard/casos-bienestar", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.GetCasosBienestar)
 			asistencias.GET("/dashboard/casos-bienestar/ficha/:fichaNumero/aprendiz/:aprendizId/detalle", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.GetDetalleInasistenciasAprendiz)
+			asistencias.GET("/mis-inasistencias", middleware.RequirePermission("asistencia", permVerMisInasistencias), asistenciaHandler.GetMisInasistencias)
 			asistencias.GET("/dashboard/pendientes-revision-instructor", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.ListPendientesRevisionAdmin)
 			// Entrar a tomar asistencia: solo requiere estar autenticado; el servicio valida que el usuario sea instructor asignado a la ficha.
 			asistencias.POST("/entrar-tomar-asistencia", asistenciaHandler.EntrarTomarAsistencia)
@@ -198,6 +200,8 @@ func SetupRouter() *gin.Engine {
 
 			admin := protected.Group("/admin")
 			admin.POST("/sync-instructor-roles", middleware.RequirePermission("ficha", permVerFichas), adminHandler.SyncInstructorRoles)
+			admin.POST("/sync-aprendiz-roles", middleware.RequirePermission("ficha", permVerFichas), adminHandler.SyncAprendizRoles)
+			admin.POST("/sync-aprendiz-permissions", middleware.RequireSuperAdminOrAdmin(), adminHandler.SyncAprendizPermissions)
 			admin.POST("/sync-agenda-permissions", middleware.RequireSuperAdminOrAdmin(), adminHandler.SyncAgendaPermissions)
 			// sync-inventario-permissions desactivado (módulo inventario no en uso)
 

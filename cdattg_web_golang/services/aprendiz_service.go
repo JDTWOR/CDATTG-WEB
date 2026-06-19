@@ -80,6 +80,7 @@ func (s *aprendizService) Create(req dto.AprendizRequest) (*dto.AprendizResponse
 	if err := s.repo.Create(&a); err != nil {
 		return nil, fmt.Errorf("error al crear aprendiz: %w", err)
 	}
+	_ = EnsureAprendizRoleForPersona(req.PersonaID)
 	return s.FindByID(a.ID)
 }
 

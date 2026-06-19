@@ -422,6 +422,7 @@ func (r *fichaImportRunner) tryEnrollAprendiz(p *parsedFichaRow, personaID uint)
 		r.c.errCount++
 		return
 	}
+	_ = EnsureAprendizRoleForPersona(personaID)
 	r.c.processed++
 }
 

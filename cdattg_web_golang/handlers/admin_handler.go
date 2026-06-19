@@ -26,6 +26,28 @@ func (h *AdminHandler) SyncInstructorRoles(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Roles de instructor sincronizados correctamente"})
 }
 
+// SyncAprendizRoles asigna rol APRENDIZ en Casbin a usuarios con matrícula activa.
+func (h *AdminHandler) SyncAprendizRoles(c *gin.Context) {
+	db := database.GetDB()
+	if err := seeders.RunSyncAprendizRolesSeeder(db); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al sincronizar roles de aprendiz: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Roles de aprendiz sincronizados correctamente"})
+}
+
+// SyncAprendizPermissions sincroniza permisos Casbin (VER MIS INASISTENCIAS) y roles APRENDIZ en producción.
+func (h *AdminHandler) SyncAprendizPermissions(c *gin.Context) {
+	db := database.GetDB()
+	if err := seeders.SyncAprendizPermissionsToRoles(db); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al sincronizar permisos de aprendiz: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Permisos y roles de aprendiz sincronizados. Los aprendices deben cerrar sesión y volver a entrar.",
+	})
+}
+
 // SyncInventarioPermissions asigna los permisos del módulo inventario a los roles ADMINISTRADOR y COORDINADOR
 // sin quitar los que ya tengan. Útil cuando el módulo inventario se añadió después del primer seed.
 func (h *AdminHandler) SyncInventarioPermissions(c *gin.Context) {

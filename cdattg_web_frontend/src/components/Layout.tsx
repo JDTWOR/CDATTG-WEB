@@ -89,6 +89,7 @@ const ICONS: Record<string, ReactNode> = {
   personas: <UsersIcon className="w-5 h-5" />,
   asistencia: <ClipboardDocumentListIcon className="w-5 h-5" />,
   'asistencia/historial': <CalendarDaysIcon className="w-5 h-5" />,
+  'asistencia/mis-inasistencias': <CalendarDaysIcon className="w-5 h-5" />,
   'asistencia/dashboard': <ChartBarIcon className="w-5 h-5" />,
   'bienestar/casos': <ExclamationTriangleIcon className="w-5 h-5" />,
   'asistencia/tipos-observacion': <ClipboardDocumentListIcon className="w-5 h-5" />,

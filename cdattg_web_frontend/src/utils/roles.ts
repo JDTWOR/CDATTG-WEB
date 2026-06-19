@@ -39,6 +39,9 @@ export function getHomeRouteForUser(roles: string[], permissions: string[]): str
       permissions.includes('*') || permissions.includes('VER ASISTENCIA');
     return canAsistencia ? '/asistencia/fichas' : '/fichas';
   }
+  if (normalized.includes('APRENDIZ')) {
+    return '/mis-inasistencias';
+  }
   return '/perfil';
 }
 

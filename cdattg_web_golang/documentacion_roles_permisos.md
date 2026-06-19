@@ -49,7 +49,8 @@ Incluye **EDITAR INSTRUCTOR**, **ELIMINAR INSTRUCTOR** y **ASIGNAR PERMISOS** (o
 | ADMINISTRADOR       | Persona, programa, ficha, aprendiz, instructor, asistencia, usuario (ASIGNAR PERMISOS), inventario completo |
 | COORDINADOR         | Igual que ADMINISTRADOR (incl. inventario) |
 | INSTRUCTOR         | Solo asistencia (VER ASISTENCIA, TOMAR ASISTENCIA) |
-| APRENDIZ, VISITANTE, ASPIRANTE, PROVEEDOR | Solo VER PERSONA (perfil) |
+| APRENDIZ | VER PERSONA, VER MIS INASISTENCIAS (perfil e inasistencias propias) |
+| VISITANTE, ASPIRANTE, PROVEEDOR | Solo VER PERSONA (perfil) |
 | BOT, VIGILANTE      | Sin permisos por defecto |
 
 ---
@@ -88,8 +89,10 @@ Todas las rutas requieren **autenticación** (Bearer). No se puede operar sobre 
 ## 8. Asignación automática de roles
 
 - **Persona con usuario** (creación o EnsureUsersForPersonas): rol **VISITANTE**; si la persona es instructor, rol **INSTRUCTOR** (solo en Casbin).
+- **Aprendiz** (Create, AsignarAprendices, importación de ficha): se asigna rol **APRENDIZ** en Casbin si la persona tiene usuario.
 - **Instructor** (CreateFromPersona): se asigna rol **INSTRUCTOR** en Casbin.
 - **Sync instructor roles** (seeder/admin): asegura que todos los usuarios cuya persona es instructor tengan el rol INSTRUCTOR en Casbin.
+- **Sync aprendiz roles** (seeder/admin): asegura que usuarios con matrícula activa tengan el rol APRENDIZ en Casbin.
 
 ---
 

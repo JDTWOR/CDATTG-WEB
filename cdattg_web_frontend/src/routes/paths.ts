@@ -16,6 +16,10 @@ export const aprendicesPaths = {
   index: '/aprendices',
 } as const;
 
+export const aprendizPaths = {
+  misInasistencias: '/mis-inasistencias',
+} as const;
+
 export const programasPaths = {
   index: '/programas',
   importar: '/programas/importar',

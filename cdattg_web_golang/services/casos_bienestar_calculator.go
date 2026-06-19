@@ -1,7 +1,10 @@
 package services
 
 import (
+	"errors"
+	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/sena/cdattg-web-golang/repositories"
@@ -11,12 +14,14 @@ import (
 type CasosBienestarCalculator struct {
 	repo       repositories.AsistenciaRepository
 	calendario *CalendarioFormacionService
+	fichaRepo  repositories.FichaRepository
 }
 
 func NewCasosBienestarCalculator() *CasosBienestarCalculator {
 	return &CasosBienestarCalculator{
 		repo:       repositories.NewAsistenciaRepository(),
 		calendario: NewCalendarioFormacionService(),
+		fichaRepo:  repositories.NewFichaRepository(),
 	}
 }
 
@@ -28,14 +33,6 @@ func agregarSedeID(ids []uint, sedeID uint) []uint {
 }
 
 func sedeIDsFromSesionesCasos(sesiones []repositories.SesionCasosBienestarRaw) []uint {
-	ids := make([]uint, 0, len(sesiones))
-	for _, s := range sesiones {
-		ids = agregarSedeID(ids, s.SedeID)
-	}
-	return ids
-}
-
-func sedeIDsFromDetalleSesiones(sesiones []repositories.DetalleSesionCasosBienestarRaw) []uint {
 	ids := make([]uint, 0, len(sesiones))
 	for _, s := range sesiones {
 		ids = agregarSedeID(ids, s.SedeID)
@@ -127,11 +124,16 @@ func inasistenciasAprendiz(
 	}, true
 }
 
-func (c *CasosBienestarCalculator) Calcular(
+type casosBienestarRangoPreparado struct {
+	validasPorFicha map[uint][]uint
+	validaPorID     map[uint]repositories.SesionCasosBienestarRaw
+	asistio         map[uint]map[uint]bool
+}
+
+func (c *CasosBienestarCalculator) prepararRango(
 	sedeID *uint,
 	fechaInicio, fechaFin string,
-	minFallas int,
-) ([]repositories.CasosBienestarRow, error) {
+) (*casosBienestarRangoPreparado, error) {
 	tInicio, err := time.Parse(time.DateOnly, fechaInicio)
 	if err != nil {
 		return nil, err
@@ -151,9 +153,11 @@ func (c *CasosBienestarCalculator) Calcular(
 	}
 
 	validasPorFicha := make(map[uint][]uint)
+	validaPorID := make(map[uint]repositories.SesionCasosBienestarRaw, len(validas))
 	validaIDs := make([]uint, 0, len(validas))
 	for _, s := range validas {
 		validasPorFicha[s.FichaID] = append(validasPorFicha[s.FichaID], s.AsistenciaID)
+		validaPorID[s.AsistenciaID] = s
 		validaIDs = append(validaIDs, s.AsistenciaID)
 	}
 
@@ -161,7 +165,47 @@ func (c *CasosBienestarCalculator) Calcular(
 	if err != nil {
 		return nil, err
 	}
-	asistio := mapAsistenciasEfectivas(asistencias)
+
+	return &casosBienestarRangoPreparado{
+		validasPorFicha: validasPorFicha,
+		validaPorID:     validaPorID,
+		asistio:         mapAsistenciasEfectivas(asistencias),
+	}, nil
+}
+
+func agruparDetalleSesionesPorAsistenciaID(
+	rows []repositories.DetalleSesionCasosBienestarRaw,
+) map[uint]repositories.DetalleSesionCasosBienestarRaw {
+	out := make(map[uint]repositories.DetalleSesionCasosBienestarRaw, len(rows))
+	for _, r := range rows {
+		existing, ok := out[r.AsistenciaID]
+		if !ok {
+			out[r.AsistenciaID] = r
+			continue
+		}
+		if r.AsistioEfectivo {
+			existing.AsistioEfectivo = true
+		}
+		if strings.TrimSpace(r.Observaciones) != "" && strings.TrimSpace(existing.Observaciones) == "" {
+			existing.Observaciones = r.Observaciones
+		}
+		if strings.TrimSpace(r.InstructorNombre) != "" && strings.TrimSpace(existing.InstructorNombre) == "" {
+			existing.InstructorNombre = r.InstructorNombre
+		}
+		out[r.AsistenciaID] = existing
+	}
+	return out
+}
+
+func (c *CasosBienestarCalculator) Calcular(
+	sedeID *uint,
+	fechaInicio, fechaFin string,
+	minFallas int,
+) ([]repositories.CasosBienestarRow, error) {
+	prep, err := c.prepararRango(sedeID, fechaInicio, fechaFin)
+	if err != nil {
+		return nil, err
+	}
 
 	aprendices, err := c.repo.ListAprendicesActivosCasosBienestar(sedeID)
 	if err != nil {
@@ -170,7 +214,7 @@ func (c *CasosBienestarCalculator) Calcular(
 
 	var out []repositories.CasosBienestarRow
 	for _, ap := range aprendices {
-		row, ok := inasistenciasAprendiz(ap, validasPorFicha[ap.FichaID], asistio, minFallas)
+		row, ok := inasistenciasAprendiz(ap, prep.validasPorFicha[ap.FichaID], prep.asistio, minFallas)
 		if ok {
 			out = append(out, row)
 		}
@@ -190,36 +234,48 @@ func (c *CasosBienestarCalculator) CalcularDetalle(
 	fechaInicio, fechaFin string,
 	sedeNombre string,
 ) ([]repositories.InasistenciaDetalleRow, error) {
-	tInicio, err := time.Parse(time.DateOnly, fechaInicio)
-	if err != nil {
-		return nil, err
+	fichaNumero = strings.TrimSpace(fichaNumero)
+	if fichaNumero == "" || aprendizID == 0 {
+		return nil, errors.New("ficha y aprendiz son requeridos")
 	}
-	tFin, err := time.Parse(time.DateOnly, fechaFin)
+
+	prep, err := c.prepararRango(nil, fechaInicio, fechaFin)
 	if err != nil {
 		return nil, err
 	}
 
-	sesiones, err := c.repo.ListDetalleSesionesCasosBienestar(fichaNumero, aprendizID, fechaInicio, fechaFin, sedeNombre)
+	ficha, err := c.fichaRepo.FindByFicha(fichaNumero)
+	if err != nil || ficha == nil {
+		return nil, fmt.Errorf("ficha no encontrada")
+	}
+
+	metaRows, err := c.repo.ListDetalleSesionesCasosBienestar(fichaNumero, aprendizID, fechaInicio, fechaFin, strings.TrimSpace(sedeNombre))
 	if err != nil {
 		return nil, err
 	}
-	if err := c.precargarCalendario(tInicio, tFin, sedeIDsFromDetalleSesiones(sesiones)); err != nil {
-		return nil, err
-	}
+	metaPorID := agruparDetalleSesionesPorAsistenciaID(metaRows)
 
 	var out []repositories.InasistenciaDetalleRow
-	for _, s := range sesiones {
-		if !c.calendario.EsSesionFormacionValida(s.FichaID, s.InstructorID, s.Fecha) {
+	for _, sid := range prep.validasPorFicha[ficha.ID] {
+		if prep.asistio[aprendizID][sid] {
 			continue
 		}
-		if s.AsistioEfectivo {
-			continue
+		fecha := prep.validaPorID[sid].Fecha.Format(time.DateOnly)
+		instructorNombre := ""
+		observaciones := ""
+		if meta, ok := metaPorID[sid]; ok {
+			fecha = meta.Fecha.Format(time.DateOnly)
+			instructorNombre = meta.InstructorNombre
+			observaciones = meta.Observaciones
 		}
 		out = append(out, repositories.InasistenciaDetalleRow{
-			Fecha:            s.Fecha.Format(time.DateOnly),
-			InstructorNombre: s.InstructorNombre,
-			Observaciones:    s.Observaciones,
+			Fecha:            fecha,
+			InstructorNombre: instructorNombre,
+			Observaciones:    observaciones,
 		})
 	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Fecha > out[j].Fecha
+	})
 	return out, nil
 }

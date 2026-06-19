@@ -148,7 +148,8 @@ export function CasosBienestarInasistenciasModal({
           <p className="min-w-0 flex-1 text-xs text-gray-500 dark:text-gray-400">
             {!loading && inasistencias.length > 0 && !coincideConteo && (
               <span className="text-amber-600 dark:text-amber-400">
-                El detalle registra {inasistencias.length} fechas; el consolidado indica {aprendiz.inasistencias}.
+                El detalle registra {inasistencias.length} sesiones; el consolidado indica {aprendiz.inasistencias}.
+                Recargue la lista de casos si el consolidado es anterior.
               </span>
             )}
             {!loading && (inasistencias.length === 0 || coincideConteo) && (

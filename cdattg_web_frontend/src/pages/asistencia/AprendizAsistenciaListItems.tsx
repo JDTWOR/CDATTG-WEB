@@ -38,6 +38,7 @@ type AprendizAsistenciaHandlers = Readonly<{
   puedeEliminarRegistro?: boolean;
   eliminandoRegistroIds?: Set<number>;
   onEliminarRegistro?: (asistenciaAprendizId: number, aprendizNombre: string, tramoLabel: string) => void;
+  sesionSoloLectura?: boolean;
 }>;
 
 function BotonesEliminarRegistroAdmin({
@@ -128,6 +129,7 @@ function AccionesTarjetaIndividual({
   puedeEliminarRegistro,
   eliminandoRegistroIds,
   onEliminarRegistro,
+  sesionSoloLectura = false,
 }: Readonly<{
   aprendiz: AprendizResponse;
   asistenciaId: number | null;
@@ -145,35 +147,40 @@ function AccionesTarjetaIndividual({
   puedeEliminarRegistro?: boolean;
   eliminandoRegistroIds?: Set<number>;
   onEliminarRegistro?: AprendizAsistenciaHandlers['onEliminarRegistro'];
+  sesionSoloLectura?: boolean;
 }>) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-gray-700">
-      <button
-        type="button"
-        disabled={!puedeEntrada}
-        onClick={() => onRegistrarIngreso(aprendiz.id)}
-        className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40 touch-manipulation"
-      >
-        <ArrowRightStartOnRectangleIcon className="h-5 w-5" />
-        Entrada
-      </button>
-      <button
-        type="button"
-        disabled={!puedeSalida}
-        onClick={() => open && onRegistrarSalida(open.id)}
-        className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40 touch-manipulation"
-      >
-        <ArrowLeftEndOnRectangleIcon className="h-5 w-5" />
-        Salida
-      </button>
-      {requiereRevisionRecord ? (
-        <BotonResolverEstado
-          requiereRevisionRecord={requiereRevisionRecord}
-          aprendiz={aprendiz}
-          onAbrirEstado={onAbrirEstado}
-          className="min-h-[44px] w-full rounded-lg border border-amber-400 bg-amber-50 text-sm font-medium text-amber-800 touch-manipulation dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-200"
-        />
-      ) : null}
+      {sesionSoloLectura ? null : (
+        <>
+          <button
+            type="button"
+            disabled={!puedeEntrada}
+            onClick={() => onRegistrarIngreso(aprendiz.id)}
+            className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40 touch-manipulation"
+          >
+            <ArrowRightStartOnRectangleIcon className="h-5 w-5" />
+            Entrada
+          </button>
+          <button
+            type="button"
+            disabled={!puedeSalida}
+            onClick={() => open && onRegistrarSalida(open.id)}
+            className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40 touch-manipulation"
+          >
+            <ArrowLeftEndOnRectangleIcon className="h-5 w-5" />
+            Salida
+          </button>
+          {requiereRevisionRecord ? (
+            <BotonResolverEstado
+              requiereRevisionRecord={requiereRevisionRecord}
+              aprendiz={aprendiz}
+              onAbrirEstado={onAbrirEstado}
+              className="min-h-[44px] w-full rounded-lg border border-amber-400 bg-amber-50 text-sm font-medium text-amber-800 touch-manipulation dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-200"
+            />
+          ) : null}
+        </>
+      )}
       {asistenciaId !== null && (
         <button
           type="button"
@@ -195,7 +202,7 @@ function AccionesTarjetaIndividual({
       <BotonesEliminarRegistroAdmin
         registros={registros}
         aprendizNombre={aprendiz.persona_nombre ?? 'Aprendiz'}
-        puedeEliminarRegistro={puedeEliminarRegistro}
+        puedeEliminarRegistro={sesionSoloLectura ? false : puedeEliminarRegistro}
         eliminandoRegistroIds={eliminandoRegistroIds}
         onEliminarRegistro={onEliminarRegistro}
         className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300 touch-manipulation"
@@ -249,13 +256,14 @@ export function TarjetaAprendizAsistencia({
   puedeEliminarRegistro,
   eliminandoRegistroIds,
   onEliminarRegistro,
+  sesionSoloLectura = false,
 }: AprendizAsistenciaHandlers) {
   const esGrupal = modoLista === 'grupal';
   const { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord } = summaryRegistros(registros);
   const rango = buildRangoText(firstIngreso, lastSalida, open);
   const estado = estadoAprendizVisual(open, lastSalida);
-  const puedeEntrada = !open && !busy;
-  const puedeSalida = !!open && !busy;
+  const puedeEntrada = !sesionSoloLectura && !open && !busy;
+  const puedeSalida = !sesionSoloLectura && !!open && !busy;
 
   return (
     <div
@@ -327,9 +335,10 @@ export function TarjetaAprendizAsistencia({
             onAbrirEstado={onAbrirEstado}
             onAbrirObservaciones={onAbrirObservaciones}
             registros={registros}
-            puedeEliminarRegistro={puedeEliminarRegistro}
+            puedeEliminarRegistro={sesionSoloLectura ? false : puedeEliminarRegistro}
             eliminandoRegistroIds={eliminandoRegistroIds}
             onEliminarRegistro={onEliminarRegistro}
+            sesionSoloLectura={sesionSoloLectura}
           />
         }
       />
@@ -354,13 +363,14 @@ export const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia(props
     puedeEliminarRegistro,
     eliminandoRegistroIds,
     onEliminarRegistro,
+    sesionSoloLectura = false,
   } = props;
   const esGrupal = modoLista === 'grupal';
   const { open, firstIngreso, lastSalida, observaciones, tiposObservacion, requiereRevisionRecord } = summaryRegistros(registros);
   const textoCeldaSalida = lastSalida ?? (open ? '—' : '–');
   const textoObsCelda = observaciones || (tiposObservacion.length === 0 ? '–' : null);
-  const puedeEntrada = !open && !busy;
-  const puedeSalida = !!open && !busy;
+  const puedeEntrada = !sesionSoloLectura && !open && !busy;
+  const puedeSalida = !sesionSoloLectura && !!open && !busy;
 
   return (
     <tr className={`bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 ${esGrupal && selected ? 'ring-1 ring-inset ring-primary-400' : ''}`}>
@@ -395,34 +405,38 @@ export const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia(props
       {esGrupal ? null : (
         <td className="border border-gray-200 dark:border-gray-600 px-3 py-2">
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled={!puedeEntrada}
-              onClick={() => onRegistrarIngreso(aprendiz.id)}
-              className="rounded-lg p-2 text-green-600 hover:bg-green-50 disabled:opacity-40 dark:text-green-400 dark:hover:bg-green-900/30"
-              title="Registrar entrada"
-              aria-label="Registrar entrada"
-            >
-              <ArrowRightStartOnRectangleIcon className="h-6 w-6" />
-            </button>
-            <button
-              type="button"
-              disabled={!puedeSalida}
-              onClick={() => open && onRegistrarSalida(open.id)}
-              className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-900/30"
-              title="Registrar salida"
-              aria-label="Registrar salida"
-            >
-              <ArrowLeftEndOnRectangleIcon className="h-6 w-6" />
-            </button>
-            {requiereRevisionRecord ? (
-              <BotonResolverEstado
-                requiereRevisionRecord={requiereRevisionRecord}
-                aprendiz={aprendiz}
-                onAbrirEstado={onAbrirEstado}
-                className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800"
-              />
-            ) : null}
+            {sesionSoloLectura ? null : (
+              <>
+                <button
+                  type="button"
+                  disabled={!puedeEntrada}
+                  onClick={() => onRegistrarIngreso(aprendiz.id)}
+                  className="rounded-lg p-2 text-green-600 hover:bg-green-50 disabled:opacity-40 dark:text-green-400 dark:hover:bg-green-900/30"
+                  title="Registrar entrada"
+                  aria-label="Registrar entrada"
+                >
+                  <ArrowRightStartOnRectangleIcon className="h-6 w-6" />
+                </button>
+                <button
+                  type="button"
+                  disabled={!puedeSalida}
+                  onClick={() => open && onRegistrarSalida(open.id)}
+                  className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-900/30"
+                  title="Registrar salida"
+                  aria-label="Registrar salida"
+                >
+                  <ArrowLeftEndOnRectangleIcon className="h-6 w-6" />
+                </button>
+                {requiereRevisionRecord ? (
+                  <BotonResolverEstado
+                    requiereRevisionRecord={requiereRevisionRecord}
+                    aprendiz={aprendiz}
+                    onAbrirEstado={onAbrirEstado}
+                    className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800"
+                  />
+                ) : null}
+              </>
+            )}
             {asistenciaId !== null && (
             <button
               type="button"
@@ -445,7 +459,7 @@ export const FilaAprendizAsistencia = memo(function FilaAprendizAsistencia(props
             <BotonesEliminarRegistroAdmin
               registros={registros}
               aprendizNombre={aprendiz.persona_nombre ?? 'Aprendiz'}
-              puedeEliminarRegistro={puedeEliminarRegistro}
+              puedeEliminarRegistro={sesionSoloLectura ? false : puedeEliminarRegistro}
               eliminandoRegistroIds={eliminandoRegistroIds}
               onEliminarRegistro={onEliminarRegistro}
               className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"

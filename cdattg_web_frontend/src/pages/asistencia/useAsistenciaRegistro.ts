@@ -33,9 +33,16 @@ type UseAsistenciaRegistroParams = Readonly<{
   sesionActual: AsistenciaResponse | null;
   setSesionActual: React.Dispatch<React.SetStateAction<AsistenciaResponse | null>>;
   puedeEliminarRegistro?: boolean;
+  sesionSoloLectura?: boolean;
 }>;
 
-export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual, puedeEliminarRegistro = false }: UseAsistenciaRegistroParams) {
+export function useAsistenciaRegistro({
+  fichaId,
+  sesionActual,
+  setSesionActual,
+  puedeEliminarRegistro = false,
+  sesionSoloLectura = false,
+}: UseAsistenciaRegistroParams) {
   const [aprendicesFicha, setAprendicesFicha] = useState<AprendizResponse[]>([]);
   const [aprendicesEnSesion, setAprendicesEnSesion] = useState<AsistenciaAprendizResponse[]>([]);
   const [loadingAprendices, setLoadingAprendices] = useState(false);
@@ -131,7 +138,7 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual, 
 
   const handleRegistrarIngreso = useCallback(
     async (aprendizId: number) => {
-      if (!sesionActual || busyAprendizIds.has(aprendizId)) return;
+      if (sesionSoloLectura || !sesionActual || busyAprendizIds.has(aprendizId)) return;
       setAprendizBusy(aprendizId, true);
       try {
         const nuevo = await apiService.registrarIngresoAsistencia({
@@ -145,11 +152,12 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual, 
         setAprendizBusy(aprendizId, false);
       }
     },
-    [sesionActual, busyAprendizIds, setAprendizBusy, upsertAsistenciaAprendizEnSesion],
+    [sesionSoloLectura, sesionActual, busyAprendizIds, setAprendizBusy, upsertAsistenciaAprendizEnSesion],
   );
 
   const handleRegistrarSalida = useCallback(
     async (asistenciaAprendizId: number, aprendizId?: number) => {
+      if (sesionSoloLectura) return;
       const busyKey = aprendizId ?? asistenciaAprendizId;
       if (busyAprendizIds.has(busyKey)) return;
       setAprendizBusy(busyKey, true);
@@ -161,12 +169,12 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual, 
         setAprendizBusy(busyKey, false);
       }
     },
-    [busyAprendizIds, setAprendizBusy, upsertAsistenciaAprendizEnSesion],
+    [sesionSoloLectura, busyAprendizIds, setAprendizBusy, upsertAsistenciaAprendizEnSesion],
   );
 
   const handleEliminarRegistro = useCallback(
     async (asistenciaAprendizId: number, aprendizNombre: string, tramoLabel: string) => {
-      if (!puedeEliminarRegistro || eliminandoRegistroIds.has(asistenciaAprendizId)) return;
+      if (sesionSoloLectura || !puedeEliminarRegistro || eliminandoRegistroIds.has(asistenciaAprendizId)) return;
       const confirmado = await confirmEliminarRegistroAsistencia(aprendizNombre, tramoLabel);
       if (!confirmado) return;
       setEliminandoRegistroIds((prev) => new Set(prev).add(asistenciaAprendizId));
@@ -183,7 +191,7 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual, 
         });
       }
     },
-    [puedeEliminarRegistro, eliminandoRegistroIds],
+    [sesionSoloLectura, puedeEliminarRegistro, eliminandoRegistroIds],
   );
 
   const onAbrirObservacionesModal = useCallback(
@@ -268,7 +276,7 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual, 
 
   const handleRegistrarPorDocumento = async (numeroDocumento: string) => {
     const doc = normalizarDocumentoEscaneado(numeroDocumento);
-    if (!sesionActual || !doc) return;
+    if (sesionSoloLectura || !sesionActual || !doc) return;
 
     const now = Date.now();
     if (registroDocumentoEnCurso.current) return;
@@ -360,7 +368,7 @@ export function useAsistenciaRegistro({ fichaId, sesionActual, setSesionActual, 
     items: { kind: 'ingreso'; aprendizId: number }[] | { kind: 'salida'; asistenciaAprendizId: number }[],
     label: string,
   ) => {
-    if (!sesionActual || items.length === 0) return;
+    if (sesionSoloLectura || !sesionActual || items.length === 0) return;
     setBulkProcesando(true);
     let ok = 0;
     let fail = 0;

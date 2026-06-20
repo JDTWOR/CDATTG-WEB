@@ -24,11 +24,14 @@ export function useAsistenciaSesion() {
   const [errorEntrada, setErrorEntrada] = useState('');
   const entrandoRef = useRef(false);
 
+  const sesionSoloLectura = Boolean(sesionActual?.is_finished);
+
   const registro = useAsistenciaRegistro({
     fichaId: fichaId ?? 0,
     sesionActual,
     setSesionActual,
     puedeEliminarRegistro,
+    sesionSoloLectura,
   });
 
   useEffect(() => {
@@ -77,8 +80,8 @@ export function useAsistenciaSesion() {
     navigate(asistenciaPaths.fichas);
   };
 
-  const showTomarSesion = Boolean(
-    fichaId && fichaSeleccionada && sesionActual && !sesionActual.is_finished && !entrando && !errorEntrada,
+  const showSesionView = Boolean(
+    fichaId && fichaSeleccionada && sesionActual && !entrando && !errorEntrada,
   );
 
   return {
@@ -87,7 +90,8 @@ export function useAsistenciaSesion() {
     sesionActual,
     entrando,
     errorEntrada,
-    showTomarSesion,
+    showSesionView,
+    sesionSoloLectura,
     handleVolverAFichas,
     ...registro,
   };

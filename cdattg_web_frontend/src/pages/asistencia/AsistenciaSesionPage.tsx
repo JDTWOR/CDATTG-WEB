@@ -16,7 +16,7 @@ export function AsistenciaSesionPage() {
     );
   }
 
-  if (page.errorEntrada || !page.showTomarSesion) {
+  if (page.errorEntrada || !page.showSesionView) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Tomar asistencia</h1>

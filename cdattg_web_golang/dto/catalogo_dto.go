@@ -2,8 +2,9 @@ package dto
 
 // SedeItem para selects
 type SedeItem struct {
-	ID     uint   `json:"id"`
-	Nombre string `json:"nombre"`
+	ID         uint  `json:"id"`
+	Nombre     string `json:"nombre"`
+	RegionalID *uint `json:"regional_id,omitempty"`
 }
 
 // AmbienteItem para selects

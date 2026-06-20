@@ -251,11 +251,10 @@ func (r *asistenciaRepository) FindIDsByFichaIDAndFecha(fichaID uint, fecha stri
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	tInicio, err := ParseDate(fecha)
+	tInicio, tFin, err := parseDashboardFechaRange(fecha)
 	if err != nil {
 		return nil, err
 	}
-	tFin := tInicio.AddDate(0, 0, 1)
 	var out []uint
 	if err := r.db.Model(&models.Asistencia{}).
 		Where("instructor_ficha_id IN ? AND fecha >= ? AND fecha < ?", ids, tInicio, tFin).
@@ -738,7 +737,8 @@ func (r *asistenciaRepository) FindSesionesNoFinalizadasDesde(fechaDesde string)
 	return list, err
 }
 
-// ParseDate parses YYYY-MM-DD to time.Time
+// ParseDate parses YYYY-MM-DD al inicio del día civil en hora local (coherente con sesiones y dashboard).
 func ParseDate(s string) (time.Time, error) {
-	return time.Parse(time.DateOnly, s)
+	tInicio, _, err := parseDashboardFechaRange(s)
+	return tInicio, err
 }

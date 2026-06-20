@@ -145,12 +145,14 @@ type AsistenciaDashboardResponse struct {
 
 // AsistenciaDashboardFichaSinSesion ficha sin sesión de asistencia en el día del resumen
 type AsistenciaDashboardFichaSinSesion struct {
-	FichaID         uint   `json:"ficha_id"`
-	FichaNumero     string `json:"ficha_numero"`
-	ProgramaNombre  string `json:"programa_nombre"`
-	JornadaNombre   string `json:"jornada_nombre"`
-	SedeNombre      string `json:"sede_nombre"`
-	TotalAprendices int    `json:"total_aprendices"`
+	FichaID          uint   `json:"ficha_id"`
+	FichaNumero      string `json:"ficha_numero"`
+	ProgramaNombre   string `json:"programa_nombre"`
+	JornadaNombre    string `json:"jornada_nombre"`
+	SedeNombre       string `json:"sede_nombre"`
+	InstructorNombre string `json:"instructor_nombre"`
+	InstructorID     *uint  `json:"instructor_id,omitempty"`
+	TotalAprendices  int    `json:"total_aprendices"`
 }
 
 // AsistenciaDashboardPorFicha cantidad de aprendices que vinieron a formación por ficha

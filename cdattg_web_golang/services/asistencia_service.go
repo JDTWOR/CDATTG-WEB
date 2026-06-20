@@ -767,11 +767,11 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 	}
 	porFichaActivas, totalEnFormacion := filtrarPorFichaEsperadas(porFichaRaw, esperados)
 	porFicha, _ := filtrarPorFichaEsperadas(porFichaRaw, formacionDia)
-	sinSesionDTO, errSin := buildFichasSinSesionEsperadas(formacionDia, s.repo, fecha)
+	sinSesionDTO, errSin := buildFichasSinSesionEsperadasWithResolver(formacionDia, s.repo, fecha, NewInstructorResponsableResolver(s.horarioSvc.calendarioSvc))
 	if errSin != nil {
 		return nil, errSin
 	}
-	sinSesionActivas, errSinAct := buildFichasSinSesionEsperadas(esperados, s.repo, fecha)
+	sinSesionActivas, errSinAct := buildFichasSinSesionEsperadasWithResolver(esperados, s.repo, fecha, NewInstructorResponsableResolver(s.horarioSvc.calendarioSvc))
 	if errSinAct != nil {
 		return nil, errSinAct
 	}

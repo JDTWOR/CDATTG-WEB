@@ -24,6 +24,11 @@ const (
 	msgErrorAutorizacion          = "Error de autorización"
 	msgErrorVerificandoPermiso    = "Error verificando permiso"
 	msgErrorVerificandoRol        = "Error verificando rol"
+	msgRolInsuficiente            = "No tiene rol suficiente para acceder a esta sección"
+	roleSuperAdministrador        = "SUPER ADMINISTRADOR"
+	roleAdministrador             = "ADMINISTRADOR"
+	roleCoordinador               = "COORDINADOR"
+	roleBienestarAprendiz         = "BIENESTAR AL APRENDIZ"
 	actVerPersona                 = "VER PERSONA"
 	actVerFicha                   = "VER FICHA"
 	actVerAsistencia              = "VER ASISTENCIA"
@@ -545,7 +550,7 @@ func RequireSuperAdmin() gin.HandlerFunc {
 			return
 		}
 		for _, r := range roles {
-			if r == "SUPER ADMINISTRADOR" {
+			if r == roleSuperAdministrador {
 				c.Next()
 				return
 			}
@@ -575,12 +580,12 @@ func RequireSuperAdminOrBienestar() gin.HandlerFunc {
 			return
 		}
 		for _, r := range roles {
-			if r == "SUPER ADMINISTRADOR" || r == "BIENESTAR AL APRENDIZ" {
+			if r == roleSuperAdministrador || r == roleBienestarAprendiz {
 				c.Next()
 				return
 			}
 		}
-		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene rol suficiente para acceder a esta sección"})
+		c.JSON(http.StatusForbidden, gin.H{"error": msgRolInsuficiente})
 		c.Abort()
 	}
 }
@@ -604,12 +609,12 @@ func RequireSuperAdminAdminOrCoordinator() gin.HandlerFunc {
 			return
 		}
 		for _, r := range roles {
-			if r == "SUPER ADMINISTRADOR" || r == "ADMINISTRADOR" || r == "COORDINADOR" {
+			if r == roleSuperAdministrador || r == roleAdministrador || r == roleCoordinador {
 				c.Next()
 				return
 			}
 		}
-		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene rol suficiente para acceder a esta sección"})
+		c.JSON(http.StatusForbidden, gin.H{"error": msgRolInsuficiente})
 		c.Abort()
 	}
 }
@@ -633,12 +638,52 @@ func RequireSuperAdminOrAdmin() gin.HandlerFunc {
 			return
 		}
 		for _, r := range roles {
-			if r == "SUPER ADMINISTRADOR" || r == "ADMINISTRADOR" {
+			if r == roleSuperAdministrador || r == roleAdministrador {
 				c.Next()
 				return
 			}
 		}
-		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene rol suficiente para acceder a esta sección"})
+		c.JSON(http.StatusForbidden, gin.H{"error": msgRolInsuficiente})
+		c.Abort()
+	}
+}
+
+// RequireDashboardStats permite acceso al panel KPI de asistencia.
+func RequireDashboardStats() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := requireAuthenticatedUserID(c)
+		if !ok {
+			return
+		}
+		e, ok := getEnforcerOrAbort(c)
+		if !ok {
+			return
+		}
+		sub := strconv.FormatUint(uint64(userID), 10)
+		roles, err := authz.GetRolesForUser(e, sub)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": msgErrorVerificandoRol})
+			c.Abort()
+			return
+		}
+		c.Set("userRoles", roles)
+		allowedRoles := map[string]bool{
+			roleSuperAdministrador: true,
+			roleAdministrador:      true,
+			roleCoordinador:        true,
+			roleBienestarAprendiz:  true,
+		}
+		for _, r := range roles {
+			if allowedRoles[r] {
+				c.Next()
+				return
+			}
+		}
+		if allowed, errEnf := authz.Enforce(e, sub, "asistencia", "VER ASISTENCIA"); errEnf == nil && allowed {
+			c.Next()
+			return
+		}
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene permiso para ver estadísticas del dashboard"})
 		c.Abort()
 	}
 }

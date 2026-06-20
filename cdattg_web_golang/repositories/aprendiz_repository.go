@@ -26,6 +26,7 @@ type AprendizRepository interface {
 	Delete(id uint) error
 	// CountActivosByFichaIDs cuenta aprendices activos (estado=true) por ficha_id.
 	CountActivosByFichaIDs(fichaIDs []uint) (map[uint]int, error)
+	CountActivosScoped(sedeIDs []uint) (int64, error)
 }
 
 type aprendizRepository struct {
@@ -168,4 +169,16 @@ func (r *aprendizRepository) CountActivosByFichaIDs(fichaIDs []uint) (map[uint]i
 		out[rw.FichaID] = rw.Total
 	}
 	return out, nil
+}
+
+func (r *aprendizRepository) CountActivosScoped(sedeIDs []uint) (int64, error) {
+	var n int64
+	q := r.db.Model(&models.Aprendiz{}).
+		Joins("INNER JOIN fichas_caracterizacion fc ON fc.id = aprendices.ficha_caracterizacion_id").
+		Where("aprendices.estado = ? AND aprendices.deleted_at IS NULL AND fc.deleted_at IS NULL", true)
+	if len(sedeIDs) > 0 {
+		q = q.Where("fc.sede_id IN ?", sedeIDs)
+	}
+	err := q.Count(&n).Error
+	return n, err
 }

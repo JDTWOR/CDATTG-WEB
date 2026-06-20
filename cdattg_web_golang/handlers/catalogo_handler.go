@@ -26,7 +26,7 @@ func (h *CatalogoHandler) GetSedes(c *gin.Context) {
 	}
 	resp := make([]dto.SedeItem, len(list))
 	for i := range list {
-		resp[i] = dto.SedeItem{ID: list[i].ID, Nombre: list[i].Nombre}
+		resp[i] = dto.SedeItem{ID: list[i].ID, Nombre: list[i].Nombre, RegionalID: list[i].RegionalID}
 	}
 	c.JSON(http.StatusOK, gin.H{"data": resp})
 }

@@ -55,6 +55,7 @@ func SetupRouter() *gin.Engine {
 	handlers.StartAsistenciaAutoFinalize(asistenciaHandler)
 	adminHandler := handlers.NewAdminHandler()
 	permisosHandler := handlers.NewPermisosHandler()
+	statsHandler := handlers.NewStatsHandler()
 	ambienteHandler := handlers.NewAmbienteHandler()
 	sedeInfraHandler := handlers.NewSedeHandler()
 	pisoInfraHandler := handlers.NewPisoHandler()
@@ -251,6 +252,12 @@ func SetupRouter() *gin.Engine {
 			{
 				usuariosRegionales.GET("/:id/regionales", permisosHandler.GetUsuarioRegionales)
 				usuariosRegionales.PUT("/:id/regionales", permisosHandler.SetUsuarioRegionales)
+			}
+
+			stats := protected.Group("/stats")
+			stats.Use(middleware.RequireDashboardStats())
+			{
+				stats.GET("/dashboard-resumen", statsHandler.GetDashboardResumen)
 			}
 
 			// Inventario desactivado: rutas /inventario, /productos, /ordenes, /aprobaciones, /devoluciones, /proveedores, /categorias, /marcas, /contratos-convenios no registradas

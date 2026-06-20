@@ -16,6 +16,7 @@ type InstructorRepository interface {
 	Create(instructor *models.Instructor) error
 	Update(instructor *models.Instructor) error
 	Delete(id uint) error
+	CountActivos(sedeIDs []uint) (int64, error)
 }
 
 type instructorRepository struct {
@@ -92,4 +93,18 @@ func (r *instructorRepository) Update(instructor *models.Instructor) error {
 
 func (r *instructorRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Instructor{}, id).Error
+}
+
+func (r *instructorRepository) CountActivos(sedeIDs []uint) (int64, error) {
+	var n int64
+	q := r.db.Model(&models.Instructor{}).Where("status = ?", true)
+	if len(sedeIDs) > 0 {
+		q = q.Where(`id IN (
+			SELECT DISTINCT ifc.instructor_id FROM instructor_fichas_caracterizacion ifc
+			INNER JOIN fichas_caracterizacion fc ON fc.id = ifc.ficha_id
+			WHERE fc.sede_id IN ? AND ifc.deleted_at IS NULL AND fc.deleted_at IS NULL
+		)`, sedeIDs)
+	}
+	err := q.Count(&n).Error
+	return n, err
 }

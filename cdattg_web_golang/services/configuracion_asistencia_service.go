@@ -22,12 +22,16 @@ var (
 	configAsistenciaMu    sync.RWMutex
 )
 
+func configAsistenciaRepository() *repositories.ConfiguracionAsistenciaRepository {
+	return repositories.NewConfiguracionAsistenciaRepository()
+}
+
 type ConfiguracionAsistenciaService struct {
 	repo *repositories.ConfiguracionAsistenciaRepository
 }
 
 func NewConfiguracionAsistenciaService() *ConfiguracionAsistenciaService {
-	return &ConfiguracionAsistenciaService{repo: repositories.NewConfiguracionAsistenciaRepository()}
+	return &ConfiguracionAsistenciaService{repo: configAsistenciaRepository()}
 }
 
 // GetConfiguracionAsistencia devuelve la configuración global (cache en memoria).
@@ -46,11 +50,11 @@ func loadConfiguracionAsistencia() models.ConfiguracionAsistencia {
 	if database.GetDB() == nil {
 		return configAsistenciaDefaults
 	}
-	cfg, err := repositories.NewConfiguracionAsistenciaRepository().FindSingleton()
+	cfg, err := configAsistenciaRepository().FindSingleton()
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			cfg = &configAsistenciaDefaults
-			_ = repositories.NewConfiguracionAsistenciaRepository().UpsertSingleton(cfg)
+			_ = configAsistenciaRepository().UpsertSingleton(cfg)
 		} else {
 			return configAsistenciaDefaults
 		}
@@ -67,46 +71,60 @@ func InvalidateConfiguracionAsistenciaCache() {
 	configAsistenciaMu.Unlock()
 }
 
-func plazoEdicionObservacionesDias() int {
-	d := GetConfiguracionAsistencia().PlazoEdicionObservacionesDias
-	if d <= 0 {
-		return configAsistenciaDefaults.PlazoEdicionObservacionesDias
+func configAsistenciaPositive(value, defaultValue int) int {
+	if value <= 0 {
+		return defaultValue
 	}
-	return d
+	return value
 }
 
-func intervaloAutoCierreMinutos() int {
-	m := GetConfiguracionAsistencia().IntervaloAutoCierreMinutos
-	if m <= 0 {
-		return configAsistenciaDefaults.IntervaloAutoCierreMinutos
+func configAsistenciaNonNegative(value, defaultValue int) int {
+	if value < 0 {
+		return defaultValue
 	}
-	return m
+	return value
+}
+
+func plazoEdicionObservacionesDias() int {
+	return configAsistenciaPositive(
+		GetConfiguracionAsistencia().PlazoEdicionObservacionesDias,
+		configAsistenciaDefaults.PlazoEdicionObservacionesDias,
+	)
+}
+
+// IntervaloAutoCierreMinutos devuelve el intervalo del cron de auto-cierre con fallback seguro.
+func IntervaloAutoCierreMinutos() int {
+	return configAsistenciaPositive(
+		GetConfiguracionAsistencia().IntervaloAutoCierreMinutos,
+		configAsistenciaDefaults.IntervaloAutoCierreMinutos,
+	)
 }
 
 func minutosAlertaSinSesion() int {
-	m := GetConfiguracionAsistencia().MinutosAlertaSinSesion
-	if m <= 0 {
-		return configAsistenciaDefaults.MinutosAlertaSinSesion
-	}
-	return m
+	return configAsistenciaPositive(
+		GetConfiguracionAsistencia().MinutosAlertaSinSesion,
+		configAsistenciaDefaults.MinutosAlertaSinSesion,
+	)
 }
 
 func minutosExtensionDefaultRuntime() int {
-	m := GetConfiguracionAsistencia().MinutosExtensionDefault
-	if m < 0 {
-		return configAsistenciaDefaults.MinutosExtensionDefault
-	}
-	return m
+	return configAsistenciaNonNegative(
+		GetConfiguracionAsistencia().MinutosExtensionDefault,
+		configAsistenciaDefaults.MinutosExtensionDefault,
+	)
 }
 
-func (s *ConfiguracionAsistenciaService) Get() dto.ConfiguracionAsistenciaResponse {
-	cfg := GetConfiguracionAsistencia()
+func configuracionAsistenciaToDTO(cfg models.ConfiguracionAsistencia) dto.ConfiguracionAsistenciaResponse {
 	return dto.ConfiguracionAsistenciaResponse{
 		PlazoEdicionObservacionesDias: cfg.PlazoEdicionObservacionesDias,
 		IntervaloAutoCierreMinutos:    cfg.IntervaloAutoCierreMinutos,
 		MinutosAlertaSinSesion:        cfg.MinutosAlertaSinSesion,
 		MinutosExtensionDefault:       cfg.MinutosExtensionDefault,
 	}
+}
+
+func (s *ConfiguracionAsistenciaService) Get() dto.ConfiguracionAsistenciaResponse {
+	return configuracionAsistenciaToDTO(GetConfiguracionAsistencia())
 }
 
 func (s *ConfiguracionAsistenciaService) Update(req dto.ConfiguracionAsistenciaUpdateRequest) (dto.ConfiguracionAsistenciaResponse, error) {

@@ -168,10 +168,7 @@ func StartAsistenciaAutoFinalize(h *AsistenciaHandler) {
 	run() // una vez al arranque
 	go func() {
 		for {
-			mins := services.GetConfiguracionAsistencia().IntervaloAutoCierreMinutos
-			if mins <= 0 {
-				mins = 5
-			}
+			mins := services.IntervaloAutoCierreMinutos()
 			time.Sleep(time.Duration(mins) * time.Minute)
 			run()
 		}

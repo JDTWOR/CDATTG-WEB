@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ type AsistenciaRepository interface {
 	FindByID(id uint) (*models.Asistencia, error)
 	FindByInstructorFichaID(instructorFichaID uint) ([]models.Asistencia, error)
 	FindActivaByInstructorFichaID(instructorFichaID uint) (*models.Asistencia, error)
+	FindByInstructorFichaIDAndFecha(instructorFichaID uint, fecha time.Time) (*models.Asistencia, error)
 	FindActivaByFichaID(fichaID uint) (*models.Asistencia, error)
 	FindByFichaIDAndFechas(fichaID uint, fechaInicio, fechaFin string) ([]models.Asistencia, error)
 	FindIDsByFichaIDAndFecha(fichaID uint, fecha string) ([]uint, error)
@@ -187,6 +189,27 @@ func (r *asistenciaRepository) FindByInstructorFichaID(instructorFichaID uint) (
 func (r *asistenciaRepository) FindActivaByInstructorFichaID(instructorFichaID uint) (*models.Asistencia, error) {
 	var m models.Asistencia
 	if err := r.db.Where("instructor_ficha_id = ? AND is_finished = ?", instructorFichaID, false).First(&m).Error; err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// FindByInstructorFichaIDAndFecha devuelve la sesión más reciente del instructor-ficha en la fecha calendario dada (activa o finalizada).
+func (r *asistenciaRepository) FindByInstructorFichaIDAndFecha(instructorFichaID uint, fecha time.Time) (*models.Asistencia, error) {
+	loc := fecha.Location()
+	if loc == nil {
+		loc = time.Local
+	}
+	local := fecha.In(loc)
+	tInicio := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
+	tFin := tInicio.AddDate(0, 0, 1)
+	var m models.Asistencia
+	if err := r.db.Where("instructor_ficha_id = ? AND fecha >= ? AND fecha < ?", instructorFichaID, tInicio, tFin).
+		Order("hora_inicio DESC").
+		First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &m, nil

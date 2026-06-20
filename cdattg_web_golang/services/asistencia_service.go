@@ -19,6 +19,7 @@ const (
 	errMsgIDInvalido                     = "id inválido"
 	errMsgFechaInvalida                  = "FECHA INVÁLIDA, USE YYYY-MM-DD"
 	errMsgYaExisteSesionActiva           = "YA EXISTE UNA SESIÓN DE ASISTENCIA ACTIVA PARA ESTA FICHA. FINALÍCELA ANTES DE CREAR OTRA"
+	errMsgYaExisteSesionEnFecha          = "YA EXISTE UNA SESIÓN DE ASISTENCIA PARA ESTE INSTRUCTOR EN LA FICHA EN LA FECHA INDICADA"
 	errMsgNoEstaCreadoComoInstructor     = "NO ESTÁ CREADO COMO INSTRUCTOR DE ESTA FICHA"
 	errMsgFueraDelHorarioJornada         = "FUERA DEL HORARIO DE LA JORNADA DE LA FICHA; SOLO SE PUEDE TOMAR ASISTENCIA EN EL HORARIO CONFIGURADO"
 	errMsgSesionOtroInstructor           = "NO PUEDE TOMAR ASISTENCIA EN LA SESIÓN DE OTRO INSTRUCTOR"
@@ -216,10 +217,10 @@ func (s *asistenciaService) CreateSesion(req dto.AsistenciaRequest) (*dto.Asiste
 	if !s.horarioSvc.calendarioSvc.EsSesionFormacionValida(ifc.FichaID, ifc.InstructorID, fecha) {
 		return nil, errors.New("la fecha no corresponde a un día de formación programado para este instructor en la ficha")
 	}
-	// Regla: solo una sesión activa por instructor-ficha
-	activa, _ := s.repo.FindActivaByInstructorFichaID(req.InstructorFichaID)
-	if activa != nil {
-		return nil, errors.New("ya existe una sesión de asistencia activa para este instructor en la ficha. Finalícela antes de crear otra")
+	// Regla: una sola sesión por instructor-ficha por fecha calendario (activa o finalizada).
+	existente, _ := s.repo.FindByInstructorFichaIDAndFecha(req.InstructorFichaID, fecha)
+	if existente != nil {
+		return nil, errors.New(strings.ToLower(errMsgYaExisteSesionEnFecha))
 	}
 	// Crear evidencia por defecto para la sesión
 	fichaNum := codigoFichaParaSesion(ifc)
@@ -247,22 +248,22 @@ func (s *asistenciaService) CreateSesion(req dto.AsistenciaRequest) (*dto.Asiste
 	return s.GetByID(a.ID)
 }
 
-// EntrarTomarAsistencia devuelve la sesión activa del instructor o crea una nueva (hoy).
+// EntrarTomarAsistencia devuelve la sesión del instructor para hoy (activa o finalizada) o crea la primera del día.
 func (s *asistenciaService) EntrarTomarAsistencia(instructorID uint, fichaID uint) (*dto.AsistenciaResponse, error) {
 	ifc, err := s.instFichaRepo.FindByFichaIDAndInstructorID(fichaID, instructorID)
 	if err != nil || ifc == nil {
 		return nil, errors.New("no está asignado como instructor de esta ficha")
 	}
-	if errVal := s.horarioSvc.ValidarPuedeTomarAsistencia(instructorID, fichaID, time.Now()); errVal != nil {
+	now := time.Now()
+	if errVal := s.horarioSvc.ValidarPuedeTomarAsistencia(instructorID, fichaID, now); errVal != nil {
 		return nil, errVal
 	}
-	// Sesión activa de este instructor → usarla solo si es de hoy (hora local)
-	activa, _ := s.repo.FindActivaByInstructorFichaID(ifc.ID)
-	if activa != nil && esSesionDeHoy(activa.Fecha) {
-		return s.asistenciaToResponse(activa), nil
+	// Reutilizar la sesión de hoy aunque ya esté finalizada (p. ej. tras auto-cierre).
+	sesionHoy, _ := s.repo.FindByInstructorFichaIDAndFecha(ifc.ID, now)
+	if sesionHoy != nil {
+		return s.asistenciaToResponse(sesionHoy), nil
 	}
-	// No hay sesión activa de hoy → crear una nueva
-	hoy := time.Now().Format(time.DateOnly)
+	hoy := now.Format(time.DateOnly)
 	return s.CreateSesion(dto.AsistenciaRequest{
 		InstructorFichaID: ifc.ID,
 		Fecha:             hoy,

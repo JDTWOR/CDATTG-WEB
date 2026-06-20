@@ -39,6 +39,25 @@ type SetRolesRequest struct {
 	Roles []string `json:"roles" binding:"required"`
 }
 
+// UsuarioRegionalesResponse regionales asignadas a un usuario coordinador.
+type UsuarioRegionalesResponse struct {
+	UserID      uint                `json:"user_id"`
+	RegionalIDs []uint              `json:"regional_ids"`
+	Regionales  []RegionalListItem  `json:"regionales"`
+}
+
+// SetUsuarioRegionalesRequest body para reemplazar regionales de un usuario.
+type SetUsuarioRegionalesRequest struct {
+	RegionalIDs []uint `json:"regional_ids" binding:"required"`
+}
+
+// RegionalListItem ítem de catálogo regional.
+type RegionalListItem struct {
+	ID     uint   `json:"id"`
+	Nombre string `json:"nombre"`
+	Codigo string `json:"codigo,omitempty"`
+}
+
 // DefinicionesPermisosResponse lista de (obj, act) y roles válidos para la UI
 type DefinicionesPermisosResponse struct {
 	Roles      []string      `json:"roles"`

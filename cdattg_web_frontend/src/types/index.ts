@@ -609,6 +609,12 @@ export interface AsistenciaDashboardResponse {
   fichas_con_sesion_hoy?: number;
 }
 
+export interface UsuarioRegionalesResponse {
+  user_id: number;
+  regional_ids: number[];
+  regionales: RegionalItem[];
+}
+
 /** Casos de bienestar: aprendices con N+ inasistencias (riesgo deserción) */
 export interface CasosBienestarResponse {
   dias_analizados: number;

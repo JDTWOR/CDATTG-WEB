@@ -85,6 +85,7 @@ import type {
   ContratoConvenioResponse,
   UsuarioListItem,
   UsuarioPermisosResponse,
+  UsuarioRegionalesResponse,
   DefinicionesPermisosResponse,
 } from '../types';
 import type { InstructorAgendaResponse } from '../types/agenda';
@@ -1033,6 +1034,15 @@ class ApiService {
 
   async setUsuarioRoles(userId: number, roles: string[]): Promise<void> {
     await this.api.patch(`/usuarios/${userId}/roles`, { roles });
+  }
+
+  async getUsuarioRegionales(userId: number): Promise<UsuarioRegionalesResponse> {
+    const response = await this.api.get<UsuarioRegionalesResponse>(`/usuarios/${userId}/regionales`);
+    return response.data;
+  }
+
+  async setUsuarioRegionales(userId: number, regionalIds: number[]): Promise<void> {
+    await this.api.put(`/usuarios/${userId}/regionales`, { regional_ids: regionalIds });
   }
 
   async toggleUsuarioEstado(userId: number): Promise<void> {

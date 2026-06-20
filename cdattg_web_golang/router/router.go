@@ -8,6 +8,7 @@ import (
 
 // Literales Casbin y segmentos de ruta reutilizados (Sonar: evitar duplicación).
 const (
+	routeUsuarios         = "/usuarios"
 	routeImport       = "/import"
 	routeIDAprendices = "/:id/aprendices"
 
@@ -231,7 +232,7 @@ func SetupRouter() *gin.Engine {
 			{
 				permisos.GET("/definiciones", permisosHandler.Definiciones)
 			}
-			usuarios := protected.Group("/usuarios")
+			usuarios := protected.Group(routeUsuarios)
 			usuarios.Use(middleware.RequirePermission("usuario", "ASIGNAR PERMISOS"))
 			{
 				usuarios.GET("", permisosHandler.ListUsuarios)
@@ -240,10 +241,16 @@ func SetupRouter() *gin.Engine {
 				usuarios.DELETE("/:id/permisos/:obj/:act", permisosHandler.QuitarPermiso)
 				usuarios.PATCH("/:id/estado", permisosHandler.ToggleEstado)
 			}
-			usuariosRoles := protected.Group("/usuarios")
+			usuariosRoles := protected.Group(routeUsuarios)
 			usuariosRoles.Use(middleware.RequireSuperAdmin())
 			{
 				usuariosRoles.PATCH("/:id/roles", permisosHandler.SetRoles)
+			}
+			usuariosRegionales := protected.Group(routeUsuarios)
+			usuariosRegionales.Use(middleware.RequireSuperAdminOrAdmin())
+			{
+				usuariosRegionales.GET("/:id/regionales", permisosHandler.GetUsuarioRegionales)
+				usuariosRegionales.PUT("/:id/regionales", permisosHandler.SetUsuarioRegionales)
 			}
 
 			// Inventario desactivado: rutas /inventario, /productos, /ordenes, /aprobaciones, /devoluciones, /proveedores, /categorias, /marcas, /contratos-convenios no registradas

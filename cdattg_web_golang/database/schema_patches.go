@@ -166,5 +166,10 @@ func EnsureSchemaPatches() error {
 	}
 	log.Println("Esquema: fila por defecto configuracion_asistencia verificada")
 
+	if err := DB.AutoMigrate(&models.UsuarioRegional{}); err != nil {
+		return err
+	}
+	log.Println("Esquema: usuario_regionales verificados")
+
 	return nil
 }

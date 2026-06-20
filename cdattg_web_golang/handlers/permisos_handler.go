@@ -130,6 +130,32 @@ func (h *PermisosHandler) Definiciones(c *gin.Context) {
 	c.JSON(http.StatusOK, h.svc.Definiciones())
 }
 
+// GetUsuarioRegionales GET /api/usuarios/:id/regionales
+func (h *PermisosHandler) GetUsuarioRegionales(c *gin.Context) {
+	userID := getParamID(c, "id")
+	resp, err := h.svc.GetUsuarioRegionales(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// SetUsuarioRegionales PUT /api/usuarios/:id/regionales
+func (h *PermisosHandler) SetUsuarioRegionales(c *gin.Context) {
+	var req dto.SetUsuarioRegionalesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "regional_ids requerido (array)"})
+		return
+	}
+	userID := getParamID(c, "id")
+	if err := h.svc.SetUsuarioRegionales(userID, req.RegionalIDs); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Regionales actualizadas"})
+}
+
 func getParamID(c *gin.Context, param string) uint {
 	id, _ := strconv.ParseUint(c.Param(param), 10, 64)
 	return uint(id)

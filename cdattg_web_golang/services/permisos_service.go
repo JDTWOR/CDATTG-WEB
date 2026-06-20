@@ -11,6 +11,8 @@ import (
 	"github.com/sena/cdattg-web-golang/repositories"
 )
 
+const errUsuarioNoEncontrado = "usuario no encontrado"
+
 type PermisosService interface {
 	ListUsuarios(offset, limit int, search string) ([]dto.UsuarioListItem, int64, error)
 	GetPermisosByUserID(userID uint) (*dto.UsuarioPermisosResponse, error)
@@ -19,14 +21,22 @@ type PermisosService interface {
 	SetRoles(userID uint, roles []string) error
 	ToggleEstado(userID uint) error
 	Definiciones() dto.DefinicionesPermisosResponse
+	GetUsuarioRegionales(userID uint) (*dto.UsuarioRegionalesResponse, error)
+	SetUsuarioRegionales(userID uint, regionalIDs []uint) error
 }
 
 type permisosService struct {
-	userRepo repositories.UserRepository
+	userRepo            repositories.UserRepository
+	usuarioRegionalRepo repositories.UsuarioRegionalRepository
+	catalogoRepo        repositories.CatalogoRepository
 }
 
 func NewPermisosService() PermisosService {
-	return &permisosService{userRepo: repositories.NewUserRepository()}
+	return &permisosService{
+		userRepo:            repositories.NewUserRepository(),
+		usuarioRegionalRepo: repositories.NewUsuarioRegionalRepository(),
+		catalogoRepo:        repositories.NewCatalogoRepository(),
+	}
 }
 
 func (s *permisosService) ListUsuarios(offset, limit int, search string) ([]dto.UsuarioListItem, int64, error) {
@@ -60,7 +70,7 @@ func (s *permisosService) ListUsuarios(offset, limit int, search string) ([]dto.
 func (s *permisosService) GetPermisosByUserID(userID uint) (*dto.UsuarioPermisosResponse, error) {
 	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
-		return nil, errors.New("usuario no encontrado")
+		return nil, errors.New(errUsuarioNoEncontrado)
 	}
 	db := database.GetDB()
 	e, err := authz.GetEnforcer(db)
@@ -97,7 +107,7 @@ func (s *permisosService) GetPermisosByUserID(userID uint) (*dto.UsuarioPermisos
 
 func (s *permisosService) AsignarPermisoDirecto(userID uint, obj, act string) error {
 	if _, err := s.userRepo.FindByID(userID); err != nil {
-		return errors.New("usuario no encontrado")
+		return errors.New(errUsuarioNoEncontrado)
 	}
 	db := database.GetDB()
 	e, err := authz.GetEnforcer(db)
@@ -114,7 +124,7 @@ func (s *permisosService) AsignarPermisoDirecto(userID uint, obj, act string) er
 
 func (s *permisosService) QuitarPermisoDirecto(userID uint, obj, act string) error {
 	if _, err := s.userRepo.FindByID(userID); err != nil {
-		return errors.New("usuario no encontrado")
+		return errors.New(errUsuarioNoEncontrado)
 	}
 	db := database.GetDB()
 	e, err := authz.GetEnforcer(db)
@@ -131,7 +141,7 @@ func (s *permisosService) QuitarPermisoDirecto(userID uint, obj, act string) err
 
 func (s *permisosService) SetRoles(userID uint, roles []string) error {
 	if _, err := s.userRepo.FindByID(userID); err != nil {
-		return errors.New("usuario no encontrado")
+		return errors.New(errUsuarioNoEncontrado)
 	}
 	db := database.GetDB()
 	e, err := authz.GetEnforcer(db)
@@ -166,7 +176,7 @@ func normRoleName(s string) string {
 func (s *permisosService) ToggleEstado(userID uint) error {
 	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
-		return errors.New("usuario no encontrado")
+		return errors.New(errUsuarioNoEncontrado)
 	}
 	user.Status = !user.Status
 	return s.userRepo.Update(user)
@@ -182,6 +192,53 @@ func (s *permisosService) Definiciones() dto.DefinicionesPermisosResponse {
 		Roles:    authz.RoleNames,
 		Permisos: perms,
 	}
+}
+
+func (s *permisosService) GetUsuarioRegionales(userID uint) (*dto.UsuarioRegionalesResponse, error) {
+	if _, err := s.userRepo.FindByID(userID); err != nil {
+		return nil, errors.New(errUsuarioNoEncontrado)
+	}
+	ids, err := s.usuarioRegionalRepo.FindRegionalIDsByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+	regionales, err := s.usuarioRegionalRepo.FindRegionalesByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]dto.RegionalListItem, len(regionales))
+	for i := range regionales {
+		items[i] = dto.RegionalListItem{
+			ID:     regionales[i].ID,
+			Nombre: regionales[i].Nombre,
+			Codigo: regionales[i].Codigo,
+		}
+	}
+	return &dto.UsuarioRegionalesResponse{
+		UserID:      userID,
+		RegionalIDs: ids,
+		Regionales:  items,
+	}, nil
+}
+
+func (s *permisosService) SetUsuarioRegionales(userID uint, regionalIDs []uint) error {
+	if _, err := s.userRepo.FindByID(userID); err != nil {
+		return errors.New(errUsuarioNoEncontrado)
+	}
+	catalog, err := s.catalogoRepo.FindRegionales()
+	if err != nil {
+		return err
+	}
+	valid := make(map[uint]struct{}, len(catalog))
+	for i := range catalog {
+		valid[catalog[i].ID] = struct{}{}
+	}
+	for _, rid := range regionalIDs {
+		if _, ok := valid[rid]; !ok {
+			return errors.New("regional no válida")
+		}
+	}
+	return s.usuarioRegionalRepo.ReplaceForUser(userID, regionalIDs)
 }
 
 var _ PermisosService = (*permisosService)(nil)

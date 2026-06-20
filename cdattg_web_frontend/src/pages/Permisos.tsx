@@ -6,7 +6,7 @@ import { ArrowLeftIcon, UserCircleIcon, ShieldCheckIcon } from '@heroicons/react
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
-import type { UsuarioListItem, UsuarioPermisosResponse, DefinicionesPermisosResponse } from '../types';
+import type { UsuarioListItem, UsuarioPermisosResponse, DefinicionesPermisosResponse, RegionalItem } from '../types';
 
 const PAGE_SIZE = 20;
 
@@ -20,8 +20,10 @@ type UsuarioPermisosDetallePanelProps = Readonly<{
   esYo: boolean;
   saving: boolean;
   isSuperAdmin: boolean;
+  isAdminOrSuper: boolean;
   onToggleEstado: () => void;
   onSetRoles: (roles: string[]) => void;
+  onSetRegionales: (regionalIds: number[]) => Promise<void>;
   onQuitarPermiso: (obj: string, act: string) => void;
   onAsignarPermiso: (obj: string, act: string) => void;
 }>;
@@ -36,12 +38,42 @@ function UsuarioPermisosDetallePanel({
   esYo,
   saving,
   isSuperAdmin,
+  isAdminOrSuper,
   onToggleEstado,
   onSetRoles,
+  onSetRegionales,
   onQuitarPermiso,
   onAsignarPermiso,
 }: UsuarioPermisosDetallePanelProps) {
   const usuario = list.find((u) => u.id === targetUserId);
+  const esCoordinador = detalle?.roles.includes('COORDINADOR') ?? false;
+  const [catalogoRegionales, setCatalogoRegionales] = useState<RegionalItem[]>([]);
+  const [regionalesAsignadas, setRegionalesAsignadas] = useState<number[]>([]);
+  const [loadingRegionales, setLoadingRegionales] = useState(false);
+
+  useEffect(() => {
+    if (!esCoordinador || !isAdminOrSuper) return;
+    setLoadingRegionales(true);
+    Promise.all([apiService.getCatalogosRegionales(), apiService.getUsuarioRegionales(targetUserId)])
+      .then(([catalogo, asignadas]) => {
+        setCatalogoRegionales(catalogo);
+        setRegionalesAsignadas(asignadas.regional_ids);
+      })
+      .catch(() => {
+        setCatalogoRegionales([]);
+        setRegionalesAsignadas([]);
+      })
+      .finally(() => setLoadingRegionales(false));
+  }, [esCoordinador, isAdminOrSuper, targetUserId, detalle?.roles]);
+
+  const handleToggleRegional = async (regionalId: number) => {
+    if (!isAdminOrSuper || esYo || saving) return;
+    const next = regionalesAsignadas.includes(regionalId)
+      ? regionalesAsignadas.filter((id) => id !== regionalId)
+      : [...regionalesAsignadas, regionalId];
+    await onSetRegionales(next);
+    setRegionalesAsignadas(next);
+  };
 
   if (loadingDetalle) {
     return <p className="text-gray-500 dark:text-gray-400">Cargando...</p>;
@@ -116,6 +148,39 @@ function UsuarioPermisosDetallePanel({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {isAdminOrSuper && !esYo && esCoordinador && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Regionales asignadas</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+            Alcance territorial del coordinador en el dashboard de asistencia.
+          </p>
+          {loadingRegionales ? (
+            <p className="text-sm text-gray-500">Cargando regionales…</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {catalogoRegionales.map((reg) => {
+                const tiene = regionalesAsignadas.includes(reg.id);
+                return (
+                  <button
+                    key={reg.id}
+                    type="button"
+                    onClick={() => void handleToggleRegional(reg.id)}
+                    disabled={saving}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                      tiene
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                    }`}
+                  >
+                    {reg.nombre}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -200,6 +265,7 @@ export function Permisos() {
   const { setLabel, clearLabel } = useBreadcrumbOverride();
   const { user: currentUser, roles, hasPermission } = useAuth();
   const isSuperAdmin = roles.includes('SUPER ADMINISTRADOR');
+  const isAdminOrSuper = isSuperAdmin || roles.includes('ADMINISTRADOR');
 
   const [list, setList] = useState<UsuarioListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -313,6 +379,21 @@ export function Permisos() {
     }
   };
 
+  const handleSetRegionales = async (regionalIds: number[]) => {
+    if (!targetUserId || esYo || saving) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      await apiService.setUsuarioRegionales(targetUserId, regionalIds);
+      setMessage('Regionales actualizadas.');
+    } catch (err: unknown) {
+      setMessage(axiosErrorMessage(err, 'Error al guardar regionales'));
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleToggleEstado = async () => {
     if (!targetUserId || esYo || saving) return;
     setSaving(true);
@@ -370,8 +451,10 @@ export function Permisos() {
           esYo={esYo}
           saving={saving}
           isSuperAdmin={isSuperAdmin}
+          isAdminOrSuper={isAdminOrSuper}
           onToggleEstado={handleToggleEstado}
           onSetRoles={handleSetRoles}
+          onSetRegionales={handleSetRegionales}
           onQuitarPermiso={handleQuitarPermiso}
           onAsignarPermiso={handleAsignarPermiso}
         />

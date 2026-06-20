@@ -16,7 +16,18 @@ import {
 } from '../../routes/paths';
 import type { SidebarManifestItem } from './types';
 
+/** Orden y agrupación del menú lateral (de arriba hacia abajo). */
 export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
+  // —— Inicio (accesos directos, sin acordeón) ——
+  {
+    section: 'Inicio',
+    path: DASHBOARD_PATH,
+    label: 'Panel principal',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', 'COORDINADOR'],
+    alsoVisibleForPermissions: ['VER MI AGENDA'],
+    iconKey: 'dashboard',
+  },
   {
     section: 'Inicio',
     path: PERFIL_PATH,
@@ -33,89 +44,90 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     alsoVisibleForPermissions: ['VER MIS INASISTENCIAS'],
     iconKey: 'asistencia/mis-inasistencias',
   },
+
+  // —— Formación ——
   {
-    section: 'Inicio',
-    path: DASHBOARD_PATH,
-    label: 'Dashboard',
-    permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
-    alsoVisibleForPermissions: ['VER MI AGENDA'],
-    iconKey: 'dashboard',
-  },
-  {
-    section: 'Gestión académica',
+    section: 'Formación',
     path: programasPaths.index,
     label: 'Programas',
     permission: 'VER PROGRAMAS',
     iconKey: 'programas',
   },
   {
-    section: 'Gestión académica',
+    section: 'Formación',
     path: fichasPaths.index,
     label: 'Fichas',
     permission: 'VER FICHAS',
     alsoVisibleForRoles: ['INSTRUCTOR'],
     iconKey: 'fichas',
   },
+
+  // —— Personal ——
   {
-    section: 'Gestión de personal',
+    section: 'Personal',
     path: instructoresPaths.index,
     label: 'Instructores',
     permission: 'VER FICHAS',
     iconKey: 'instructores',
   },
   {
-    section: 'Gestión de personal',
+    section: 'Personal',
     path: aprendicesPaths.index,
     label: 'Aprendices',
     permission: 'VER APRENDICES',
     iconKey: 'aprendices',
   },
   {
-    section: 'Gestión de personal',
+    section: 'Personal',
     path: personasPaths.index,
     label: 'Personas',
     permission: 'VER PERSONAS',
     iconKey: 'personas',
   },
+
+  // —— Asistencia ——
   {
-    section: 'Control y seguimiento',
+    section: 'Asistencia',
     path: asistenciaPaths.fichas,
     label: 'Tomar asistencia',
     permission: 'VER ASISTENCIA',
     iconKey: 'asistencia',
   },
   {
-    section: 'Control y seguimiento',
+    section: 'Asistencia',
     path: asistenciaPaths.historial.index,
-    label: 'Historial asistencias',
+    label: 'Historial',
     permission: 'VER ASISTENCIA',
     iconKey: 'asistencia/historial',
   },
   {
-    section: 'Control y seguimiento',
+    section: 'Asistencia',
     path: asistenciaPaths.index,
-    label: 'Dashboard asistencia',
+    label: 'Reporte de asistencia',
     permission: null,
     rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
     iconKey: 'asistencia/dashboard',
   },
   {
-    section: 'Bienestar al aprendiz',
-    path: bienestarPaths.casos.index,
-    label: 'Casos Bienestar',
-    permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
-    iconKey: 'bienestar/casos',
-  },
-  {
-    section: 'Control y seguimiento',
+    section: 'Asistencia',
     path: asistenciaPaths.tiposObservacion,
     label: 'Tipos de observación',
     permission: null,
     rolesRequired: ['SUPER ADMINISTRADOR'],
     iconKey: 'asistencia/tipos-observacion',
   },
+
+  // —— Bienestar ——
+  {
+    section: 'Bienestar',
+    path: bienestarPaths.casos.index,
+    label: 'Casos bienestar',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
+    iconKey: 'bienestar/casos',
+  },
+
+  // —— Infraestructura ——
   {
     section: 'Infraestructura',
     path: infraestructuraPaths.sedes,
@@ -143,23 +155,27 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
   {
     section: 'Infraestructura',
     path: infraestructuraPaths.ambientes,
-    label: 'Ambientes de formación',
+    label: 'Ambientes',
     permission: null,
     rolesRequired: ['SUPER ADMINISTRADOR'],
     iconKey: 'infraestructura/ambientes',
   },
+
+  // —— Vigilancia ——
   {
-    section: 'Control y seguimiento',
+    section: 'Vigilancia',
     path: vigilanciaPaths.ambientes,
-    label: 'Vigilancia de ambientes',
+    label: 'Ambientes en uso',
     permission: null,
     rolesRequired: ['VIGILANTE', 'SUPER ADMINISTRADOR'],
     iconKey: 'vigilancia/ambientes',
   },
+
+  // —— Administración ——
   {
     section: 'Administración',
     path: administracionPaths.jornadas,
-    label: 'Jornadas de formación',
+    label: 'Jornadas',
     permission: null,
     rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
     iconKey: 'administracion/jornadas',
@@ -175,7 +191,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
   {
     section: 'Administración',
     path: administracionPaths.configuracionAsistencia,
-    label: 'Configuración de asistencia',
+    label: 'Config. asistencia',
     permission: null,
     rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
     iconKey: 'administracion/configuracion-asistencia',
@@ -188,3 +204,6 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     iconKey: 'permisos',
   },
 ];
+
+/** Sección de accesos rápidos (sin acordeón). */
+export const SIDEBAR_PRIMARY_SECTION = 'Inicio';

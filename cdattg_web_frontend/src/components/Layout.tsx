@@ -1,5 +1,5 @@
-import { type ReactNode, type ComponentProps, useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { type ReactNode, useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   HomeIcon,
   BookOpenIcon,
@@ -15,26 +15,24 @@ import {
   ArrowUturnLeftIcon,
   MoonIcon,
   SunIcon,
-  KeyIcon,
-  XMarkIcon,
   Bars3Icon,
   ShieldCheckIcon,
   ExclamationTriangleIcon,
   CalendarDaysIcon,
   BuildingOffice2Icon,
   EyeIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-  ChevronDoubleLeftIcon,
-  ChevronDoubleRightIcon,
 } from '@heroicons/react/24/outline';
-import LogoSena from '../../logo-sena-verde-complementario-svg-2022.svg';
 import { AppBreadcrumb } from './navigation/AppBreadcrumb';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { apiService } from '../services/api';
-import { formatRolesLine, hasAnyRole } from '../utils/roles';
-import { SIDEBAR_MANIFEST, type SidebarManifestItem } from '../navigation/sidebar';
+import { formatRolesLine, getHomeRouteForUser } from '../utils/roles';
+import { SIDEBAR_MANIFEST, SIDEBAR_PRIMARY_SECTION } from '../navigation/sidebar';
+import { filterVisibleSidebarItems } from './layout/sidebarVisibility';
+import { useChangePassword } from './layout/useChangePassword';
+import { ChangePasswordModal } from './layout/ChangePasswordModal';
+import { LayoutBrandLink } from './layout/LayoutBrandLink';
+import { LayoutSidebar, sectionForPathname } from './layout/LayoutSidebar';
+import { LayoutUserMenu } from './layout/LayoutUserMenu';
 
 interface LayoutProps {
   children: ReactNode;
@@ -46,38 +44,6 @@ function readSidebarHidden(): boolean {
   if (globalThis.window === undefined) return false;
   return globalThis.window.localStorage.getItem(SIDEBAR_HIDDEN_KEY) === 'true';
 }
-
-const navLinkClass = (isActive: boolean) =>
-  `flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-    isActive
-      ? 'bg-primary-100 text-primary-700 font-medium dark:bg-primary-900/40 dark:text-primary-300'
-      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-  }`;
-
-type SidebarItem = SidebarManifestItem;
-
-function isNavItemActive(pathname: string, item: SidebarItem, items: SidebarItem[]): boolean {
-  if (item.path === '/dashboard') return pathname === '/dashboard';
-  return (
-    pathname === item.path ||
-    (pathname.startsWith(item.path + '/') &&
-      !items.some(
-        (other) =>
-          other.path !== item.path &&
-          other.path.startsWith(item.path + '/') &&
-          pathname.startsWith(other.path)
-      ))
-  );
-}
-
-function sectionForPathname(pathname: string, items: SidebarItem[]): string | null {
-  for (const item of items) {
-    if (isNavItemActive(pathname, item, items)) return item.section;
-  }
-  return items[0]?.section ?? null;
-}
-
-const SIDEBAR_ITEMS = SIDEBAR_MANIFEST;
 
 const ICONS: Record<string, ReactNode> = {
   perfil: <UsersIcon className="w-5 h-5" />,
@@ -111,453 +77,184 @@ const ICONS: Record<string, ReactNode> = {
 };
 
 export const Layout = ({ children }: LayoutProps) => {
-  const { user, logout, hasPermission, roles } = useAuth();
+  const { user, logout, hasPermission, roles, permissions } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
-  const [passwordActual, setPasswordActual] = useState('');
-  const [passwordNueva, setPasswordNueva] = useState('');
-  const [passwordNuevaConfirm, setPasswordNuevaConfirm] = useState('');
-  const [changePasswordError, setChangePasswordError] = useState('');
-  const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
-  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const changePassword = useChangePassword();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarHidden, setSidebarHidden] = useState(readSidebarHidden);
+
+  const visibleItems = useMemo(
+    () => filterVisibleSidebarItems(SIDEBAR_MANIFEST, roles, hasPermission),
+    [roles, hasPermission],
+  );
+
+  const [expandedSection, setExpandedSection] = useState<string | null>(() =>
+    sectionForPathname(location.pathname, visibleItems),
+  );
 
   useEffect(() => {
     globalThis.window.localStorage.setItem(SIDEBAR_HIDDEN_KEY, String(sidebarHidden));
   }, [sidebarHidden]);
-
-  const hideSidebar = () => {
-    setSidebarHidden(true);
-    setSidebarOpen(false);
-  };
-
-  const showSidebarDocked = () => {
-    setSidebarHidden(false);
-    setSidebarOpen(false);
-  };
-
-  const visibleItems = useMemo(
-    () =>
-      SIDEBAR_ITEMS.filter((item) => {
-        if (item.rolesRequired && item.rolesRequired.length > 0) {
-          const matchRequired = hasAnyRole(roles, item.rolesRequired);
-          const matchAlsoRole = item.alsoVisibleForRoles?.some((r) => hasAnyRole(roles, [r])) ?? false;
-          const matchAlsoPerm =
-            item.alsoVisibleForPermissions?.some((p) => hasPermission(p)) ?? false;
-          if (!matchRequired && !matchAlsoRole && !matchAlsoPerm) return false;
-        }
-        if (item.permission === null) return true;
-        if (hasPermission(item.permission)) return true;
-        if (item.alsoVisibleForPermissions?.length && item.alsoVisibleForPermissions.some((p) => hasPermission(p))) {
-          return true;
-        }
-        if (item.alsoVisibleForRoles?.length && hasAnyRole(roles, item.alsoVisibleForRoles)) return true;
-        return false;
-      }),
-    [roles, hasPermission]
-  );
-
-  const [expandedSection, setExpandedSection] = useState<string | null>(() =>
-    sectionForPathname(location.pathname, visibleItems)
-  );
 
   useEffect(() => {
     const activeSection = sectionForPathname(location.pathname, visibleItems);
     if (activeSection) setExpandedSection(activeSection);
   }, [location.pathname, visibleItems]);
 
-  const rolesLine = roles.length > 0 ? formatRolesLine(roles) : '';
-  const sections = Array.from(new Set(visibleItems.map((i) => i.section)));
-
-  // Evitar scroll del body cuando el drawer está abierto (móvil)
   useEffect(() => {
-    if (sidebarOpen) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
+    if (!sidebarOpen) return;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [sidebarOpen]);
+
+  const rolesLine = roles.length > 0 ? formatRolesLine(roles) : '';
+  const brandPath = useMemo(() => getHomeRouteForUser(roles, permissions), [roles, permissions]);
+  const primaryItems = visibleItems.filter((item) => item.section === SIDEBAR_PRIMARY_SECTION);
+  const groupedSections = Array.from(
+    new Set(visibleItems.filter((item) => item.section !== SIDEBAR_PRIMARY_SECTION).map((i) => i.section)),
+  );
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const openChangePassword = () => {
-    setChangePasswordOpen(true);
-    setPasswordActual('');
-    setPasswordNueva('');
-    setPasswordNuevaConfirm('');
-    setChangePasswordError('');
-    setChangePasswordSuccess('');
+  const handleSectionToggle = (section: string) => {
+    setExpandedSection((prev) => (prev === section ? null : section));
   };
 
-  const closeChangePassword = () => {
-    setChangePasswordOpen(false);
-    setChangePasswordError('');
-    setChangePasswordSuccess('');
-  };
-
-  const submitChangePassword = async () => {
-    setChangePasswordError('');
-    setChangePasswordSuccess('');
-    if (passwordNueva.length < 6) {
-      setChangePasswordError('La nueva contraseña debe tener al menos 6 caracteres.');
+  const handleSidebarToggle = () => {
+    if (sidebarHidden) {
+      setSidebarHidden(false);
       return;
     }
-    if (passwordNueva !== passwordNuevaConfirm) {
-      setChangePasswordError('La nueva contraseña y la confirmación no coinciden.');
+    if (globalThis.window?.matchMedia('(min-width: 768px)')?.matches) {
+      setSidebarHidden(true);
+      setSidebarOpen(false);
       return;
     }
-    setChangePasswordLoading(true);
-    try {
-      await apiService.changePassword({
-        password_actual: passwordActual,
-        password_nueva: passwordNueva,
-      });
-      setChangePasswordSuccess('Contraseña actualizada correctamente.');
-      setPasswordActual('');
-      setPasswordNueva('');
-      setPasswordNuevaConfirm('');
-      setTimeout(() => {
-        closeChangePassword();
-      }, 1500);
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al cambiar la contraseña.';
-      setChangePasswordError(msg);
-    } finally {
-      setChangePasswordLoading(false);
-    }
+    setSidebarOpen(true);
   };
 
-  const handleChangePassword: NonNullable<ComponentProps<'form'>['onSubmit']> = (e) => {
-    e.preventDefault();
-    void submitChangePassword();
-  };
+  const showNavbarBrand = sidebarHidden;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Navbar */}
-      <nav className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-14 sm:h-16">
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Menú: siempre en móvil; en desktop cuando el panel está oculto */}
+      <nav className="app-header border-b border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="container-fluid flex h-14 items-center justify-between px-3 sm:h-[3.5rem] sm:px-4">
+          <ul className="navbar-nav flex min-w-0 items-center">
+            <li className="nav-item">
               <button
                 type="button"
-                onClick={() => setSidebarOpen(true)}
-                className={`p-2.5 -ml-1 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation ${sidebarHidden ? '' : 'md:hidden'}`}
-                aria-label="Abrir menú"
+                onClick={handleSidebarToggle}
+                className="nav-link flex touch-manipulation items-center px-3 py-2 text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                aria-label={sidebarHidden ? 'Mostrar menú' : 'Alternar menú'}
               >
-                <Bars3Icon className="w-6 h-6" />
+                <Bars3Icon className="h-5 w-5" />
               </button>
-              <Link to="/perfil" className="flex items-center space-x-2" onClick={() => setSidebarOpen(false)}>
-                <img
-                  src={LogoSena}
-                  alt="Logo SENA"
-                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg shrink-0"
+            </li>
+            {showNavbarBrand ? (
+              <li className="nav-item min-w-0">
+                <LayoutBrandLink
+                  to={brandPath}
+                  variant="navbar"
+                  className="px-2 py-2"
+                  onClick={() => setSidebarOpen(false)}
                 />
-                <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate max-w-[140px] sm:max-w-none">CDATTG Web</span>
-              </Link>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
+              </li>
+            ) : (
+              <li className="nav-item min-w-0 md:hidden">
+                <LayoutBrandLink
+                  to={brandPath}
+                  variant="navbar"
+                  className="px-2 py-2"
+                  onClick={() => setSidebarOpen(false)}
+                />
+              </li>
+            )}
+          </ul>
+          <ul className="navbar-nav ms-auto flex shrink-0 items-center gap-1">
+            <li className="nav-item">
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="p-2.5 sm:p-2 rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors touch-manipulation min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
+                className="nav-link flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center px-3 py-2 text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white md:min-h-0 md:min-w-0"
                 title={theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
                 aria-label={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
               >
                 {theme === 'light' ? (
-                  <MoonIcon className="w-5 h-5 text-gray-700" />
+                  <MoonIcon className="h-5 w-5" />
                 ) : (
-                  <SunIcon className="w-5 h-5 text-yellow-300" />
+                  <SunIcon className="h-5 w-5 text-yellow-400" />
                 )}
               </button>
-              {/* Usuario: en móvil solo avatar; en desktop nombre + avatar + acciones */}
-              <div className="hidden md:flex items-center space-x-3">
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user?.full_name}</p>
-                  {rolesLine ? (
-                    <p className="text-xs font-medium text-primary-600 dark:text-primary-400">{rolesLine}</p>
-                  ) : null}
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
-                </div>
-                <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/50 rounded-full flex items-center justify-center">
-                  <span className="text-primary-700 dark:text-primary-300 font-semibold">
-                    {user?.full_name?.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              </div>
-              <div className="hidden md:flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={openChangePassword}
-                  className="btn-secondary text-sm inline-flex items-center gap-2"
-                  title="Cambiar contraseña"
-                >
-                  <KeyIcon className="w-4 h-4" />
-                  Cambiar contraseña
-                </button>
-                <button onClick={handleLogout} className="btn-secondary text-sm">
-                  Cerrar Sesión
-                </button>
-              </div>
-              {/* En móvil: solo avatar (las acciones están en el drawer) */}
-              <div className="md:hidden w-10 h-10 bg-primary-100 dark:bg-primary-900/50 rounded-full flex items-center justify-center shrink-0">
-                <span className="text-primary-700 dark:text-primary-300 font-semibold text-sm">
-                  {user?.full_name?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            </div>
-          </div>
+            </li>
+            <li className="nav-item">
+              <LayoutUserMenu
+                userName={user?.full_name}
+                userEmail={user?.email}
+                rolesLine={rolesLine}
+                homePath={brandPath}
+                onOpenChangePassword={changePassword.openModal}
+                onLogout={handleLogout}
+              />
+            </li>
+          </ul>
         </div>
       </nav>
 
-      {/* Modal cambiar contraseña */}
-      {changePasswordOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/50"
-            aria-label="Cerrar ventana de cambio de contraseña"
-            onClick={closeChangePassword}
-          />
-          <dialog
-            open
-            className="relative z-10 m-0 flex w-full max-w-md flex-col rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-800"
-            aria-labelledby="change-password-title"
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h2
-                id="change-password-title"
-                className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"
-              >
-                <KeyIcon className="w-6 h-6" />
-                Cambiar contraseña
-              </h2>
-              <button
-                type="button"
-                onClick={closeChangePassword}
-                className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded"
-                aria-label="Cerrar"
-              >
-                <XMarkIcon className="w-6 h-6" />
-              </button>
-            </div>
-            <form onSubmit={handleChangePassword} className="space-y-4">
-              {changePasswordError && (
-                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
-                  {changePasswordError}
-                </div>
-              )}
-              {changePasswordSuccess && (
-                <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg text-sm">
-                  {changePasswordSuccess}
-                </div>
-              )}
-              <div>
-                <label htmlFor="password_actual" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Contraseña actual *
-                </label>
-                <input
-                  id="password_actual"
-                  type="password"
-                  value={passwordActual}
-                  onChange={(e) => setPasswordActual(e.target.value)}
-                  className="input-field w-full"
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
-              <div>
-                <label htmlFor="password_nueva" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Nueva contraseña * (mín. 6 caracteres)
-                </label>
-                <input
-                  id="password_nueva"
-                  type="password"
-                  value={passwordNueva}
-                  onChange={(e) => setPasswordNueva(e.target.value)}
-                  className="input-field w-full"
-                  required
-                  minLength={6}
-                  autoComplete="new-password"
-                />
-              </div>
-              <div>
-                <label htmlFor="password_nueva_confirm" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Confirmar nueva contraseña *
-                </label>
-                <input
-                  id="password_nueva_confirm"
-                  type="password"
-                  value={passwordNuevaConfirm}
-                  onChange={(e) => setPasswordNuevaConfirm(e.target.value)}
-                  className="input-field w-full"
-                  required
-                  minLength={6}
-                  autoComplete="new-password"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeChangePassword} className="btn-secondary">
-                  Cancelar
-                </button>
-                <button type="submit" className="btn-primary" disabled={changePasswordLoading}>
-                  {changePasswordLoading ? 'Guardando...' : 'Cambiar contraseña'}
-                </button>
-              </div>
-            </form>
-          </dialog>
-        </div>
-      )}
+      <ChangePasswordModal
+        open={changePassword.open}
+        passwordActual={changePassword.passwordActual}
+        passwordNueva={changePassword.passwordNueva}
+        passwordNuevaConfirm={changePassword.passwordNuevaConfirm}
+        error={changePassword.error}
+        success={changePassword.success}
+        loading={changePassword.loading}
+        onClose={changePassword.closeModal}
+        onSubmit={changePassword.handleSubmit}
+        onPasswordActualChange={changePassword.setPasswordActual}
+        onPasswordNuevaChange={changePassword.setPasswordNueva}
+        onPasswordNuevaConfirmChange={changePassword.setPasswordNuevaConfirm}
+      />
 
-      {/* Backdrop del drawer (móvil o panel oculto en desktop) */}
-      {sidebarOpen && (
+      {sidebarOpen ? (
         <button
           type="button"
           className={`fixed inset-0 z-40 bg-black/50 ${sidebarHidden ? '' : 'md:hidden'}`}
           aria-label="Cerrar menú"
           onClick={() => setSidebarOpen(false)}
         />
-      )}
+      ) : null}
 
       <div className="flex">
-        {/* Sidebar: drawer en móvil; en desktop anclado o oculto según preferencia */}
-        <aside
-          className={`
-            w-64 bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700
-            fixed inset-y-0 left-0 z-50
-            h-dvh max-h-dvh
-            ${sidebarHidden ? '' : 'md:static md:z-auto md:h-auto md:max-h-none md:min-h-[calc(100vh-4rem)]'}
-            transform transition-transform duration-200 ease-out
-            flex flex-col
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-            ${sidebarHidden ? '' : 'md:translate-x-0'}
-          `}
-        >
-          {/* Cabecera drawer móvil / panel flotante en desktop */}
-          <div className={`flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 ${sidebarHidden ? '' : 'md:hidden'}`}>
-            <span className="font-semibold text-gray-900 dark:text-white">Menú</span>
-            <div className="flex items-center gap-1">
-              {sidebarHidden && (
-                <button
-                  type="button"
-                  onClick={showSidebarDocked}
-                  className="p-2 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30 touch-manipulation"
-                  title="Mostrar panel lateral"
-                  aria-label="Mostrar panel lateral"
-                >
-                  <ChevronDoubleRightIcon className="w-5 h-5" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(false)}
-                className="p-2.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 touch-manipulation"
-                aria-label="Cerrar menú"
-              >
-                <XMarkIcon className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
+        <LayoutSidebar
+          sidebarOpen={sidebarOpen}
+          sidebarHidden={sidebarHidden}
+          brandPath={brandPath}
+          pathname={location.pathname}
+          visibleItems={visibleItems}
+          primaryItems={primaryItems}
+          groupedSections={groupedSections}
+          expandedSection={expandedSection}
+          icons={ICONS}
+          onClose={() => setSidebarOpen(false)}
+          onHide={() => {
+            setSidebarHidden(true);
+            setSidebarOpen(false);
+          }}
+          onShowDocked={() => {
+            setSidebarHidden(false);
+            setSidebarOpen(false);
+          }}
+          onSectionToggle={handleSectionToggle}
+        />
 
-          {/* Ocultar panel (solo desktop con panel anclado) */}
-          <div className={`hidden md:flex items-center justify-end border-b border-gray-200 dark:border-gray-700 px-2 py-1 ${sidebarHidden ? 'md:hidden' : ''}`}>
-            <button
-              type="button"
-              onClick={hideSidebar}
-              className="flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
-              title="Ocultar panel lateral"
-              aria-label="Ocultar panel lateral"
-            >
-              <ChevronDoubleLeftIcon className="h-4 w-4" />
-              Ocultar panel
-            </button>
-          </div>
-
-          <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-4">
-            {sections.map((section, sectionIndex) => {
-              const isExpanded = expandedSection === section;
-              const sectionHasActiveItem = visibleItems.some(
-                (item) => item.section === section && isNavItemActive(location.pathname, item, visibleItems)
-              );
-              return (
-                <div key={section} className={sectionIndex > 0 ? 'mt-2' : ''}>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedSection(isExpanded ? null : section)}
-                    className={`flex w-full items-center justify-between rounded-lg px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider transition-colors touch-manipulation ${
-                      sectionHasActiveItem
-                        ? 'text-primary-700 dark:text-primary-300'
-                        : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
-                    }`}
-                    aria-expanded={isExpanded}
-                  >
-                    <span>{section}</span>
-                    {isExpanded ? (
-                      <ChevronDownIcon className="h-4 w-4 shrink-0" aria-hidden />
-                    ) : (
-                      <ChevronRightIcon className="h-4 w-4 shrink-0" aria-hidden />
-                    )}
-                  </button>
-                  {isExpanded &&
-                    visibleItems
-                      .filter((item) => item.section === section)
-                      .map((item) => {
-                        const isActive = isNavItemActive(location.pathname, item, visibleItems);
-                        const iconKey = item.iconKey;
-                        return (
-                          <Link
-                            key={item.path}
-                            to={item.path}
-                            className={`${navLinkClass(isActive)} min-h-[44px] md:min-h-0`}
-                            onClick={() => setSidebarOpen(false)}
-                          >
-                            {ICONS[iconKey] ?? ICONS[iconKey.split('/')[0]] ?? ICONS.dashboard}
-                            <span>{item.label}</span>
-                          </Link>
-                        );
-                      })}
-                </div>
-              );
-            })}
-          </nav>
-
-          {/* Bloque usuario en drawer (solo móvil): Cambiar contraseña + Cerrar sesión */}
-          <div className="safe-bottom md:hidden shrink-0 border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 p-4 space-y-2">
-            <div className="px-4 py-2">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user?.full_name}</p>
-              {rolesLine ? (
-                <p className="text-xs font-medium text-primary-600 dark:text-primary-400 truncate">{rolesLine}</p>
-              ) : null}
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => { openChangePassword(); setSidebarOpen(false); }}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 font-medium touch-manipulation"
-            >
-              <KeyIcon className="w-5 h-5" />
-              Cambiar contraseña
-            </button>
-            <button
-              type="button"
-              onClick={() => { handleLogout(); setSidebarOpen(false); }}
-              className="w-full py-3 px-4 rounded-lg btn-secondary touch-manipulation"
-            >
-              Cerrar sesión
-            </button>
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 p-4 sm:p-6 dark:bg-gray-900 min-w-0">
+        <main className="min-w-0 flex-1 p-4 dark:bg-gray-900 sm:p-6">
           <AppBreadcrumb />
           {children}
         </main>

@@ -19,7 +19,9 @@ export function hasAnyRole(userRoles: string[], required: string[]): boolean {
   return required.some((r) => normalized.has(r.toUpperCase()));
 }
 
-const DASHBOARD_ROLES = ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'] as const;
+const DASHBOARD_ROLES = ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', 'COORDINADOR'] as const;
+
+export const MAIN_DASHBOARD_ROLES = [...DASHBOARD_ROLES] as const;
 
 /** Ruta de inicio según rol: instructores → asistencia; coordinación → dashboard. */
 export function getHomeRouteForUser(roles: string[], permissions: string[]): string {

@@ -55,7 +55,7 @@ export function generarReportePdfAprendiz({
   const ancho = doc.internal.pageSize.getWidth() - margen * 2;
   let y = margen;
 
-  const rango = formatRangoFechasVista(periodo?.fecha_inicio, periodo?.fecha_fin);
+  const rango = formatRangoFechasVista(periodo?.fecha_inicio, periodo?.fecha_fin, ' a ');
   const pct = porcentajeAsistencia(aprendiz);
   const generado = new Date().toLocaleString('es-CO');
 
@@ -81,8 +81,8 @@ export function generarReportePdfAprendiz({
     ['Nombre completo', aprendiz.persona_nombre],
     ['N.º de documento', aprendiz.numero_documento],
     ['Ficha de caracterización', aprendiz.ficha_numero],
-    ['Sede', aprendiz.sede_nombre || '—'],
-    ['Programa de formación', aprendiz.programa_nombre?.trim() || '—'],
+    ['Sede', aprendiz.sede_nombre || '-'],
+    ['Programa de formación', aprendiz.programa_nombre?.trim() || '-'],
   ];
 
   autoTable(doc, {
@@ -172,7 +172,7 @@ export function generarReportePdfAprendiz({
         formatFechaVista(item.fecha),
         diaSemanaCorto(item.fecha),
         item.instructor_nombre?.trim() || 'Sin registrar',
-        item.observaciones?.trim() || '—',
+        item.observaciones?.trim() || '-',
       ]),
     });
   }

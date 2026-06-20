@@ -131,6 +131,11 @@ func (s *CalendarioFormacionService) instructorTieneFormacionEnFecha(
 	if len(fichaDiaIDs) > 0 && !containsUint(fichaDiaIDs, diaID) {
 		return false
 	}
+	fichaHorario := *ficha
+	fichaHorario.FichaDiasFormacion = fichaDias
+	if len(NewInstructorHorarioService().bloquesDiaFicha(&fichaHorario, diaID)) == 0 {
+		return false
+	}
 	diaIDs := diaIDsProgramadosConFallback(diasInst, fichaDias)
 	if len(diaIDs) == 0 {
 		return false

@@ -117,6 +117,15 @@ func bloquesFromFichaDias(dias []models.FichaDiasFormacion, diaFormacionID uint)
 	return out
 }
 
+func fichaDiasIncluyenDia(dias []models.FichaDiasFormacion, diaFormacionID uint) bool {
+	for _, fd := range dias {
+		if fd.DiaFormacionID == diaFormacionID {
+			return true
+		}
+	}
+	return false
+}
+
 func jornadaIDFromFicha(ficha *models.FichaCaracterizacion) *uint {
 	if ficha == nil {
 		return nil
@@ -169,10 +178,17 @@ func (s *InstructorHorarioService) bloquesDiaFicha(ficha *models.FichaCaracteriz
 	if out := bloquesFromFichaDias(dias, diaFormacionID); len(out) > 0 {
 		return out
 	}
-	if jid := jornadaIDFromFicha(ficha); jid != nil && *jid > 0 {
+	jid := jornadaIDFromFicha(ficha)
+	if jid != nil && *jid > 0 {
 		if out := bloquesPlantillaDia(*jid, diaFormacionID); len(out) > 0 {
 			return out
 		}
+		if plantilla, err := BloquesJornadaPlantilla(*jid); err == nil && len(plantilla) > 0 {
+			return nil
+		}
+	}
+	if fichaDiasIncluyenDia(dias, diaFormacionID) {
+		return nil
 	}
 	return bloqueFallbackJornadaCabecera(ficha, diaFormacionID)
 }

@@ -1,8 +1,10 @@
 package services
 
 import (
+	"errors"
 	"time"
 
+	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
 )
@@ -27,6 +29,9 @@ func ValidarHorarioFichaEnMomento(ficha *models.FichaCaracterizacion, diaFormaci
 
 // BloquesJornadaPlantilla devuelve bloques de una plantilla por ID.
 func BloquesJornadaPlantilla(jornadaID uint) ([]HorarioBloqueInput, error) {
+	if database.GetDB() == nil {
+		return nil, errors.New("base de datos no disponible")
+	}
 	bloques, err := repositories.NewJornadaBloqueRepository().FindByJornadaID(jornadaID)
 	if err != nil {
 		return nil, err

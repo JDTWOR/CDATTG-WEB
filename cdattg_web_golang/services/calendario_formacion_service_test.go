@@ -24,6 +24,35 @@ func (s *stubFichaDiasRepoCal) FindDistinctFichaIDsReferencingJornada(uint) ([]u
 	return nil, nil
 }
 
+func TestInstructorTieneFormacionEnFecha_ExcluyeSabadoPivotLegacy(t *testing.T) {
+	inicio := time.Date(2025, 1, 1, 0, 0, 0, 0, time.Local)
+	fin := time.Date(2026, 12, 31, 0, 0, 0, 0, time.Local)
+	jornadaID := uint(1)
+	ficha := &models.FichaCaracterizacion{
+		UserAuditModel: models.UserAuditModel{BaseModel: models.BaseModel{ID: 10}},
+		Status:         true,
+		JornadaID:      &jornadaID,
+		Jornada:        &models.Jornada{BaseModel: models.BaseModel{ID: 1}, HoraInicio: "06:30", HoraFin: "13:00"},
+		FechaInicio:    &inicio,
+		FechaFin:       &fin,
+	}
+	ifc := &models.InstructorFichaCaracterizacion{InstructorID: 1, FichaID: 10, FechaInicio: &inicio, FechaFin: &fin}
+	fichaDias := []models.FichaDiasFormacion{
+		{DiaFormacionID: 1, HoraInicio: "06:30", HoraFin: "13:00"},
+		{DiaFormacionID: 2, HoraInicio: "06:30", HoraFin: "13:00"},
+		{DiaFormacionID: 3, HoraInicio: "06:30", HoraFin: "13:00"},
+		{DiaFormacionID: 4, HoraInicio: "06:30", HoraFin: "13:00"},
+		{DiaFormacionID: 5, HoraInicio: "06:30", HoraFin: "13:00"},
+		{DiaFormacionID: 6},
+	}
+	diasInst := []models.InstructorFichaDias{{DiaFormacionID: 3}}
+	svc := &CalendarioFormacionService{}
+	sabado := time.Date(2026, 6, 13, 0, 0, 0, 0, time.Local)
+	if svc.instructorTieneFormacionEnFecha(ficha, ifc, fichaDias, diasInst, nil, sabado) {
+		t.Fatal("sábado no debe contar aunque exista pivot legacy sin horas fuera de plantilla")
+	}
+}
+
 func TestInstructorTieneFormacionEnFecha_ExcluyeSabadoSinProgramacion(t *testing.T) {
 	inicio := time.Date(2025, 1, 1, 0, 0, 0, 0, time.Local)
 	fin := time.Date(2026, 12, 31, 0, 0, 0, 0, time.Local)
@@ -35,8 +64,11 @@ func TestInstructorTieneFormacionEnFecha_ExcluyeSabadoSinProgramacion(t *testing
 	}
 	ifc := &models.InstructorFichaCaracterizacion{InstructorID: 1, FichaID: 10, FechaInicio: &inicio, FechaFin: &fin}
 	fichaDias := []models.FichaDiasFormacion{
-		{DiaFormacionID: 1}, {DiaFormacionID: 2}, {DiaFormacionID: 3},
-		{DiaFormacionID: 4}, {DiaFormacionID: 5},
+		{DiaFormacionID: 1, HoraInicio: "06:30", HoraFin: "13:00"},
+		{DiaFormacionID: 2, HoraInicio: "06:30", HoraFin: "13:00"},
+		{DiaFormacionID: 3, HoraInicio: "06:30", HoraFin: "13:00"},
+		{DiaFormacionID: 4, HoraInicio: "06:30", HoraFin: "13:00"},
+		{DiaFormacionID: 5, HoraInicio: "06:30", HoraFin: "13:00"},
 	}
 	diasInst := []models.InstructorFichaDias{{DiaFormacionID: 3}}
 	svc := &CalendarioFormacionService{}

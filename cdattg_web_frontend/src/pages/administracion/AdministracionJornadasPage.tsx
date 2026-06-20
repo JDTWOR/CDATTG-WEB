@@ -235,7 +235,7 @@ export const AdministracionJornadasPage = () => {
   useEffect(() => {
     if (!canManage) {
       setLoading(false);
-      setError('Solo superadministrador o administrador puede gestionar jornadas.');
+      setError('Solo superadministrador, administrador o coordinador puede gestionar jornadas.');
       return;
     }
     void cargar();

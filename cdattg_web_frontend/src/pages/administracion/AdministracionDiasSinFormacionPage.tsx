@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { CalendarDaysIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../../services/api';
 import { axiosErrorMessage } from '../../utils/httpError';
+import { useAuth } from '../../context/AuthContext';
+import { hasAnyRole } from '../../utils/roles';
 import type { DiaSinFormacionSedeItem, SedeItem } from '../../types';
 
 type FormState = {
@@ -67,6 +69,8 @@ function cuerpoTablaRegistros(
 }
 
 export function AdministracionDiasSinFormacionPage() {
+  const { roles } = useAuth();
+  const canManage = hasAnyRole(roles, ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR']);
   const [sedes, setSedes] = useState<SedeItem[]>([]);
   const [items, setItems] = useState<DiaSinFormacionSedeItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,8 +95,12 @@ export function AdministracionDiasSinFormacionPage() {
   }, [filterSedeId]);
 
   useEffect(() => {
+    if (!canManage) {
+      setLoading(false);
+      return;
+    }
     void load();
-  }, [load]);
+  }, [canManage, load]);
 
   const guardar = async () => {
     if (!form.sede_id || !form.fecha_inicio || !form.fecha_fin || !form.motivo.trim()) {
@@ -125,6 +133,14 @@ export function AdministracionDiasSinFormacionPage() {
       globalThis.alert(axiosErrorMessage(err, 'No se pudo eliminar'));
     }
   };
+
+  if (!canManage) {
+    return (
+      <div className="p-6">
+        <p className="text-sm text-gray-600 dark:text-gray-400">No tiene permisos para administrar esta sección.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">

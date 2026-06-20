@@ -26,6 +26,7 @@ export default {
         sena: {
           green: '#39b54a',
           dark: '#1e3a5f',
+          orange: '#f97316',
         }
       },
     },

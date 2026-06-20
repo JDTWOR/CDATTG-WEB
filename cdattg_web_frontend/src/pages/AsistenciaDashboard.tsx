@@ -7,7 +7,6 @@ import {
   SignalIcon,
   ExclamationTriangleIcon,
   DocumentMagnifyingGlassIcon,
-  MagnifyingGlassIcon,
   ClipboardDocumentCheckIcon,
   ClockIcon,
 } from '@heroicons/react/24/outline';
@@ -22,6 +21,13 @@ import type {
 } from '../types';
 import { asistenciaPaths, bienestarPaths } from '../routes/paths';
 import { canViewCasosBienestar } from './bienestar/casos/casosBienestarPermissions';
+import {
+  filtrarFilasFicha,
+  filasPorJornada,
+  FiltrosDashboard,
+  jornadaInicialDesdeApi,
+  useJornadasDisponibles,
+} from './dashboard/dashboardFichaFilters';
 
 const DASH_SEARCH_ID = 'asistencia-dashboard-buscar-ficha';
 const DASH_JORNADA_ID = 'asistencia-dashboard-filtro-jornada';
@@ -44,21 +50,6 @@ function formatearJornadasActivas(jornadas: string[] | undefined): string {
         .join(' '),
     )
     .join(', ');
-}
-
-function filtrarFilasFicha<T extends { ficha_numero?: string; programa_nombre?: string; jornada_nombre?: string }>(
-  rows: T[],
-  searchQuery: string,
-  jornadaFilter: string,
-): T[] {
-  const q = searchQuery.trim().toLowerCase();
-  return rows.filter(
-    (row) =>
-      (jornadaFilter === '' || (row.jornada_nombre ?? '') === jornadaFilter) &&
-      (q === '' ||
-        row.ficha_numero?.toLowerCase().includes(q) ||
-        row.programa_nombre?.toLowerCase().includes(q)),
-  );
 }
 
 type DashboardMetricas = {
@@ -86,11 +77,6 @@ function agregarTotalesConSesion(rows: AsistenciaDashboardPorFicha[]): {
   );
 }
 
-function filasPorJornada<T extends { jornada_nombre?: string }>(rows: T[], jornadaFilter: string): T[] {
-  if (!jornadaFilter) return rows;
-  return rows.filter((row) => (row.jornada_nombre ?? '') === jornadaFilter);
-}
-
 function calcularMetricasDashboard(
   data: AsistenciaDashboardResponse,
   porFicha: AsistenciaDashboardPorFicha[],
@@ -111,91 +97,6 @@ function calcularMetricasDashboard(
     fichasSinSesion: sinS.length,
     jornadasTexto: jornadaFilter || formatearJornadasActivas(data.jornadas_disponibles),
   };
-}
-
-function jornadaInicialDesdeApi(data: AsistenciaDashboardResponse): string {
-  const activas = data.jornadas_activas ?? [];
-  if (activas.length === 1) return activas[0];
-  return '';
-}
-
-function useJornadasDisponibles(
-  jornadasApi: string[] | undefined,
-  porFicha: AsistenciaDashboardPorFicha[],
-  sinSesion: AsistenciaDashboardFichaSinSesion[],
-): string[] {
-  return useMemo(() => {
-    if (jornadasApi?.length) {
-      return [...jornadasApi].sort((a, b) => a.localeCompare(b, 'es'));
-    }
-    const set = new Set<string>();
-    porFicha.forEach((row) => {
-      if (row.jornada_nombre) set.add(row.jornada_nombre);
-    });
-    sinSesion.forEach((row) => {
-      if (row.jornada_nombre) set.add(row.jornada_nombre);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [jornadasApi, porFicha, sinSesion]);
-}
-
-type FiltrosDashboardProps = Readonly<{
-  searchQuery: string;
-  onSearchQueryChange: (value: string) => void;
-  jornadaFilter: string;
-  onJornadaFilterChange: (value: string) => void;
-  jornadasDisponibles: string[];
-}>;
-
-function FiltrosDashboard({
-  searchQuery,
-  onSearchQueryChange,
-  jornadaFilter,
-  onJornadaFilterChange,
-  jornadasDisponibles,
-}: FiltrosDashboardProps) {
-  return (
-    <div className="flex flex-col sm:flex-row gap-4 items-end sm:items-center bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600 mb-4">
-      <div className="w-full sm:w-auto flex-1 min-w-[250px]">
-        <label htmlFor={DASH_SEARCH_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Búsqueda de ficha
-        </label>
-        <div className="relative">
-          <MagnifyingGlassIcon
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none"
-            aria-hidden
-          />
-          <input
-            id={DASH_SEARCH_ID}
-            type="search"
-            autoComplete="off"
-            placeholder="Código de ficha o nombre de programa…"
-            value={searchQuery}
-            onChange={(e) => onSearchQueryChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-shadow"
-          />
-        </div>
-      </div>
-      <div className="w-full sm:w-auto min-w-[250px]">
-        <label htmlFor={DASH_JORNADA_ID} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Jornada de formación
-        </label>
-        <select
-          id={DASH_JORNADA_ID}
-          value={jornadaFilter}
-          onChange={(e) => onJornadaFilterChange(e.target.value)}
-          className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-shadow"
-        >
-          <option value="">Todas las jornadas</option>
-          {jornadasDisponibles.map((jornada) => (
-            <option key={jornada} value={jornada}>
-              {jornada}
-            </option>
-          ))}
-        </select>
-      </div>
-    </div>
-  );
 }
 
 type PaginacionTablaProps = Readonly<{
@@ -296,6 +197,9 @@ function AsistenciaDashboardDataView({
         jornadaFilter={jornadaFilter}
         onJornadaFilterChange={onJornadaFilterChange}
         jornadasDisponibles={jornadasDisponibles}
+        searchId={DASH_SEARCH_ID}
+        jornadaId={DASH_JORNADA_ID}
+        className="mb-4"
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -529,6 +433,9 @@ function AsistenciaDashboardDataView({
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                     Sede
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    Instructor
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                     Matrícula activa
                   </th>
@@ -544,6 +451,7 @@ function AsistenciaDashboardDataView({
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{row.programa_nombre || '—'}</td>
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{row.jornada_nombre || '—'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{row.sede_nombre || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{row.instructor_nombre ?? 'Sin asignar'}</td>
                     <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300 tabular-nums">
                       {row.total_aprendices}
                     </td>

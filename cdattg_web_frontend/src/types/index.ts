@@ -179,6 +179,7 @@ export interface ProgramaFormacionResponse {
 export interface SedeItem {
   id: number;
   nombre: string;
+  regional_id?: number;
 }
 export interface AmbienteItem {
   id: number;
@@ -587,6 +588,8 @@ export interface AsistenciaDashboardFichaSinSesion {
   programa_nombre?: string;
   jornada_nombre?: string;
   sede_nombre?: string;
+  instructor_nombre?: string;
+  instructor_id?: number;
   total_aprendices: number;
 }
 
@@ -607,6 +610,67 @@ export interface AsistenciaDashboardResponse {
   fichas_sin_asistencia_hoy?: AsistenciaDashboardFichaSinSesion[];
   total_fichas_registradas?: number;
   fichas_con_sesion_hoy?: number;
+}
+
+/** Resumen KPI del panel principal /dashboard */
+export interface DashboardResumenResponse {
+  fecha: string;
+  institucion: {
+    total_regionales: number;
+    total_sedes: number;
+    total_fichas_activas: number;
+    total_instructores: number;
+    total_aprendices: number;
+  };
+  asistencia_hoy: {
+    en_formacion_ahora: number;
+    esperados: number;
+    pendientes_revision: number;
+    fichas_con_sesion: number;
+    fichas_sin_sesion: number;
+    pct_cobertura: number;
+    total_fichas_registradas: number;
+  };
+  por_sede: Array<{
+    nombre: string;
+    regional_nombre: string;
+    vinieron: number;
+    total: number;
+    pct: number;
+  }>;
+  por_jornada: Array<{
+    nombre: string;
+    vinieron: number;
+    total: number;
+    pct: number;
+  }>;
+  por_regional: Array<{
+    nombre: string;
+    vinieron: number;
+    total: number;
+    fichas_sin_sesion: number;
+  }>;
+  fichas_sin_sesion: AsistenciaDashboardFichaSinSesion[];
+  riesgo: {
+    casos_bienestar: number;
+    pendientes_revision: number;
+  };
+  alcance: {
+    restricted: boolean;
+    empty: boolean;
+    regional_ids: number[];
+    regional_nombres: string[];
+  };
+  jornadas_activas?: string[];
+  jornadas_disponibles?: string[];
+  por_ficha: AsistenciaDashboardPorFicha[];
+  ultimos_dias_formacion?: Array<{
+    fecha: string;
+    etiqueta: string;
+    esperados: number;
+    vinieron: number;
+    pct: number;
+  }>;
 }
 
 export interface UsuarioRegionalesResponse {

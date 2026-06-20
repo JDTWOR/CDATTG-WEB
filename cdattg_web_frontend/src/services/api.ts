@@ -36,6 +36,7 @@ import type {
   TipoObservacionAsistenciaItem,
   TipoObservacionAsistenciaCreateRequest,
   AsistenciaDashboardResponse,
+  DashboardResumenResponse,
   CasosBienestarResponse,
   CasoBienestarAprendizDetalleResponse,
   MisInasistenciasResponse,
@@ -785,9 +786,15 @@ class ApiService {
     return response.data;
   }
 
-  /** Dashboard de asistencia (solo superadmin). Params opcionales: sede_id, fecha (YYYY-MM-DD). */
+  /** Dashboard de asistencia detallado. Params opcionales: sede_id, fecha (YYYY-MM-DD). */
   async getAsistenciaDashboard(params?: { sede_id?: number; fecha?: string }): Promise<AsistenciaDashboardResponse> {
     const response = await this.api.get<AsistenciaDashboardResponse>('/asistencias/dashboard', { params });
+    return response.data;
+  }
+
+  /** Panel KPI principal /dashboard. Params: fecha, regional_id, sede_id. */
+  async getDashboardResumen(params?: { fecha?: string; regional_id?: number; sede_id?: number }): Promise<DashboardResumenResponse> {
+    const response = await this.api.get<DashboardResumenResponse>('/stats/dashboard-resumen', { params });
     return response.data;
   }
 

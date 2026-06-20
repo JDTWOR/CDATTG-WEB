@@ -1,414 +1,745 @@
 import { useEffect, useMemo, useState } from 'react';
+
 import { Link } from 'react-router-dom';
+
 import {
-  UsersIcon,
+
   AcademicCapIcon,
-  UserGroupIcon,
-  ChartBarIcon,
-  ExclamationTriangleIcon,
-  ClipboardDocumentListIcon,
+
+  BuildingOffice2Icon,
+
   CalendarDaysIcon,
+
+  ChartBarIcon,
+
+  ClipboardDocumentCheckIcon,
+
+  ClipboardDocumentListIcon,
+
   DocumentTextIcon,
+
+  ExclamationTriangleIcon,
+
+  MapPinIcon,
+
+  UserGroupIcon,
+
 } from '@heroicons/react/24/outline';
+
 import { useAuth } from '../../context/AuthContext';
+
 import { apiService } from '../../services/api';
-import { axiosErrorMessage } from '../../utils/httpError';
+
 import { asistenciaPaths, bienestarPaths, fichasPaths } from '../../routes/paths';
+
 import { canViewCasosBienestar } from '../bienestar/casos/casosBienestarPermissions';
-import type { AsistenciaDashboardResponse } from '../../types';
 
-export function AdminDashboardView() {
-  const { user, roles, hasPermission } = useAuth();
-  const [totalPersonas, setTotalPersonas] = useState<number | null>(null);
-  const [totalInstructores, setTotalInstructores] = useState<number | null>(null);
-  const [totalAprendices, setTotalAprendices] = useState<number | null>(null);
-  const [asistenciaHoy, setAsistenciaHoy] = useState<number | null>(null);
-  const [pendientesRevisionHoy, setPendientesRevisionHoy] = useState<number | null>(null);
-  const [casosBienestar, setCasosBienestar] = useState<number | null>(null);
-  const [asistenciaDashboard, setAsistenciaDashboard] = useState<AsistenciaDashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+import { AsistenciaPorSedeChart } from '../../components/dashboard/AsistenciaPorSedeChart';
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const canSeePersonasNow = hasPermission('VER PERSONAS');
-        const canSeeInstructoresNow = hasPermission('VER FICHAS');
-        const canSeeAprendicesNow = hasPermission('VER APRENDICES');
-        const canSeeAsistenciaNow = hasPermission('VER ASISTENCIA');
-        const isSuperAdminNow = roles.includes('SUPER ADMINISTRADOR');
-        const canLoadAsistenciaDashboard = canSeeAsistenciaNow || isSuperAdminNow;
-        const canSeeBienestarNow = canViewCasosBienestar(roles);
+import { CoberturaOperativaChart } from '../../components/dashboard/CoberturaOperativaChart';
 
-        const [personasRes, instructoresRes, aprendicesRes, asistenciaRes, casosRes] = await Promise.all([
-          canSeePersonasNow ? apiService.getPersonas(1, 1) : Promise.resolve(null),
-          canSeeInstructoresNow ? apiService.getInstructores(1, 1) : Promise.resolve(null),
-          canSeeAprendicesNow ? apiService.getAprendices(1, 1) : Promise.resolve(null),
-          canLoadAsistenciaDashboard ? apiService.getAsistenciaDashboard() : Promise.resolve(null),
-          canSeeBienestarNow ? apiService.getCasosBienestar({ dias: 30, min_fallas: 3 }) : Promise.resolve(null),
-        ]);
+import { AsistenciaUltimosDiasChart } from '../../components/dashboard/AsistenciaUltimosDiasChart';
 
-        setTotalPersonas(personasRes?.total ?? null);
-        setTotalInstructores(instructoresRes?.total ?? null);
-        setTotalAprendices(aprendicesRes?.total ?? null);
-        setAsistenciaDashboard(asistenciaRes);
-        setAsistenciaHoy(asistenciaRes?.total_aprendices_en_formacion ?? null);
-        setPendientesRevisionHoy(asistenciaRes?.pendientes_revision ?? null);
-        setCasosBienestar(
-          casosRes != null && Array.isArray(casosRes.casos) ? casosRes.casos.length : null,
-        );
-      } catch (e: unknown) {
-        setError(axiosErrorMessage(e, 'No se pudo cargar el resumen general.'));
-      } finally {
-        setLoading(false);
-      }
-    };
+import { DashboardFilters } from '../../components/dashboard/DashboardFilters';
 
-    void fetchData();
-  }, [hasPermission, roles]);
+import { InfoTooltip } from '../../components/dashboard/InfoTooltip';
 
-  const renderValor = (valor: number | null, canSee: boolean) => {
-    if (!canSee) return '—';
-    if (loading && valor === null) return '…';
-    if (valor === null) return '—';
-    return valor.toLocaleString('es-CO');
-  };
+import { KpiCard } from '../../components/dashboard/KpiCard';
 
-  const canSeePersonas = hasPermission('VER PERSONAS');
-  const canSeeInstructores = hasPermission('VER FICHAS'); // listado de instructores usa permiso de fichas
-  const canSeeAprendices = hasPermission('VER APRENDICES');
-  const canSeeAsistencia = hasPermission('VER ASISTENCIA');
-  const canSeeBienestar = canViewCasosBienestar(roles);
-  const esSuperAdmin = roles.includes('SUPER ADMINISTRADOR');
+import {
 
-  const fichasSinAsistenciaHoy = useMemo(
-    () => asistenciaDashboard?.fichas_sin_asistencia_hoy ?? [],
-    [asistenciaDashboard],
-  );
+  calcularMetricasDesdeResumen,
 
-  const filasPorSede = useMemo(() => {
-    const map = new Map<string, { vinieron: number; total: number }>();
-    (asistenciaDashboard?.por_ficha ?? []).forEach((row) => {
-      const key = row.sede_nombre || 'Sin sede';
-      const prev = map.get(key) ?? { vinieron: 0, total: 0 };
-      map.set(key, {
-        vinieron: prev.vinieron + (row.cantidad_vinieron ?? 0),
-        total: prev.total + (row.total_aprendices ?? 0),
-      });
-    });
-    return Array.from(map.entries())
-      .map(([nombre, valores]) => ({ nombre, ...valores }))
-      .sort((a, b) => b.vinieron - a.vinieron)
-      .slice(0, 5);
-  }, [asistenciaDashboard]);
+  filtrarFilasFicha,
 
-  const filasPorJornada = useMemo(() => {
-    const map = new Map<string, { vinieron: number; total: number }>();
-    (asistenciaDashboard?.por_ficha ?? []).forEach((row) => {
-      const key = row.jornada_nombre || 'Sin jornada';
-      const prev = map.get(key) ?? { vinieron: 0, total: 0 };
-      map.set(key, {
-        vinieron: prev.vinieron + (row.cantidad_vinieron ?? 0),
-        total: prev.total + (row.total_aprendices ?? 0),
-      });
-    });
-    return Array.from(map.entries())
-      .map(([nombre, valores]) => ({ nombre, ...valores }))
-      .sort((a, b) => b.vinieron - a.vinieron)
-      .slice(0, 5);
-  }, [asistenciaDashboard]);
+  FiltrosDashboard,
+
+  useJornadasDisponibles,
+
+} from './dashboardFichaFilters';
+
+import { useDashboardResumen } from './useDashboardResumen';
+
+import { nombrePrimerNombrePrimerApellido } from '../../utils/formatNombreCorto';
+
+import { etiquetaDiaConsulta, formatFechaVista, hoyISOColombia } from '../../utils/formatFecha';
+
+import type { RegionalItem, SedeItem } from '../../types';
+
+
+
+function fmtDashboardNum(n: number | null | undefined, loading: boolean): string {
+
+  if (loading && n == null) return '…';
+
+  if (n == null) return '—';
+
+  return n.toLocaleString('es-CO');
+
+}
+
+
+
+function buildResumenFichasTooltip(
+
+  fecha: string,
+
+  data: ReturnType<typeof useDashboardResumen>['data'],
+
+  metricas: ReturnType<typeof calcularMetricasDesdeResumen> | null,
+
+): string {
+
+  const dia = etiquetaDiaConsulta(fecha);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Bienvenido, {user?.full_name}
-        </p>
-        {error && (
-          <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">
-            {error}
-          </p>
-        )}
-      </div>
 
-      {/* Fila 1: KPI rápidos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Personas</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                {renderValor(totalPersonas, canSeePersonas)}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/50 rounded-lg flex items-center justify-center">
-              <UsersIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" aria-hidden />
-            </div>
-          </div>
-        </div>
+    `Fichas activas con formación ${dia} sin sesión de asistencia registrada. ` +
 
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Instructores</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                {renderValor(totalInstructores, canSeeInstructores)}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center">
-              <AcademicCapIcon className="w-6 h-6 text-green-600 dark:text-green-400" aria-hidden />
-            </div>
-          </div>
-        </div>
+    `Resumen: ${data?.institucion.total_fichas_activas ?? 0} activas · ` +
 
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Aprendices</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                {renderValor(totalAprendices, canSeeAprendices)}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center">
-              <UserGroupIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" aria-hidden />
-            </div>
-          </div>
-        </div>
+    `${metricas?.fichasConSesion ?? data?.asistencia_hoy.fichas_con_sesion ?? 0} con sesión · ` +
 
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Aprendices en formación ahora</p>
-              <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
-                Con ingreso hoy y sin salida registrada (no es el número de fichas).
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                {renderValor(asistenciaHoy, canSeeAsistencia)}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center">
-              <ChartBarIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" aria-hidden />
-            </div>
-          </div>
-        </div>
-      </div>
+    `${metricas?.fichasSinSesion ?? data?.asistencia_hoy.fichas_sin_sesion ?? 0} sin sesión.`
 
-      {/* Fila 2: riesgo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Casos bienestar</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                {renderValor(casosBienestar, canSeeBienestar)}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/40 rounded-lg flex items-center justify-center">
-              <ExclamationTriangleIcon className="w-6 h-6 text-red-600 dark:text-red-400" aria-hidden />
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pendientes de revisión</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                {renderValor(pendientesRevisionHoy, canSeeAsistencia)}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/40 rounded-lg flex items-center justify-center">
-              <ClipboardDocumentListIcon className="w-6 h-6 text-orange-600 dark:text-orange-400" aria-hidden />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Superadmin: fichas del sistema sin sesión de asistencia hoy */}
-      {esSuperAdmin && (canSeeAsistencia || asistenciaDashboard != null) && (
-        <div className="card border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-900/10">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <ExclamationTriangleIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" aria-hidden />
-                Fichas pendientes (sin sesión hoy)
-              </h2>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Fichas con formación hoy y jornada activa que aún no tienen sesión de asistencia para el día{' '}
-                <span className="font-medium text-gray-800 dark:text-gray-200">{asistenciaDashboard?.fecha ?? '—'}</span>
-                {loading && !asistenciaDashboard ? ' (cargando…)' : ''}.
-              </p>
-              {asistenciaDashboard != null &&
-                typeof asistenciaDashboard.total_fichas_registradas === 'number' &&
-                typeof asistenciaDashboard.fichas_con_sesion_hoy === 'number' && (
-                  <p className="mt-2 text-sm font-medium text-gray-800 dark:text-gray-200">
-                    Resumen:{' '}
-                    <span className="tabular-nums">{asistenciaDashboard.total_fichas_registradas}</span> fichas activas ·{' '}
-                    <span className="tabular-nums">{asistenciaDashboard.fichas_con_sesion_hoy}</span> con sesión hoy ·{' '}
-                    <span className="tabular-nums text-amber-700 dark:text-amber-300">
-                      {fichasSinAsistenciaHoy.length}
-                    </span>{' '}
-                    sin sesión
-                  </p>
-                )}
-            </div>
-            <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 shrink-0 tabular-nums">
-              {loading && fichasSinAsistenciaHoy.length === 0 ? '…' : fichasSinAsistenciaHoy.length}
-            </p>
-          </div>
-          {fichasSinAsistenciaHoy.length === 0 ? (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              No hay fichas pendientes en la jornada activa: todas las esperadas ya tienen sesión o ninguna jornada está
-              activa en este momento.
-            </p>
-          ) : (
-            <div className="overflow-x-auto max-h-[28rem] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-600">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600 text-sm">
-                <caption className="sr-only">
-                  Listado de fichas sin sesión de asistencia en la fecha del resumen
-                </caption>
-                <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      Ficha
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      Programa
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      Jornada
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      Sede
-                    </th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      Aprendices
-                    </th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-28">
-                      Acción
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-900/40 divide-y divide-gray-200 dark:divide-gray-700">
-                  {fichasSinAsistenciaHoy.map((row) => (
-                    <tr key={row.ficha_id} className="hover:bg-gray-50 dark:hover:bg-gray-800/80">
-                      <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">{row.ficha_numero}</td>
-                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{row.programa_nombre || '—'}</td>
-                      <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{row.jornada_nombre || '—'}</td>
-                      <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{row.sede_nombre || '—'}</td>
-                      <td className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">{row.total_aprendices}</td>
-                      <td className="px-4 py-2 text-right">
-                        <Link
-                          to={fichasPaths.detalle(row.ficha_id)}
-                          className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline text-xs font-medium"
-                        >
-                          <DocumentTextIcon className="w-4 h-4" aria-hidden />
-                          Ver ficha
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Fila 3: segmentación */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Asistencia por sede</h2>
-          {canSeeAsistencia && filasPorSede.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <caption className="sr-only">Asistencia agregada por sede para hoy</caption>
-                <thead>
-                  <tr className="text-left text-gray-500 dark:text-gray-400">
-                    <th className="pb-2">Sede</th>
-                    <th className="pb-2 text-right">Vinieron / Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filasPorSede.map((row) => (
-                    <tr key={row.nombre} className="border-t border-gray-100 dark:border-gray-700">
-                      <td className="py-2 text-gray-700 dark:text-gray-300">{row.nombre}</td>
-                      <td className="py-2 text-right font-medium text-gray-900 dark:text-white">
-                        {row.vinieron} / {row.total}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {canSeeAsistencia && filasPorSede.length === 0 && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sin datos para hoy.</p>
-          )}
-          {canSeeAsistencia ? null : (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sin permiso para ver asistencia.</p>
-          )}
-        </div>
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Asistencia por jornada</h2>
-          {canSeeAsistencia && filasPorJornada.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <caption className="sr-only">Asistencia agregada por jornada para hoy</caption>
-                <thead>
-                  <tr className="text-left text-gray-500 dark:text-gray-400">
-                    <th className="pb-2">Jornada</th>
-                    <th className="pb-2 text-right">Vinieron / Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filasPorJornada.map((row) => (
-                    <tr key={row.nombre} className="border-t border-gray-100 dark:border-gray-700">
-                      <td className="py-2 text-gray-700 dark:text-gray-300">{row.nombre}</td>
-                      <td className="py-2 text-right font-medium text-gray-900 dark:text-white">
-                        {row.vinieron} / {row.total}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {canSeeAsistencia && filasPorJornada.length === 0 && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sin datos para hoy.</p>
-          )}
-          {canSeeAsistencia ? null : (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sin permiso para ver asistencia.</p>
-          )}
-        </div>
-      </div>
-
-      {/* Fila 4: acciones */}
-      <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Accesos directos</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <Link to={asistenciaPaths.fichas} className="btn-secondary inline-flex items-center justify-center">
-            Tomar asistencia
-          </Link>
-          <Link to={asistenciaPaths.historial.index} className="btn-secondary inline-flex items-center justify-center">
-            <CalendarDaysIcon className="w-5 h-5 mr-2" aria-hidden />
-            Historial asistencias
-          </Link>
-          <Link to={asistenciaPaths.index} className="btn-secondary inline-flex items-center justify-center">
-            Dashboard asistencia
-          </Link>
-          <Link to={bienestarPaths.casos.index} className="btn-secondary inline-flex items-center justify-center">
-            Casos bienestar
-          </Link>
-          {roles.includes('SUPER ADMINISTRADOR') && (
-            <Link to={asistenciaPaths.tiposObservacion} className="btn-secondary inline-flex items-center justify-center">
-              Tipos de observación
-            </Link>
-          )}
-        </div>
-      </div>
-    </div>
   );
-};
+
+}
+
+
+
+function DashboardEmptyAlcance() {
+
+  return (
+
+    <div className="card text-center py-12">
+
+      <p className="text-gray-600 dark:text-gray-400">
+
+        No tiene regional asignada. Contacte al administrador para asignar su alcance territorial.
+
+      </p>
+
+    </div>
+
+  );
+
+}
+
+
+
+type DashboardAccesosDirectosProps = Readonly<{
+
+  canSeeAsistencia: boolean;
+
+  canSeeBienestar: boolean;
+
+  canVerAsistenciaDetalle: boolean;
+
+}>;
+
+
+
+function DashboardAccesosDirectos({
+
+  canSeeAsistencia,
+
+  canSeeBienestar,
+
+  canVerAsistenciaDetalle,
+
+}: DashboardAccesosDirectosProps) {
+
+  return (
+
+    <div className="card">
+
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Accesos directos</h2>
+
+      <div className="flex flex-wrap gap-3">
+
+        {canSeeAsistencia ? (
+
+          <Link to={asistenciaPaths.fichas} className="btn-secondary text-sm inline-flex items-center gap-2">
+
+            <AcademicCapIcon className="w-4 h-4" aria-hidden />
+
+            Tomar asistencia
+
+          </Link>
+
+        ) : null}
+
+        {canSeeBienestar ? (
+
+          <Link to={bienestarPaths.casos.index} className="btn-secondary text-sm inline-flex items-center gap-2">
+
+            <ExclamationTriangleIcon className="w-4 h-4" aria-hidden />
+
+            Casos bienestar
+
+          </Link>
+
+        ) : null}
+
+        {canVerAsistenciaDetalle ? (
+
+          <Link to={asistenciaPaths.index} className="btn-secondary text-sm inline-flex items-center gap-2">
+
+            <ChartBarIcon className="w-4 h-4" aria-hidden />
+
+            Dashboard asistencia detallado
+
+          </Link>
+
+        ) : null}
+
+      </div>
+
+    </div>
+
+  );
+
+}
+
+
+
+export function AdminDashboardView() {
+
+  const { user, roles, hasPermission } = useAuth();
+
+  const esCoordinador = roles.includes('COORDINADOR');
+
+  const esAdmin = roles.includes('SUPER ADMINISTRADOR') || roles.includes('ADMINISTRADOR');
+
+  const puedeFiltrosInst = esAdmin && !esCoordinador;
+
+
+
+  const [fecha, setFecha] = useState(hoyISOColombia);
+
+  const [regionalId, setRegionalId] = useState('');
+
+  const [sedeId, setSedeId] = useState('');
+
+  const [regionales, setRegionales] = useState<RegionalItem[]>([]);
+
+  const [sedes, setSedes] = useState<SedeItem[]>([]);
+
+
+
+  const {
+
+    data,
+
+    loading,
+
+    error,
+
+    jornadaFilter,
+
+    setJornadaFilter,
+
+    searchQuery,
+
+    setSearchQuery,
+
+  } = useDashboardResumen({
+
+    fecha,
+
+    regionalId: regionalId ? Number(regionalId) : undefined,
+
+    sedeId: sedeId ? Number(sedeId) : undefined,
+
+  });
+
+
+
+  const refetching = loading && data != null;
+
+
+
+  useEffect(() => {
+
+    if (!puedeFiltrosInst) return;
+
+    Promise.all([apiService.getCatalogosRegionales(), apiService.getCatalogosSedes()])
+
+      .then(([regs, sds]) => {
+
+        setRegionales(regs);
+
+        setSedes(sds);
+
+      })
+
+      .catch(() => {
+
+        /* filtros opcionales */
+
+      });
+
+  }, [puedeFiltrosInst]);
+
+
+
+  const metricas = useMemo(
+
+    () => (data ? calcularMetricasDesdeResumen(data, jornadaFilter) : null),
+
+    [data, jornadaFilter],
+
+  );
+
+
+
+  const jornadasDisponibles = useJornadasDisponibles(
+
+    data?.jornadas_disponibles,
+
+    data?.por_ficha ?? [],
+
+    data?.fichas_sin_sesion ?? [],
+
+  );
+
+
+
+  const fichasSinSesionFiltradas = useMemo(
+
+    () => filtrarFilasFicha(data?.fichas_sin_sesion ?? [], searchQuery, jornadaFilter),
+
+    [data?.fichas_sin_sesion, searchQuery, jornadaFilter],
+
+  );
+
+
+
+  const canSeeAsistencia = hasPermission('VER ASISTENCIA') || roles.includes('SUPER ADMINISTRADOR');
+
+  const canSeeBienestar = canViewCasosBienestar(roles);
+
+  const canVerAsistenciaDetalle =
+
+    roles.includes('SUPER ADMINISTRADOR') || roles.includes('BIENESTAR AL APRENDIZ');
+
+
+
+  if (data?.alcance.empty) {
+
+    return <DashboardEmptyAlcance />;
+
+  }
+
+
+
+  const resumenFichasTooltip = buildResumenFichasTooltip(fecha, data, metricas);
+
+  const diaConsulta = etiquetaDiaConsulta(fecha);
+
+
+
+  return (
+
+    <div className="space-y-6">
+
+      <div>
+
+        <p className="text-gray-600 dark:text-gray-400">Bienvenido, {user?.full_name}</p>
+
+        {data?.alcance.restricted && data.alcance.regional_nombres.length > 0 ? (
+
+          <span className="inline-flex mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-300">
+
+            {data.alcance.regional_nombres.join(' · ')}
+
+          </span>
+
+        ) : null}
+
+      </div>
+
+
+
+      {error ? (
+
+        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+
+          {error}
+
+        </p>
+
+      ) : null}
+
+
+
+      <DashboardFilters
+
+        fecha={fecha}
+
+        onFechaChange={setFecha}
+
+        loading={refetching}
+
+        showInstitutionalFilters={puedeFiltrosInst}
+
+        regionalId={regionalId}
+
+        onRegionalIdChange={setRegionalId}
+
+        sedeId={sedeId}
+
+        onSedeIdChange={setSedeId}
+
+        regionales={regionales}
+
+        sedes={sedes}
+
+      />
+
+
+
+      <div className={`space-y-6 transition-opacity ${refetching ? 'opacity-60' : ''}`}>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
+
+          <KpiCard
+
+            label="Regionales"
+
+            value={fmtDashboardNum(data?.institucion.total_regionales, loading)}
+
+            icon={<MapPinIcon className="w-6 h-6 text-sena-green" aria-hidden />}
+
+            accentClass="bg-green-50 dark:bg-green-900/30"
+
+          />
+
+          <KpiCard
+
+            label="Sedes"
+
+            value={fmtDashboardNum(data?.institucion.total_sedes, loading)}
+
+            icon={<BuildingOffice2Icon className="w-6 h-6 text-sena-dark" aria-hidden />}
+
+            accentClass="bg-slate-100 dark:bg-slate-800/50"
+
+          />
+
+          <KpiCard
+
+            label="Fichas activas"
+
+            value={fmtDashboardNum(data?.institucion.total_fichas_activas, loading)}
+
+            icon={<DocumentTextIcon className="w-6 h-6 text-sena-green" aria-hidden />}
+
+            accentClass="bg-green-50 dark:bg-green-900/30"
+
+          />
+
+          <KpiCard
+
+            label="Aprendices"
+
+            value={fmtDashboardNum(data?.institucion.total_aprendices, loading)}
+
+            icon={<UserGroupIcon className="w-6 h-6 text-sena-dark" aria-hidden />}
+
+            accentClass="bg-slate-100 dark:bg-slate-800/50"
+
+          />
+
+          <KpiCard
+
+            label="En formación ahora"
+
+            value={fmtDashboardNum(metricas?.enFormacion ?? data?.asistencia_hoy.en_formacion_ahora, loading)}
+
+            tooltip={`Aprendices con ingreso ${diaConsulta} y salida sin registrar.`}
+
+            icon={<ChartBarIcon className="w-6 h-6 text-sena-green" aria-hidden />}
+
+            accentClass="bg-green-50 dark:bg-green-900/30"
+
+          />
+
+          <KpiCard
+
+            label="% cobertura"
+
+            value={
+
+              loading
+
+                ? '…'
+
+                : `${metricas?.pctCobertura ?? data?.asistencia_hoy.pct_cobertura ?? 0}%`
+
+            }
+
+            tooltip={`Porcentaje de fichas con sesión de asistencia ${diaConsulta} (según jornada filtrada).`}
+
+            icon={<ClipboardDocumentListIcon className="w-6 h-6 text-sena-dark" aria-hidden />}
+
+            accentClass="bg-slate-100 dark:bg-slate-800/50"
+
+          />
+
+        </div>
+
+
+
+        <FiltrosDashboard
+
+          searchQuery={searchQuery}
+
+          onSearchQueryChange={setSearchQuery}
+
+          jornadaFilter={jornadaFilter}
+
+          onJornadaFilterChange={setJornadaFilter}
+
+          jornadasDisponibles={jornadasDisponibles}
+
+        />
+
+
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          <div className="card">
+
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Asistencia por sede</h2>
+
+            <AsistenciaPorSedeChart data={metricas?.porSede ?? data?.por_sede ?? []} />
+
+          </div>
+
+          <div className="card">
+
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Cobertura operativa</h2>
+
+            <CoberturaOperativaChart
+
+              fichasConSesion={metricas?.fichasConSesion ?? data?.asistencia_hoy.fichas_con_sesion ?? 0}
+
+              fichasSinSesion={metricas?.fichasSinSesion ?? data?.asistencia_hoy.fichas_sin_sesion ?? 0}
+
+            />
+
+          </div>
+
+        </div>
+
+
+
+        <div className="card">
+
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+
+            Asistencia — últimos 7 días de formación
+
+          </h2>
+
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+
+            Aprendices esperados vs. asistencia efectiva registrada por día (hasta {formatFechaVista(fecha)}).
+
+          </p>
+
+          <AsistenciaUltimosDiasChart data={data?.ultimos_dias_formacion ?? []} />
+
+        </div>
+
+
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+          <KpiCard
+
+            label="Casos bienestar"
+
+            value={fmtDashboardNum(data?.riesgo.casos_bienestar, loading)}
+
+            tooltip="Aprendices con ≥3 inasistencias en los últimos 30 días."
+
+            icon={<ExclamationTriangleIcon className="w-6 h-6 text-sena-orange" aria-hidden />}
+
+            accentClass="bg-orange-50 dark:bg-orange-900/30"
+
+          />
+
+          <KpiCard
+
+            label="Pendientes revisión"
+
+            value={fmtDashboardNum(data?.riesgo.pendientes_revision, loading)}
+
+            tooltip={`Registros de ${diaConsulta} que requieren revisión del instructor.`}
+
+            icon={<ClipboardDocumentCheckIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" aria-hidden />}
+
+            accentClass="bg-amber-100 dark:bg-amber-900/50"
+
+          />
+
+          <KpiCard
+
+            label={`Fichas sin sesión ${diaConsulta}`}
+
+            value={fmtDashboardNum(metricas?.fichasSinSesion ?? data?.asistencia_hoy.fichas_sin_sesion, loading)}
+
+            tooltip={resumenFichasTooltip}
+
+            icon={<CalendarDaysIcon className="w-6 h-6 text-sena-orange" aria-hidden />}
+
+            accentClass="bg-orange-50 dark:bg-orange-900/30"
+
+          />
+
+        </div>
+
+
+
+        <div className="card">
+
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+
+            <span>Fichas pendientes (sin sesión {diaConsulta})</span>
+
+            <span className="ml-2 text-primary-600 dark:text-primary-400 tabular-nums">
+
+              {fichasSinSesionFiltradas.length}
+
+            </span>
+
+            <InfoTooltip text={resumenFichasTooltip} />
+
+          </h2>
+
+          <div className="mt-4 overflow-x-auto">
+
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+
+              <thead className="bg-gray-50 dark:bg-gray-700/50">
+
+                <tr>
+
+                  <th className="px-3 py-2 text-center font-medium text-gray-500 dark:text-gray-300 uppercase text-xs">Ficha</th>
+
+                  <th className="px-3 py-2 text-center font-medium text-gray-500 dark:text-gray-300 uppercase text-xs">Programa</th>
+
+                  <th className="px-3 py-2 text-center font-medium text-gray-500 dark:text-gray-300 uppercase text-xs">Jornada</th>
+
+                  <th className="px-3 py-2 text-center font-medium text-gray-500 dark:text-gray-300 uppercase text-xs">Sede</th>
+
+                  <th className="px-3 py-2 text-center font-medium text-gray-500 dark:text-gray-300 uppercase text-xs">Instructor</th>
+
+                  <th className="px-3 py-2 text-center font-medium text-gray-500 dark:text-gray-300 uppercase text-xs">Aprendices</th>
+
+                  <th className="px-3 py-2 text-center font-medium text-gray-500 dark:text-gray-300 uppercase text-xs">Acción</th>
+
+                </tr>
+
+              </thead>
+
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+
+                {fichasSinSesionFiltradas.length === 0 ? (
+
+                  <tr>
+
+                    <td colSpan={7} className="px-3 py-6 text-center text-gray-500 dark:text-gray-400">
+
+                      {loading ? 'Cargando…' : 'No hay fichas pendientes con el filtro actual.'}
+
+                    </td>
+
+                  </tr>
+
+                ) : (
+
+                  fichasSinSesionFiltradas.map((f) => {
+
+                    const instructorCorto = nombrePrimerNombrePrimerApellido(f.instructor_nombre);
+
+                    return (
+
+                      <tr key={f.ficha_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+
+                        <td className="px-3 py-2 text-center font-medium text-gray-900 dark:text-white">{f.ficha_numero}</td>
+
+                        <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{f.programa_nombre ?? '—'}</td>
+
+                        <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{f.jornada_nombre ?? '—'}</td>
+
+                        <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{f.sede_nombre ?? '—'}</td>
+
+                        <td className="px-3 py-2 text-center">
+
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-800 dark:bg-primary-900/40 dark:text-primary-300">
+
+                            {instructorCorto}
+
+                          </span>
+
+                        </td>
+
+                        <td className="px-3 py-2 text-center tabular-nums">{f.total_aprendices}</td>
+
+                        <td className="px-3 py-2 text-center">
+
+                          <Link
+
+                            to={fichasPaths.detalle(f.ficha_id)}
+
+                            className="text-primary-600 hover:text-primary-800 dark:text-primary-400 font-medium"
+
+                          >
+
+                            Ver ficha
+
+                          </Link>
+
+                        </td>
+
+                      </tr>
+
+                    );
+
+                  })
+
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <DashboardAccesosDirectos
+
+        canSeeAsistencia={canSeeAsistencia}
+
+        canSeeBienestar={canSeeBienestar}
+
+        canVerAsistenciaDetalle={canVerAsistenciaDetalle}
+
+      />
+
+    </div>
+
+  );
+
+}
+
+

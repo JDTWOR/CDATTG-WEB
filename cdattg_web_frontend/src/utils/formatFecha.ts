@@ -1,3 +1,21 @@
+const TZ_COLOMBIA = 'America/Bogota';
+
+/** Fecha de hoy en Colombia (yyyy-MM-dd). */
+export function hoyISOColombia(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: TZ_COLOMBIA });
+}
+
+/** Indica si la fecha ISO corresponde al día actual en Colombia. */
+export function esFechaHoyColombia(fecha: string): boolean {
+  return fecha.slice(0, 10) === hoyISOColombia();
+}
+
+/** Etiqueta contextual: "hoy" o "el dd/mm/yyyy" para textos del dashboard. */
+export function etiquetaDiaConsulta(fecha: string): string {
+  if (esFechaHoyColombia(fecha)) return 'hoy';
+  return `el ${formatFechaVista(fecha)}`;
+}
+
 /** Fecha legible (dd/mm/yyyy) desde ISO o yyyy-MM-dd. */
 export function formatFechaVista(iso?: string | null): string {
   if (iso == null || iso === '') return '—';

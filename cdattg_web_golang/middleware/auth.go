@@ -585,6 +585,35 @@ func RequireSuperAdminOrBienestar() gin.HandlerFunc {
 	}
 }
 
+// RequireSuperAdminAdminOrCoordinator permite acceso a SUPER ADMINISTRADOR, ADMINISTRADOR o COORDINADOR.
+func RequireSuperAdminAdminOrCoordinator() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := requireAuthenticatedUserID(c)
+		if !ok {
+			return
+		}
+		e, ok := getEnforcerOrAbort(c)
+		if !ok {
+			return
+		}
+		sub := strconv.FormatUint(uint64(userID), 10)
+		roles, err := authz.GetRolesForUser(e, sub)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": msgErrorVerificandoRol})
+			c.Abort()
+			return
+		}
+		for _, r := range roles {
+			if r == "SUPER ADMINISTRADOR" || r == "ADMINISTRADOR" || r == "COORDINADOR" {
+				c.Next()
+				return
+			}
+		}
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene rol suficiente para acceder a esta sección"})
+		c.Abort()
+	}
+}
+
 // RequireSuperAdminOrAdmin permite acceso a usuarios con rol "SUPER ADMINISTRADOR" o "ADMINISTRADOR".
 func RequireSuperAdminOrAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {

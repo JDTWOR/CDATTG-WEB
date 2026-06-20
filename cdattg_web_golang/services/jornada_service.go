@@ -209,7 +209,7 @@ func extensionFromRequest(v *int) int {
 	if v != nil && *v >= 0 {
 		return *v
 	}
-	return 60
+	return minutosExtensionDefaultRuntime()
 }
 
 func bloquesDTOToInput(bloques []dto.JornadaBloqueItem) ([]HorarioBloqueInput, error) {

@@ -17,6 +17,7 @@ const (
 	routePisos      = "/pisos"
 	routeJornadas   = "/jornadas"
 	routeDiasSinFormacion = "/dias-sin-formacion"
+	routeConfiguracionAsistencia = "/configuracion-asistencia"
 
 	permVerPersonas     = "VER PERSONAS"
 	permCrearPersona    = "CREAR PERSONA"
@@ -68,6 +69,7 @@ func SetupRouter() *gin.Engine {
 	_ = handlers.NewContratoConvenioHandler()
 	jornadaHandler := handlers.NewJornadaHandler()
 	diaSinFormacionHandler := handlers.NewDiaSinFormacionSedeHandler()
+	configAsistenciaHandler := handlers.NewConfiguracionAsistenciaHandler()
 
 	// Rutas públicas
 	api := r.Group("/api")
@@ -206,7 +208,7 @@ func SetupRouter() *gin.Engine {
 			// sync-inventario-permissions desactivado (módulo inventario no en uso)
 
 			administracion := protected.Group("/administracion")
-			administracion.Use(middleware.RequireSuperAdminOrAdmin())
+			administracion.Use(middleware.RequireSuperAdminAdminOrCoordinator())
 			{
 				administracion.GET(routeJornadas, jornadaHandler.List)
 				administracion.POST(routeJornadas, jornadaHandler.Create)
@@ -218,6 +220,9 @@ func SetupRouter() *gin.Engine {
 				administracion.POST(routeDiasSinFormacion, diaSinFormacionHandler.Create)
 				administracion.PUT(routeDiasSinFormacion+"/:id", diaSinFormacionHandler.Update)
 				administracion.DELETE(routeDiasSinFormacion+"/:id", diaSinFormacionHandler.Delete)
+
+				administracion.GET(routeConfiguracionAsistencia, configAsistenciaHandler.Get)
+				administracion.PUT(routeConfiguracionAsistencia, configAsistenciaHandler.Update)
 			}
 
 			// Gestión de permisos y roles (ASIGNAR PERMISOS o SUPER ADMIN para roles)

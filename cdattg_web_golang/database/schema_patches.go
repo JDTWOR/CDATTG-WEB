@@ -151,10 +151,20 @@ func EnsureSchemaPatches() error {
 		&models.InstructorFichaTrasladoFecha{},
 		&models.DiaFestivo{},
 		&models.DiaSinFormacionSede{},
+		&models.ConfiguracionAsistencia{},
 	); err != nil {
 		return err
 	}
-	log.Println("Esquema: instructor_ficha_traslado_fechas, dias_festivos y dias_sin_formacion_sede verificados")
+	log.Println("Esquema: instructor_ficha_traslado_fechas, dias_festivos, dias_sin_formacion_sede y configuracion_asistencia verificados")
+
+	if err := DB.Exec(`
+		INSERT INTO configuracion_asistencia (id, plazo_edicion_observaciones_dias, intervalo_auto_cierre_minutos, minutos_alerta_sin_sesion, minutos_extension_default)
+		VALUES (1, 5, 5, 90, 60)
+		ON CONFLICT (id) DO NOTHING
+	`).Error; err != nil {
+		return err
+	}
+	log.Println("Esquema: fila por defecto configuracion_asistencia verificada")
 
 	return nil
 }

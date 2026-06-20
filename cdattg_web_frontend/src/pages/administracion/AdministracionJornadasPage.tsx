@@ -213,7 +213,7 @@ export const AdministracionJornadasPage = () => {
   const [propagarFichas, setPropagarFichas] = useState(true);
   const [infoMsg, setInfoMsg] = useState('');
 
-  const canManage = hasAnyRole(roles, ['SUPER ADMINISTRADOR', 'ADMINISTRADOR']);
+  const canManage = hasAnyRole(roles, ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR']);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -394,6 +394,10 @@ export const AdministracionJornadasPage = () => {
                 onChange={(e) => setFormExtension(Number(e.target.value))}
                 className="input-field mt-1 w-full"
               />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Minutos después del fin del bloque en que aún se permite registrar salida. Si no define valor aquí,
+                se usa el global en Configuración de asistencia.
+              </p>
             </div>
           </div>
 

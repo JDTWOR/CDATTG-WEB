@@ -479,14 +479,10 @@ func (s *InstructorHorarioService) validarTomarAsistenciaProgramado(
 }
 
 func extensionMinutosJornada(j *models.Jornada) int {
-	extMin := 60
-	if j == nil {
-		return extMin
-	}
-	if j.MinutosExtensionFin != nil && *j.MinutosExtensionFin >= 0 {
+	if j != nil && j.MinutosExtensionFin != nil && *j.MinutosExtensionFin >= 0 {
 		return *j.MinutosExtensionFin
 	}
-	return extMin
+	return minutosExtensionDefaultRuntime()
 }
 
 func (s *InstructorHorarioService) validarHorarioAsistencia(ficha *models.FichaCaracterizacion, diaHoy uint, momento time.Time) error {

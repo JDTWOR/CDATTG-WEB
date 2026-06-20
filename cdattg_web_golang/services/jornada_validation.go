@@ -60,11 +60,10 @@ func validarHorarioConExtension(j *models.Jornada, now time.Time) bool {
 }
 
 func extensionMinutosFromJornada(j *models.Jornada) int {
-	extMin := 60
-	if j.MinutosExtensionFin != nil && *j.MinutosExtensionFin >= 0 {
-		extMin = *j.MinutosExtensionFin
+	if j != nil && j.MinutosExtensionFin != nil && *j.MinutosExtensionFin >= 0 {
+		return *j.MinutosExtensionFin
 	}
-	return extMin
+	return minutosExtensionDefaultRuntime()
 }
 
 type JornadaValidationService struct {
@@ -162,6 +161,44 @@ func HoraInicioMasMinutos(j *models.Jornada, dia time.Time, minutosDespues int) 
 	base := time.Date(dia.Year(), dia.Month(), dia.Day(), 0, 0, 0, 0, dia.Location())
 	start := base.Add(time.Duration(tInicio.Hour())*time.Hour + time.Duration(tInicio.Minute())*time.Minute)
 	return start.Add(time.Duration(minutosDespues) * time.Minute)
+}
+
+func maxHoraFinDeBloques(bloques []HorarioBloqueInput) string {
+	max := ""
+	for _, b := range bloques {
+		hf := normalizeHoraMM(b.HoraFin)
+		if hf != "" && (max == "" || hf > max) {
+			max = hf
+		}
+	}
+	return max
+}
+
+func instanteHoraEnDia(dia time.Time, hora string) time.Time {
+	t, err := parseHora(normalizeHoraMM(hora))
+	if err != nil {
+		return dia.Add(24 * time.Hour)
+	}
+	base := time.Date(dia.Year(), dia.Month(), dia.Day(), 0, 0, 0, 0, dia.Location())
+	return base.Add(time.Duration(t.Hour())*time.Hour + time.Duration(t.Minute())*time.Minute)
+}
+
+// HoraFinEfectivaParaSesion calcula el fin de ventana para auto-cierre usando bloques de ficha/plantilla.
+// Orden: bloques del día en ficha → bloques plantilla jornada → cabecera legacy j.HoraFin → fin de día.
+func HoraFinEfectivaParaSesion(j *models.Jornada, ficha *models.FichaCaracterizacion, dia time.Time) time.Time {
+	if j == nil && ficha != nil {
+		j = ficha.Jornada
+	}
+	horarioSvc := NewInstructorHorarioService()
+	diaID := WeekdayToDiaFormacionID(dia.Weekday())
+	bloques := horarioSvc.bloquesDiaFicha(ficha, diaID)
+	if len(bloques) > 0 {
+		if maxFin := maxHoraFinDeBloques(bloques); maxFin != "" {
+			extMin := extensionMinutosFromJornada(j)
+			return instanteHoraEnDia(dia, maxFin).Add(time.Duration(extMin) * time.Minute)
+		}
+	}
+	return HoraFinEfectiva(j, dia)
 }
 
 // HoraFinEfectiva devuelve el instante (en la zona de dia) en que termina la ventana válida de la jornada

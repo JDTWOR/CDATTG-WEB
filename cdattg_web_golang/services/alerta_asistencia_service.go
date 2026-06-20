@@ -59,7 +59,10 @@ func (s *AlertaAsistenciaService) CheckAndNotify() {
 		return
 	}
 
-	minutosDespues := minutosAlertaDesdeConfig(cfgAlertas.MinutosDespuesInicioJornada)
+	minutosDespues := minutosAlertaSinSesion()
+	if minutosDespues <= 0 {
+		minutosDespues = minutosAlertaDesdeConfig(cfgAlertas.MinutosDespuesInicioJornada)
+	}
 
 	for i := range fichas {
 		s.notifyFichaSiAplica(&fichas[i], now, hoy, fechaStr, minutosDespues, emails)

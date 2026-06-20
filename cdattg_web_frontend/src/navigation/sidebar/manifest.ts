@@ -161,7 +161,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: administracionPaths.jornadas,
     label: 'Jornadas de formación',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
     iconKey: 'administracion/jornadas',
   },
   {
@@ -169,8 +169,16 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: administracionPaths.diasSinFormacion,
     label: 'Días sin formación',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
     iconKey: 'administracion/dias-sin-formacion',
+  },
+  {
+    section: 'Administración',
+    path: administracionPaths.configuracionAsistencia,
+    label: 'Configuración de asistencia',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
+    iconKey: 'administracion/configuracion-asistencia',
   },
   {
     section: 'Administración',

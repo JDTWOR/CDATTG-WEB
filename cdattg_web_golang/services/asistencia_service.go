@@ -26,7 +26,6 @@ const (
 	errMsgAprendizOcultoEnAsistencia     = "EL APRENDIZ ESTÁ OCULTO DE LA TOMA DE ASISTENCIA EN ESTA FICHA"
 )
 
-const plazoEdicionObservacionSesionDias = 5
 
 const (
 	minSegundosEntreIngresoYSalida = 60
@@ -377,16 +376,12 @@ func (s *asistenciaService) FinalizarSesionesVencidas() {
 		if a.InstructorFicha == nil || a.InstructorFicha.Ficha == nil {
 			continue
 		}
-		j := a.InstructorFicha.Ficha.Jornada
+		ficha := a.InstructorFicha.Ficha
+		j := ficha.Jornada
 		// Usar el día de la sesión en hora local (evita que UTC midnight se interprete como día anterior en -05).
 		localFecha := a.Fecha.In(now.Location())
 		sessionDate := time.Date(localFecha.Year(), localFecha.Month(), localFecha.Day(), 0, 0, 0, 0, now.Location())
-		var endEffective time.Time
-		if j != nil {
-			endEffective = HoraFinEfectiva(j, sessionDate)
-		} else {
-			endEffective = sessionDate.Add(24 * time.Hour)
-		}
+		endEffective := HoraFinEfectivaParaSesion(j, ficha, sessionDate)
 		if now.After(endEffective) {
 			_, _ = s.Finalizar(a.ID)
 		}
@@ -596,7 +591,7 @@ func (s *asistenciaService) ActualizarObservaciones(asistenciaAprendizID uint, o
 	if err != nil {
 		return nil, errors.New(errMsgRegistroAsistenciaNoEncontrado)
 	}
-	if aa.Asistencia != nil && aa.Asistencia.IsFinished && !sesionCerradaDentroDePlazoEdicion(aa.Asistencia.Fecha, time.Now(), plazoEdicionObservacionSesionDias) {
+	if aa.Asistencia != nil && aa.Asistencia.IsFinished && !sesionCerradaDentroDePlazoEdicion(aa.Asistencia.Fecha, time.Now(), plazoEdicionObservacionesDias()) {
 		return nil, errors.New(errMsgObservacionFueraDePlazo)
 	}
 	aa.Observaciones = observaciones
@@ -611,7 +606,7 @@ func (s *asistenciaService) CrearOActualizarObservaciones(asistenciaID, aprendiz
 	if err != nil || asist == nil {
 		return nil, errors.New(errMsgSesionAsistenciaNoEncontrada)
 	}
-	if asist.IsFinished && !sesionCerradaDentroDePlazoEdicion(asist.Fecha, time.Now(), plazoEdicionObservacionSesionDias) {
+	if asist.IsFinished && !sesionCerradaDentroDePlazoEdicion(asist.Fecha, time.Now(), plazoEdicionObservacionesDias()) {
 		return nil, errors.New(errMsgObservacionFueraDePlazo)
 	}
 	// Con múltiples tramos: actualizar observaciones en el tramo abierto o en el último registro.

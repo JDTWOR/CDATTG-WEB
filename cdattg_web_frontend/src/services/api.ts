@@ -45,6 +45,7 @@ import type {
   JornadaItem,
   JornadaAdminItem,
   DiaSinFormacionSedeItem,
+  ConfiguracionAsistenciaItem,
   JornadaPropagateResult,
   JornadaUpdateResponse,
   DiaFormacionItem,
@@ -408,6 +409,23 @@ class ApiService {
 
   async deleteAdministracionJornada(id: number): Promise<void> {
     await this.api.delete(`/administracion/jornadas/${id}`);
+  }
+
+  async getConfiguracionAsistencia(): Promise<ConfiguracionAsistenciaItem> {
+    const response = await this.api.get<{ data: ConfiguracionAsistenciaItem }>(
+      '/administracion/configuracion-asistencia',
+    );
+    return response.data.data;
+  }
+
+  async updateConfiguracionAsistencia(
+    data: ConfiguracionAsistenciaItem,
+  ): Promise<ConfiguracionAsistenciaItem> {
+    const response = await this.api.put<{ data: ConfiguracionAsistenciaItem }>(
+      '/administracion/configuracion-asistencia',
+      data,
+    );
+    return response.data.data;
   }
 
   async getDiasSinFormacion(sedeId?: number): Promise<DiaSinFormacionSedeItem[]> {

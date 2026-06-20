@@ -20,4 +20,14 @@ export const administracionRoutes: RouteObject[] = [
       return { Component: AdministracionDiasSinFormacionPage };
     },
   },
+  {
+    path: administracionPaths.configuracionAsistencia,
+    handle: { breadcrumb: { label: 'Configuración de asistencia' } },
+    lazy: async () => {
+      const { AdministracionConfiguracionAsistenciaPage } = await import(
+        '../../pages/administracion/AdministracionConfiguracionAsistenciaPage'
+      );
+      return { Component: AdministracionConfiguracionAsistenciaPage };
+    },
+  },
 ];

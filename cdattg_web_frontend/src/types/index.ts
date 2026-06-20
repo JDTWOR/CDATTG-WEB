@@ -225,6 +225,13 @@ export interface DiaSinFormacionSedeItem {
   created_at?: string;
 }
 
+export interface ConfiguracionAsistenciaItem {
+  plazo_edicion_observaciones_dias: number;
+  intervalo_auto_cierre_minutos: number;
+  minutos_alerta_sin_sesion: number;
+  minutos_extension_default: number;
+}
+
 export interface JornadaItem {
   id: number;
   nombre: string;

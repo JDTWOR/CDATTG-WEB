@@ -167,9 +167,12 @@ func StartAsistenciaAutoFinalize(h *AsistenciaHandler) {
 	}
 	run() // una vez al arranque
 	go func() {
-		ticker := time.NewTicker(5 * time.Minute)
-		defer ticker.Stop()
-		for range ticker.C {
+		for {
+			mins := services.GetConfiguracionAsistencia().IntervaloAutoCierreMinutos
+			if mins <= 0 {
+				mins = 5
+			}
+			time.Sleep(time.Duration(mins) * time.Minute)
 			run()
 		}
 	}()

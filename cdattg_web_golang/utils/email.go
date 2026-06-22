@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/smtp"
+	"strings"
 
 	"github.com/sena/cdattg-web-golang/config"
 )
@@ -27,13 +28,9 @@ func SendMail(to []string, subject, bodyPlain string) error {
 	}
 
 	msg := bytes.NewBuffer(nil)
-	msg.WriteString("From: " + from + "\r\n")
-	msg.WriteString("To: " + to[0])
-	for i := 1; i < len(to); i++ {
-		msg.WriteString(", " + to[i])
-	}
-	msg.WriteString("\r\n")
-	msg.WriteString("Subject: " + subject + "\r\n")
+	fmt.Fprintf(msg, "From: %s\r\n", from)
+	fmt.Fprintf(msg, "To: %s\r\n", strings.Join(to, ", "))
+	fmt.Fprintf(msg, "Subject: %s\r\n", subject)
 	msg.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
 	msg.WriteString("\r\n")
 	msg.WriteString(bodyPlain)

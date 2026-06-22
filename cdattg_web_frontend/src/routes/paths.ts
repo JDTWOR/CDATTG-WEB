@@ -98,4 +98,10 @@ export const administracionPaths = {
   jornadas: '/administracion/jornadas',
   diasSinFormacion: '/administracion/dias-sin-formacion',
   configuracionAsistencia: '/administracion/configuracion-asistencia',
+  elecciones: '/administracion/elecciones',
+  eleccionDetalle: (id: number | string) => `/administracion/elecciones/${id}`,
+} as const;
+
+export const eleccionAprendizPaths = {
+  index: '/eleccion-aprendices',
 } as const;

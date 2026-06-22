@@ -30,4 +30,20 @@ export const administracionRoutes: RouteObject[] = [
       return { Component: AdministracionConfiguracionAsistenciaPage };
     },
   },
+  {
+    path: administracionPaths.elecciones,
+    handle: { breadcrumb: { label: 'Elecciones aprendices' } },
+    lazy: async () => {
+      const { EleccionesAdminPage } = await import('../../pages/elecciones/EleccionesAdminPage');
+      return { Component: EleccionesAdminPage };
+    },
+  },
+  {
+    path: `${administracionPaths.elecciones}/:id`,
+    handle: { breadcrumb: { label: 'Detalle elección' } },
+    lazy: async () => {
+      const { EleccionProcesoDetallePage } = await import('../../pages/elecciones/EleccionProcesoDetallePage');
+      return { Component: EleccionProcesoDetallePage };
+    },
+  },
 ];

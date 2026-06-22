@@ -8,6 +8,7 @@ import {
   MENSAJE_SIN_PERMISO_MIS_INASISTENCIAS,
 } from './misInasistenciasPermissions';
 import { useMisInasistencias } from './hooks/useMisInasistencias';
+import { EleccionRepresentantesBanner } from '../../components/elecciones/EleccionRepresentantesBanner';
 
 export function MisInasistenciasPage() {
   const { roles, permissions } = useAuth();
@@ -39,6 +40,8 @@ export function MisInasistenciasPage() {
           Actualizar
         </button>
       </div>
+
+      <EleccionRepresentantesBanner />
 
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-gray-100 pb-4 dark:border-gray-700">

@@ -90,6 +90,17 @@ import type {
   DefinicionesPermisosResponse,
 } from '../types';
 import type { InstructorAgendaResponse } from '../types/agenda';
+import type {
+  EleccionDesempateRequest,
+  EleccionMiRegional,
+  EleccionPlancha,
+  EleccionPlanchaRequest,
+  EleccionProceso,
+  EleccionProcesoRequest,
+  EleccionResultado,
+  EleccionVotoRequest,
+  RepresentanteAprendiz,
+} from '../types/eleccion';
 import { sortAprendicesAz } from '../utils/sortAprendices';
 
 function normalizeAprendicesList(data: AprendizResponse[]): AprendizResponse[] {
@@ -1059,6 +1070,113 @@ class ApiService {
   async getPermisosDefiniciones(): Promise<DefinicionesPermisosResponse> {
     const response = await this.api.get<DefinicionesPermisosResponse>('/permisos/definiciones');
     return response.data;
+  }
+
+  // --- Elecciones representante aprendiz ---
+  async getEleccionProcesos(): Promise<EleccionProceso[]> {
+    const response = await this.api.get<{ data: EleccionProceso[] }>('/elecciones/procesos');
+    return response.data.data;
+  }
+
+  async getEleccionProceso(id: number): Promise<EleccionProceso> {
+    const response = await this.api.get<{ data: EleccionProceso }>(`/elecciones/procesos/${id}`);
+    return response.data.data;
+  }
+
+  async createEleccionProceso(data: EleccionProcesoRequest): Promise<EleccionProceso> {
+    const response = await this.api.post<{ data: EleccionProceso }>('/elecciones/procesos', data);
+    return response.data.data;
+  }
+
+  async updateEleccionProceso(id: number, data: EleccionProcesoRequest): Promise<EleccionProceso> {
+    const response = await this.api.put<{ data: EleccionProceso }>(`/elecciones/procesos/${id}`, data);
+    return response.data.data;
+  }
+
+  async eleccionAbrirInscripcion(id: number): Promise<EleccionProceso> {
+    const response = await this.api.post<{ data: EleccionProceso }>(`/elecciones/procesos/${id}/abrir-inscripcion`);
+    return response.data.data;
+  }
+
+  async eleccionCerrarInscripcion(id: number): Promise<EleccionProceso> {
+    const response = await this.api.post<{ data: EleccionProceso }>(`/elecciones/procesos/${id}/cerrar-inscripcion`);
+    return response.data.data;
+  }
+
+  async eleccionAbrirVotacion(id: number): Promise<EleccionProceso> {
+    const response = await this.api.post<{ data: EleccionProceso }>(`/elecciones/procesos/${id}/abrir-votacion`);
+    return response.data.data;
+  }
+
+  async eleccionCalcularResultado(id: number): Promise<EleccionResultado> {
+    const response = await this.api.post<{ data: EleccionResultado }>(`/elecciones/procesos/${id}/calcular-resultado`);
+    return response.data.data;
+  }
+
+  async eleccionRegistrarDesempate(id: number, data: EleccionDesempateRequest): Promise<EleccionResultado> {
+    const response = await this.api.post<{ data: EleccionResultado }>(`/elecciones/procesos/${id}/registrar-desempate`, data);
+    return response.data.data;
+  }
+
+  async getEleccionPlanchasAdmin(procesoId: number, confirmadasOnly = false): Promise<EleccionPlancha[]> {
+    const response = await this.api.get<{ data: EleccionPlancha[] }>(`/elecciones/procesos/${procesoId}/planchas-admin`, {
+      params: confirmadasOnly ? { confirmadas: '1' } : undefined,
+    });
+    return response.data.data;
+  }
+
+  async rechazarEleccionPlancha(planchaId: number, motivo: string): Promise<void> {
+    await this.api.post(`/elecciones/planchas/${planchaId}/rechazar`, { motivo });
+  }
+
+  async getEleccionResultados(procesoId: number, auditoria = false): Promise<EleccionResultado> {
+    const response = await this.api.get<{ data: EleccionResultado }>(`/elecciones/procesos/${procesoId}/resultados`, {
+      params: auditoria ? { auditoria: '1' } : undefined,
+    });
+    return response.data.data;
+  }
+
+  async exportEleccionResultadosCSV(procesoId: number): Promise<Blob> {
+    const response = await this.api.get(`/elecciones/procesos/${procesoId}/resultados/export`, { responseType: 'blob' });
+    return response.data;
+  }
+
+  async getEleccionMiRegional(): Promise<EleccionMiRegional> {
+    const response = await this.api.get<{ data: EleccionMiRegional }>('/elecciones/mi-regional');
+    return response.data.data;
+  }
+
+  async getEleccionPlanchas(procesoId: number): Promise<EleccionPlancha[]> {
+    const response = await this.api.get<{ data: EleccionPlancha[] }>(`/elecciones/procesos/${procesoId}/planchas`);
+    return response.data.data;
+  }
+
+  async proponerEleccionPlancha(procesoId: number, data: EleccionPlanchaRequest): Promise<EleccionPlancha> {
+    const response = await this.api.post<{ data: EleccionPlancha }>(`/elecciones/procesos/${procesoId}/planchas`, data);
+    return response.data.data;
+  }
+
+  async confirmarEleccionPlancha(planchaId: number): Promise<EleccionPlancha> {
+    const response = await this.api.post<{ data: EleccionPlancha }>(`/elecciones/planchas/${planchaId}/confirmar`);
+    return response.data.data;
+  }
+
+  async registrarEleccionVoto(procesoId: number, data: EleccionVotoRequest): Promise<void> {
+    await this.api.post(`/elecciones/procesos/${procesoId}/voto`, data);
+  }
+
+  async getRepresentantesVigentes(regionalId: number): Promise<RepresentanteAprendiz | null> {
+    const response = await this.api.get<{ data: RepresentanteAprendiz | null }>(
+      `/elecciones/regionales/${regionalId}/representantes-vigentes`,
+    );
+    return response.data.data;
+  }
+
+  async getHistorialRepresentantes(regionalId: number): Promise<RepresentanteAprendiz[]> {
+    const response = await this.api.get<{ data: RepresentanteAprendiz[] }>(
+      `/elecciones/regionales/${regionalId}/historial-representantes`,
+    );
+    return response.data.data;
   }
 }
 

@@ -1,6 +1,7 @@
 import {
   aprendicesPaths,
   aprendizPaths,
+  eleccionAprendizPaths,
   asistenciaPaths,
   bienestarPaths,
   DASHBOARD_PATH,
@@ -43,6 +44,15 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     rolesRequired: ['APRENDIZ'],
     alsoVisibleForPermissions: ['VER MIS INASISTENCIAS'],
     iconKey: 'asistencia/mis-inasistencias',
+  },
+  {
+    section: 'Inicio',
+    path: eleccionAprendizPaths.index,
+    label: 'Elección representante',
+    permission: null,
+    rolesRequired: ['APRENDIZ'],
+    alsoVisibleForPermissions: ['VER ELECCION'],
+    iconKey: 'eleccion/aprendiz',
   },
 
   // —— Formación ——
@@ -195,6 +205,14 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     permission: null,
     rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
     iconKey: 'administracion/configuracion-asistencia',
+  },
+  {
+    section: 'Administración',
+    path: administracionPaths.elecciones,
+    label: 'Elecciones aprendices',
+    permission: 'GESTIONAR ELECCION',
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
+    iconKey: 'administracion/elecciones',
   },
   {
     section: 'Administración',

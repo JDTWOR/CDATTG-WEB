@@ -150,6 +150,12 @@ func Migrate() error {
 		&models.PersonaContactAlert{},
 		&models.PersonaImport{},
 		&models.PersonaImportIssue{},
+
+		&models.EleccionProceso{},
+		&models.EleccionPlancha{},
+		&models.EleccionVoto{},
+		&models.EleccionResultado{},
+		&models.RepresentanteAprendiz{},
 	)
 	
 	if err != nil {

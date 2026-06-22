@@ -72,6 +72,7 @@ func SetupRouter() *gin.Engine {
 	jornadaHandler := handlers.NewJornadaHandler()
 	diaSinFormacionHandler := handlers.NewDiaSinFormacionSedeHandler()
 	configAsistenciaHandler := handlers.NewConfiguracionAsistenciaHandler()
+	eleccionHandler := handlers.NewEleccionHandler()
 
 	// Rutas públicas
 	api := r.Group("/api")
@@ -259,6 +260,9 @@ func SetupRouter() *gin.Engine {
 			{
 				stats.GET("/dashboard-resumen", statsHandler.GetDashboardResumen)
 			}
+
+			elecciones := protected.Group("/elecciones")
+			registerEleccionRoutes(elecciones, eleccionHandler)
 
 			// Inventario desactivado: rutas /inventario, /productos, /ordenes, /aprobaciones, /devoluciones, /proveedores, /categorias, /marcas, /contratos-convenios no registradas
 

@@ -42,6 +42,9 @@ var (
 	PermisosAsistencia = []string{
 		"VER ASISTENCIA", "TOMAR ASISTENCIA", "VER MI AGENDA", "VER MIS INASISTENCIAS",
 	}
+	PermisosEleccion = []string{
+		"GESTIONAR ELECCION", "VER ELECCION", "VOTAR ELECCION", "VER RESULTADOS ELECCION",
+	}
 	// PermisosInventario desactivado: módulo inventario no en uso
 	PermisosInventario = []string{}
 	PermisosUsuario    = []string{
@@ -60,6 +63,7 @@ const (
 	ObjAprendiz   = "aprendiz"
 	ObjInstructor = "instructor"
 	ObjAsistencia = "asistencia"
+	ObjEleccion   = "eleccion"
 	ObjUsuario    = "usuario"
 	ObjInventario = "inventario"
 	ObjProducto   = "producto"
@@ -101,6 +105,9 @@ func AllPermissionPairs() []struct{ Obj, Act string } {
 	}
 	for _, act := range PermisosAsistencia {
 		out = append(out, struct{ Obj, Act string }{ObjAsistencia, act})
+	}
+	for _, act := range PermisosEleccion {
+		out = append(out, struct{ Obj, Act string }{ObjEleccion, act})
 	}
 	for _, act := range PermisosUsuario {
 		out = append(out, struct{ Obj, Act string }{ObjUsuario, act})

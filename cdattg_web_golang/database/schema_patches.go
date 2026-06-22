@@ -172,6 +172,20 @@ func patchAutoMigrateDashboardModels() error {
 	)
 }
 
+func patchAutoMigrateEleccionModels() error {
+	if err := DB.AutoMigrate(
+		&models.EleccionProceso{},
+		&models.EleccionPlancha{},
+		&models.EleccionVoto{},
+		&models.EleccionResultado{},
+		&models.RepresentanteAprendiz{},
+	); err != nil {
+		return err
+	}
+	log.Println("Esquema: tablas de elecciones de aprendices verificadas")
+	return nil
+}
+
 // EnsureSchemaPatches aplica cambios incrementales de esquema sin ejecutar Migrate() completo.
 func EnsureSchemaPatches() error {
 	if DB == nil {
@@ -185,6 +199,7 @@ func EnsureSchemaPatches() error {
 		patchJornadasHorarios,
 		patchFichaDiasFueraDePlantillaJornada,
 		patchAutoMigrateDashboardModels,
+		patchAutoMigrateEleccionModels,
 	}
 	for _, patch := range patches {
 		if err := patch(); err != nil {

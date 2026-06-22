@@ -39,6 +39,9 @@ func RunRolePermissionSeeder(db *gorm.DB) error {
 	if err := seedAprendizPermissions(e); err != nil {
 		return err
 	}
+	if err := seedEleccionPermissions(e); err != nil {
+		return err
+	}
 
 	if err := e.SavePolicy(); err != nil {
 		return err
@@ -130,6 +133,30 @@ func seedAprendizPermissions(e *casbin.Enforcer) error {
 		return err
 	}
 	return nil
+}
+
+func seedEleccionPermissions(e *casbin.Enforcer) error {
+	adminPerms := []string{"GESTIONAR ELECCION", "VER ELECCION", "VER RESULTADOS ELECCION"}
+	for _, role := range []string{"ADMINISTRADOR", "COORDINADOR"} {
+		if err := addPermissionsForObject(e, role, authz.ObjEleccion, adminPerms); err != nil {
+			return err
+		}
+	}
+	aprendizPerms := []string{"VER ELECCION", "VOTAR ELECCION"}
+	return addPermissionsForObject(e, "APRENDIZ", authz.ObjEleccion, aprendizPerms)
+}
+
+// SyncEleccionPermissionsToRoles idempotente para despliegues existentes.
+func SyncEleccionPermissionsToRoles(db *gorm.DB) error {
+	log.Println("Sincronizando permisos de elecciones...")
+	e, err := authz.GetEnforcer(db)
+	if err != nil {
+		return err
+	}
+	if err := seedEleccionPermissions(e); err != nil {
+		return err
+	}
+	return e.SavePolicy()
 }
 
 // SyncAprendizPermissionsToRoles aplica permisos Casbin de aprendiz y sincroniza roles (idempotente).

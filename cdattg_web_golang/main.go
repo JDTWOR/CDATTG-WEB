@@ -36,6 +36,9 @@ func main() {
 	if err := database.EnsureSchemaPatches(); err != nil {
 		log.Fatal("Error aplicando parches de esquema:", err)
 	}
+	if err := seeders.SyncEleccionPermissionsToRoles(database.GetDB()); err != nil {
+		log.Fatal("Error sincronizando permisos de elecciones:", err)
+	}
 	if err := seeders.RunFestivosColombiaSeeder(database.GetDB()); err != nil {
 		log.Fatal("Error sembrando festivos Colombia:", err)
 	}

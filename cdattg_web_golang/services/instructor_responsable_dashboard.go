@@ -7,6 +7,7 @@ import (
 
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
+	"github.com/sena/cdattg-web-golang/utils"
 )
 
 const msgInstructorSinAsignar = "Sin asignar"
@@ -71,7 +72,7 @@ func (r *InstructorResponsableResolver) fallbackInstructorPrincipal(ficha models
 }
 
 func parseFechaDashboard(fecha string) time.Time {
-	loc := dashboardLoadLocation()
+	loc := utils.AppLocation()
 	fechaT, err := time.ParseInLocation(time.DateOnly, fecha, loc)
 	if err != nil {
 		return time.Now().In(loc)

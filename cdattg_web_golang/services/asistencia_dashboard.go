@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sena/cdattg-web-golang/config"
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/repositories"
+	"github.com/sena/cdattg-web-golang/utils"
 )
 
 type dashboardEsperadosCalc struct {
@@ -49,13 +49,6 @@ func filtrarFichasConFormacionEnFecha(
 	return out
 }
 
-func dashboardLoadLocation() *time.Location {
-	loc, err := time.LoadLocation(config.AppConfig.Database.TimeZone)
-	if err != nil {
-		return time.Local
-	}
-	return loc
-}
 
 func esFechaDashboardHoy(fecha string, loc *time.Location) bool {
 	now := time.Now().In(loc)
@@ -112,7 +105,7 @@ func calcularDashboardEsperadosSedes(
 	fecha string,
 	filtrarPorHorarioJornada bool,
 ) (*dashboardEsperadosCalc, error) {
-	loc := dashboardLoadLocation()
+	loc := utils.AppLocation()
 	refTime := time.Now().In(loc)
 	fechaConsulta, err := time.ParseInLocation(time.DateOnly, fecha, loc)
 	if err != nil {
@@ -293,7 +286,7 @@ func buildUltimosDiasFormacion(
 	sedeIDs []uint,
 	fechaRef string,
 ) ([]dto.DashboardDiaFormacionStats, error) {
-	loc := dashboardLoadLocation()
+	loc := utils.AppLocation()
 	ref, err := time.ParseInLocation(time.DateOnly, fechaRef, loc)
 	if err != nil {
 		ref = time.Now().In(loc)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/repositories"
+	"github.com/sena/cdattg-web-golang/utils"
 )
 
 type DashboardResumenService interface {
@@ -40,7 +41,7 @@ func NewDashboardResumenService() DashboardResumenService {
 
 func (s *dashboardResumenService) GetResumen(userID uint, roles []string, fecha string, regionalID, sedeID *uint) (*dto.DashboardResumenResponse, error) {
 	if strings.TrimSpace(fecha) == "" {
-		loc := dashboardLoadLocation()
+		loc := utils.AppLocation()
 		fecha = time.Now().In(loc).Format(time.DateOnly)
 	}
 	scope, err := s.scopeSvc.Resolve(userID, roles)

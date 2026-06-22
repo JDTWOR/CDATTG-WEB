@@ -42,7 +42,7 @@ func (s *AlertaAsistenciaService) CheckAndNotify() {
 		return
 	}
 
-	loc := alertaLoadLocation()
+	loc := utils.AppLocation()
 	now := time.Now().In(loc)
 	hoy := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	fechaStr := hoy.Format(time.DateOnly)
@@ -67,14 +67,6 @@ func (s *AlertaAsistenciaService) CheckAndNotify() {
 	for i := range fichas {
 		s.notifyFichaSiAplica(&fichas[i], now, hoy, fechaStr, minutosDespues, emails)
 	}
-}
-
-func alertaLoadLocation() *time.Location {
-	loc, err := time.LoadLocation(config.AppConfig.Database.TimeZone)
-	if err != nil {
-		return time.Local
-	}
-	return loc
 }
 
 func minutosAlertaDesdeConfig(m int) int {

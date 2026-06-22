@@ -7,16 +7,28 @@ BACKEND_DIR := cdattg_web_golang
 DB_USER ?= cdattg
 DB_NAME ?= cdattg_web
 
-# Nombre del volumen de Postgres (compose usa <directorio>_postgres_data)
-# Si tu carpeta tiene otro nombre, ejecuta: make COMPOSE_VOLUME_PREFIX=tu_carpeta db-reset
-COMPOSE_VOLUME_PREFIX ?= projects
+# Nombre del volumen de Postgres (compose: <nombre_proyecto>_postgres_data)
+COMPOSE_VOLUME_PREFIX ?= cdattg_go
 POSTGRES_VOLUME := $(COMPOSE_VOLUME_PREFIX)_postgres_data
 
-.PHONY: docker-up docker-down db-drop-recreate db-seed db-reset db-fresh help
+COMPOSE_LOCAL := docker compose -f docker-compose.yml -f docker-compose.local.yml
 
-# Levantar stack
+.PHONY: docker-up docker-down docker-local-up docker-local-down docker-local-setup db-drop-recreate db-seed db-reset db-fresh help
+
+# Levantar stack (producción / .env de servidor)
 docker-up:
 	docker compose up -d --build
+
+# Copiar .env.local.example -> .env si no existe
+docker-local-setup:
+	@test -f .env || cp .env.local.example .env
+
+# Stack local: API por /api en nginx, TZ Bogotá, SMTP deshabilitado por defecto
+docker-local-up: docker-local-setup
+	$(COMPOSE_LOCAL) up -d --build
+
+docker-local-down:
+	$(COMPOSE_LOCAL) down
 
 # Parar servicios y borrar volumen de Postgres (borra la DB por completo)
 docker-down:
@@ -43,8 +55,10 @@ db-fresh: db-drop-recreate db-seed
 
 help:
 	@echo "Comandos Docker / DB (ejecutar desde la raíz del proyecto):"
-	@echo "  make docker-up         - Levantar stack (docker compose up -d --build)"
-	@echo "  make docker-down       - Parar y borrar volumen de Postgres"
+	@echo "  make docker-local-up    - Stack LOCAL (.env.local.example, proxy /api, :9080/:9081)"
+	@echo "  make docker-local-down  - Detener stack local"
+	@echo "  make docker-up          - Levantar stack (docker compose up -d --build)"
+	@echo "  make docker-down        - Parar y borrar volumen de Postgres"
 	@echo "  make db-drop-recreate  - Dropear y recrear la base (sin borrar volumen)"
 	@echo "  make db-seed           - Ejecutar migraciones y seeders (dentro del contenedor)"
 	@echo "  make db-fresh          - Dropear DB + migraciones + seed (rápido)"

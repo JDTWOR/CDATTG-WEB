@@ -5,6 +5,11 @@ import { apiService } from '../../services/api';
 import { axiosErrorMessage } from '../../utils/httpError';
 import type { EleccionProceso, EleccionProcesoRequest } from '../../types/eleccion';
 import { administracionPaths } from '../../routes/paths';
+import {
+  anioActualColombia,
+  fromDatetimeLocalColombia,
+  toDatetimeLocalColombia,
+} from '../../utils/formatFecha';
 
 const ESTADO_LABEL: Record<string, string> = {
   borrador: 'Borrador',
@@ -33,27 +38,35 @@ const FECHA_SECCIONES = [
   },
 ] as const;
 
-function toDatetimeLocal(value?: string): string {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function fromDatetimeLocal(value: string): string | null {
-  if (!value) return null;
-  return new Date(value).toISOString();
-}
-
 function buildCreatePayload(form: EleccionProcesoRequest): EleccionProcesoRequest {
   return {
     ...form,
-    fecha_inscripcion_inicio: fromDatetimeLocal(String(form.fecha_inscripcion_inicio ?? '')),
-    fecha_inscripcion_fin: fromDatetimeLocal(String(form.fecha_inscripcion_fin ?? '')),
-    fecha_votacion_inicio: fromDatetimeLocal(String(form.fecha_votacion_inicio ?? '')),
-    fecha_votacion_fin: fromDatetimeLocal(String(form.fecha_votacion_fin ?? '')),
+    fecha_inscripcion_inicio: fromDatetimeLocalColombia(String(form.fecha_inscripcion_inicio ?? '')),
+    fecha_inscripcion_fin: fromDatetimeLocalColombia(String(form.fecha_inscripcion_fin ?? '')),
+    fecha_votacion_inicio: fromDatetimeLocalColombia(String(form.fecha_votacion_inicio ?? '')),
+    fecha_votacion_fin: fromDatetimeLocalColombia(String(form.fecha_votacion_fin ?? '')),
   };
+}
+
+function existeCicloElectoral(procesos: EleccionProceso[], regionalId: number, anio: number): boolean {
+  return procesos.some((p) => p.regional_id === regionalId && p.anio === anio);
+}
+
+function primeraRegionalSinCiclo(
+  procesos: EleccionProceso[],
+  regionales: { id: number; nombre: string }[],
+  anio: number,
+): number | null {
+  const libre = regionales.find((r) => !existeCicloElectoral(procesos, r.id, anio));
+  return libre?.id ?? null;
+}
+
+function puedeCrearCicloEnAnio(
+  procesos: EleccionProceso[],
+  regionales: { id: number; nombre: string }[],
+  anio: number,
+): boolean {
+  return primeraRegionalSinCiclo(procesos, regionales, anio) !== null;
 }
 
 type FechaFieldKey = (typeof FECHA_SECCIONES)[number]['campos'][number]['key'];
@@ -80,7 +93,7 @@ function FechaSeccionesFields({ form, onDateChange }: FechaSeccionesFieldsProps)
                   id={`eleccion-${key}`}
                   type="datetime-local"
                   className="input-field"
-                  value={toDatetimeLocal(String(form[key] ?? ''))}
+                  value={toDatetimeLocalColombia(String(form[key] ?? ''))}
                   onChange={(e) => onDateChange(key, e.target.value)}
                 />
               </div>
@@ -95,6 +108,7 @@ function FechaSeccionesFields({ form, onDateChange }: FechaSeccionesFieldsProps)
 type NuevoCicloEleccionModalProps = Readonly<{
   form: EleccionProcesoRequest;
   regionales: { id: number; nombre: string }[];
+  procesos: EleccionProceso[];
   saving: boolean;
   onClose: () => void;
   onSubmit: () => void;
@@ -104,6 +118,7 @@ type NuevoCicloEleccionModalProps = Readonly<{
 function NuevoCicloEleccionModal({
   form,
   regionales,
+  procesos,
   saving,
   onClose,
   onSubmit,
@@ -112,6 +127,8 @@ function NuevoCicloEleccionModal({
   const setField = <K extends keyof EleccionProcesoRequest>(key: K, value: EleccionProcesoRequest[K]) => {
     onFormChange({ ...form, [key]: value });
   };
+  const cicloDuplicado = existeCicloElectoral(procesos, form.regional_id, form.anio);
+  const regionalNombre = regionales.find((r) => r.id === form.regional_id)?.nombre ?? String(form.regional_id);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -149,6 +166,12 @@ function NuevoCicloEleccionModal({
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-4">
+          {cicloDuplicado ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+              Ya existe un ciclo electoral para <strong>{regionalNombre}</strong> en el año <strong>{form.anio}</strong>.
+              Solo se permite un ciclo por regional y año.
+            </div>
+          ) : null}
           <section>
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Datos generales</h3>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -162,11 +185,15 @@ function NuevoCicloEleccionModal({
                   value={form.regional_id}
                   onChange={(e) => setField('regional_id', Number(e.target.value))}
                 >
-                  {regionales.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.nombre}
-                    </option>
-                  ))}
+                  {regionales.map((r) => {
+                    const ocupada = existeCicloElectoral(procesos, r.id, form.anio);
+                    return (
+                      <option key={r.id} value={r.id} disabled={ocupada}>
+                        {r.nombre}
+                        {ocupada ? ' (ciclo existente)' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
@@ -215,7 +242,7 @@ function NuevoCicloEleccionModal({
           <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onClose} disabled={saving}>
             Cancelar
           </button>
-          <button type="button" className="btn-primary w-full sm:w-auto" disabled={saving} onClick={onSubmit}>
+          <button type="button" className="btn-primary w-full sm:w-auto" disabled={saving || cicloDuplicado} onClick={onSubmit}>
             {saving ? 'Guardando…' : 'Crear ciclo'}
           </button>
         </div>
@@ -282,8 +309,8 @@ export function EleccionesAdminPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<EleccionProcesoRequest>({
     regional_id: 0,
-    anio: new Date().getFullYear(),
-    nombre_ciclo: `Elecciones ${new Date().getFullYear()}`,
+    anio: anioActualColombia(),
+    nombre_ciclo: `Elecciones ${anioActualColombia()}`,
     min_dias_matricula: 30,
   });
 
@@ -311,7 +338,30 @@ export function EleccionesAdminPage() {
     void load();
   }, [load]);
 
+  const anioActual = anioActualColombia();
+  const puedeCrearCiclo = puedeCrearCicloEnAnio(items, regionales, anioActual);
+
+  const handleOpenModal = () => {
+    setError('');
+    const regionalId = primeraRegionalSinCiclo(items, regionales, anioActual);
+    if (regionalId === null) {
+      setError(`Ya existe un ciclo electoral para cada regional en el año ${anioActual}.`);
+      return;
+    }
+    setForm((f) => ({
+      ...f,
+      regional_id: regionalId,
+      anio: anioActual,
+      nombre_ciclo: `Elecciones ${anioActual}`,
+    }));
+    setModalOpen(true);
+  };
+
   const handleCreate = async () => {
+    if (existeCicloElectoral(items, form.regional_id, form.anio)) {
+      setError('Ya existe un ciclo electoral para esta regional en el mismo año.');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -340,7 +390,17 @@ export function EleccionesAdminPage() {
             <ArrowPathIcon className="h-4 w-4" />
             Actualizar
           </button>
-          <button type="button" onClick={() => setModalOpen(true)} className="btn-primary inline-flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleOpenModal}
+            disabled={!puedeCrearCiclo || loading}
+            title={
+              puedeCrearCiclo
+                ? undefined
+                : `Todas las regionales ya tienen un ciclo en ${anioActual}.`
+            }
+            className="btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
             <PlusIcon className="h-4 w-4" />
             Nuevo ciclo
           </button>
@@ -373,10 +433,18 @@ export function EleccionesAdminPage() {
         <NuevoCicloEleccionModal
           form={form}
           regionales={regionales}
+          procesos={items}
           saving={saving}
           onClose={() => setModalOpen(false)}
           onSubmit={() => void handleCreate()}
-          onFormChange={setForm}
+          onFormChange={(next) => {
+            if (existeCicloElectoral(items, next.regional_id, next.anio)) {
+              const regionalLibre = primeraRegionalSinCiclo(items, regionales, next.anio);
+              setForm(regionalLibre === null ? next : { ...next, regional_id: regionalLibre });
+              return;
+            }
+            setForm(next);
+          }}
         />
       ) : null}
     </div>

@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
+import { formatNumero } from '../utils/formatFecha';
 import { useAuth } from '../context/AuthContext';
 import { getAsistenciaDashboardWsUrl } from '../config/api';
 import type {
@@ -215,14 +216,14 @@ function AsistenciaDashboardDataView({
               <p className="text-3xl font-bold text-primary-600 dark:text-primary-400 mt-1 tabular-nums">
                 {totalConSesion > 0 ? (
                   <>
-                    {vinieron.toLocaleString('es-CO')}
+                    {formatNumero(vinieron)}
                     <span className="text-lg font-semibold text-gray-500 dark:text-gray-400">
                       {' '}
-                      / {totalConSesion.toLocaleString('es-CO')}
+                      / {formatNumero(totalConSesion)}
                     </span>
                   </>
                 ) : (
-                  vinieron.toLocaleString('es-CO')
+                  formatNumero(vinieron)
                 )}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -232,7 +233,7 @@ function AsistenciaDashboardDataView({
                     {porcentajeVinieron != null && ` (${porcentajeVinieron}%)`}
                     {scopeJornadaLabel ? ` · ámbito: ${scopeJornadaLabel}` : ''}
                     {enFormacion !== vinieron && (
-                      <> · {enFormacion.toLocaleString('es-CO')} con ingreso sin salida</>
+                      <> · {formatNumero(enFormacion)} con ingreso sin salida</>
                     )}
                   </>
                 ) : (
@@ -241,7 +242,7 @@ function AsistenciaDashboardDataView({
               </p>
               {fichasSinSesion > 0 && totalEsperado > totalConSesion && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Matrícula activa proyectada: {totalEsperado.toLocaleString('es-CO')} aprendices
+                  Matrícula activa proyectada: {formatNumero(totalEsperado)} aprendices
                   ({fichasSinSesion} ficha{fichasSinSesion === 1 ? '' : 's'} sin apertura de sesión)
                 </p>
               )}
@@ -385,8 +386,8 @@ function AsistenciaDashboardDataView({
                     {jornadaFilter ? ` · ${jornadaFilter}` : ''}
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900 dark:text-white tabular-nums">
-                    {totalesConSesion.vinieron.toLocaleString('es-CO')} /{' '}
-                    {totalesConSesion.totalAprendices.toLocaleString('es-CO')}
+                    {formatNumero(totalesConSesion.vinieron)} /{' '}
+                    {formatNumero(totalesConSesion.totalAprendices)}
                   </td>
                   <td />
                 </tr>

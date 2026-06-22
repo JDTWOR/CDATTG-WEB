@@ -9,6 +9,7 @@ import {
   PLACEHOLDER_INSTRUCTOR_LIDER,
 } from '../constants/instructorLiderLabels';
 import { resolveInstructorLiderId } from '../utils/instructorLider';
+import { hoyISOColombia } from '../utils/formatFecha';
 import { SelectSearch } from './SelectSearch';
 import type {
   InstructorFichaResponse,
@@ -74,12 +75,10 @@ interface ModalAsignarFichaProps {
   onSuccess?: () => void;
 }
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => hoyISOColombia();
 const finAnio = () => {
-  const d = new Date();
-  d.setMonth(11);
-  d.setDate(31);
-  return d.toISOString().slice(0, 10);
+  const y = hoyISOColombia().slice(0, 4);
+  return `${y}-12-31`;
 };
 
 export function ModalAsignarFicha(props: Readonly<ModalAsignarFichaProps>) {

@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { apiService } from '../../services/api';
+import { formatFechaVista } from '../../utils/formatFecha';
 import type { AprendizResponse, AsistenciaAprendizResponse, AsistenciaResponse } from '../../types';
 
 export type BadgeColorAsistencia = 'green' | 'yellow' | 'gray';
@@ -39,8 +40,7 @@ export function minIsoDateString(a: string, b: string): string {
 }
 
 export function formatoFechaColumna(iso: string): string {
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
+  return formatFechaVista(iso);
 }
 
 export function fechasEnRango(inicio: string, fin: string, maxFecha?: string): string[] {

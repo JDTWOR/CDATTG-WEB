@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { CasoBienestarItem, InasistenciaDetalleItem } from '../../../types';
-import { formatFechaVista, formatRangoFechasVista } from '../../../utils/formatFecha';
+import { formatDiaSemana, formatFechaHoraCompleta, formatFechaVista, formatRangoFechasVista } from '../../../utils/formatFecha';
 
 type JsPdfConAutoTable = jsPDF & {
   lastAutoTable: { finalY: number };
@@ -16,10 +16,7 @@ export type ReportePdfAprendizParams = Readonly<{
 }>;
 
 function diaSemanaCorto(fecha: string): string {
-  const dt = new Date(`${fecha.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(dt.getTime())) return '';
-  const dia = dt.toLocaleDateString('es-CO', { weekday: 'long' });
-  return dia.charAt(0).toUpperCase() + dia.slice(1);
+  return formatDiaSemana(fecha);
 }
 
 function porcentajeAsistencia(aprendiz: CasoBienestarItem): number {
@@ -57,7 +54,7 @@ export function generarReportePdfAprendiz({
 
   const rango = formatRangoFechasVista(periodo?.fecha_inicio, periodo?.fecha_fin, ' a ');
   const pct = porcentajeAsistencia(aprendiz);
-  const generado = new Date().toLocaleString('es-CO');
+  const generado = formatFechaHoraCompleta();
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
 import type { OrdenResponse, OrdenFromCarritoRequest, ProductoResponse, CarritoItem } from '../types';
+import { formatFechaVista } from '../utils/formatFecha';
 
 export const InventarioOrdenes = () => {
   const { hasPermission } = useAuth();
@@ -163,7 +164,7 @@ export const InventarioOrdenes = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{o.persona_nombre ?? '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{new Date(o.fecha_orden).toLocaleDateString()}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{formatFechaVista(o.fecha_orden)}</td>
                       <td className="px-4 py-3 text-right">
                         <Link to={inventarioPaths.ordenes.detalle(o.id)} className="text-primary-600 dark:text-primary-400 hover:underline text-sm">
                           Ver

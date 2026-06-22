@@ -5,6 +5,7 @@ import { asistenciaPaths, fichasPaths } from '../routes/paths';
 import { ArrowLeftIcon, ArrowDownTrayIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
+import { formatFechaLarga, formatHoraVista, formatNumero } from '../utils/formatFecha';
 import { FichaCaracterizacionCard } from '../components/FichaCaracterizacionCard';
 import {
   exportarExcelAnio,
@@ -123,7 +124,7 @@ function ObservacionesSesionesDiaContenido({ sesiones, sesionesConObservaciones 
           <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
             Sesión #{sesion.id}
             {sesion.hora_inicio
-              ? ` · ${new Date(sesion.hora_inicio).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`
+              ? ` · ${formatHoraVista(sesion.hora_inicio)}`
               : ''}
           </p>
           <p className="text-sm text-gray-700 dark:text-gray-300">{sesion.observaciones}</p>
@@ -418,12 +419,8 @@ export const AsistenciaHistorialFicha = () => {
         const ingresoDate = parseHora(aa.hora_ingreso);
         const salidaDate = parseHora(aa.hora_salida);
 
-        const ing = ingresoDate
-          ? ingresoDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
-          : null;
-        const sal = salidaDate
-          ? salidaDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
-          : null;
+        const ing = ingresoDate ? formatHoraVista(aa.hora_ingreso) : null;
+        const sal = salidaDate ? formatHoraVista(aa.hora_salida) : null;
 
         const hasIngreso = !!ingresoDate;
 
@@ -845,8 +842,8 @@ export const AsistenciaHistorialFicha = () => {
             aria-live="polite"
           >
             <span className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
-              {resumenAsistencia.asistieron.toLocaleString('es-CO')} /{' '}
-              {resumenAsistencia.total.toLocaleString('es-CO')}
+              {formatNumero(resumenAsistencia.asistieron)} /{' '}
+              {formatNumero(resumenAsistencia.total)}
             </span>
             <span className="text-sm text-gray-600 dark:text-gray-400">asistieron</span>
           </div>
@@ -1055,16 +1052,11 @@ export const AsistenciaHistorialFicha = () => {
             <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-600">
               <p className="text-sm text-gray-700 dark:text-gray-300">
                 <span className="font-semibold tabular-nums">
-                  {resumenAsistencia.asistieron.toLocaleString('es-CO')} de{' '}
-                  {resumenAsistencia.total.toLocaleString('es-CO')}
+                  {formatNumero(resumenAsistencia.asistieron)} de{' '}
+                  {formatNumero(resumenAsistencia.total)}
                 </span>{' '}
                 aprendices asistieron el{' '}
-                {new Date(`${fecha}T12:00:00`).toLocaleDateString('es-CO', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
+                {formatFechaLarga(fecha)}
                 .
               </p>
             </div>

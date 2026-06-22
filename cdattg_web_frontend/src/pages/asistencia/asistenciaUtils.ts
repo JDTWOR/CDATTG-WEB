@@ -1,4 +1,5 @@
 import type { AprendizResponse, AsistenciaAprendizResponse } from '../../types';
+import { formatHoraVista } from '../../utils/formatFecha';
 
 export type AccionRegistroDocumento = 'ingreso' | 'salida';
 
@@ -72,10 +73,7 @@ export function summaryRegistros(registros: AsistenciaAprendizResponse[]) {
       new Date(cur.hora_ingreso).getTime() < new Date(best.hora_ingreso).getTime() ? cur : best,
       conIngreso[0],
     );
-    firstIngreso = new Date(earliest.hora_ingreso).toLocaleTimeString('es-CO', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    firstIngreso = formatHoraVista(earliest.hora_ingreso);
   }
 
   let lastSalida: string | null = null;
@@ -84,10 +82,7 @@ export function summaryRegistros(registros: AsistenciaAprendizResponse[]) {
       new Date(cur.hora_salida).getTime() > new Date(best.hora_salida).getTime() ? cur : best,
       conSalida[0],
     );
-    lastSalida = new Date(latest.hora_salida).toLocaleTimeString('es-CO', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    lastSalida = formatHoraVista(latest.hora_salida);
   }
 
   const lastReg = registros.length > 0 ? registros.at(-1) : undefined;
@@ -124,10 +119,7 @@ export function buildRangoText(firstIngreso: string | null, lastSalida: string |
 }
 
 function formatHoraRegistro(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+  return formatHoraVista(iso);
 }
 
 export function formatTramoRegistro(registro: AsistenciaAprendizResponse): string {

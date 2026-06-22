@@ -4,6 +4,7 @@ import { inventarioPaths } from '../routes/paths';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
 import type { OrdenResponse } from '../types';
+import { formatFechaHoraVista, formatFechaVista } from '../utils/formatFecha';
 
 export const InventarioOrdenDetalle = () => {
   const { id } = useParams<{ id: string }>();
@@ -64,9 +65,9 @@ export const InventarioOrdenDetalle = () => {
         <p><span className="font-medium text-gray-700 dark:text-gray-300">Tipo:</span> {orden.tipo_orden}</p>
         <p><span className="font-medium text-gray-700 dark:text-gray-300">Estado:</span> {orden.estado}</p>
         <p><span className="font-medium text-gray-700 dark:text-gray-300">Solicitante:</span> {orden.persona_nombre ?? '-'}</p>
-        <p><span className="font-medium text-gray-700 dark:text-gray-300">Fecha orden:</span> {new Date(orden.fecha_orden).toLocaleString()}</p>
+        <p><span className="font-medium text-gray-700 dark:text-gray-300">Fecha orden:</span> {formatFechaHoraVista(orden.fecha_orden)}</p>
         {orden.fecha_devolucion && (
-          <p><span className="font-medium text-gray-700 dark:text-gray-300">Fecha devolución:</span> {new Date(orden.fecha_devolucion).toLocaleDateString()}</p>
+          <p><span className="font-medium text-gray-700 dark:text-gray-300">Fecha devolución:</span> {formatFechaVista(orden.fecha_devolucion)}</p>
         )}
         <div>
           <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Detalle</p>

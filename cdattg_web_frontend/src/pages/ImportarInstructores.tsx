@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
+import { formatFechaHoraVista } from '../utils/formatFecha';
 import { SelectSearch } from '../components/SelectSearch';
 import type { InstructorImportLogItem, InstructorImportResult, RegionalItem } from '../types';
 
@@ -81,14 +82,7 @@ export const ImportarInstructores = () => {
     }
   };
 
-  const formatDate = (s: string) => {
-    try {
-      const d = new Date(s);
-      return d.toLocaleDateString('es-CO', { dateStyle: 'short' }) + ' ' + d.toLocaleTimeString('es-CO', { timeStyle: 'short' });
-    } catch {
-      return s;
-    }
-  };
+  const formatDate = (s: string) => formatFechaHoraVista(s);
 
   return (
     <div className="space-y-6">

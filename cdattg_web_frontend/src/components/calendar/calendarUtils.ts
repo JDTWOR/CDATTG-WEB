@@ -1,4 +1,7 @@
 import type { InstructorAgendaEvent } from '../../types/agenda';
+import { formatLocalISOColombia } from '../../utils/formatFecha';
+
+export { formatMesAnioLabel } from '../../utils/formatFecha';
 
 export const GRID_START_HOUR = 6;
 export const GRID_END_HOUR = 24;
@@ -106,10 +109,7 @@ export function addDays(d: Date, n: number): Date {
 }
 
 export function formatLocalISO(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return formatLocalISOColombia(d);
 }
 
 export function startOfMonth(d: Date): Date {
@@ -152,11 +152,6 @@ export function formatHorasProgramadas(totalMinutos: number): string {
     return `${h} h`;
   }
   return `${h} h ${m} min`;
-}
-
-export function formatMesAnioLabel(d: Date): string {
-  const raw = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(d);
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 /** Extrae HH:MM de la API sin aplicar zona horaria (horario de pared). */

@@ -62,7 +62,7 @@ import { useDashboardResumen } from './useDashboardResumen';
 
 import { nombrePrimerNombrePrimerApellido } from '../../utils/formatNombreCorto';
 
-import { etiquetaDiaConsulta, formatFechaVista, hoyISOColombia } from '../../utils/formatFecha';
+import { etiquetaDiaConsulta, formatFechaVista, formatNumero, hoyISOColombia } from '../../utils/formatFecha';
 
 import type { RegionalItem, SedeItem } from '../../types';
 
@@ -74,7 +74,7 @@ function fmtDashboardNum(n: number | null | undefined, loading: boolean): string
 
   if (n == null) return '—';
 
-  return n.toLocaleString('es-CO');
+  return formatNumero(n);
 
 }
 

@@ -7,22 +7,7 @@ import {
   UserIcon,
 } from '@heroicons/react/24/outline';
 import type { InasistenciaDetalleItem } from '../../types';
-import { formatFechaVista } from '../../utils/formatFecha';
-
-function diaSemanaLegible(fecha: string): string {
-  const iso = fecha.slice(0, 10);
-  const dt = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(dt.getTime())) return '';
-  const dia = dt.toLocaleDateString('es-CO', { weekday: 'long' });
-  return dia.charAt(0).toUpperCase() + dia.slice(1);
-}
-
-function etiquetaMes(fechaIso: string): string {
-  const dt = new Date(`${fechaIso.slice(0, 7)}-01T12:00:00`);
-  if (Number.isNaN(dt.getTime())) return fechaIso.slice(0, 7);
-  const mes = dt.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
-  return mes.charAt(0).toUpperCase() + mes.slice(1);
-}
+import { formatFechaVista, formatDiaSemana, formatMesAnioDesdeIso } from '../../utils/formatFecha';
 
 function agruparInasistenciasPorMes(
   items: InasistenciaDetalleItem[],
@@ -36,7 +21,7 @@ function agruparInasistenciasPorMes(
   }
   return [...map.entries()]
     .sort(([a], [b]) => b.localeCompare(a))
-    .map(([mes, grupo]) => ({ mes: etiquetaMes(`${mes}-01`), items: grupo }));
+    .map(([mes, grupo]) => ({ mes: formatMesAnioDesdeIso(`${mes}-01`), items: grupo }));
 }
 
 export function InasistenciasDetalleLoadingSkeleton() {
@@ -54,7 +39,7 @@ export function InasistenciasDetalleLoadingSkeleton() {
 }
 
 function InasistenciaCard({ item, indice }: Readonly<{ item: InasistenciaDetalleItem; indice: number }>) {
-  const dia = diaSemanaLegible(item.fecha);
+  const dia = formatDiaSemana(item.fecha);
   const tieneObservaciones = Boolean(item.observaciones?.trim());
 
   return (

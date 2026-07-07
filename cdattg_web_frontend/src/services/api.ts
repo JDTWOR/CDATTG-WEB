@@ -38,6 +38,7 @@ import type {
   AsistenciaDashboardResponse,
   DashboardResumenResponse,
   CasosBienestarResponse,
+  SesionesSinAsistenciaTomadaResponse,
   CasoBienestarAprendizDetalleResponse,
   MisInasistenciasResponse,
   SedeItem,
@@ -812,6 +813,19 @@ class ApiService {
   /** Casos de bienestar: aprendices con N+ inasistencias (riesgo deserción). Params: dias (default 30), min_fallas (default 3), sede_id (opcional). */
   async getCasosBienestar(params?: { dias?: number; min_fallas?: number; sede_id?: number }): Promise<CasosBienestarResponse> {
     const response = await this.api.get<CasosBienestarResponse>('/asistencias/dashboard/casos-bienestar', { params });
+    return response.data;
+  }
+
+  /** Sesiones en días de formación donde el instructor no registró asistencia efectiva (coordinación). */
+  async getSesionesSinAsistenciaTomada(params?: {
+    dias?: number;
+    regional_id?: number;
+    sede_id?: number;
+  }): Promise<SesionesSinAsistenciaTomadaResponse> {
+    const response = await this.api.get<SesionesSinAsistenciaTomadaResponse>(
+      '/asistencias/dashboard/sesiones-sin-asistencia-tomada',
+      { params },
+    );
     return response.data;
   }
 

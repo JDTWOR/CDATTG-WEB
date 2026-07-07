@@ -71,5 +71,13 @@ export const asistenciaRoutes: RouteObject = {
         return { Component: AsistenciaTiposObservacion };
       },
     },
+    {
+      path: 'sesiones-sin-asistencia-tomada',
+      handle: { breadcrumb: { label: 'Sesiones sin asistencia tomada' } },
+      lazy: async () => {
+        const { SesionesSinAsistenciaTomadaPage } = await import('../../pages/asistencia/SesionesSinAsistenciaTomadaPage');
+        return { Component: SesionesSinAsistenciaTomadaPage };
+      },
+    },
   ],
 };

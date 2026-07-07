@@ -41,6 +41,7 @@ export const asistenciaPaths = {
     ficha: (fichaId: number | string) => `/asistencia/historial/fichas/${fichaId}`,
   },
   tiposObservacion: '/asistencia/tipos-observacion',
+  sesionesSinAsistenciaTomada: '/asistencia/sesiones-sin-asistencia-tomada',
 } as const;
 
 export type BienestarCasosQuery = {

@@ -112,6 +112,14 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
   },
   {
     section: 'Asistencia',
+    path: asistenciaPaths.sesionesSinAsistenciaTomada,
+    label: 'Sin asistencia tomada',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
+    iconKey: 'asistencia/sin-asistencia',
+  },
+  {
+    section: 'Asistencia',
     path: asistenciaPaths.index,
     label: 'Reporte de asistencia',
     permission: null,

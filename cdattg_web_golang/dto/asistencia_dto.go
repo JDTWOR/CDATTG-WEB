@@ -171,6 +171,9 @@ type AsistenciaDashboardPorFicha struct {
 type CasosBienestarResponse struct {
 	DiasAnalizados int                       `json:"dias_analizados"`
 	MinFallas      int                       `json:"min_fallas"`
+	FechaInicio    string                    `json:"fecha_inicio"`
+	FechaFin       string                    `json:"fecha_fin"`
+	Historico      bool                      `json:"historico_completo"`
 	Casos          []CasoBienestarItem       `json:"casos"`
 	Instructores   []InstructorPendienteItem `json:"instructores"`
 }
@@ -187,9 +190,10 @@ type CasoBienestarItem struct {
 	InstructorNombre     string `json:"instructor_nombre,omitempty"`
 	AmbienteNombre       string `json:"ambiente_nombre,omitempty"`
 	ModalidadNombre      string `json:"modalidad_formacion_nombre,omitempty"`
-	TotalSesiones        int    `json:"total_sesiones"`
-	AsistenciasEfectivas int    `json:"asistencias_efectivas"`
-	Inasistencias        int    `json:"inasistencias"`
+	TotalSesiones             int    `json:"total_sesiones"`
+	AsistenciasEfectivas      int    `json:"asistencias_efectivas"`
+	Inasistencias             int    `json:"inasistencias"` // sin justificar (umbral de alerta)
+	InasistenciasJustificadas int    `json:"inasistencias_justificadas"`
 }
 
 // InasistenciaDetalleItem representa una fecha de sesión en la que el aprendiz no asistió.
@@ -204,20 +208,23 @@ type CasoBienestarAprendizDetalleResponse struct {
 	FichaNumero   string                    `json:"ficha_numero"`
 	AprendizID    uint                      `json:"aprendiz_id"`
 	FechaInicio   string                    `json:"fecha_inicio"`
-	FechaFin      string                    `json:"fecha_fin"`
-	Inasistencias []InasistenciaDetalleItem `json:"inasistencias"`
+	FechaFin                  string                    `json:"fecha_fin"`
+	Inasistencias             []InasistenciaDetalleItem `json:"inasistencias"`
+	InasistenciasJustificadas []InasistenciaDetalleItem `json:"inasistencias_justificadas"`
 }
 
 // MisInasistenciasResponse detalle de inasistencias del aprendiz autenticado.
 type MisInasistenciasResponse struct {
-	AprendizID         uint                      `json:"aprendiz_id"`
-	FichaNumero        string                    `json:"ficha_numero"`
-	ProgramaNombre     string                    `json:"programa_nombre,omitempty"`
-	SedeNombre         string                    `json:"sede_nombre,omitempty"`
-	FechaInicio        string                    `json:"fecha_inicio"`
-	FechaFin           string                    `json:"fecha_fin"`
-	TotalInasistencias int                       `json:"total_inasistencias"`
-	Inasistencias      []InasistenciaDetalleItem `json:"inasistencias"`
+	AprendizID                uint                      `json:"aprendiz_id"`
+	FichaNumero               string                    `json:"ficha_numero"`
+	ProgramaNombre            string                    `json:"programa_nombre,omitempty"`
+	SedeNombre                string                    `json:"sede_nombre,omitempty"`
+	FechaInicio               string                    `json:"fecha_inicio"`
+	FechaFin                  string                    `json:"fecha_fin"`
+	TotalInasistencias        int                       `json:"total_inasistencias"` // sin justificar
+	TotalInasistenciasJustificadas int                  `json:"total_inasistencias_justificadas"`
+	Inasistencias             []InasistenciaDetalleItem `json:"inasistencias"`
+	InasistenciasJustificadas []InasistenciaDetalleItem `json:"inasistencias_justificadas"`
 }
 
 // InstructorPendienteItem resume cuántos aprendices tiene un instructor con registros "por corregir" (requiere_revision=true) en el período analizado.
@@ -226,4 +233,29 @@ type InstructorPendienteItem struct {
 	InstructorNombre            string `json:"instructor_nombre"`
 	NumeroDocumento             string `json:"numero_documento"`
 	CantidadAprendicesSinSalida int    `json:"cantidad_aprendices_sin_salida"`
+}
+
+// SesionSinAsistenciaTomadaItem incumplimiento del instructor en día de formación programado.
+type SesionSinAsistenciaTomadaItem struct {
+	AsistenciaID       uint   `json:"asistencia_id"`
+	FichaNumero        string `json:"ficha_numero"`
+	InstructorID       uint   `json:"instructor_id"`
+	InstructorNombre   string `json:"instructor_nombre"`
+	NumeroDocumento    string `json:"numero_documento"`
+	ProgramaNombre     string `json:"programa_nombre"`
+	SedeNombre         string `json:"sede_nombre"`
+	JornadaNombre      string `json:"jornada_nombre"`
+	Fecha              string `json:"fecha"`
+	SesionFinalizada   bool   `json:"sesion_finalizada"`
+	TipoIncumplimiento string `json:"tipo_incumplimiento"`
+}
+
+// SesionesSinAsistenciaTomadaResponse listado para coordinación: instructor no tomó asistencia en sesión.
+type SesionesSinAsistenciaTomadaResponse struct {
+	DiasAnalizados int                             `json:"dias_analizados"`
+	FechaInicio    string                          `json:"fecha_inicio"`
+	FechaFin       string                          `json:"fecha_fin"`
+	Historico      bool                            `json:"historico_completo"`
+	Total          int                             `json:"total"`
+	Sesiones       []SesionSinAsistenciaTomadaItem `json:"sesiones"`
 }

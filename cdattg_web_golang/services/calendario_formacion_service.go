@@ -188,6 +188,28 @@ func (s *CalendarioFormacionService) EsSesionFormacionValida(fichaID, instructor
 	return s.instructorTieneFormacionEnFecha(ficha, ifc, fichaDias, diasInst, traslados, fecha)
 }
 
+// DebeTomarAsistenciaEnFechaConDatos evalúa formación programada usando datos precargados (sin consultas extra).
+func (s *CalendarioFormacionService) DebeTomarAsistenciaEnFechaConDatos(
+	ficha *models.FichaCaracterizacion,
+	ifc *models.InstructorFichaCaracterizacion,
+	fichaDias []models.FichaDiasFormacion,
+	diasInst []models.InstructorFichaDias,
+	traslados []models.InstructorFichaTrasladoFecha,
+	fecha time.Time,
+) bool {
+	fecha = fechaCalendario(fecha)
+	if s.EsDiaFestivoColombia(fecha) {
+		return false
+	}
+	if ficha.SedeID != nil && *ficha.SedeID > 0 && s.EsDiaSinFormacionSede(*ficha.SedeID, fecha) {
+		return false
+	}
+	if config.RelaxarRestriccionAsistencia() {
+		return true
+	}
+	return s.instructorTieneFormacionEnFecha(ficha, ifc, fichaDias, diasInst, traslados, fecha)
+}
+
 // PrecargarFestivosEnRango calienta caché de festivos para un rango.
 func (s *CalendarioFormacionService) PrecargarFestivosEnRango(desde, hasta time.Time) error {
 	rows, err := s.diaFestivoRepo.FindEnRango(desde, hasta)

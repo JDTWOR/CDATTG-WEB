@@ -511,12 +511,16 @@ func (h *AsistenciaHandler) GetDashboard(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetCasosBienestar devuelve aprendices con N+ inasistencias en el período (oficina de bienestar). Query: dias (default 30), min_fallas (default 3), sede_id (opcional).
+// GetCasosBienestar devuelve aprendices con N+ inasistencias en el período (oficina de bienestar). Query: dias (default 30, 0=histórico completo), min_fallas (default 3), sede_id (opcional).
 func (h *AsistenciaHandler) GetCasosBienestar(c *gin.Context) {
 	dias := 30
 	if s := c.Query("dias"); s != "" {
-		if n, err := strconv.Atoi(s); err == nil && n > 0 {
-			dias = n
+		if n, err := strconv.Atoi(s); err == nil {
+			if n == 0 {
+				dias = 0
+			} else if n > 0 {
+				dias = n
+			}
 		}
 	}
 	minFallas := 3
@@ -550,8 +554,12 @@ func (h *AsistenciaHandler) GetDetalleInasistenciasAprendiz(c *gin.Context) {
 	}
 	dias := 30
 	if s := c.Query("dias"); s != "" {
-		if n, err := strconv.Atoi(s); err == nil && n > 0 {
-			dias = n
+		if n, err := strconv.Atoi(s); err == nil {
+			if n == 0 {
+				dias = 0
+			} else if n > 0 {
+				dias = n
+			}
 		}
 	}
 	sedeNombre := c.Query("sede")
@@ -584,6 +592,43 @@ func (h *AsistenciaHandler) GetMisInasistencias(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetSesionesSinAsistenciaTomada lista sesiones en días de formación válidos donde el instructor no registró asistencia efectiva. Query: dias (default 30, 0=histórico completo).
+func (h *AsistenciaHandler) GetSesionesSinAsistenciaTomada(c *gin.Context) {
+	userID, _ := c.Get("userID")
+	roles := rolesFromContext(c)
+
+	dias := 30
+	if s := c.Query("dias"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil {
+			if n == 0 {
+				dias = 0
+			} else if n > 0 {
+				dias = n
+			}
+		}
+	}
+	var regionalID, sedeID *uint
+	if v := c.Query("regional_id"); v != "" {
+		if id, err := strconv.ParseUint(v, 10, 64); err == nil {
+			u := uint(id)
+			regionalID = &u
+		}
+	}
+	if v := c.Query("sede_id"); v != "" {
+		if id, err := strconv.ParseUint(v, 10, 64); err == nil {
+			u := uint(id)
+			sedeID = &u
+		}
+	}
+
+	resp, err := h.svc.GetSesionesSinAsistenciaTomada(userID.(uint), roles, dias, regionalID, sedeID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, resp)

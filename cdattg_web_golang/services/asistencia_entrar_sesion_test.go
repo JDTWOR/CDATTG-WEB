@@ -74,8 +74,23 @@ func (s *stubAsistenciaRepoEntrar) ListAprendicesActivosCasosBienestar(*uint) ([
 func (s *stubAsistenciaRepoEntrar) ListAsistenciasEfectivasEnSesiones([]uint) ([]repositories.AsistenciaEfectivaRaw, error) {
 	return nil, nil
 }
+func (s *stubAsistenciaRepoEntrar) ListInasistenciasJustificadasEnSesiones([]uint) ([]repositories.InasistenciaJustificadaRaw, error) {
+	return nil, nil
+}
 func (s *stubAsistenciaRepoEntrar) ListDetalleSesionesCasosBienestar(string, uint, string, string, string) ([]repositories.DetalleSesionCasosBienestarRaw, error) {
 	return nil, nil
+}
+func (s *stubAsistenciaRepoEntrar) ListSesionesSinAsistenciaTomadaEnRango([]uint, string, string) ([]repositories.SesionSinAsistenciaTomadaRow, error) {
+	return nil, nil
+}
+func (s *stubAsistenciaRepoEntrar) ListAsignacionesInstructorFichaActivas([]uint) ([]repositories.AsignacionInstructorFichaReporteRaw, error) {
+	return nil, nil
+}
+func (s *stubAsistenciaRepoEntrar) ListClavesSesionInstructorFichaEnRango([]uint, string, string) ([]repositories.ClaveSesionInstructorFichaRaw, error) {
+	return nil, nil
+}
+func (s *stubAsistenciaRepoEntrar) MinFechaAsistencia(*uint) (time.Time, bool, error) {
+	return time.Time{}, false, nil
 }
 func (s *stubAsistenciaRepoEntrar) FindSesionesNoFinalizadasDesde(string) ([]models.Asistencia, error) {
 	return nil, nil

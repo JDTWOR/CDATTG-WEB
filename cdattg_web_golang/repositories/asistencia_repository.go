@@ -16,14 +16,38 @@ const (
 	asistPreloadAAAprendizPersona           = "AsistenciaAprendices.Aprendiz.Persona"
 	asistCondFichaID                        = "ficha_id = ?"
 	asistSQLFilterSedeFicha                 = " AND fc.sede_id = ?"
+	// Coherente con ListAsistenciasEfectivasEnSesiones / historial de asistencia.
+	asistSQLAsistioEfectivo = `aa_sesion.hora_ingreso IS NOT NULL
+    AND (aa_sesion.estado IS NULL OR aa_sesion.estado = '' OR aa_sesion.estado = 'ASISTENCIA_COMPLETA' OR aa_sesion.estado = 'ASISTENCIA_PARCIAL')`
+	asistSQLAsistioEfectivoAA = `aa.hora_ingreso IS NOT NULL
+    AND (aa.estado IS NULL OR aa.estado = '' OR aa.estado = 'ASISTENCIA_COMPLETA' OR aa.estado = 'ASISTENCIA_PARCIAL')`
+	codigoInasistenciaJustificada = "INASISTENCIA_JUSTIFICADA"
+	asistSQLInasistenciaJustificadaAA = `EXISTS (
+    SELECT 1 FROM asistencia_aprendiz_tipo_observacion aato
+    INNER JOIN tipos_observacion_asistencia toa ON toa.id = aato.tipo_observacion_id
+    WHERE aato.asistencia_aprendiz_id = aa.id
+      AND toa.codigo = '` + codigoInasistenciaJustificada + `'
+      AND toa.deleted_at IS NULL
+  )`
 	// Sesiones abiertas/cerradas sin ningún aprendiz en asistencia_aprendices (ruido operativo).
 	asistSQLSoloSesionesConAprendices = `
   AND EXISTS (
     SELECT 1 FROM asistencia_aprendices aa_sesion WHERE aa_sesion.asistencia_id = a.id
   )`
-	// Coherente con ListAsistenciasEfectivasEnSesiones / historial de asistencia.
-	asistSQLAsistioEfectivo = `aa.hora_ingreso IS NOT NULL
-    AND (aa.estado IS NULL OR aa.estado = '' OR aa.estado = 'ASISTENCIA_COMPLETA' OR aa.estado = 'ASISTENCIA_PARCIAL')`
+	// Sesión con al menos un aprendiz con asistencia efectiva (hora de ingreso y estado válido).
+	asistSQLSesionConAsistenciaTomada = `
+  AND EXISTS (
+    SELECT 1 FROM asistencia_aprendices aa_sesion
+    WHERE aa_sesion.asistencia_id = a.id
+      AND ` + asistSQLAsistioEfectivo + `
+  )`
+	// Sesión sin ninguna asistencia efectiva registrada (falla del instructor).
+	asistSQLSesionSinAsistenciaTomada = `
+  AND NOT EXISTS (
+    SELECT 1 FROM asistencia_aprendices aa_sesion
+    WHERE aa_sesion.asistencia_id = a.id
+      AND ` + asistSQLAsistioEfectivo + `
+  )`
 )
 
 type AsistenciaRepository interface {
@@ -43,7 +67,12 @@ type AsistenciaRepository interface {
 	ListSesionesCasosBienestarEnRango(sedeID *uint, fechaInicio, fechaFin string) ([]SesionCasosBienestarRaw, error)
 	ListAprendicesActivosCasosBienestar(sedeID *uint) ([]AprendizCasosBienestarRaw, error)
 	ListAsistenciasEfectivasEnSesiones(asistenciaIDs []uint) ([]AsistenciaEfectivaRaw, error)
+	ListInasistenciasJustificadasEnSesiones(asistenciaIDs []uint) ([]InasistenciaJustificadaRaw, error)
 	ListDetalleSesionesCasosBienestar(fichaNumero string, aprendizID uint, fechaInicio, fechaFin string, sedeNombre string) ([]DetalleSesionCasosBienestarRaw, error)
+	ListSesionesSinAsistenciaTomadaEnRango(sedeIDs []uint, fechaInicio, fechaFin string) ([]SesionSinAsistenciaTomadaRow, error)
+	ListAsignacionesInstructorFichaActivas(sedeIDs []uint) ([]AsignacionInstructorFichaReporteRaw, error)
+	ListClavesSesionInstructorFichaEnRango(sedeIDs []uint, fechaInicio, fechaFin string) ([]ClaveSesionInstructorFichaRaw, error)
+	MinFechaAsistencia(sedeID *uint) (time.Time, bool, error)
 	FindSesionesNoFinalizadasDesde(fechaDesde string) ([]models.Asistencia, error)
 	GetPendientesRevisionPorInstructor(sedeID *uint, fechaInicio, fechaFin string) ([]PendienteInstructorRow, error)
 }
@@ -60,9 +89,10 @@ type CasosBienestarRow struct {
 	InstructorNombre     string
 	AmbienteNombre       string
 	ModalidadNombre      string
-	TotalSesiones        int
-	AsistenciasEfectivas int
-	Inasistencias        int
+	TotalSesiones             int
+	AsistenciasEfectivas      int
+	Inasistencias             int // sin justificar (alerta bienestar)
+	InasistenciasJustificadas int
 }
 
 // PendienteInstructorRow una fila del resumen de pendientes de revisión por instructor
@@ -80,7 +110,51 @@ type InasistenciaDetalleRow struct {
 	MotivoExclusion  string
 }
 
-// SesionCasosBienestarRaw sesión de asistencia en rango para cálculo de bienestar.
+const (
+	TipoIncumplimientoSesionSinMarcas = "sesion_sin_marcas"
+	TipoIncumplimientoDiaSinSesion    = "dia_sin_sesion"
+)
+
+// SesionSinAsistenciaTomadaRow incumplimiento del instructor: sesión vacía o día programado sin sesión.
+type SesionSinAsistenciaTomadaRow struct {
+	AsistenciaID        uint
+	InstructorFichaID   uint
+	FichaID             uint
+	FichaNumero         string
+	InstructorID        uint
+	InstructorNombre    string
+	NumeroDocumento     string
+	ProgramaNombre      string
+	SedeNombre          string
+	JornadaNombre       string
+	SedeID              uint
+	Fecha               time.Time
+	IsFinished          bool
+	TipoIncumplimiento  string
+}
+
+// AsignacionInstructorFichaReporteRaw asignación activa instructor–ficha para reporte de coordinación.
+type AsignacionInstructorFichaReporteRaw struct {
+	InstructorFichaID uint
+	InstructorID      uint
+	FichaID           uint
+	FichaNumero       string
+	InstructorNombre  string
+	NumeroDocumento   string
+	ProgramaNombre    string
+	SedeNombre        string
+	JornadaNombre     string
+	SedeID            uint
+	FechaInicio       *time.Time
+	FechaFin          *time.Time
+}
+
+// ClaveSesionInstructorFichaRaw sesión existente (instructor_ficha + fecha).
+type ClaveSesionInstructorFichaRaw struct {
+	InstructorFichaID uint
+	Fecha             time.Time
+}
+
 type SesionCasosBienestarRaw struct {
 	AsistenciaID uint
 	FichaID      uint
@@ -106,9 +180,15 @@ type AprendizCasosBienestarRaw struct {
 
 // AsistenciaEfectivaRaw asistencia efectiva de un aprendiz en una sesión.
 type AsistenciaEfectivaRaw struct {
-	AprendizID     uint
-	AsistenciaID   uint
-	Observaciones  string
+	AprendizID    uint
+	AsistenciaID  uint
+	Observaciones string
+}
+
+// InasistenciaJustificadaRaw inasistencia con tipo INASISTENCIA_JUSTIFICADA en la sesión.
+type InasistenciaJustificadaRaw struct {
+	AprendizID   uint
+	AsistenciaID uint
 }
 
 // DetalleSesionCasosBienestarRaw sesión con datos para detalle por aprendiz.
@@ -120,6 +200,7 @@ type DetalleSesionCasosBienestarRaw struct {
 	Fecha            time.Time
 	InstructorNombre string
 	AsistioEfectivo  bool
+	Justificada      bool
 	Observaciones    string
 }
 
@@ -317,7 +398,7 @@ func (r *asistenciaRepository) GetDashboardResumen(sedeID *uint, fecha string) (
 	var rows []row
 	raw := `
 		SELECT fc.id AS ficha_id, fc.ficha AS ficha_numero, COALESCE(pf.nombre, '') AS programa_nombre, COALESCE(j.nombre, '') AS jornada_nombre, COALESCE(s.nombre, '') AS sede_nombre,
-		       COUNT(DISTINCT CASE WHEN ` + asistSQLAsistioEfectivo + ` THEN aa.aprendiz_ficha_id END)::int AS cantidad_vinieron,
+		       COUNT(DISTINCT CASE WHEN ` + asistSQLAsistioEfectivoAA + ` THEN aa.aprendiz_ficha_id END)::int AS cantidad_vinieron,
 		       COUNT(DISTINCT CASE WHEN aa.hora_ingreso IS NOT NULL AND aa.hora_salida IS NULL THEN aa.aprendiz_ficha_id END)::int AS cantidad_en_formacion,
 		       COUNT(DISTINCT af.id)::int AS total_aprendices
 		FROM asistencias a
@@ -466,7 +547,7 @@ FROM asistencias a
 INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
 INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id
 WHERE a.fecha >= ? AND a.fecha < ?
-` + asistSQLSoloSesionesConAprendices
+` + asistSQLSesionConAsistenciaTomada
 	args := []interface{}{tInicio, tFin}
 	if sedeID != nil && *sedeID > 0 {
 		raw += asistSQLFilterSedeFicha
@@ -568,7 +649,7 @@ SELECT
   COALESCE(aa.observaciones, '') AS observaciones
 FROM asistencia_aprendices aa
 WHERE aa.asistencia_id IN ?
-  AND `+asistSQLAsistioEfectivo+`
+  AND `+asistSQLAsistioEfectivoAA+`
 `, asistenciaIDs).Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -576,6 +657,33 @@ WHERE aa.asistencia_id IN ?
 	out := make([]AsistenciaEfectivaRaw, len(rows))
 	for i := range rows {
 		out[i] = AsistenciaEfectivaRaw(rows[i])
+	}
+	return out, nil
+}
+
+func (r *asistenciaRepository) ListInasistenciasJustificadasEnSesiones(asistenciaIDs []uint) ([]InasistenciaJustificadaRaw, error) {
+	if len(asistenciaIDs) == 0 {
+		return nil, nil
+	}
+	type row struct {
+		AprendizID   uint `gorm:"column:aprendiz_id"`
+		AsistenciaID uint `gorm:"column:asistencia_id"`
+	}
+	var rows []row
+	err := r.db.Raw(`
+SELECT DISTINCT
+  aa.aprendiz_ficha_id AS aprendiz_id,
+  aa.asistencia_id
+FROM asistencia_aprendices aa
+WHERE aa.asistencia_id IN ?
+  AND `+asistSQLInasistenciaJustificadaAA+`
+`, asistenciaIDs).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]InasistenciaJustificadaRaw, len(rows))
+	for i := range rows {
+		out[i] = InasistenciaJustificadaRaw(rows[i])
 	}
 	return out, nil
 }
@@ -604,6 +712,7 @@ func (r *asistenciaRepository) ListDetalleSesionesCasosBienestar(
 		Fecha            time.Time `gorm:"column:fecha"`
 		InstructorNombre string    `gorm:"column:instructor_nombre"`
 		AsistioEfectivo  bool      `gorm:"column:asistio_efectivo"`
+		Justificada      bool      `gorm:"column:justificada"`
 		Observaciones    string    `gorm:"column:observaciones"`
 	}
 	raw := `
@@ -620,6 +729,7 @@ SELECT
     AND (aa.estado IS NULL OR aa.estado = '' OR aa.estado = 'ASISTENCIA_COMPLETA' OR aa.estado = 'ASISTENCIA_PARCIAL'),
     false
   ) AS asistio_efectivo,
+  COALESCE(`+asistSQLInasistenciaJustificadaAA+`, false) AS justificada,
   COALESCE(aa.observaciones, '') AS observaciones
 FROM asistencias a
 INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
@@ -630,7 +740,7 @@ LEFT JOIN sedes s ON s.id = fc.sede_id
 LEFT JOIN asistencia_aprendices aa ON aa.asistencia_id = a.id AND aa.aprendiz_ficha_id = ?
 WHERE a.fecha >= ? AND a.fecha < ?
   AND fc.ficha = ?
-` + asistSQLSoloSesionesConAprendices + `
+` + asistSQLSesionConAsistenciaTomada + `
 `
 	args := []interface{}{aprendizID, tInicio, tFin, fichaNumero}
 	if strings.TrimSpace(sedeNombre) != "" {
@@ -645,6 +755,222 @@ WHERE a.fecha >= ? AND a.fecha < ?
 	out := make([]DetalleSesionCasosBienestarRaw, len(rows))
 	for i := range rows {
 		out[i] = DetalleSesionCasosBienestarRaw(rows[i])
+	}
+	return out, nil
+}
+
+func appendAsistenciaSedeFilter(raw string, args []interface{}, sedeIDs []uint) (string, []interface{}) {
+	switch len(sedeIDs) {
+	case 0:
+		return raw, args
+	case 1:
+		return raw + asistSQLFilterSedeFicha, append(args, sedeIDs[0])
+	default:
+		return raw + " AND fc.sede_id IN ?", append(args, sedeIDs)
+	}
+}
+
+func (r *asistenciaRepository) ListSesionesSinAsistenciaTomadaEnRango(sedeIDs []uint, fechaInicio, fechaFin string) ([]SesionSinAsistenciaTomadaRow, error) {
+	tInicio, err := time.Parse(time.DateOnly, fechaInicio)
+	if err != nil {
+		return nil, err
+	}
+	tFin, err := time.Parse(time.DateOnly, fechaFin)
+	if err != nil {
+		return nil, err
+	}
+	tFin = tFin.AddDate(0, 0, 1)
+
+	type row struct {
+		AsistenciaID      uint      `gorm:"column:asistencia_id"`
+		InstructorFichaID uint      `gorm:"column:instructor_ficha_id"`
+		FichaID           uint      `gorm:"column:ficha_id"`
+		FichaNumero       string    `gorm:"column:ficha_numero"`
+		InstructorID      uint      `gorm:"column:instructor_id"`
+		InstructorNombre  string    `gorm:"column:instructor_nombre"`
+		NumeroDocumento   string    `gorm:"column:numero_documento"`
+		ProgramaNombre    string    `gorm:"column:programa_nombre"`
+		SedeNombre        string    `gorm:"column:sede_nombre"`
+		JornadaNombre     string    `gorm:"column:jornada_nombre"`
+		SedeID            uint      `gorm:"column:sede_id"`
+		Fecha             time.Time `gorm:"column:fecha"`
+		IsFinished        bool      `gorm:"column:is_finished"`
+	}
+	raw := `
+SELECT
+  a.id AS asistencia_id,
+  ifc.id AS instructor_ficha_id,
+  fc.id AS ficha_id,
+  fc.ficha AS ficha_numero,
+  ifc.instructor_id,
+  TRIM(COALESCE(p.primer_nombre,'') || ' ' || COALESCE(p.segundo_nombre,'') || ' ' ||
+       COALESCE(p.primer_apellido,'') || ' ' || COALESCE(p.segundo_apellido,'')) AS instructor_nombre,
+  COALESCE(p.numero_documento, '') AS numero_documento,
+  COALESCE(pf.nombre, '') AS programa_nombre,
+  COALESCE(s.nombre, '') AS sede_nombre,
+  COALESCE(j.nombre, '') AS jornada_nombre,
+  COALESCE(fc.sede_id, 0) AS sede_id,
+  a.fecha::date AS fecha,
+  a.is_finished
+FROM asistencias a
+INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
+INNER JOIN instructors i ON i.id = ifc.instructor_id
+INNER JOIN personas p ON p.id = i.persona_id
+INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id
+LEFT JOIN programas_formacion pf ON pf.id = fc.programa_formacion_id
+LEFT JOIN sedes s ON s.id = fc.sede_id
+LEFT JOIN jornadas j ON j.id = fc.jornada_id
+WHERE a.fecha >= ? AND a.fecha < ?
+  AND fc.deleted_at IS NULL
+  AND fc.status = true
+` + asistSQLSesionSinAsistenciaTomada
+	args := []interface{}{tInicio, tFin}
+	raw, args = appendAsistenciaSedeFilter(raw, args, sedeIDs)
+	raw += " ORDER BY a.fecha DESC, fc.ficha, instructor_nombre"
+	var rows []row
+	if err := r.db.Raw(raw, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]SesionSinAsistenciaTomadaRow, len(rows))
+	for i := range rows {
+		out[i] = SesionSinAsistenciaTomadaRow{
+			AsistenciaID:       rows[i].AsistenciaID,
+			InstructorFichaID:  rows[i].InstructorFichaID,
+			FichaID:            rows[i].FichaID,
+			FichaNumero:        rows[i].FichaNumero,
+			InstructorID:       rows[i].InstructorID,
+			InstructorNombre:   rows[i].InstructorNombre,
+			NumeroDocumento:    rows[i].NumeroDocumento,
+			ProgramaNombre:     rows[i].ProgramaNombre,
+			SedeNombre:         rows[i].SedeNombre,
+			JornadaNombre:      rows[i].JornadaNombre,
+			SedeID:             rows[i].SedeID,
+			Fecha:              rows[i].Fecha,
+			IsFinished:         rows[i].IsFinished,
+			TipoIncumplimiento: TipoIncumplimientoSesionSinMarcas,
+		}
+	}
+	return out, nil
+}
+
+func (r *asistenciaRepository) MinFechaAsistencia(sedeID *uint) (time.Time, bool, error) {
+	type row struct {
+		MinFecha *time.Time `gorm:"column:min_fecha"`
+	}
+	raw := `
+SELECT MIN(a.fecha)::date AS min_fecha
+FROM asistencias a
+INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
+INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id
+WHERE a.deleted_at IS NULL
+  AND fc.deleted_at IS NULL
+`
+	args := []interface{}{}
+	if sedeID != nil && *sedeID > 0 {
+		raw += asistSQLFilterSedeFicha
+		args = append(args, *sedeID)
+	}
+	var result row
+	if err := r.db.Raw(raw, args...).Scan(&result).Error; err != nil {
+		return time.Time{}, false, err
+	}
+	if result.MinFecha == nil {
+		return time.Time{}, false, nil
+	}
+	return *result.MinFecha, true, nil
+}
+
+func (r *asistenciaRepository) ListAsignacionesInstructorFichaActivas(sedeIDs []uint) ([]AsignacionInstructorFichaReporteRaw, error) {
+	type row struct {
+		InstructorFichaID uint       `gorm:"column:instructor_ficha_id"`
+		InstructorID      uint       `gorm:"column:instructor_id"`
+		FichaID           uint       `gorm:"column:ficha_id"`
+		FichaNumero       string     `gorm:"column:ficha_numero"`
+		InstructorNombre  string     `gorm:"column:instructor_nombre"`
+		NumeroDocumento   string     `gorm:"column:numero_documento"`
+		ProgramaNombre    string     `gorm:"column:programa_nombre"`
+		SedeNombre        string     `gorm:"column:sede_nombre"`
+		JornadaNombre     string     `gorm:"column:jornada_nombre"`
+		SedeID            uint       `gorm:"column:sede_id"`
+		FechaInicio       *time.Time `gorm:"column:fecha_inicio"`
+		FechaFin          *time.Time `gorm:"column:fecha_fin"`
+	}
+	raw := `
+SELECT
+  ifc.id AS instructor_ficha_id,
+  ifc.instructor_id,
+  fc.id AS ficha_id,
+  fc.ficha AS ficha_numero,
+  TRIM(COALESCE(p.primer_nombre,'') || ' ' || COALESCE(p.segundo_nombre,'') || ' ' ||
+       COALESCE(p.primer_apellido,'') || ' ' || COALESCE(p.segundo_apellido,'')) AS instructor_nombre,
+  COALESCE(p.numero_documento, '') AS numero_documento,
+  COALESCE(pf.nombre, '') AS programa_nombre,
+  COALESCE(s.nombre, '') AS sede_nombre,
+  COALESCE(j.nombre, '') AS jornada_nombre,
+  COALESCE(fc.sede_id, 0) AS sede_id,
+  ifc.fecha_inicio,
+  ifc.fecha_fin
+FROM instructor_fichas_caracterizacion ifc
+INNER JOIN fichas_caracterizacion fc ON fc.id = ifc.ficha_id
+INNER JOIN instructors i ON i.id = ifc.instructor_id
+INNER JOIN personas p ON p.id = i.persona_id
+LEFT JOIN programas_formacion pf ON pf.id = fc.programa_formacion_id
+LEFT JOIN sedes s ON s.id = fc.sede_id
+LEFT JOIN jornadas j ON j.id = fc.jornada_id
+WHERE fc.deleted_at IS NULL
+  AND fc.status = true
+  AND ifc.deleted_at IS NULL
+`
+	args := []interface{}{}
+	raw, args = appendAsistenciaSedeFilter(raw, args, sedeIDs)
+	raw += " ORDER BY fc.ficha, instructor_nombre"
+	var rows []row
+	if err := r.db.Raw(raw, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]AsignacionInstructorFichaReporteRaw, len(rows))
+	for i := range rows {
+		out[i] = AsignacionInstructorFichaReporteRaw(rows[i])
+	}
+	return out, nil
+}
+
+func (r *asistenciaRepository) ListClavesSesionInstructorFichaEnRango(sedeIDs []uint, fechaInicio, fechaFin string) ([]ClaveSesionInstructorFichaRaw, error) {
+	tInicio, err := time.Parse(time.DateOnly, fechaInicio)
+	if err != nil {
+		return nil, err
+	}
+	tFin, err := time.Parse(time.DateOnly, fechaFin)
+	if err != nil {
+		return nil, err
+	}
+	tFin = tFin.AddDate(0, 0, 1)
+
+	type row struct {
+		InstructorFichaID uint      `gorm:"column:instructor_ficha_id"`
+		Fecha             time.Time `gorm:"column:fecha"`
+	}
+	raw := `
+SELECT
+  a.instructor_ficha_id,
+  a.fecha::date AS fecha
+FROM asistencias a
+INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id
+INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id
+WHERE a.fecha >= ? AND a.fecha < ?
+  AND a.deleted_at IS NULL
+  AND fc.deleted_at IS NULL
+  AND fc.status = true
+`
+	args := []interface{}{tInicio, tFin}
+	raw, args = appendAsistenciaSedeFilter(raw, args, sedeIDs)
+	var rows []row
+	if err := r.db.Raw(raw, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]ClaveSesionInstructorFichaRaw, len(rows))
+	for i := range rows {
+		out[i] = ClaveSesionInstructorFichaRaw(rows[i])
 	}
 	return out, nil
 }

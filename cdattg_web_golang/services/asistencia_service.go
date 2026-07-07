@@ -66,6 +66,7 @@ type AsistenciaService interface {
 	GetCasosBienestar(sedeID *uint, dias, minFallas int) (*dto.CasosBienestarResponse, error)
 	GetDetalleInasistenciasAprendiz(fichaNumero string, aprendizID uint, dias int, sedeNombre string) (*dto.CasoBienestarAprendizDetalleResponse, error)
 	GetMisInasistencias(personaID uint, dias int) (*dto.MisInasistenciasResponse, error)
+	GetSesionesSinAsistenciaTomada(userID uint, roles []string, dias int, regionalID, sedeID *uint) (*dto.SesionesSinAsistenciaTomadaResponse, error)
 	AjustarEstadoAprendiz(asistenciaAprendizID uint, estado, motivo string, instructorFichaIDRegistroSalida *uint) (*dto.AsistenciaAprendizResponse, error)
 	ListPendientesRevision(instructorID uint, fecha string) ([]dto.AsistenciaAprendizResponse, error)
 	FinalizarSesionesVencidas()
@@ -808,41 +809,44 @@ func (s *asistenciaService) GetDashboard(sedeID *uint, fecha string) (*dto.Asist
 }
 
 func (s *asistenciaService) GetCasosBienestar(sedeID *uint, dias, minFallas int) (*dto.CasosBienestarResponse, error) {
-	if dias <= 0 {
-		dias = 30
-	}
 	if minFallas <= 0 {
 		minFallas = 3
 	}
-	fechaFin := time.Now()
-	fechaInicio := fechaFin.AddDate(0, 0, -dias)
-	fechaInicioStr := fechaInicio.Format(time.DateOnly)
-	fechaFinStr := fechaFin.Format(time.DateOnly)
+	rango, err := resolverRangoCasosBienestar(s.repo, sedeID, dias)
+	if err != nil {
+		return nil, err
+	}
+	fechaInicioStr := rango.FechaInicio.Format(time.DateOnly)
+	fechaFinStr := rango.FechaFin.Format(time.DateOnly)
 
 	rows, err := NewCasosBienestarCalculator().Calcular(sedeID, fechaInicioStr, fechaFinStr, minFallas)
 	if err != nil {
 		return nil, err
 	}
 	resp := &dto.CasosBienestarResponse{
-		DiasAnalizados: dias,
+		DiasAnalizados: rango.DiasAnalizados,
 		MinFallas:      minFallas,
+		FechaInicio:    fechaInicioStr,
+		FechaFin:       fechaFinStr,
+		Historico:      rango.Historico,
 		Casos:          make([]dto.CasoBienestarItem, len(rows)),
 	}
 	for i := range rows {
 		resp.Casos[i] = dto.CasoBienestarItem{
-			AprendizID:           rows[i].AprendizID,
-			PersonaNombre:        rows[i].PersonaNombre,
-			NumeroDocumento:      rows[i].NumeroDocumento,
-			FichaNumero:          rows[i].FichaNumero,
-			ProgramaNombre:       rows[i].ProgramaNombre,
-			SedeNombre:           rows[i].SedeNombre,
-			JornadaNombre:        rows[i].JornadaNombre,
-			InstructorNombre:     rows[i].InstructorNombre,
-			AmbienteNombre:       rows[i].AmbienteNombre,
-			ModalidadNombre:      rows[i].ModalidadNombre,
-			TotalSesiones:        rows[i].TotalSesiones,
-			AsistenciasEfectivas: rows[i].AsistenciasEfectivas,
-			Inasistencias:        rows[i].Inasistencias,
+			AprendizID:                rows[i].AprendizID,
+			PersonaNombre:             rows[i].PersonaNombre,
+			NumeroDocumento:           rows[i].NumeroDocumento,
+			FichaNumero:               rows[i].FichaNumero,
+			ProgramaNombre:            rows[i].ProgramaNombre,
+			SedeNombre:                rows[i].SedeNombre,
+			JornadaNombre:             rows[i].JornadaNombre,
+			InstructorNombre:          rows[i].InstructorNombre,
+			AmbienteNombre:            rows[i].AmbienteNombre,
+			ModalidadNombre:           rows[i].ModalidadNombre,
+			TotalSesiones:             rows[i].TotalSesiones,
+			AsistenciasEfectivas:      rows[i].AsistenciasEfectivas,
+			Inasistencias:             rows[i].Inasistencias,
+			InasistenciasJustificadas: rows[i].InasistenciasJustificadas,
 		}
 	}
 	// Resumen por instructor: cantidad de aprendices con registros pendientes de revisión (sin salida, REGISTRO_POR_CORREGIR) en el mismo rango.
@@ -864,30 +868,37 @@ func (s *asistenciaService) GetDetalleInasistenciasAprendiz(fichaNumero string, 
 	if strings.TrimSpace(fichaNumero) == "" || aprendizID == 0 {
 		return nil, errors.New("ficha y aprendiz son requeridos")
 	}
-	if dias <= 0 {
-		dias = 30
+	rango, err := resolverRangoCasosBienestar(s.repo, nil, dias)
+	if err != nil {
+		return nil, err
 	}
-	fechaFin := time.Now()
-	fechaInicio := fechaFin.AddDate(0, 0, -dias)
-	fechaInicioStr := fechaInicio.Format(time.DateOnly)
-	fechaFinStr := fechaFin.Format(time.DateOnly)
+	fechaInicioStr := rango.FechaInicio.Format(time.DateOnly)
+	fechaFinStr := rango.FechaFin.Format(time.DateOnly)
 
-	rows, err := NewCasosBienestarCalculator().CalcularDetalle(fichaNumero, aprendizID, fechaInicioStr, fechaFinStr, sedeNombre)
+	sinJustificar, justificadas, err := NewCasosBienestarCalculator().CalcularDetalle(fichaNumero, aprendizID, fechaInicioStr, fechaFinStr, sedeNombre)
 	if err != nil {
 		return nil, err
 	}
 	resp := &dto.CasoBienestarAprendizDetalleResponse{
-		FichaNumero:   fichaNumero,
-		AprendizID:    aprendizID,
-		FechaInicio:   fechaInicioStr,
-		FechaFin:      fechaFinStr,
-		Inasistencias: make([]dto.InasistenciaDetalleItem, len(rows)),
+		FichaNumero:               fichaNumero,
+		AprendizID:                aprendizID,
+		FechaInicio:               fechaInicioStr,
+		FechaFin:                  fechaFinStr,
+		Inasistencias:             make([]dto.InasistenciaDetalleItem, len(sinJustificar)),
+		InasistenciasJustificadas: make([]dto.InasistenciaDetalleItem, len(justificadas)),
 	}
-	for i := range rows {
+	for i := range sinJustificar {
 		resp.Inasistencias[i] = dto.InasistenciaDetalleItem{
-			Fecha:            rows[i].Fecha,
-			InstructorNombre: rows[i].InstructorNombre,
-			Observaciones:    rows[i].Observaciones,
+			Fecha:            sinJustificar[i].Fecha,
+			InstructorNombre: sinJustificar[i].InstructorNombre,
+			Observaciones:    sinJustificar[i].Observaciones,
+		}
+	}
+	for i := range justificadas {
+		resp.InasistenciasJustificadas[i] = dto.InasistenciaDetalleItem{
+			Fecha:            justificadas[i].Fecha,
+			InstructorNombre: justificadas[i].InstructorNombre,
+			Observaciones:    justificadas[i].Observaciones,
 		}
 	}
 	return resp, nil
@@ -923,15 +934,84 @@ func (s *asistenciaService) GetMisInasistencias(personaID uint, dias int) (*dto.
 		return nil, err
 	}
 	return &dto.MisInasistenciasResponse{
-		AprendizID:         aprendiz.ID,
-		FichaNumero:        detalle.FichaNumero,
-		ProgramaNombre:     programaNombre,
-		SedeNombre:         sedeNombre,
-		FechaInicio:        detalle.FechaInicio,
-		FechaFin:           detalle.FechaFin,
-		TotalInasistencias: len(detalle.Inasistencias),
-		Inasistencias:      detalle.Inasistencias,
+		AprendizID:                     aprendiz.ID,
+		FichaNumero:                    detalle.FichaNumero,
+		ProgramaNombre:                 programaNombre,
+		SedeNombre:                     sedeNombre,
+		FechaInicio:                    detalle.FechaInicio,
+		FechaFin:                       detalle.FechaFin,
+		TotalInasistencias:             len(detalle.Inasistencias),
+		TotalInasistenciasJustificadas: len(detalle.InasistenciasJustificadas),
+		Inasistencias:                  detalle.Inasistencias,
+		InasistenciasJustificadas:      detalle.InasistenciasJustificadas,
 	}, nil
+}
+
+func (s *asistenciaService) GetSesionesSinAsistenciaTomada(
+	userID uint,
+	roles []string,
+	dias int,
+	regionalID, sedeID *uint,
+) (*dto.SesionesSinAsistenciaTomadaResponse, error) {
+	scopeSvc := NewDashboardScopeService()
+	scope, err := scopeSvc.Resolve(userID, roles)
+	if err != nil {
+		return nil, err
+	}
+	sedeIDs, restrictedEmpty := scopeSvc.ResolveEffectiveSedes(scope, regionalID, sedeID)
+
+	var minSedeID *uint
+	if sedeID != nil && *sedeID > 0 {
+		minSedeID = sedeID
+	} else if len(sedeIDs) == 1 {
+		minSedeID = &sedeIDs[0]
+	}
+	rango, err := resolverRangoCasosBienestar(s.repo, minSedeID, dias)
+	if err != nil {
+		return nil, err
+	}
+	fechaInicioStr := rango.FechaInicio.Format(time.DateOnly)
+	fechaFinStr := rango.FechaFin.Format(time.DateOnly)
+
+	if restrictedEmpty {
+		return &dto.SesionesSinAsistenciaTomadaResponse{
+			DiasAnalizados: rango.DiasAnalizados,
+			FechaInicio:    fechaInicioStr,
+			FechaFin:       fechaFinStr,
+			Historico:      rango.Historico,
+			Total:          0,
+			Sesiones:       []dto.SesionSinAsistenciaTomadaItem{},
+		}, nil
+	}
+
+	rows, err := NewCasosBienestarCalculator().ListSesionesSinAsistenciaTomada(sedeIDs, fechaInicioStr, fechaFinStr)
+	if err != nil {
+		return nil, err
+	}
+	resp := &dto.SesionesSinAsistenciaTomadaResponse{
+		DiasAnalizados: rango.DiasAnalizados,
+		FechaInicio:    fechaInicioStr,
+		FechaFin:       fechaFinStr,
+		Historico:      rango.Historico,
+		Total:          len(rows),
+		Sesiones:       make([]dto.SesionSinAsistenciaTomadaItem, len(rows)),
+	}
+	for i := range rows {
+		resp.Sesiones[i] = dto.SesionSinAsistenciaTomadaItem{
+			AsistenciaID:       rows[i].AsistenciaID,
+			FichaNumero:        rows[i].FichaNumero,
+			InstructorID:       rows[i].InstructorID,
+			InstructorNombre:   rows[i].InstructorNombre,
+			NumeroDocumento:    rows[i].NumeroDocumento,
+			ProgramaNombre:     rows[i].ProgramaNombre,
+			SedeNombre:         rows[i].SedeNombre,
+			JornadaNombre:      rows[i].JornadaNombre,
+			Fecha:              rows[i].Fecha.Format(time.DateOnly),
+			SesionFinalizada:   rows[i].IsFinished,
+			TipoIncumplimiento: rows[i].TipoIncumplimiento,
+		}
+	}
+	return resp, nil
 }
 
 func (s *asistenciaService) GetAsistenciaAprendizByID(id uint) (*dto.AsistenciaAprendizResponse, error) {

@@ -177,6 +177,7 @@ func SetupRouter() *gin.Engine {
 			asistencias.GET("/dashboard/casos-bienestar/ficha/:fichaNumero/aprendiz/:aprendizId/detalle", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.GetDetalleInasistenciasAprendiz)
 			asistencias.GET("/mis-inasistencias", middleware.RequirePermission("asistencia", permVerMisInasistencias), asistenciaHandler.GetMisInasistencias)
 			asistencias.GET("/dashboard/pendientes-revision-instructor", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.ListPendientesRevisionAdmin)
+			asistencias.GET("/dashboard/sesiones-sin-asistencia-tomada", middleware.RequireSuperAdminAdminOrCoordinator(), asistenciaHandler.GetSesionesSinAsistenciaTomada)
 			// Entrar a tomar asistencia: solo requiere estar autenticado; el servicio valida que el usuario sea instructor asignado a la ficha.
 			asistencias.POST("/entrar-tomar-asistencia", asistenciaHandler.EntrarTomarAsistencia)
 			asistencias.GET("/reglas", asistenciaHandler.GetReglas)

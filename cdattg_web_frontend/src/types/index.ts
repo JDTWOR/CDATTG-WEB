@@ -49,6 +49,26 @@ export interface PersonaRequest {
   nivel_escolaridad_id?: number;
 }
 
+/** Actualización de perfil propio (sin número de documento ni estado). */
+export interface PersonaSelfUpdateRequest {
+  tipo_documento?: number;
+  primer_nombre: string;
+  segundo_nombre?: string;
+  primer_apellido: string;
+  segundo_apellido?: string;
+  fecha_nacimiento?: string;
+  genero?: number;
+  telefono?: string;
+  celular?: string;
+  email?: string;
+  pais_id?: number;
+  departamento_id?: number;
+  municipio_id?: number;
+  direccion?: string;
+  parametro_id?: number;
+  nivel_escolaridad_id?: number;
+}
+
 export interface PersonaResponse {
   id: number;
   tipo_documento?: number;

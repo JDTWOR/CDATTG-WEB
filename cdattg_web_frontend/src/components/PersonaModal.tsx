@@ -14,9 +14,17 @@ interface PersonaModalProps {
   persona: PersonaResponse | null;
   onClose: () => void;
   onSave: (data: PersonaRequest) => void;
+  /** Perfil propio: número de documento bloqueado y sin campo estado. */
+  selfService?: boolean;
 }
 
 const MIN_AGE = 14;
+
+function personaModalTitle(selfService: boolean, isEdit: boolean): string {
+  if (selfService) return 'Editar mi perfil';
+  if (isEdit) return 'Editar Persona';
+  return 'Registro de Persona';
+}
 
 const F = {
   tipoDoc: 'persona-modal-tipo-documento',
@@ -35,7 +43,7 @@ const F = {
   municipio: 'persona-modal-municipio',
 } as const;
 
-export const PersonaModal = ({ persona, onClose, onSave }: Readonly<PersonaModalProps>) => {
+export const PersonaModal = ({ persona, onClose, onSave, selfService = false }: Readonly<PersonaModalProps>) => {
   const [formData, setFormData] = useState<PersonaRequest>({
     numero_documento: '',
     primer_nombre: '',
@@ -177,7 +185,7 @@ export const PersonaModal = ({ persona, onClose, onSave }: Readonly<PersonaModal
       >
         <div className="border-b border-gray-200 p-6 dark:border-gray-600">
           <h2 id={modalTitleId} className="text-2xl font-bold text-gray-900 dark:text-white">
-            {persona ? 'Editar Persona' : 'Registro de Persona'}
+            {personaModalTitle(selfService, Boolean(persona))}
           </h2>
         </div>
         <form onSubmit={handleSubmit} className="space-y-6 p-6">
@@ -207,9 +215,11 @@ export const PersonaModal = ({ persona, onClose, onSave }: Readonly<PersonaModal
                   id={F.numDoc}
                   type="text"
                   required
+                  readOnly={selfService}
                   value={formData.numero_documento}
                   onChange={(e) => setFormData({ ...formData, numero_documento: e.target.value })}
-                  className="input-field"
+                  className={`input-field${selfService ? ' cursor-not-allowed bg-gray-100 dark:bg-gray-700' : ''}`}
+                  title={selfService ? 'El número de documento no se puede modificar' : undefined}
                 />
               </div>
               <div>
@@ -411,18 +421,20 @@ export const PersonaModal = ({ persona, onClose, onSave }: Readonly<PersonaModal
             </div>
           </section>
 
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="persona-modal-status"
-              checked={formData.status ?? true}
-              onChange={(e) => setFormData({ ...formData, status: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            <label htmlFor="persona-modal-status" className="ml-2 block text-sm text-gray-900 dark:text-gray-200">
-              Activo
-            </label>
-          </div>
+          {selfService ? null : (
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="persona-modal-status"
+                checked={formData.status ?? true}
+                onChange={(e) => setFormData({ ...formData, status: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              />
+              <label htmlFor="persona-modal-status" className="ml-2 block text-sm text-gray-900 dark:text-gray-200">
+                Activo
+              </label>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3 border-t border-gray-200 pt-4 dark:border-gray-600">
             <button type="button" onClick={onClose} className="btn-secondary">

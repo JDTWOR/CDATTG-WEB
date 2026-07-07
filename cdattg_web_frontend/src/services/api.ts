@@ -7,6 +7,7 @@ import type {
   ChangePasswordRequest,
   UserResponse,
   PersonaRequest,
+  PersonaSelfUpdateRequest,
   PersonaResponse,
   PaginatedResponse,
   PersonaImportResult,
@@ -284,6 +285,11 @@ class ApiService {
 
   async updatePersona(id: number, data: PersonaRequest): Promise<PersonaResponse> {
     const response = await this.api.put<PersonaResponse>(`/personas/${id}`, data);
+    return response.data;
+  }
+
+  async updateMiPersona(data: PersonaSelfUpdateRequest): Promise<PersonaResponse> {
+    const response = await this.api.put<PersonaResponse>('/personas/mi-perfil', data);
     return response.data;
   }
 

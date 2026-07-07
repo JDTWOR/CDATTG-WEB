@@ -18,6 +18,8 @@ type FichaRepository interface {
 	FindActivasParaHoyConJornada(hoy time.Time) ([]models.FichaCaracterizacion, error)
 	// FindActivasParaFechaConJornada fichas activas con formación el día de la semana de fecha; sedeID opcional.
 	FindActivasParaFechaConJornada(fecha time.Time, sedeID *uint) ([]models.FichaCaracterizacion, error)
+	// FindActivasSolapandoRango fichas activas cuyo período solapa [desde, hasta] (para análisis histórico).
+	FindActivasSolapandoRango(desde, hasta time.Time, sedeIDs []uint, jornadaNombre string, soloEnFormacion bool) ([]models.FichaCaracterizacion, error)
 	Search(query string) ([]models.FichaCaracterizacion, error)
 	Create(ficha *models.FichaCaracterizacion) error
 	Update(ficha *models.FichaCaracterizacion) error
@@ -66,7 +68,11 @@ func (r *fichaRepository) FindByIDWithInstructoresAndAprendices(id uint) (*model
 
 func (r *fichaRepository) FindByFicha(ficha string) (*models.FichaCaracterizacion, error) {
 	var fichaModel models.FichaCaracterizacion
-	if err := r.db.Where("ficha = ?", ficha).First(&fichaModel).Error; err != nil {
+	norm := strings.TrimSpace(ficha)
+	if norm == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	if err := r.db.Where("UPPER(ficha) = UPPER(?)", norm).First(&fichaModel).Error; err != nil {
 		return nil, err
 	}
 	return &fichaModel, nil
@@ -96,6 +102,32 @@ func (r *fichaRepository) FindActivasParaFechaConJornada(fecha time.Time, sedeID
 	var list []models.FichaCaracterizacion
 	err := q.Preload("Jornada").Preload("ProgramaFormacion").Preload("Sede").Preload("FichaDiasFormacion").
 		Find(&list).Error
+	return list, err
+}
+
+// FindActivasSolapandoRango devuelve fichas activas con vigencia que intersecta el rango consultado.
+func (r *fichaRepository) FindActivasSolapandoRango(desde, hasta time.Time, sedeIDs []uint, jornadaNombre string, soloEnFormacion bool) ([]models.FichaCaracterizacion, error) {
+	desdeStr := desde.Format(time.DateOnly)
+	hastaStr := hasta.Format(time.DateOnly)
+	q := r.db.Where("status = ?", true)
+	if !config.IgnorarVigenciaFicha() {
+		q = q.Where("(fecha_inicio IS NULL OR fecha_inicio <= ?)", hastaStr)
+		if soloEnFormacion {
+			nowStr := time.Now().Format(time.DateOnly)
+			q = q.Where("(fecha_fin IS NULL OR fecha_fin >= ?)", nowStr)
+		} else {
+			q = q.Where("(fecha_fin IS NULL OR fecha_fin >= ?)", desdeStr)
+		}
+	}
+	if len(sedeIDs) > 0 {
+		q = q.Where("sede_id IN ?", sedeIDs)
+	}
+	if strings.TrimSpace(jornadaNombre) != "" {
+		q = q.Where("jornada_id IN (SELECT id FROM jornadas WHERE nombre = ? AND deleted_at IS NULL)", jornadaNombre)
+	}
+	var list []models.FichaCaracterizacion
+	err := q.Preload("Jornada").Preload("ProgramaFormacion").Preload("Sede").Preload("FichaDiasFormacion").
+		Order("ficha ASC").Find(&list).Error
 	return list, err
 }
 

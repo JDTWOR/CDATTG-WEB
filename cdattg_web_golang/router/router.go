@@ -262,6 +262,7 @@ func SetupRouter() *gin.Engine {
 			stats.Use(middleware.RequireDashboardStats())
 			{
 				stats.GET("/dashboard-resumen", statsHandler.GetDashboardResumen)
+				stats.GET("/asistencia-analisis", statsHandler.GetAsistenciaAnalisis)
 			}
 
 			elecciones := protected.Group("/elecciones")

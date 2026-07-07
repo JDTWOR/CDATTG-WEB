@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sena/cdattg-web-golang/authz"
@@ -11,11 +12,15 @@ import (
 )
 
 type StatsHandler struct {
-	dashboardSvc services.DashboardResumenService
+	dashboardSvc  services.DashboardResumenService
+	analisisSvc   services.AsistenciaAnalisisService
 }
 
 func NewStatsHandler() *StatsHandler {
-	return &StatsHandler{dashboardSvc: services.NewDashboardResumenService()}
+	return &StatsHandler{
+		dashboardSvc: services.NewDashboardResumenService(),
+		analisisSvc:  services.NewAsistenciaAnalisisService(),
+	}
 }
 
 func rolesFromContext(c *gin.Context) []string {
@@ -60,6 +65,49 @@ func (h *StatsHandler) GetDashboardResumen(c *gin.Context) {
 	resp, err := h.dashboardSvc.GetResumen(userID.(uint), roles, fecha, regionalID, sedeID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetAsistenciaAnalisis GET /api/stats/asistencia-analisis
+func (h *StatsHandler) GetAsistenciaAnalisis(c *gin.Context) {
+	userID, _ := c.Get("userID")
+	roles := rolesFromContext(c)
+
+	p := services.AsistenciaAnalisisParams{
+		FechaDesde: c.Query("fecha_desde"),
+		FechaHasta: c.Query("fecha_hasta"),
+		Jornada:    c.Query("jornada"),
+	}
+	if v := c.Query("regional_id"); v != "" {
+		if id, err := strconv.ParseUint(v, 10, 64); err == nil {
+			u := uint(id)
+			p.RegionalID = &u
+		}
+	}
+	if v := c.Query("sede_id"); v != "" {
+		if id, err := strconv.ParseUint(v, 10, 64); err == nil {
+			u := uint(id)
+			p.SedeID = &u
+		}
+	}
+	p.FichaNumero = strings.TrimSpace(c.Query("ficha"))
+	if v := c.Query("aprendiz_id"); v != "" {
+		if id, err := strconv.ParseUint(v, 10, 64); err == nil {
+			u := uint(id)
+			p.AprendizID = &u
+		}
+	}
+	if v := c.Query("dia_semana_id"); v != "" {
+		if id, err := strconv.Atoi(v); err == nil {
+			p.DiaSemanaID = &id
+		}
+	}
+
+	resp, err := h.analisisSvc.GetAnalisis(userID.(uint), roles, p)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, resp)

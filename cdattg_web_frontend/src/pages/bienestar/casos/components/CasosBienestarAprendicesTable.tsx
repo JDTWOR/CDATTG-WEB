@@ -141,7 +141,10 @@ export function CasosBienestarAprendicesTable({
                 Cumplimiento
               </th>
               <th className="px-4 py-3.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                Inasistencias
+                Sin justificar
+              </th>
+              <th className="hidden px-4 py-3.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 md:table-cell">
+                Justificadas
               </th>
               <th className="px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
                 Acciones
@@ -186,6 +189,15 @@ export function CasosBienestarAprendicesTable({
                   </td>
                   <td className="px-4 py-3.5 text-center">
                     <BadgeInasistencias inasistencias={c.inasistencias} minFallas={minFallas} />
+                  </td>
+                  <td className="hidden px-4 py-3.5 text-center md:table-cell">
+                    {(c.inasistencias_justificadas ?? 0) > 0 ? (
+                      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                        {c.inasistencias_justificadas}
+                      </span>
+                    ) : (
+                      <span className="text-sm tabular-nums text-gray-400 dark:text-gray-500">0</span>
+                    )}
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center justify-end gap-1.5">

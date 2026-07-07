@@ -20,6 +20,8 @@ export function MisInasistenciasPage() {
   }
 
   const rangoPeriodo = formatRangoFechasVista(data?.fecha_inicio, data?.fecha_fin);
+  const justificadas = data?.inasistencias_justificadas ?? [];
+  const totalJustificadas = data?.total_inasistencias_justificadas ?? justificadas.length;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -27,7 +29,8 @@ export function MisInasistenciasPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Mis inasistencias</h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Consulte las sesiones de formación en las que no registró asistencia efectiva.
+            Consulte las sesiones en las que no registró asistencia efectiva, separadas entre justificadas y sin
+            justificar.
           </p>
         </div>
         <button
@@ -81,35 +84,80 @@ export function MisInasistenciasPage() {
           </label>
         </div>
 
-        <div className="mt-4 flex items-center gap-3 rounded-lg bg-amber-50 px-4 py-3 dark:bg-amber-950/30">
-          <CalendarDaysIcon className="h-8 w-8 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-          <div>
-            <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
-              {loading ? '—' : (data?.total_inasistencias ?? 0)}
-            </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400">
-              Inasistencias
-              {rangoPeriodo && (
-                <>
-                  {' '}
-                  · {rangoPeriodo}
-                </>
-              )}
-            </p>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex items-center gap-3 rounded-lg bg-amber-50 px-4 py-3 dark:bg-amber-950/30">
+            <CalendarDaysIcon className="h-8 w-8 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+            <div>
+              <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                {loading ? '—' : (data?.total_inasistencias ?? 0)}
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                Sin justificar
+                {rangoPeriodo && (
+                  <>
+                    {' '}
+                    · {rangoPeriodo}
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-lg bg-blue-50 px-4 py-3 dark:bg-blue-950/30">
+            <CalendarDaysIcon className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
+            <div>
+              <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                {loading ? '—' : totalJustificadas}
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Justificadas</p>
+            </div>
           </div>
         </div>
 
-        <div className="mt-6">
-          <InasistenciasDetalleLista
-            loading={loading}
-            error={error}
-            inasistencias={data?.inasistencias ?? []}
-          />
+        <div className="mt-6 space-y-6">
+          <section>
+            <h2 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
+              Inasistencias sin justificar
+              {!loading && (
+                <span className="ml-2 font-normal text-gray-500 dark:text-gray-400">
+                  ({data?.inasistencias.length ?? 0})
+                </span>
+              )}
+            </h2>
+            <InasistenciasDetalleLista
+              loading={loading}
+              error={error}
+              inasistencias={data?.inasistencias ?? []}
+              variant="sin_justificar"
+              emptyDescription="No tiene inasistencias sin justificar en el período consultado."
+            />
+          </section>
+
+          {(loading || justificadas.length > 0) && (
+            <section>
+              <h2 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
+                Inasistencias justificadas
+                {!loading && (
+                  <span className="ml-2 font-normal text-gray-500 dark:text-gray-400">
+                    ({justificadas.length})
+                  </span>
+                )}
+              </h2>
+              <InasistenciasDetalleLista
+                loading={loading}
+                error=""
+                inasistencias={justificadas}
+                variant="justificada"
+                emptyTitle="Sin inasistencias justificadas"
+                emptyDescription="No hay registros con tipo «Inasistencia justificada» en el período consultado."
+              />
+            </section>
+          )}
         </div>
 
         {!loading && !error && (
           <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-            Criterio: días con formación programada. Excluye festivos y PARO de sede.
+            Criterio: días con formación programada. Excluye festivos y PARO de sede. Las justificadas requieren que el
+            instructor haya registrado el tipo de observación correspondiente.
           </p>
         )}
       </div>

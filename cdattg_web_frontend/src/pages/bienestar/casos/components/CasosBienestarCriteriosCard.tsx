@@ -1,5 +1,5 @@
 import { FunnelIcon } from '@heroicons/react/24/outline';
-import { CASOS_BIEN_DIAS_ID, CASOS_BIEN_MIN_FALLAS_ID } from '../casosBienestarConstants';
+import { CASOS_BIEN_DIAS_HISTORICO, CASOS_BIEN_DIAS_ID, CASOS_BIEN_DIAS_OPCIONES, CASOS_BIEN_MIN_FALLAS_ID } from '../casosBienestarConstants';
 
 type CasosBienestarCriteriosCardProps = Readonly<{
   dias: number;
@@ -14,6 +14,8 @@ export function CasosBienestarCriteriosCard({
   onDiasChange,
   onMinFallasChange,
 }: CasosBienestarCriteriosCardProps) {
+  const esHistorico = dias === CASOS_BIEN_DIAS_HISTORICO;
+
   return (
     <div className="card p-4">
       <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -23,7 +25,7 @@ export function CasosBienestarCriteriosCard({
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <label htmlFor={CASOS_BIEN_DIAS_ID} className="text-sm text-gray-600 dark:text-gray-400">
-            Últimos
+            {esHistorico ? 'Período' : 'Últimos'}
           </label>
           <select
             id={CASOS_BIEN_DIAS_ID}
@@ -31,15 +33,16 @@ export function CasosBienestarCriteriosCard({
             onChange={(e) => onDiasChange(Number(e.target.value))}
             className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
           >
-            <option value={15}>15 días</option>
-            <option value={30}>30 días</option>
-            <option value={60}>60 días</option>
-            <option value={90}>90 días</option>
+            {CASOS_BIEN_DIAS_OPCIONES.map((opcion) => (
+              <option key={opcion.value} value={opcion.value}>
+                {opcion.label}
+              </option>
+            ))}
           </select>
         </div>
         <div className="flex items-center gap-2">
           <label htmlFor={CASOS_BIEN_MIN_FALLAS_ID} className="text-sm text-gray-600 dark:text-gray-400">
-            Mínimo de inasistencias
+            Mínimo de inasistencias sin justificar
           </label>
           <select
             id={CASOS_BIEN_MIN_FALLAS_ID}

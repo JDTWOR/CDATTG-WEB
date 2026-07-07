@@ -6,6 +6,7 @@ import { CasosBienestarAprendicesTable } from './components/CasosBienestarAprend
 import { CasosBienestarCriteriosCard } from './components/CasosBienestarCriteriosCard';
 import { CasosBienestarInasistenciasModal } from './components/CasosBienestarInasistenciasModal';
 import { useCasosBienestarFichaDetalle } from './hooks/useCasosBienestarFichaDetalle';
+import { resumenPeriodoCasosBienestar } from './casosBienestarUtils';
 
 export function CasosBienestarFichaDetallePage() {
   const page = useCasosBienestarFichaDetalle();
@@ -100,7 +101,12 @@ export function CasosBienestarFichaDetallePage() {
                   {page.casosFichaTotal}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Con {page.minFallas} o más inasistencias en los últimos {page.dias} días
+                  {resumenPeriodoCasosBienestar(
+                    page.dias,
+                    page.minFallas,
+                    page.data?.fecha_inicio,
+                    page.data?.fecha_fin,
+                  )}
                 </p>
                 {page.busquedaActiva && page.casosFichaTotal > 0 && (
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -120,11 +126,19 @@ export function CasosBienestarFichaDetallePage() {
                   <span className="font-semibold tabular-nums">{page.totalSesiones}</span>
                 </p>
                 <p className="text-sm text-gray-900 dark:text-white">
-                  Inasistencias acumuladas:{' '}
+                  Inasistencias sin justificar:{' '}
                   <span className="font-semibold tabular-nums text-amber-600 dark:text-amber-400">
                     {page.totalInasistencias}
                   </span>
                 </p>
+                {page.totalInasistenciasJustificadas > 0 && (
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    Inasistencias justificadas:{' '}
+                    <span className="font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+                      {page.totalInasistenciasJustificadas}
+                    </span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -165,6 +179,7 @@ export function CasosBienestarFichaDetallePage() {
           loading={page.detalleLoading}
           error={page.detalleError}
           inasistencias={page.detalleInasistencias}
+          inasistenciasJustificadas={page.detalleInasistenciasJustificadas}
           dias={page.dias}
           minFallas={page.minFallas}
           periodo={page.detallePeriodo}
@@ -172,6 +187,7 @@ export function CasosBienestarFichaDetallePage() {
           onDescargarPdf={() =>
             void page.descargarReportePdfAprendiz(page.aprendizDetalle!, {
               inasistencias: page.detalleInasistencias,
+              inasistenciasJustificadas: page.detalleInasistenciasJustificadas,
               periodo: page.detallePeriodo,
             })
           }

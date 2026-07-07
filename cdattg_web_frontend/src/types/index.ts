@@ -683,6 +683,9 @@ export interface UsuarioRegionalesResponse {
 export interface CasosBienestarResponse {
   dias_analizados: number;
   min_fallas: number;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  historico_completo?: boolean;
   casos: CasoBienestarItem[];
 }
 
@@ -698,6 +701,7 @@ export interface CasoBienestarAprendizDetalleResponse {
   fecha_inicio: string;
   fecha_fin: string;
   inasistencias: InasistenciaDetalleItem[];
+  inasistencias_justificadas?: InasistenciaDetalleItem[];
 }
 
 export interface MisInasistenciasResponse {
@@ -707,8 +711,34 @@ export interface MisInasistenciasResponse {
   sede_nombre?: string;
   fecha_inicio: string;
   fecha_fin: string;
+  /** Inasistencias sin justificar */
   total_inasistencias: number;
+  total_inasistencias_justificadas?: number;
   inasistencias: InasistenciaDetalleItem[];
+  inasistencias_justificadas?: InasistenciaDetalleItem[];
+}
+
+export interface SesionSinAsistenciaTomadaItem {
+  asistencia_id: number;
+  ficha_numero: string;
+  instructor_id: number;
+  instructor_nombre: string;
+  numero_documento: string;
+  programa_nombre: string;
+  sede_nombre: string;
+  jornada_nombre: string;
+  fecha: string;
+  sesion_finalizada: boolean;
+  tipo_incumplimiento: 'sesion_sin_marcas' | 'dia_sin_sesion';
+}
+
+export interface SesionesSinAsistenciaTomadaResponse {
+  dias_analizados: number;
+  fecha_inicio: string;
+  fecha_fin: string;
+  historico_completo?: boolean;
+  total: number;
+  sesiones: SesionSinAsistenciaTomadaItem[];
 }
 
 export interface CasoBienestarItem {
@@ -724,7 +754,9 @@ export interface CasoBienestarItem {
   modalidad_formacion_nombre?: string;
   total_sesiones: number;
   asistencias_efectivas: number;
+  /** Inasistencias sin justificar (umbral de alerta) */
   inasistencias: number;
+  inasistencias_justificadas?: number;
 }
 
 export interface AsistenciaDashboardPorFicha {

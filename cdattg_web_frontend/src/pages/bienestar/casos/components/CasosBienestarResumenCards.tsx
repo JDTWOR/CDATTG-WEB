@@ -1,5 +1,6 @@
 import { DocumentMagnifyingGlassIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import type { CasosBienestarResponse } from '../../../../types';
+import { resumenPeriodoCasosBienestar } from '../casosBienestarUtils';
 
 type CasosBienestarResumenCardsProps = Readonly<{
   data: CasosBienestarResponse;
@@ -24,7 +25,12 @@ export function CasosBienestarResumenCards({
           <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Casos detectados</p>
           <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{data.casos.length}</p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Últimos {data.dias_analizados} días, con {data.min_fallas}+ inasistencias
+            {resumenPeriodoCasosBienestar(
+              data.dias_analizados,
+              data.min_fallas,
+              data.fecha_inicio,
+              data.fecha_fin,
+            )}
           </p>
           {filtrosActivos && totalFichas > 0 && (
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">

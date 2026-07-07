@@ -119,11 +119,43 @@ export function casosDeFicha(
 
 export function porcentajeAsistenciaAprendiz(caso: CasoBienestarItem): number {
   if (caso.total_sesiones <= 0) return 0;
-  return Math.round((caso.asistencias_efectivas / caso.total_sesiones) * 100);
+  const cubiertas = caso.asistencias_efectivas + (caso.inasistencias_justificadas ?? 0);
+  return Math.round((cubiertas / caso.total_sesiones) * 100);
 }
 
 export function nivelAlertaInasistencias(inasistencias: number, minFallas: number): 'alto' | 'medio' | 'base' {
   if (inasistencias >= minFallas + 3) return 'alto';
   if (inasistencias >= minFallas + 1) return 'medio';
   return 'base';
+}
+
+export function parseDiasCasosBienestarParam(raw: string | null | undefined): number {
+  if (raw == null || raw === '') return 30;
+  const n = Number(raw);
+  if (n === 0) return 0;
+  if (Number.isFinite(n) && n > 0) return n;
+  return 30;
+}
+
+export function etiquetaPeriodoCasosBienestar(
+  dias: number,
+  fechaInicio?: string,
+  fechaFin?: string,
+): string {
+  if (dias === 0) {
+    if (fechaInicio && fechaFin) {
+      return `Desde ${fechaInicio} hasta ${fechaFin}`;
+    }
+    return 'Histórico completo';
+  }
+  return `Últimos ${dias} días`;
+}
+
+export function resumenPeriodoCasosBienestar(
+  dias: number,
+  minFallas: number,
+  fechaInicio?: string,
+  fechaFin?: string,
+): string {
+  return `${etiquetaPeriodoCasosBienestar(dias, fechaInicio, fechaFin)}, con ${minFallas}+ inasistencias sin justificar`;
 }

@@ -38,22 +38,32 @@ export function InasistenciasDetalleLoadingSkeleton() {
   );
 }
 
-function InasistenciaCard({ item, indice }: Readonly<{ item: InasistenciaDetalleItem; indice: number }>) {
+function InasistenciaCard({
+  item,
+  indice,
+  variant = 'sin_justificar',
+}: Readonly<{ item: InasistenciaDetalleItem; indice: number; variant?: 'sin_justificar' | 'justificada' }>) {
   const dia = formatDiaSemana(item.fecha);
   const tieneObservaciones = Boolean(item.observaciones?.trim());
+  const esJustificada = variant === 'justificada';
+  const borderClass = esJustificada
+    ? 'border-blue-100 dark:border-blue-900/40'
+    : 'border-amber-100 dark:border-amber-900/40';
+  const barClass = esJustificada ? 'bg-blue-400 dark:bg-blue-500' : 'bg-amber-400 dark:bg-amber-500';
+  const badgeClass = esJustificada
+    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+    : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+  const iconClass = esJustificada ? 'text-blue-600 dark:text-blue-400' : 'text-amber-600 dark:text-amber-400';
 
   return (
     <article
-      className="relative rounded-lg border border-amber-100 bg-white pl-4 pr-4 py-3 shadow-sm dark:border-amber-900/40 dark:bg-gray-800/80"
+      className={`relative rounded-lg border bg-white pl-4 pr-4 py-3 shadow-sm dark:bg-gray-800/80 ${borderClass}`}
       aria-label={`Inasistencia ${indice + 1}: ${formatFechaVista(item.fecha)}`}
     >
-      <span
-        className="absolute left-0 top-3 bottom-3 w-1 rounded-full bg-amber-400 dark:bg-amber-500"
-        aria-hidden
-      />
+      <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-full ${barClass}`} aria-hidden />
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <CalendarDaysIcon className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+          <CalendarDaysIcon className={`h-4 w-4 shrink-0 ${iconClass}`} aria-hidden />
           <div>
             <p className="text-sm font-semibold text-gray-900 dark:text-white">
               {formatFechaVista(item.fecha)}
@@ -61,8 +71,8 @@ function InasistenciaCard({ item, indice }: Readonly<{ item: InasistenciaDetalle
             {dia && <p className="text-xs text-gray-500 dark:text-gray-400">{dia}</p>}
           </div>
         </div>
-        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-          Registro de inasistencia
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeClass}`}>
+          {esJustificada ? 'Inasistencia justificada' : 'Sin justificar'}
         </span>
       </div>
       <div className="mt-3 flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -89,6 +99,7 @@ type InasistenciasDetalleListaProps = Readonly<{
   loading: boolean;
   error: string;
   inasistencias: InasistenciaDetalleItem[];
+  variant?: 'sin_justificar' | 'justificada';
   emptyTitle?: string;
   emptyDescription?: string;
 }>;
@@ -97,6 +108,7 @@ export function InasistenciasDetalleLista({
   loading,
   error,
   inasistencias,
+  variant = 'sin_justificar',
   emptyTitle = 'Sin registros de inasistencia',
   emptyDescription = 'No se identificaron sesiones con inasistencia en el período consultado.',
 }: InasistenciasDetalleListaProps) {
@@ -141,7 +153,7 @@ export function InasistenciasDetalleLista({
           </h4>
           <div className="space-y-3">
             {grupo.items.map((item, idx) => (
-              <InasistenciaCard key={`${item.fecha}-${idx}`} item={item} indice={idx} />
+              <InasistenciaCard key={`${item.fecha}-${idx}`} item={item} indice={idx} variant={variant} />
             ))}
           </div>
         </section>

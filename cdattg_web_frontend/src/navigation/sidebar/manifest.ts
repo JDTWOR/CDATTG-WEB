@@ -120,6 +120,14 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
   },
   {
     section: 'Asistencia',
+    path: asistenciaPaths.analisis,
+    label: 'Panel analítico de asistencia',
+    permission: null,
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
+    iconKey: 'asistencia/dashboard',
+  },
+  {
+    section: 'Asistencia',
     path: asistenciaPaths.index,
     label: 'Reporte de asistencia',
     permission: null,

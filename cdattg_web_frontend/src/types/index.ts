@@ -693,6 +693,52 @@ export interface DashboardResumenResponse {
   }>;
 }
 
+/** Panel analítico de asistencia (bloques A, B, C) */
+export interface AsistenciaAnalisisResponse {
+  fecha_desde: string;
+  fecha_hasta: string;
+  hora_toma: {
+    promedio_hora: string;
+    promedio_minutos_dia: number;
+    total_sesiones: number;
+    detalle_por_ficha: Array<{
+      ficha_id: number;
+      ficha_numero: string;
+      jornada_nombre: string;
+      promedio_hora: string;
+      total_sesiones: number;
+    }>;
+  };
+  cumplimiento: {
+    items: Array<{
+      ficha_id: number;
+      ficha_numero: string;
+      programa_nombre: string;
+      jornada_nombre: string;
+      sede_nombre: string;
+      dias_programados: number;
+      dias_con_sesion: number;
+      pct_cumplimiento: number;
+    }>;
+  };
+  dia_semana: {
+    por_dia_jornada: Array<{
+      dia_semana_id: number;
+      dia_semana: string;
+      jornada_nombre: string;
+      esperados: number;
+      vinieron: number;
+      pct: number;
+    }>;
+    dias_mas_asistencia: Array<{
+      dia_semana_id: number;
+      dia_semana: string;
+      vinieron: number;
+      pct: number;
+    }>;
+  };
+}
+
 export interface UsuarioRegionalesResponse {
   user_id: number;
   regional_ids: number[];

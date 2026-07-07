@@ -79,5 +79,13 @@ export const asistenciaRoutes: RouteObject = {
         return { Component: SesionesSinAsistenciaTomadaPage };
       },
     },
+    {
+      path: 'analisis',
+      handle: { breadcrumb: { label: 'Panel analítico de asistencia' } },
+      lazy: async () => {
+        const { PanelAnaliticoAsistenciaPage } = await import('../../pages/asistencia-analisis/PanelAnaliticoAsistenciaPage');
+        return { Component: PanelAnaliticoAsistenciaPage };
+      },
+    },
   ],
 };

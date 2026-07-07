@@ -38,6 +38,7 @@ import type {
   TipoObservacionAsistenciaCreateRequest,
   AsistenciaDashboardResponse,
   DashboardResumenResponse,
+  AsistenciaAnalisisResponse,
   CasosBienestarResponse,
   SesionesSinAsistenciaTomadaResponse,
   CasoBienestarAprendizDetalleResponse,
@@ -813,6 +814,21 @@ class ApiService {
   /** Panel KPI principal /dashboard. Params: fecha, regional_id, sede_id. */
   async getDashboardResumen(params?: { fecha?: string; regional_id?: number; sede_id?: number }): Promise<DashboardResumenResponse> {
     const response = await this.api.get<DashboardResumenResponse>('/stats/dashboard-resumen', { params });
+    return response.data;
+  }
+
+  /** Panel analítico de asistencia (hora toma, cumplimiento por ficha, día de semana). */
+  async getAsistenciaAnalisis(params?: {
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    regional_id?: number;
+    sede_id?: number;
+    jornada?: string;
+    ficha?: string;
+    aprendiz_id?: number;
+    dia_semana_id?: number;
+  }): Promise<AsistenciaAnalisisResponse> {
+    const response = await this.api.get<AsistenciaAnalisisResponse>('/stats/asistencia-analisis', { params });
     return response.data;
   }
 

@@ -46,7 +46,7 @@ const SesionSinAsistenciaRow = memo(function SesionSinAsistenciaRow({
 
 function etiquetaIncumplimiento(item: SesionSinAsistenciaTomadaItem): string {
   if (item.tipo_incumplimiento === 'dia_sin_sesion') {
-    return 'Día programado sin sesión';
+    return 'Sin Registro';
   }
   if (item.sesion_finalizada) {
     return 'Sesión finalizada sin marcas';

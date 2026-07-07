@@ -19,8 +19,9 @@ type mockPersonaService struct {
 	findAllFunc   func(int, int, string) ([]dto.PersonaResponse, int64, error)
 	findByIDFunc  func(uint) (*dto.PersonaResponse, error)
 	createFunc    func(dto.PersonaRequest) (*dto.PersonaResponse, error)
-	updateFunc    func(uint, dto.PersonaRequest) (*dto.PersonaResponse, error)
-	deleteFunc    func(uint) error
+	updateFunc     func(uint, dto.PersonaRequest) (*dto.PersonaResponse, error)
+	updateSelfFunc func(uint, dto.PersonaSelfUpdateRequest) (*dto.PersonaResponse, error)
+	deleteFunc     func(uint) error
 	resetPassword func(uint) error
 }
 
@@ -58,6 +59,13 @@ func (m *mockPersonaService) EnsureUsersForPersonas([]uint) error {
 func (m *mockPersonaService) Update(id uint, req dto.PersonaRequest) (*dto.PersonaResponse, error) {
 	if m.updateFunc != nil {
 		return m.updateFunc(id, req)
+	}
+	return nil, nil
+}
+
+func (m *mockPersonaService) UpdateSelf(id uint, req dto.PersonaSelfUpdateRequest) (*dto.PersonaResponse, error) {
+	if m.updateSelfFunc != nil {
+		return m.updateSelfFunc(id, req)
 	}
 	return nil, nil
 }

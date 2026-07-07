@@ -22,6 +22,7 @@ const (
 
 	permVerPersonas     = "VER PERSONAS"
 	permCrearPersona    = "CREAR PERSONA"
+	permEditarMiPersona = "EDITAR MI PERSONA"
 	permVerFichas       = "VER FICHAS"
 	permCrearInstructor = "CREAR INSTRUCTOR"
 	permTomarAsistencia = "TOMAR ASISTENCIA"
@@ -97,6 +98,7 @@ func SetupRouter() *gin.Engine {
 				personas.GET("/import/template", middleware.RequirePermission("persona", permCrearPersona), personaHandler.DownloadPersonaImportTemplate)
 				personas.GET("/imports", middleware.RequirePermission("persona", permVerPersonas), personaHandler.ListPersonaImports)
 				personas.POST(routeImport, middleware.RequirePermission("persona", permCrearPersona), personaHandler.ImportPersonas)
+				personas.PUT("/mi-perfil", middleware.RequirePermission("persona", permEditarMiPersona), personaHandler.UpdateMiPerfil)
 				personas.GET("/:id", middleware.RequirePermission("persona", "VER PERSONA"), personaHandler.GetByID)
 				personas.POST("", middleware.RequirePermission("persona", permCrearPersona), personaHandler.Create)
 				personas.PUT("/:id", middleware.RequirePermission("persona", "EDITAR PERSONA"), personaHandler.Update)
@@ -124,7 +126,7 @@ func SetupRouter() *gin.Engine {
 				catalogos.GET("/dias-formacion", catalogoHandler.GetDiasFormacion)
 			}
 			catalogosPersona := protected.Group("/catalogos")
-			catalogosPersona.Use(middleware.RequirePermission("persona", permVerPersonas))
+			catalogosPersona.Use(middleware.RequirePermissionCatalogosPersona())
 			{
 				catalogosPersona.GET("/paises", catalogoHandler.GetPaises)
 				catalogosPersona.GET("/departamentos", catalogoHandler.GetDepartamentos)

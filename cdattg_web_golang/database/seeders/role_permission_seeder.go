@@ -129,6 +129,9 @@ func seedAprendizPermissions(e *casbin.Enforcer) error {
 	if _, err := authz.AddPermissionForRole(e, "APRENDIZ", authz.ObjPersona, authz.ActVerPersona); err != nil {
 		return err
 	}
+	if _, err := authz.AddPermissionForRole(e, "APRENDIZ", authz.ObjPersona, authz.ActEditarMiPersona); err != nil {
+		return err
+	}
 	if _, err := authz.AddPermissionForRole(e, "APRENDIZ", authz.ObjAsistencia, "VER MIS INASISTENCIAS"); err != nil {
 		return err
 	}

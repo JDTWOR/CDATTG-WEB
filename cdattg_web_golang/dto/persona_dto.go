@@ -2,6 +2,26 @@ package dto
 
 import "time"
 
+// PersonaSelfUpdateRequest actualización de perfil propio (sin número de documento ni estado).
+type PersonaSelfUpdateRequest struct {
+	TipoDocumento      *uint     `json:"tipo_documento"`
+	PrimerNombre       string    `json:"primer_nombre" binding:"required"`
+	SegundoNombre      string    `json:"segundo_nombre"`
+	PrimerApellido     string    `json:"primer_apellido" binding:"required"`
+	SegundoApellido    string    `json:"segundo_apellido"`
+	FechaNacimiento    *FlexDate `json:"fecha_nacimiento"`
+	Genero             *uint     `json:"genero"`
+	Telefono           string    `json:"telefono"`
+	Celular            string    `json:"celular"`
+	Email              string    `json:"email" binding:"omitempty,email"`
+	PaisID             *uint     `json:"pais_id"`
+	DepartamentoID     *uint     `json:"departamento_id"`
+	MunicipioID        *uint     `json:"municipio_id"`
+	Direccion          string    `json:"direccion"`
+	ParametroID        *uint     `json:"parametro_id"`
+	NivelEscolaridadID *uint     `json:"nivel_escolaridad_id"`
+}
+
 // PersonaRequest representa la solicitud de creación/actualización de persona
 type PersonaRequest struct {
 	TipoDocumento      *uint     `json:"tipo_documento"`

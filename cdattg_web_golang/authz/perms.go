@@ -22,7 +22,7 @@ var RoleNames = []string{
 // Permisos por objeto (obj). Se usan en Casbin como (roleName o userID, obj, act).
 var (
 	PermisosPersona = []string{
-		"CREAR PERSONA", ActVerPersona, "VER PERSONAS", "EDITAR PERSONA", "ELIMINAR PERSONA",
+		"CREAR PERSONA", ActVerPersona, ActEditarMiPersona, "VER PERSONAS", "EDITAR PERSONA", "ELIMINAR PERSONA",
 		"CAMBIAR ESTADO PERSONA", "RESTABLECER PASSWORD",
 	}
 	PermisosPrograma = []string{
@@ -55,7 +55,8 @@ var (
 // ObjPersona, ObjPrograma, ... nombres de objeto usados en rutas y Casbin.
 // ActVerPersona y demás act* son acciones Casbin (act) reutilizables en seed y middleware.
 const (
-	ActVerPersona = "VER PERSONA"
+	ActVerPersona      = "VER PERSONA"
+	ActEditarMiPersona = "EDITAR MI PERSONA"
 
 	ObjPersona    = "persona"
 	ObjPrograma   = "programa"

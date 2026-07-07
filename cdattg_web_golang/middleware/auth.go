@@ -258,6 +258,37 @@ func RequirePermissionCatalogosFicha() gin.HandlerFunc {
 	}
 }
 
+// RequirePermissionCatalogosPersona permite GET a catálogos del formulario de persona
+// si el usuario puede listar personas, ver/editar la propia o editar personas (admin).
+func RequirePermissionCatalogosPersona() gin.HandlerFunc {
+	acts := []string{
+		"VER PERSONAS",
+		authz.ActVerPersona,
+		authz.ActEditarMiPersona,
+		"EDITAR PERSONA",
+		"CREAR PERSONA",
+	}
+	return func(c *gin.Context) {
+		userID, ok := requireAuthenticatedUserID(c)
+		if !ok {
+			return
+		}
+		e, ok := getEnforcerOrAbort(c)
+		if !ok {
+			return
+		}
+		sub := strconv.FormatUint(uint64(userID), 10)
+		for _, act := range acts {
+			if allowed, errEnf := authz.Enforce(e, sub, authz.ObjPersona, act); errEnf == nil && allowed {
+				c.Next()
+				return
+			}
+		}
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene permiso para acceder a catálogos de persona"})
+		c.Abort()
+	}
+}
+
 // RequirePermissionLeerFichaIndividual permite GET /fichas-caracterizacion/:id a quien pueda ver o editar fichas,
 // o a instructores asignados a esa ficha.
 func RequirePermissionLeerFichaIndividual() gin.HandlerFunc {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sena/cdattg-web-golang/dto"
+	"github.com/sena/cdattg-web-golang/models"
 	"github.com/sena/cdattg-web-golang/services"
 	"github.com/xuri/excelize/v2"
 )
@@ -111,6 +112,34 @@ func (h *PersonaHandler) Update(c *gin.Context) {
 	}
 
 	persona, err := h.personaService.Update(uint(id), req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, persona)
+}
+
+// UpdateMiPerfil permite al usuario autenticado actualizar su propia persona (sin número de documento).
+func (h *PersonaHandler) UpdateMiPerfil(c *gin.Context) {
+	u, ok := c.Get("user")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuario no autenticado"})
+		return
+	}
+	user, _ := u.(*models.User)
+	if user == nil || user.PersonaID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Este usuario no tiene una persona vinculada"})
+		return
+	}
+
+	var req dto.PersonaSelfUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsgDatosInvalidos, "details": err.Error()})
+		return
+	}
+
+	persona, err := h.personaService.UpdateSelf(*user.PersonaID, req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

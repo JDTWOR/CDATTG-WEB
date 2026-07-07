@@ -1,18 +1,23 @@
 package services
 
-
-
 import (
-
 	"testing"
-
 	"time"
 
-
-
 	"github.com/sena/cdattg-web-golang/repositories"
-
 )
+
+func slotsIndividuales(ids []uint, fecha time.Time) []sesionDiaBienestar {
+	slots := make([]sesionDiaBienestar, len(ids))
+	for i, id := range ids {
+		slots[i] = sesionDiaBienestar{
+			Fecha:         fecha,
+			InstructorID:  1,
+			AsistenciaIDs: []uint{id},
+		}
+	}
+	return slots
+}
 
 
 
@@ -97,18 +102,13 @@ func TestAgruparDetalleSesionesPorAsistenciaID_marcaJustificadaSiAlgunaLoEs(t *t
 
 
 func TestInasistenciasAprendiz_coincideConSesionesSinAsistir(t *testing.T) {
-
-	sesIDs := []uint{1, 2, 3, 4}
-
+	fecha := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+	slots := slotsIndividuales([]uint{1, 2, 3, 4}, fecha)
 	asistio := map[uint]map[uint]bool{
-
 		99: {2: true},
-
 	}
-
 	ap := repositories.AprendizCasosBienestarRaw{AprendizID: 99, FichaNumero: "123"}
-
-	row, ok := inasistenciasAprendiz(ap, sesIDs, asistio, map[uint]map[uint]bool{}, 1)
+	row, ok := inasistenciasAprendiz(ap, slots, asistio, map[uint]map[uint]bool{}, 1)
 
 	if !ok {
 
@@ -133,20 +133,14 @@ func TestInasistenciasAprendiz_coincideConSesionesSinAsistir(t *testing.T) {
 
 
 func TestInasistenciasAprendiz_excluyeJustificadasDelUmbral(t *testing.T) {
-
-	sesIDs := []uint{1, 2, 3, 4, 5}
-
+	fecha := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+	slots := slotsIndividuales([]uint{1, 2, 3, 4, 5}, fecha)
 	asistio := map[uint]map[uint]bool{}
-
 	justificada := map[uint]map[uint]bool{
-
 		50: {1: true, 2: true, 3: true},
-
 	}
-
 	ap := repositories.AprendizCasosBienestarRaw{AprendizID: 50}
-
-	row, ok := inasistenciasAprendiz(ap, sesIDs, asistio, justificada, 2)
+	row, ok := inasistenciasAprendiz(ap, slots, asistio, justificada, 2)
 
 	if !ok {
 
@@ -171,18 +165,13 @@ func TestInasistenciasAprendiz_excluyeJustificadasDelUmbral(t *testing.T) {
 
 
 func TestInasistenciasAprendiz_noAlertaSiSoloJustificadasSuperanUmbral(t *testing.T) {
-
-	sesIDs := []uint{1, 2, 3}
-
+	fecha := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+	slots := slotsIndividuales([]uint{1, 2, 3}, fecha)
 	justificada := map[uint]map[uint]bool{
-
 		51: {1: true, 2: true, 3: true},
-
 	}
-
 	ap := repositories.AprendizCasosBienestarRaw{AprendizID: 51}
-
-	_, ok := inasistenciasAprendiz(ap, sesIDs, map[uint]map[uint]bool{}, justificada, 3)
+	_, ok := inasistenciasAprendiz(ap, slots, map[uint]map[uint]bool{}, justificada, 3)
 
 	if ok {
 
@@ -195,45 +184,21 @@ func TestInasistenciasAprendiz_noAlertaSiSoloJustificadasSuperanUmbral(t *testin
 
 
 func TestContarInasistenciasDesdePrep_mismoCriterioQueConsolidado(t *testing.T) {
-
-	sesIDs := []uint{100, 101, 102}
-
+	fecha := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+	slots := slotsIndividuales([]uint{100, 101, 102}, fecha)
 	asistio := map[uint]map[uint]bool{7: {101: true}}
-
 	justificada := map[uint]map[uint]bool{7: {100: true}}
-
 	ap := repositories.AprendizCasosBienestarRaw{AprendizID: 7}
-
-	row, _ := inasistenciasAprendiz(ap, sesIDs, asistio, justificada, 0)
-
-
+	row, _ := inasistenciasAprendiz(ap, slots, asistio, justificada, 0)
 
 	prep := &casosBienestarRangoPreparado{
-
-		validasPorFicha: map[uint][]uint{1: sesIDs},
-
-		asistio:         asistio,
-
-		justificada:     justificada,
-
+		slotsPorFicha: map[uint][]sesionDiaBienestar{1: slots},
+		asistio:       asistio,
+		justificada:   justificada,
 	}
-
-	detalleCount := 0
-
-	for _, sid := range prep.validasPorFicha[1] {
-
-		if !prep.asistio[7][sid] && !prep.justificada[7][sid] {
-
-			detalleCount++
-
-		}
-
-	}
-
-	if detalleCount != row.Inasistencias {
-
-		t.Fatalf("detalle %d != consolidado %d", detalleCount, row.Inasistencias)
-
+	sinJustificar, _ := clasificarInasistenciasDetalle(prep, 1, 7, nil)
+	if len(sinJustificar) != row.Inasistencias {
+		t.Fatalf("detalle %d != consolidado %d", len(sinJustificar), row.Inasistencias)
 	}
 
 	if row.Inasistencias != 1 {
@@ -253,14 +218,11 @@ func TestContarInasistenciasDesdePrep_mismoCriterioQueConsolidado(t *testing.T) 
 
 
 func TestInasistenciasAprendiz_excluyeSesionSinAsistenciaTomadaEnTotal(t *testing.T) {
-
-	sesIDs := []uint{2}
-
+	fecha := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+	slots := slotsIndividuales([]uint{2}, fecha)
 	asistio := map[uint]map[uint]bool{99: {2: true}}
-
 	ap := repositories.AprendizCasosBienestarRaw{AprendizID: 99}
-
-	row, ok := inasistenciasAprendiz(ap, sesIDs, asistio, map[uint]map[uint]bool{}, 1)
+	row, ok := inasistenciasAprendiz(ap, slots, asistio, map[uint]map[uint]bool{}, 1)
 
 	if ok {
 
@@ -273,7 +235,9 @@ func TestInasistenciasAprendiz_excluyeSesionSinAsistenciaTomadaEnTotal(t *testin
 func TestClasificarInasistenciasDetalle_separaJustificadas(t *testing.T) {
 	fecha := time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC)
 	prep := &casosBienestarRangoPreparado{
-		validasPorFicha: map[uint][]uint{1: {10, 11, 12}},
+		slotsPorFicha: map[uint][]sesionDiaBienestar{
+			1: slotsIndividuales([]uint{10, 11, 12}, fecha),
+		},
 		validaPorID: map[uint]repositories.SesionCasosBienestarRaw{
 			10: {AsistenciaID: 10, Fecha: fecha},
 			11: {AsistenciaID: 11, Fecha: fecha},
@@ -292,6 +256,45 @@ func TestClasificarInasistenciasDetalle_separaJustificadas(t *testing.T) {
 	}
 	if len(justificadas) != 2 {
 		t.Fatalf("justificadas: got %d want 2", len(justificadas))
+	}
+}
+
+func TestInasistenciasAprendiz_dedupSesionesMismoDiaInstructor(t *testing.T) {
+	fecha := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+	slots := []sesionDiaBienestar{
+		{Fecha: fecha, InstructorID: 74, AsistenciaIDs: []uint{76, 89}},
+		{Fecha: fecha.AddDate(0, 0, 7), InstructorID: 74, AsistenciaIDs: []uint{194}},
+	}
+	asistio := map[uint]map[uint]bool{99: {89: true}}
+	ap := repositories.AprendizCasosBienestarRaw{AprendizID: 99}
+	row, ok := inasistenciasAprendiz(ap, slots, asistio, map[uint]map[uint]bool{}, 1)
+	if !ok {
+		t.Fatal("esperaba al menos una inasistencia")
+	}
+	if row.TotalSesiones != 2 {
+		t.Fatalf("total sesiones: got %d want 2", row.TotalSesiones)
+	}
+	if row.AsistenciasEfectivas != 1 {
+		t.Fatalf("efectivas: got %d want 1", row.AsistenciasEfectivas)
+	}
+	if row.Inasistencias != 1 {
+		t.Fatalf("inasistencias: got %d want 1 (sin doble conteo el mismo día)", row.Inasistencias)
+	}
+}
+
+func TestAgruparSesionesPorDiaInstructor_fusionaDuplicados(t *testing.T) {
+	fecha := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+	validas := []repositories.SesionCasosBienestarRaw{
+		{AsistenciaID: 76, FichaID: 21, InstructorID: 74, Fecha: fecha},
+		{AsistenciaID: 89, FichaID: 21, InstructorID: 74, Fecha: fecha},
+		{AsistenciaID: 194, FichaID: 21, InstructorID: 74, Fecha: fecha.AddDate(0, 0, 7)},
+	}
+	slots := agruparSesionesPorDiaInstructor(validas)[21]
+	if len(slots) != 2 {
+		t.Fatalf("slots: got %d want 2", len(slots))
+	}
+	if len(slots[0].AsistenciaIDs) != 2 {
+		t.Fatalf("primer día debe fusionar 2 sesiones, got %v", slots[0].AsistenciaIDs)
 	}
 }
 

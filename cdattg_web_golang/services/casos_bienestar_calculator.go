@@ -98,26 +98,95 @@ func mapInasistenciasJustificadas(rows []repositories.InasistenciaJustificadaRaw
 	return out
 }
 
+// sesionDiaBienestar agrupa sesiones del mismo instructor en la misma fecha de formación.
+// Evita doble conteo cuando hubo más de una sesión abierta el mismo día.
+type sesionDiaBienestar struct {
+	Fecha          time.Time
+	InstructorID   uint
+	AsistenciaIDs  []uint
+}
+
+func agruparSesionesPorDiaInstructor(validas []repositories.SesionCasosBienestarRaw) map[uint][]sesionDiaBienestar {
+	type diaKey struct {
+		fichaID      uint
+		instructorID uint
+		fecha        string
+	}
+	groups := make(map[diaKey][]uint)
+	meta := make(map[diaKey]repositories.SesionCasosBienestarRaw, len(validas))
+	for _, s := range validas {
+		k := diaKey{
+			fichaID:      s.FichaID,
+			instructorID: s.InstructorID,
+			fecha:        s.Fecha.Format(time.DateOnly),
+		}
+		groups[k] = append(groups[k], s.AsistenciaID)
+		if _, ok := meta[k]; !ok {
+			meta[k] = s
+		}
+	}
+	out := make(map[uint][]sesionDiaBienestar)
+	for k, ids := range groups {
+		out[k.fichaID] = append(out[k.fichaID], sesionDiaBienestar{
+			Fecha:         meta[k].Fecha,
+			InstructorID:  k.instructorID,
+			AsistenciaIDs: ids,
+		})
+	}
+	for fichaID := range out {
+		sort.Slice(out[fichaID], func(i, j int) bool {
+			return out[fichaID][i].Fecha.Before(out[fichaID][j].Fecha)
+		})
+	}
+	return out
+}
+
+func aprendizAsistioEnSlot(aprendizID uint, slot sesionDiaBienestar, asistio map[uint]map[uint]bool) bool {
+	for _, sid := range slot.AsistenciaIDs {
+		if asistio[aprendizID][sid] {
+			return true
+		}
+	}
+	return false
+}
+
+func aprendizJustificadoEnSlot(
+	aprendizID uint,
+	slot sesionDiaBienestar,
+	justificada map[uint]map[uint]bool,
+	metaPorID map[uint]repositories.DetalleSesionCasosBienestarRaw,
+) bool {
+	for _, sid := range slot.AsistenciaIDs {
+		if justificada[aprendizID][sid] {
+			return true
+		}
+		if meta, ok := metaPorID[sid]; ok && meta.Justificada {
+			return true
+		}
+	}
+	return false
+}
+
 func inasistenciasAprendiz(
 	ap repositories.AprendizCasosBienestarRaw,
-	sesIDs []uint,
+	slots []sesionDiaBienestar,
 	asistio map[uint]map[uint]bool,
 	justificada map[uint]map[uint]bool,
 	minFallas int,
 ) (repositories.CasosBienestarRow, bool) {
-	if len(sesIDs) == 0 {
+	if len(slots) == 0 {
 		return repositories.CasosBienestarRow{}, false
 	}
-	total := len(sesIDs)
+	total := len(slots)
 	efectivas := 0
 	sinJustificar := 0
 	justificadas := 0
-	for _, sid := range sesIDs {
-		if asistio[ap.AprendizID][sid] {
+	for _, slot := range slots {
+		if aprendizAsistioEnSlot(ap.AprendizID, slot, asistio) {
 			efectivas++
 			continue
 		}
-		if justificada[ap.AprendizID][sid] {
+		if aprendizJustificadoEnSlot(ap.AprendizID, slot, justificada, nil) {
 			justificadas++
 		} else {
 			sinJustificar++
@@ -145,10 +214,10 @@ func inasistenciasAprendiz(
 }
 
 type casosBienestarRangoPreparado struct {
-	validasPorFicha map[uint][]uint
-	validaPorID     map[uint]repositories.SesionCasosBienestarRaw
-	asistio         map[uint]map[uint]bool
-	justificada     map[uint]map[uint]bool
+	slotsPorFicha map[uint][]sesionDiaBienestar
+	validaPorID   map[uint]repositories.SesionCasosBienestarRaw
+	asistio       map[uint]map[uint]bool
+	justificada   map[uint]map[uint]bool
 }
 
 func (c *CasosBienestarCalculator) prepararRango(
@@ -173,11 +242,10 @@ func (c *CasosBienestarCalculator) prepararRango(
 		return nil, err
 	}
 
-	validasPorFicha := make(map[uint][]uint)
+	slotsPorFicha := agruparSesionesPorDiaInstructor(validas)
 	validaPorID := make(map[uint]repositories.SesionCasosBienestarRaw, len(validas))
 	validaIDs := make([]uint, 0, len(validas))
 	for _, s := range validas {
-		validasPorFicha[s.FichaID] = append(validasPorFicha[s.FichaID], s.AsistenciaID)
 		validaPorID[s.AsistenciaID] = s
 		validaIDs = append(validaIDs, s.AsistenciaID)
 	}
@@ -192,10 +260,10 @@ func (c *CasosBienestarCalculator) prepararRango(
 	}
 
 	return &casosBienestarRangoPreparado{
-		validasPorFicha: validasPorFicha,
-		validaPorID:     validaPorID,
-		asistio:         mapAsistenciasEfectivas(asistencias),
-		justificada:     mapInasistenciasJustificadas(justificadas),
+		slotsPorFicha: slotsPorFicha,
+		validaPorID:   validaPorID,
+		asistio:       mapAsistenciasEfectivas(asistencias),
+		justificada:   mapInasistenciasJustificadas(justificadas),
 	}, nil
 }
 
@@ -243,7 +311,7 @@ func (c *CasosBienestarCalculator) Calcular(
 
 	var out []repositories.CasosBienestarRow
 	for _, ap := range aprendices {
-		row, ok := inasistenciasAprendiz(ap, prep.validasPorFicha[ap.FichaID], prep.asistio, prep.justificada, minFallas)
+		row, ok := inasistenciasAprendiz(ap, prep.slotsPorFicha[ap.FichaID], prep.asistio, prep.justificada, minFallas)
 		if ok {
 			out = append(out, row)
 		}
@@ -257,18 +325,28 @@ func (c *CasosBienestarCalculator) Calcular(
 	return out, nil
 }
 
-func buildInasistenciaDetalleItem(
+func buildInasistenciaDetalleItemDesdeSlot(
 	prep *casosBienestarRangoPreparado,
-	sid uint,
+	slot sesionDiaBienestar,
 	metaPorID map[uint]repositories.DetalleSesionCasosBienestarRaw,
 ) repositories.InasistenciaDetalleRow {
-	fecha := prep.validaPorID[sid].Fecha.Format(time.DateOnly)
+	fecha := slot.Fecha.Format(time.DateOnly)
 	instructorNombre := ""
 	observaciones := ""
-	if meta, ok := metaPorID[sid]; ok {
-		fecha = meta.Fecha.Format(time.DateOnly)
-		instructorNombre = meta.InstructorNombre
-		observaciones = meta.Observaciones
+	for _, sid := range slot.AsistenciaIDs {
+		if meta, ok := metaPorID[sid]; ok {
+			fecha = meta.Fecha.Format(time.DateOnly)
+			if strings.TrimSpace(meta.InstructorNombre) != "" {
+				instructorNombre = meta.InstructorNombre
+			}
+			if strings.TrimSpace(meta.Observaciones) != "" && strings.TrimSpace(observaciones) == "" {
+				observaciones = meta.Observaciones
+			}
+			continue
+		}
+		if s, ok := prep.validaPorID[sid]; ok {
+			fecha = s.Fecha.Format(time.DateOnly)
+		}
 	}
 	return repositories.InasistenciaDetalleRow{
 		Fecha:            fecha,
@@ -277,29 +355,17 @@ func buildInasistenciaDetalleItem(
 	}
 }
 
-func esInasistenciaJustificadaEnSesion(
-	prep *casosBienestarRangoPreparado,
-	aprendizID, sid uint,
-	metaPorID map[uint]repositories.DetalleSesionCasosBienestarRaw,
-) bool {
-	if prep.justificada[aprendizID][sid] {
-		return true
-	}
-	meta, ok := metaPorID[sid]
-	return ok && meta.Justificada
-}
-
 func clasificarInasistenciasDetalle(
 	prep *casosBienestarRangoPreparado,
 	fichaID, aprendizID uint,
 	metaPorID map[uint]repositories.DetalleSesionCasosBienestarRaw,
 ) (sinJustificar, justificadas []repositories.InasistenciaDetalleRow) {
-	for _, sid := range prep.validasPorFicha[fichaID] {
-		if prep.asistio[aprendizID][sid] {
+	for _, slot := range prep.slotsPorFicha[fichaID] {
+		if aprendizAsistioEnSlot(aprendizID, slot, prep.asistio) {
 			continue
 		}
-		item := buildInasistenciaDetalleItem(prep, sid, metaPorID)
-		if esInasistenciaJustificadaEnSesion(prep, aprendizID, sid, metaPorID) {
+		item := buildInasistenciaDetalleItemDesdeSlot(prep, slot, metaPorID)
+		if aprendizJustificadoEnSlot(aprendizID, slot, prep.justificada, metaPorID) {
 			justificadas = append(justificadas, item)
 			continue
 		}

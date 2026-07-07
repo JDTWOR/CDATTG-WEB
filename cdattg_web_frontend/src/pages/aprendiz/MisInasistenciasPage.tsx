@@ -76,8 +76,8 @@ export function MisInasistenciasPage() {
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
             >
               {diasOpciones.map((opcion) => (
-                <option key={opcion} value={opcion}>
-                  Últimos {opcion} días
+                <option key={opcion.value} value={opcion.value}>
+                  {opcion.label}
                 </option>
               ))}
             </select>

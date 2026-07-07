@@ -3,7 +3,14 @@ import { apiService } from '../../../services/api';
 import { axiosErrorMessage } from '../../../utils/httpError';
 import type { MisInasistenciasResponse } from '../../../types';
 
-const DIAS_OPCIONES = [30, 60, 90] as const;
+const DIAS_HISTORICO = 0;
+
+const DIAS_OPCIONES = [
+  { value: 30, label: 'Últimos 30 días' },
+  { value: 60, label: 'Últimos 60 días' },
+  { value: 90, label: 'Últimos 90 días' },
+  { value: DIAS_HISTORICO, label: 'Desde el origen de los tiempos' },
+] as const;
 
 export function useMisInasistencias(enabled: boolean) {
   const [dias, setDias] = useState<number>(30);

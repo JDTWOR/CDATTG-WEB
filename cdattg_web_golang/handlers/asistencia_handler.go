@@ -571,7 +571,7 @@ func (h *AsistenciaHandler) GetDetalleInasistenciasAprendiz(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetMisInasistencias devuelve las inasistencias del aprendiz autenticado (resuelto por persona_id del JWT).
+// GetMisInasistencias devuelve las inasistencias del aprendiz autenticado (resuelto por persona_id del JWT). Query: dias (default 30, 0=histórico completo).
 func (h *AsistenciaHandler) GetMisInasistencias(c *gin.Context) {
 	u, _ := c.Get("user")
 	user, _ := u.(*models.User)
@@ -581,8 +581,12 @@ func (h *AsistenciaHandler) GetMisInasistencias(c *gin.Context) {
 	}
 	dias := 30
 	if s := c.Query("dias"); s != "" {
-		if n, err := strconv.Atoi(s); err == nil && n > 0 {
-			dias = n
+		if n, err := strconv.Atoi(s); err == nil {
+			if n == 0 {
+				dias = 0
+			} else if n > 0 {
+				dias = n
+			}
 		}
 	}
 	resp, err := h.svc.GetMisInasistencias(*user.PersonaID, dias)

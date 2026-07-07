@@ -1,55 +1,49 @@
 import Select from 'react-select';
-import { selectStylesSingle, selectTheme } from './selectSearchTheme';
+import type { SelectOption } from './SelectSearch';
+import { selectStylesMulti, selectTheme } from './selectSearchTheme';
 
-export interface SelectOption {
-  value: number;
-  label: string;
-}
-
-interface SelectSearchProps {
+interface SelectSearchMultiProps {
   options: SelectOption[];
-  value: number | null | undefined;
-  onChange: (value: number | undefined) => void;
+  value: number[];
+  onChange: (value: number[]) => void;
   placeholder?: string;
   isDisabled?: boolean;
-  isRequired?: boolean;
   ariaLabel?: string;
-  /** Para asociar un <label htmlFor="..."> al control nativo de react-select */
   inputId?: string;
 }
 
-export function SelectSearch(props: Readonly<SelectSearchProps>) {
+export function SelectSearchMulti(props: Readonly<SelectSearchMultiProps>) {
   const {
     options,
     value,
     onChange,
     placeholder = 'Buscar...',
     isDisabled = false,
-    isRequired = false,
     ariaLabel,
     inputId,
   } = props;
-  const selectedOption =
-    value !== undefined && value !== null ? options.find((o) => o.value === value) || null : null;
+
+  const selectedOptions = options.filter((o) => value.includes(o.value));
 
   return (
     <div className="react-select-wrapper w-full">
-      <Select<SelectOption, false>
+      <Select<SelectOption, true>
         inputId={inputId}
+        isMulti
         options={options}
-        value={selectedOption}
-        onChange={(opt) => onChange(opt?.value)}
+        value={selectedOptions}
+        onChange={(opts) => onChange(opts.map((o) => o.value))}
         placeholder={placeholder}
         isDisabled={isDisabled}
         isClearable
         isSearchable
+        closeMenuOnSelect={false}
         noOptionsMessage={() => 'Sin opciones'}
         loadingMessage={() => 'Cargando...'}
         theme={selectTheme}
-        styles={selectStylesSingle}
+        styles={selectStylesMulti}
         menuPortalTarget={document.body}
         menuPosition="fixed"
-        required={isRequired}
         aria-label={ariaLabel}
         classNames={{
           control: () => 'w-full',

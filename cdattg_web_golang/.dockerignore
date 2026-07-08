@@ -7,3 +7,8 @@ storage/
 *.test
 *.out
 vendor/
+coverage/
+tmp/
+**/*_test.go
+cmd/seed-demo-analitico/
+database/seeders/demo_analitico_*

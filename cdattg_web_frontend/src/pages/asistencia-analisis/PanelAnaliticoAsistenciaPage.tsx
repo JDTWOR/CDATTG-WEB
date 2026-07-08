@@ -6,9 +6,10 @@ import {
   ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline';
 import { apiService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { axiosErrorMessage } from '../../utils/httpError';
 import { hoyISOColombia, formatNumero } from '../../utils/formatFecha';
-import type { AsistenciaAnalisisResponse } from '../../types';
+import type { AsistenciaAnalisisResponse, RegionalItem, SedeItem } from '../../types';
 import { KpiCard } from '../../components/dashboard/KpiCard';
 
 const JORNADAS = ['', 'DIURNA', 'TARDE', 'NOCHE', 'JORNADA CONTINUA', 'FINES DE SEMANA'] as const;
@@ -37,14 +38,41 @@ function pctBarClass(pct: number): string {
 }
 
 export function PanelAnaliticoAsistenciaPage() {
+  const { roles } = useAuth();
+  const esCoordinador = roles.includes('COORDINADOR');
+  const esAdmin =
+    roles.includes('SUPER ADMINISTRADOR') || roles.includes('ADMINISTRADOR');
+  const puedeFiltrarInstitucional = esAdmin && !esCoordinador;
+
   const [fechaDesde, setFechaDesde] = useState(defaultDesde);
   const [fechaHasta, setFechaHasta] = useState(hoyISOColombia);
   const [jornada, setJornada] = useState('');
   const [diaSemanaId, setDiaSemanaId] = useState(0);
   const [fichaNumero, setFichaNumero] = useState('');
+  const [regionalId, setRegionalId] = useState('');
+  const [sedeId, setSedeId] = useState('');
+  const [regionales, setRegionales] = useState<RegionalItem[]>([]);
+  const [sedes, setSedes] = useState<SedeItem[]>([]);
   const [data, setData] = useState<AsistenciaAnalisisResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const sedesFiltradas = useMemo(() => {
+    if (!regionalId) return sedes;
+    return sedes.filter((s) => String(s.regional_id ?? '') === regionalId);
+  }, [sedes, regionalId]);
+
+  useEffect(() => {
+    if (!puedeFiltrarInstitucional) return;
+    Promise.all([apiService.getCatalogosRegionales(), apiService.getCatalogosSedes()])
+      .then(([regs, sds]) => {
+        setRegionales(regs);
+        setSedes(sds);
+      })
+      .catch(() => {
+        /* filtros opcionales */
+      });
+  }, [puedeFiltrarInstitucional]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,6 +84,8 @@ export function PanelAnaliticoAsistenciaPage() {
         jornada: jornada || undefined,
         ficha: fichaNumero.trim() || undefined,
         dia_semana_id: diaSemanaId > 0 ? diaSemanaId : undefined,
+        regional_id: regionalId ? Number(regionalId) : undefined,
+        sede_id: sedeId ? Number(sedeId) : undefined,
       });
       setData(res);
     } catch (e: unknown) {
@@ -64,10 +94,10 @@ export function PanelAnaliticoAsistenciaPage() {
     } finally {
       setLoading(false);
     }
-  }, [fechaDesde, fechaHasta, jornada, diaSemanaId, fichaNumero]);
+  }, [fechaDesde, fechaHasta, jornada, diaSemanaId, fichaNumero, regionalId, sedeId]);
 
   useEffect(() => {
-    void load();
+    load();
   }, [load]);
 
   const topDias = useMemo(() => {
@@ -143,6 +173,55 @@ export function PanelAnaliticoAsistenciaPage() {
             />
           </div>
         </div>
+        {puedeFiltrarInstitucional ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label
+                htmlFor="analisis-regional"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Regional
+              </label>
+              <select
+                id="analisis-regional"
+                value={regionalId}
+                onChange={(e) => {
+                  setRegionalId(e.target.value);
+                  setSedeId('');
+                }}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-sm"
+              >
+                <option value="">Todas las regionales</option>
+                {regionales.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="analisis-sede"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Sede
+              </label>
+              <select
+                id="analisis-sede"
+                value={sedeId}
+                onChange={(e) => setSedeId(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-sm"
+              >
+                <option value="">Todas las sedes</option>
+                {sedesFiltradas.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {error ? (

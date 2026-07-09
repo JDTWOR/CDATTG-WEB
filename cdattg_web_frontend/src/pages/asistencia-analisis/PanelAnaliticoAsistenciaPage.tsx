@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChartBarIcon,
   ClockIcon,
@@ -11,6 +11,7 @@ import { axiosErrorMessage } from '../../utils/httpError';
 import { hoyISOColombia, formatNumero } from '../../utils/formatFecha';
 import type { AsistenciaAnalisisResponse, RegionalItem, SedeItem } from '../../types';
 import { KpiCard } from '../../components/dashboard/KpiCard';
+import { CumplimientoDetalleFicha } from './CumplimientoDetalleFicha';
 
 const JORNADAS = ['', 'DIURNA', 'TARDE', 'NOCHE', 'JORNADA CONTINUA', 'FINES DE SEMANA'] as const;
 
@@ -56,6 +57,8 @@ export function PanelAnaliticoAsistenciaPage() {
   const [data, setData] = useState<AsistenciaAnalisisResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [fichaDetalleAbierta, setFichaDetalleAbierta] = useState<number | null>(null);
+  const bloqueARef = useRef<HTMLElement>(null);
 
   const sedesFiltradas = useMemo(() => {
     if (!regionalId) return sedes;
@@ -104,6 +107,12 @@ export function PanelAnaliticoAsistenciaPage() {
     const items = data?.dia_semana.dias_mas_asistencia ?? [];
     return items.slice(0, 3).filter((d) => d.vinieron > 0);
   }, [data]);
+
+  const filasSemana = useMemo(() => {
+    const rows = data?.dia_semana.por_dia ?? [];
+    if (diaSemanaId <= 0) return rows;
+    return rows.filter((r) => r.dia_semana_id === diaSemanaId);
+  }, [data, diaSemanaId]);
 
   return (
     <div className="page-container space-y-8">
@@ -231,7 +240,7 @@ export function PanelAnaliticoAsistenciaPage() {
       ) : null}
 
       {/* Bloque A */}
-      <section className="space-y-4">
+      <section ref={bloqueARef} className="space-y-4">
         <div className="flex items-center gap-2">
           <ClockIcon className="w-5 h-5 text-primary-600" aria-hidden />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -239,9 +248,11 @@ export function PanelAnaliticoAsistenciaPage() {
           </h2>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Promedio según el primer registro de cada sesión (cuando el instructor inicia la toma).
+          Promedio según el primer registro de cada sesión.{' '}
+          <strong>Sesiones</strong> cuenta cada toma;{' '}
+          <strong>días con sesión</strong> cuenta fechas distintas programadas con toma (coincide con bloque B).
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <KpiCard
             label="Hora promedio global"
             value={loading ? '…' : (data?.hora_toma.promedio_hora ?? '—')}
@@ -251,7 +262,14 @@ export function PanelAnaliticoAsistenciaPage() {
           <KpiCard
             label="Sesiones analizadas"
             value={loading ? '…' : formatNumero(data?.hora_toma.total_sesiones ?? 0)}
+            tooltip="Total de registros de asistencia (puede ser mayor que días con sesión si hubo varias tomas el mismo día)."
             icon={<ChartBarIcon className="w-6 h-6 text-sena-dark" aria-hidden />}
+          />
+          <KpiCard
+            label="Días con sesión"
+            value={loading ? '…' : formatNumero(data?.hora_toma.total_dias_con_sesion ?? 0)}
+            tooltip="Fechas distintas con al menos una sesión. Este número se alinea con «Con sesión» del bloque B por ficha."
+            icon={<CalendarDaysIcon className="w-6 h-6 text-primary-600" aria-hidden />}
           />
         </div>
         <div className="card overflow-x-auto">
@@ -260,23 +278,27 @@ export function PanelAnaliticoAsistenciaPage() {
             <thead className="bg-gray-50 dark:bg-gray-800/50">
               <tr>
                 <th className="px-3 py-2 text-left font-medium text-gray-500">Ficha</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-500">Programa</th>
                 <th className="px-3 py-2 text-left font-medium text-gray-500">Jornada</th>
                 <th className="px-3 py-2 text-right font-medium text-gray-500">Hora prom.</th>
                 <th className="px-3 py-2 text-right font-medium text-gray-500">Sesiones</th>
+                <th className="px-3 py-2 text-right font-medium text-gray-500">Días c/ sesión</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {(data?.hora_toma.detalle_por_ficha ?? []).map((row) => (
                 <tr key={row.ficha_id}>
                   <td className="px-3 py-2 font-medium">{row.ficha_numero}</td>
+                  <td className="px-3 py-2">{row.programa_nombre || '—'}</td>
                   <td className="px-3 py-2">{row.jornada_nombre || '—'}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{row.promedio_hora}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{row.total_sesiones}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{row.dias_con_sesion}</td>
                 </tr>
               ))}
               {!loading && (data?.hora_toma.detalle_por_ficha.length ?? 0) === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
                     Sin sesiones en el período seleccionado.
                   </td>
                 </tr>
@@ -295,7 +317,9 @@ export function PanelAnaliticoAsistenciaPage() {
           </h2>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Porcentaje de días programados en los que la ficha registró al menos una sesión de asistencia.
+          Porcentaje de días programados en los que la ficha registró al menos una sesión.{' '}
+          <strong>Con sesión</strong> coincide con <strong>Días c/ sesión</strong> del bloque A;{' '}
+          <strong>Sesiones</strong> puede ser mayor si hubo varias tomas el mismo día.
         </p>
         <div className="card overflow-x-auto">
           <table className="min-w-full text-sm divide-y divide-gray-200 dark:divide-gray-700">
@@ -306,33 +330,64 @@ export function PanelAnaliticoAsistenciaPage() {
                 <th className="px-3 py-2 text-left font-medium text-gray-500">Jornada</th>
                 <th className="px-3 py-2 text-right font-medium text-gray-500">Días prog.</th>
                 <th className="px-3 py-2 text-right font-medium text-gray-500">Con sesión</th>
+                <th className="px-3 py-2 text-right font-medium text-gray-500">Sesiones</th>
                 <th className="px-3 py-2 text-right font-medium text-gray-500">%</th>
+                <th className="px-3 py-2 text-right font-medium text-gray-500">Detalle</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {(data?.cumplimiento.items ?? []).map((row) => (
-                <tr key={row.ficha_id}>
-                  <td className="px-3 py-2 font-medium">{row.ficha_numero}</td>
-                  <td className="px-3 py-2">{row.programa_nombre || '—'}</td>
-                  <td className="px-3 py-2">{row.jornada_nombre || '—'}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{row.dias_programados}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{row.dias_con_sesion}</td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <div className="w-16 h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                        <div
-                          className={`h-full ${pctBarClass(row.pct_cumplimiento)}`}
-                          style={{ width: `${Math.min(100, row.pct_cumplimiento)}%` }}
-                        />
+                <Fragment key={row.ficha_id}>
+                  <tr>
+                    <td className="px-3 py-2 font-medium">{row.ficha_numero}</td>
+                    <td className="px-3 py-2">{row.programa_nombre || '—'}</td>
+                    <td className="px-3 py-2">{row.jornada_nombre || '—'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{row.dias_programados}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-medium text-green-700 dark:text-green-400">
+                      {row.dias_con_sesion}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-gray-600 dark:text-gray-400">
+                      {row.total_sesiones}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <div className="w-16 h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                          <div
+                            className={`h-full ${pctBarClass(row.pct_cumplimiento)}`}
+                            style={{ width: `${Math.min(100, row.pct_cumplimiento)}%` }}
+                          />
+                        </div>
+                        <span className="tabular-nums font-medium w-12 text-right">{row.pct_cumplimiento}%</span>
                       </div>
-                      <span className="tabular-nums font-medium w-12 text-right">{row.pct_cumplimiento}%</span>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFichaDetalleAbierta((prev) => (prev === row.ficha_id ? null : row.ficha_id))
+                        }
+                        className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
+                      >
+                        {fichaDetalleAbierta === row.ficha_id ? 'Ocultar' : 'Ver detalle'}
+                      </button>
+                    </td>
+                  </tr>
+                  {fichaDetalleAbierta === row.ficha_id ? (
+                    <tr key={`${row.ficha_id}-detalle`}>
+                      <td colSpan={8} className="px-4 py-4 bg-gray-50 dark:bg-gray-800/40">
+                        <CumplimientoDetalleFicha
+                          key={row.ficha_id}
+                          item={row}
+                          onIrABloqueA={() => bloqueARef.current?.scrollIntoView({ behavior: 'smooth' })}
+                        />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
               {!loading && (data?.cumplimiento.items.length ?? 0) === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={8} className="px-3 py-6 text-center text-gray-500">
                     Sin fichas con días programados en el período.
                   </td>
                 </tr>
@@ -347,11 +402,12 @@ export function PanelAnaliticoAsistenciaPage() {
         <div className="flex items-center gap-2">
           <CalendarDaysIcon className="w-5 h-5 text-primary-600" aria-hidden />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            C — Asistencia por día de la semana
+            C — Asistencia semana anterior
           </h2>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Solo aprendices en formación activa. Muestra cantidad y porcentaje de asistencia.
+          Semana calendario completa anterior ({data?.dia_semana.semana_desde || '…'} al{' '}
+          {data?.dia_semana.semana_hasta || '…'}). Aprendices activos visibles en asistencia por día y jornada.
         </p>
 
         <div className="flex flex-wrap gap-2">
@@ -376,9 +432,10 @@ export function PanelAnaliticoAsistenciaPage() {
             <p className="text-sm text-green-800 dark:text-green-200">
               <strong>Días con más asistencia:</strong>{' '}
               {topDias.map((d, i) => (
-                <span key={d.dia_semana_id}>
+                <span key={d.fecha ?? d.dia_semana_id}>
                   {i > 0 ? ', ' : ''}
-                  {d.dia_semana} ({formatNumero(d.vinieron)} aprendices, {d.pct}%)
+                  {d.fecha ? `${d.fecha} (${d.dia_semana})` : d.dia_semana} ({formatNumero(d.vinieron)}{' '}
+                  aprendices, {d.pct}%)
                 </span>
               ))}
             </p>
@@ -389,6 +446,7 @@ export function PanelAnaliticoAsistenciaPage() {
           <table className="min-w-full text-sm divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-800/50">
               <tr>
+                <th className="px-3 py-2 text-left font-medium text-gray-500">Fecha</th>
                 <th className="px-3 py-2 text-left font-medium text-gray-500">Día</th>
                 <th className="px-3 py-2 text-left font-medium text-gray-500">Jornada</th>
                 <th className="px-3 py-2 text-right font-medium text-gray-500">Aprendices esp.</th>
@@ -397,8 +455,9 @@ export function PanelAnaliticoAsistenciaPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {(data?.dia_semana.por_dia_jornada ?? []).map((row) => (
-                <tr key={`${row.dia_semana_id}-${row.jornada_nombre}`}>
+              {filasSemana.map((row) => (
+                <tr key={`${row.fecha}-${row.jornada_nombre}`}>
+                  <td className="px-3 py-2 tabular-nums">{row.fecha}</td>
                   <td className="px-3 py-2 font-medium">{row.dia_semana}</td>
                   <td className="px-3 py-2">{row.jornada_nombre || '—'}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatNumero(row.esperados)}</td>
@@ -406,10 +465,10 @@ export function PanelAnaliticoAsistenciaPage() {
                   <td className="px-3 py-2 text-right tabular-nums font-medium">{row.pct}%</td>
                 </tr>
               ))}
-              {!loading && (data?.dia_semana.por_dia_jornada.length ?? 0) === 0 ? (
+              {!loading && filasSemana.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
-                    Sin datos de asistencia por día de semana en el período.
+                  <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
+                    Sin datos de asistencia para la semana anterior con los filtros seleccionados.
                   </td>
                 </tr>
               ) : null}

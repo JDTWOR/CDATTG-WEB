@@ -7,18 +7,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// SesionPrimeraHoraRow primera hora de toma de asistencia por sesión.
-type SesionPrimeraHoraRow struct {
-	AsistenciaID  uint       `gorm:"column:asistencia_id"`
-	FichaID       uint       `gorm:"column:ficha_id"`
-	FichaNumero   string     `gorm:"column:ficha_numero"`
-	JornadaNombre string     `gorm:"column:jornada_nombre"`
-	AprendizID    *uint      `gorm:"column:aprendiz_id"`
-	PrimeraHora   *time.Time `gorm:"column:primera_hora"`
+// SesionDetalleRow sesión de asistencia con fecha y primera hora (fuente única bloques A y B).
+type SesionDetalleRow struct {
+	AsistenciaID   uint       `gorm:"column:asistencia_id"`
+	FichaID        uint       `gorm:"column:ficha_id"`
+	FichaNumero    string     `gorm:"column:ficha_numero"`
+	ProgramaNombre string     `gorm:"column:programa_nombre"`
+	JornadaNombre  string     `gorm:"column:jornada_nombre"`
+	Fecha          time.Time  `gorm:"column:fecha"`
+	PrimeraHora    *time.Time `gorm:"column:primera_hora"`
 }
 
 type AsistenciaAnalisisRepository interface {
-	FindSesionesPrimeraHora(desde, hasta time.Time, sedeIDs []uint, fichaID, aprendizID *uint, jornada string) ([]SesionPrimeraHoraRow, error)
+	FindSesionesDetalle(desde, hasta time.Time, sedeIDs []uint, fichaID, aprendizID *uint, jornada string) ([]SesionDetalleRow, error)
 	FindFechasConSesionPorFicha(fichaID uint, desde, hasta time.Time) (map[string]struct{}, error)
 	CountAprendicesAsistieronEnSesiones(asistenciaIDs []uint, aprendizID *uint) (int, error)
 	FindAsistenciaIDsEnRango(desde, hasta time.Time, sedeIDs []uint, jornada string, soloFichasActivas bool) ([]uint, error)
@@ -34,9 +35,10 @@ func NewAsistenciaAnalisisRepository() AsistenciaAnalisisRepository {
 
 func (r *asistenciaAnalisisRepository) baseJoin(q *gorm.DB) *gorm.DB {
 	return q.Table("asistencias a").
-		Joins("INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id AND ifc.deleted_at IS NULL").
+		Joins("INNER JOIN instructor_fichas_caracterizacion ifc ON a.instructor_ficha_id = ifc.id").
 		Joins("INNER JOIN fichas_caracterizacion fc ON ifc.ficha_id = fc.id AND fc.deleted_at IS NULL").
-		Joins("LEFT JOIN jornadas j ON fc.jornada_id = j.id")
+		Joins("LEFT JOIN jornadas j ON fc.jornada_id = j.id").
+		Joins("LEFT JOIN programas_formacion pf ON fc.programa_formacion_id = pf.id")
 }
 
 func (r *asistenciaAnalisisRepository) applySedeFilter(q *gorm.DB, sedeIDs []uint) *gorm.DB {
@@ -54,19 +56,20 @@ func (r *asistenciaAnalisisRepository) applyActivasFilter(q *gorm.DB, soloActiva
 	return q.Where("fc.status = ? AND (fc.fecha_fin IS NULL OR fc.fecha_fin >= ?)", true, refStr)
 }
 
-func (r *asistenciaAnalisisRepository) FindSesionesPrimeraHora(
+func (r *asistenciaAnalisisRepository) FindSesionesDetalle(
 	desde, hasta time.Time,
 	sedeIDs []uint,
 	fichaID, aprendizID *uint,
 	jornada string,
-) ([]SesionPrimeraHoraRow, error) {
+) ([]SesionDetalleRow, error) {
 	q := r.baseJoin(r.db).
 		Select(`
 			a.id AS asistencia_id,
 			fc.id AS ficha_id,
 			fc.ficha AS ficha_numero,
+			COALESCE(pf.nombre, '') AS programa_nombre,
 			COALESCE(j.nombre, '') AS jornada_nombre,
-			NULL AS aprendiz_id,
+			a.fecha AS fecha,
 			COALESCE(
 				(SELECT MIN(aa.hora_ingreso) FROM asistencia_aprendices aa
 				 WHERE aa.asistencia_id = a.id AND aa.deleted_at IS NULL AND aa.hora_ingreso IS NOT NULL),
@@ -88,7 +91,7 @@ func (r *asistenciaAnalisisRepository) FindSesionesPrimeraHora(
 			WHERE aa2.asistencia_id = a.id AND aa2.deleted_at IS NULL AND ap.id = ?
 		)`, *aprendizID)
 	}
-	var rows []SesionPrimeraHoraRow
+	var rows []SesionDetalleRow
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -98,7 +101,7 @@ func (r *asistenciaAnalisisRepository) FindSesionesPrimeraHora(
 func (r *asistenciaAnalisisRepository) FindFechasConSesionPorFicha(fichaID uint, desde, hasta time.Time) (map[string]struct{}, error) {
 	var fechas []time.Time
 	err := r.baseJoin(r.db).
-		Select("DISTINCT DATE(a.fecha) AS fecha").
+		Select("DISTINCT a.fecha").
 		Where("a.deleted_at IS NULL AND fc.id = ? AND a.fecha >= ? AND a.fecha < ?", fichaID, desde, hasta).
 		Pluck("fecha", &fechas).Error
 	if err != nil {

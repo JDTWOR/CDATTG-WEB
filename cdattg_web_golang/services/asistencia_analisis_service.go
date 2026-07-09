@@ -84,19 +84,19 @@ func (s *asistenciaAnalisisService) GetAnalisis(userID uint, roles []string, p A
 	if err != nil {
 		return nil, err
 	}
-	cumplimiento, err := s.buildCumplimiento(desde, hasta, sedeIDs, jornada, fichaID)
+	cumplimiento, err := s.buildCumplimiento(desde, hasta, sedeIDs, jornada, fichaID, horaToma.sesionesPorFicha)
 	if err != nil {
 		return nil, err
 	}
-	diaSemana, err := s.buildDiaSemana(desde, hasta, sedeIDs, jornada, p.DiaSemanaID, fichaID)
+	diaSemana, err := s.buildSemanaAnterior(sedeIDs, jornada, p.DiaSemanaID, fichaID)
 	if err != nil {
 		return nil, err
 	}
-
+	enriquecerHoraTomaConCumplimiento(&horaToma.section, cumplimiento)
 	return &dto.AsistenciaAnalisisResponse{
 		FechaDesde:   desde.Format(time.DateOnly),
 		FechaHasta:   hasta.Add(-24 * time.Hour).Format(time.DateOnly),
-		HoraToma:     horaToma,
+		HoraToma:     horaToma.section,
 		Cumplimiento: cumplimiento,
 		DiaSemana:    diaSemana,
 	}, nil
@@ -111,7 +111,9 @@ func emptyAnalisisResponse(p AsistenciaAnalisisParams) *dto.AsistenciaAnalisisRe
 		},
 		Cumplimiento: dto.AnalisisCumplimientoSection{Items: []dto.AnalisisCumplimientoFicha{}},
 		DiaSemana: dto.AnalisisDiaSemanaSection{
-			PorDiaJornada:     []dto.AnalisisDiaSemanaJornada{},
+			SemanaDesde:       "",
+			SemanaHasta:       "",
+			PorDia:            []dto.AnalisisDiaSemanaFila{},
 			DiasMasAsistencia: []dto.AnalisisDiaRanking{},
 		},
 	}
@@ -142,11 +144,6 @@ func parseRangoAnalisis(desdeStr, hastaStr string) (time.Time, time.Time, error)
 	return desde, hasta, nil
 }
 
-func minutosDesdeMedianoche(t time.Time, loc *time.Location) int {
-	local := t.In(loc)
-	return local.Hour()*60 + local.Minute()
-}
-
 func formatoHoraDesdeMinutos(m int) string {
 	if m < 0 {
 		m = 0
@@ -167,58 +164,62 @@ func promedioMinutos(vals []int) int {
 	return int(math.Round(float64(sum) / float64(len(vals))))
 }
 
+type horaTomaBuildResult struct {
+	section         dto.AnalisisHoraTomaSection
+	sesionesPorFicha map[uint]*fichaSesionesAgrupadas
+}
+
 func (s *asistenciaAnalisisService) buildHoraToma(
 	desde, hasta time.Time,
 	sedeIDs []uint,
 	fichaID, aprendizID *uint,
 	jornada string,
-) (dto.AnalisisHoraTomaSection, error) {
-	rows, err := s.analisisRepo.FindSesionesPrimeraHora(desde, hasta, sedeIDs, fichaID, aprendizID, jornada)
+) (horaTomaBuildResult, error) {
+	rows, err := s.analisisRepo.FindSesionesDetalle(desde, hasta, sedeIDs, fichaID, aprendizID, jornada)
 	if err != nil {
-		return dto.AnalisisHoraTomaSection{}, err
+		return horaTomaBuildResult{}, err
 	}
 	loc := utils.AppLocation()
-	minutos := make([]int, 0, len(rows))
-	byFicha := make(map[uint]*struct {
-		numero string
-		jornada string
-		mins    []int
-	})
-	for i := range rows {
-		if rows[i].PrimeraHora == nil {
-			continue
-		}
-		m := minutosDesdeMedianoche(*rows[i].PrimeraHora, loc)
-		minutos = append(minutos, m)
-		entry := byFicha[rows[i].FichaID]
-		if entry == nil {
-			entry = &struct {
-				numero  string
-				jornada string
-				mins    []int
-			}{numero: rows[i].FichaNumero, jornada: rows[i].JornadaNombre}
-			byFicha[rows[i].FichaID] = entry
-		}
-		entry.mins = append(entry.mins, m)
+	agrupado := agruparSesionesPorFicha(rows, loc)
+
+	allMinutos := make([]int, 0, len(rows))
+	for _, entry := range agrupado {
+		allMinutos = append(allMinutos, entry.minutos...)
 	}
-	avg := promedioMinutos(minutos)
-	detalle := make([]dto.AnalisisHoraTomaPorFicha, 0, len(byFicha))
-	for fid, e := range byFicha {
-		pm := promedioMinutos(e.mins)
+	avg := promedioMinutos(allMinutos)
+
+	totalDias := make(map[string]struct{})
+	detalle := make([]dto.AnalisisHoraTomaPorFicha, 0, len(agrupado))
+	for fid, e := range agrupado {
+		for fecha := range e.fechas {
+			totalDias[fecha] = struct{}{}
+		}
+		pm := promedioMinutos(e.minutos)
 		detalle = append(detalle, dto.AnalisisHoraTomaPorFicha{
-			FichaID:       fid,
-			FichaNumero:   e.numero,
-			JornadaNombre: e.jornada,
-			PromedioHora:  formatoHoraDesdeMinutos(pm),
-			TotalSesiones: len(e.mins),
+			FichaID:        fid,
+			FichaNumero:    e.numero,
+			ProgramaNombre: e.programa,
+			JornadaNombre:  e.jornada,
+			PromedioHora:   formatoHoraDesdeMinutos(pm),
+			TotalSesiones:  e.totalSesiones,
+			DiasConSesion:  len(e.fechas),
 		})
 	}
 	sort.Slice(detalle, func(i, j int) bool { return detalle[i].FichaNumero < detalle[j].FichaNumero })
-	return dto.AnalisisHoraTomaSection{
-		PromedioHora:       formatoHoraDesdeMinutos(avg),
-		PromedioMinutosDia: avg,
-		TotalSesiones:      len(minutos),
-		DetallePorFicha:    detalle,
+
+	totalSesiones := 0
+	for _, e := range agrupado {
+		totalSesiones += e.totalSesiones
+	}
+	return horaTomaBuildResult{
+		section: dto.AnalisisHoraTomaSection{
+			PromedioHora:       formatoHoraDesdeMinutos(avg),
+			PromedioMinutosDia: avg,
+			TotalSesiones:      totalSesiones,
+			TotalDiasConSesion: len(totalDias),
+			DetallePorFicha:    detalle,
+		},
+		sesionesPorFicha: agrupado,
 	}, nil
 }
 
@@ -260,207 +261,92 @@ func (s *asistenciaAnalisisService) buildCumplimiento(
 	sedeIDs []uint,
 	jornada string,
 	fichaID *uint,
+	sesionesPorFicha map[uint]*fichaSesionesAgrupadas,
 ) (dto.AnalisisCumplimientoSection, error) {
 	fichas, err := s.fichaRepo.FindActivasSolapandoRango(desde, hasta, sedeIDs, jornada, false)
 	if err != nil {
 		return dto.AnalisisCumplimientoSection{}, err
 	}
-	if fichaID != nil && *fichaID > 0 {
-		filtered := make([]models.FichaCaracterizacion, 0, 1)
-		for i := range fichas {
-			if fichas[i].ID == *fichaID {
-				filtered = append(filtered, fichas[i])
-				break
-			}
-		}
-		fichas = filtered
-	}
+	fichas = filtrarFichasPorID(fichas, fichaID)
+
 	items := make([]dto.AnalisisCumplimientoFicha, 0, len(fichas))
 	for i := range fichas {
 		f := &fichas[i]
-		start, end := rangoDiasFichaEnConsulta(f, desde, hasta)
-		if end.Before(start) {
-			continue
+		entry := sesionesPorFicha[f.ID]
+		totalSesiones := 0
+		if entry != nil {
+			totalSesiones = entry.totalSesiones
 		}
-		sesiones, err := s.analisisRepo.FindFechasConSesionPorFicha(f.ID, desde, hasta)
+		item, err := s.itemCumplimientoFicha(f, desde, hasta, fechasSesionFicha(sesionesPorFicha, f.ID), totalSesiones)
 		if err != nil {
 			return dto.AnalisisCumplimientoSection{}, err
 		}
-		programados := 0
-		conSesion := 0
-		for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
-			if !s.fichaTieneFormacionEnDia(f, d) {
-				continue
-			}
-			programados++
-			key := d.Format(time.DateOnly)
-			if _, ok := sesiones[key]; ok {
-				conSesion++
-			}
+		if item != nil {
+			items = append(items, *item)
 		}
-		if programados == 0 {
-			continue
-		}
-		pct := math.Round(float64(conSesion)/float64(programados)*1000) / 10
-		progNombre := ""
-		if f.ProgramaFormacion != nil {
-			progNombre = f.ProgramaFormacion.Nombre
-		}
-		jornadaNombre := ""
-		if f.Jornada != nil {
-			jornadaNombre = f.Jornada.Nombre
-		}
-		sedeNombre := ""
-		if f.Sede != nil {
-			sedeNombre = f.Sede.Nombre
-		}
-		items = append(items, dto.AnalisisCumplimientoFicha{
-			FichaID:         f.ID,
-			FichaNumero:     f.Ficha,
-			ProgramaNombre:  progNombre,
-			JornadaNombre:   jornadaNombre,
-			SedeNombre:      sedeNombre,
-			DiasProgramados: programados,
-			DiasConSesion:   conSesion,
-			PctCumplimiento: pct,
-		})
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].PctCumplimiento < items[j].PctCumplimiento })
 	return dto.AnalisisCumplimientoSection{Items: items}, nil
 }
 
-type diaJornadaKey struct {
-	diaID   int
-	jornada string
+// rangoSemanaAnteriorCompleta devuelve [lunes, lunes) de la semana calendario anterior a la actual.
+func rangoSemanaAnteriorCompleta(ref time.Time) (time.Time, time.Time) {
+	loc := utils.AppLocation()
+	ref = ref.In(loc)
+	daysSinceMonday := int(ref.Weekday() - time.Monday)
+	if ref.Weekday() == time.Sunday {
+		daysSinceMonday = 6
+	}
+	mondayThisWeek := ref.AddDate(0, 0, -daysSinceMonday)
+	mondayPrev := mondayThisWeek.AddDate(0, 0, -7)
+	return mondayPrev, mondayThisWeek
 }
 
-func (s *asistenciaAnalisisService) buildDiaSemana(
-	desde, hasta time.Time,
+func (s *asistenciaAnalisisService) buildSemanaAnterior(
 	sedeIDs []uint,
 	jornada string,
 	diaSemanaID *int,
 	fichaID *uint,
 ) (dto.AnalisisDiaSemanaSection, error) {
 	loc := utils.AppLocation()
-	agg := make(map[diaJornadaKey]*struct{ esperados, vinieron int })
-	diaTotal := make(map[int]*struct{ esperados, vinieron int })
-
+	desde, hasta := rangoSemanaAnteriorCompleta(time.Now())
 	endDay := hasta.Add(-time.Second)
+
+	porDia := make([]dto.AnalisisDiaSemanaFila, 0, 7)
+	rankingRows := make([]dto.AnalisisDiaRanking, 0, 7)
+
 	for d := desde.In(loc); !d.After(endDay); d = d.AddDate(0, 0, 1) {
 		diaID := int(WeekdayToDiaFormacionID(d.Weekday()))
 		if diaSemanaID != nil && *diaSemanaID > 0 && diaID != *diaSemanaID {
 			continue
 		}
-		var sedeID *uint
-		if len(sedeIDs) == 1 {
-			sedeID = &sedeIDs[0]
-		}
-		fichas, err := s.fichaRepo.FindActivasParaFechaConJornada(d, sedeID)
+		diaRes, err := s.procesarDiaSemanaAnterior(d, sedeIDs, jornada, fichaID)
 		if err != nil {
 			return dto.AnalisisDiaSemanaSection{}, err
 		}
-		fichas = filtrarFichasPorSedes(fichas, sedeIDs)
-		fechaStr := d.Format(time.DateOnly)
-		var sedeForDash *uint
-		if len(sedeIDs) == 1 {
-			sedeForDash = &sedeIDs[0]
-		}
-		_, porFichaDia, err := s.asistRepo.GetDashboardResumen(sedeForDash, fechaStr)
-		if err != nil {
-			return dto.AnalisisDiaSemanaSection{}, err
-		}
-		vinieronPorFicha := make(map[uint]int, len(porFichaDia))
-		for _, row := range porFichaDia {
-			vinieronPorFicha[row.FichaID] = row.CantidadVinieron
-		}
-		for i := range fichas {
-			f := &fichas[i]
-			if fichaID != nil && *fichaID > 0 && f.ID != *fichaID {
-				continue
-			}
-			if jornada != "" && (f.Jornada == nil || f.Jornada.Nombre != jornada) {
-				continue
-			}
-			if !s.fichaTieneFormacionEnDia(f, d) {
-				continue
-			}
-			aprendices, err := s.aprendizRepo.FindByFichaID(f.ID)
-			if err != nil {
-				return dto.AnalisisDiaSemanaSection{}, err
-			}
-			activeCount := 0
-			for _, ap := range aprendices {
-				if ap.Estado {
-					activeCount++
-				}
-			}
-			if activeCount == 0 {
-				continue
-			}
-			jornadaNombre := ""
-			if f.Jornada != nil {
-				jornadaNombre = f.Jornada.Nombre
-			}
-			key := diaJornadaKey{diaID: diaID, jornada: jornadaNombre}
-			if agg[key] == nil {
-				agg[key] = &struct{ esperados, vinieron int }{}
-			}
-			agg[key].esperados += activeCount
-			vinieron := vinieronPorFicha[f.ID]
-			agg[key].vinieron += vinieron
-
-			if diaTotal[diaID] == nil {
-				diaTotal[diaID] = &struct{ esperados, vinieron int }{}
-			}
-			diaTotal[diaID].esperados += activeCount
-			diaTotal[diaID].vinieron += vinieron
+		porDia = append(porDia, diaRes.filas...)
+		if diaRes.ranking != nil {
+			rankingRows = append(rankingRows, *diaRes.ranking)
 		}
 	}
 
-	porDiaJornada := make([]dto.AnalisisDiaSemanaJornada, 0, len(agg))
-	for key, v := range agg {
-		pct := 0.0
-		if v.esperados > 0 {
-			pct = math.Round(float64(v.vinieron)/float64(v.esperados)*1000) / 10
+	sort.Slice(porDia, func(i, j int) bool {
+		if porDia[i].Fecha != porDia[j].Fecha {
+			return porDia[i].Fecha < porDia[j].Fecha
 		}
-		porDiaJornada = append(porDiaJornada, dto.AnalisisDiaSemanaJornada{
-			DiaSemanaID:   key.diaID,
-			DiaSemana:     nombresDiaSemana[key.diaID],
-			JornadaNombre: key.jornada,
-			Esperados:     v.esperados,
-			Vinieron:      v.vinieron,
-			Pct:           pct,
-		})
-	}
-	sort.Slice(porDiaJornada, func(i, j int) bool {
-		if porDiaJornada[i].DiaSemanaID != porDiaJornada[j].DiaSemanaID {
-			return porDiaJornada[i].DiaSemanaID < porDiaJornada[j].DiaSemanaID
-		}
-		return porDiaJornada[i].JornadaNombre < porDiaJornada[j].JornadaNombre
+		return porDia[i].JornadaNombre < porDia[j].JornadaNombre
 	})
-
-	ranking := make([]dto.AnalisisDiaRanking, 0, len(diaTotal))
-	for diaID, v := range diaTotal {
-		pct := 0.0
-		if v.esperados > 0 {
-			pct = math.Round(float64(v.vinieron)/float64(v.esperados)*1000) / 10
+	sort.Slice(rankingRows, func(i, j int) bool {
+		if rankingRows[i].Vinieron != rankingRows[j].Vinieron {
+			return rankingRows[i].Vinieron > rankingRows[j].Vinieron
 		}
-		ranking = append(ranking, dto.AnalisisDiaRanking{
-			DiaSemanaID: diaID,
-			DiaSemana:   nombresDiaSemana[diaID],
-			Vinieron:    v.vinieron,
-			Pct:         pct,
-		})
-	}
-	sort.Slice(ranking, func(i, j int) bool {
-		if ranking[i].Vinieron != ranking[j].Vinieron {
-			return ranking[i].Vinieron > ranking[j].Vinieron
-		}
-		return ranking[i].Pct > ranking[j].Pct
+		return rankingRows[i].Pct > rankingRows[j].Pct
 	})
 
 	return dto.AnalisisDiaSemanaSection{
-		PorDiaJornada:     porDiaJornada,
-		DiasMasAsistencia: ranking,
+		SemanaDesde:       desde.Format(time.DateOnly),
+		SemanaHasta:       endDay.Format(time.DateOnly),
+		PorDia:            porDia,
+		DiasMasAsistencia: rankingRows,
 	}, nil
 }

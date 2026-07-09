@@ -26,6 +26,8 @@ type AprendizRepository interface {
 	Delete(id uint) error
 	// CountActivosByFichaIDs cuenta aprendices activos (estado=true) por ficha_id.
 	CountActivosByFichaIDs(fichaIDs []uint) (map[uint]int, error)
+	// CountVisiblesAsistenciaByFichaIDs activos y no ocultos en toma de asistencia.
+	CountVisiblesAsistenciaByFichaIDs(fichaIDs []uint) (map[uint]int, error)
 	CountActivosScoped(sedeIDs []uint) (int64, error)
 }
 
@@ -145,6 +147,30 @@ func (r *aprendizRepository) Update(a *models.Aprendiz) error {
 
 func (r *aprendizRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Aprendiz{}, id).Error
+}
+
+func (r *aprendizRepository) CountVisiblesAsistenciaByFichaIDs(fichaIDs []uint) (map[uint]int, error) {
+	out := make(map[uint]int)
+	if len(fichaIDs) == 0 {
+		return out, nil
+	}
+	type row struct {
+		FichaID uint `gorm:"column:ficha_caracterizacion_id"`
+		Total   int  `gorm:"column:total"`
+	}
+	var rows []row
+	err := r.db.Model(&models.Aprendiz{}).
+		Select("ficha_caracterizacion_id, COUNT(*)::int AS total").
+		Where("ficha_caracterizacion_id IN ? AND estado = ? AND oculto_en_asistencia = ? AND deleted_at IS NULL", fichaIDs, true, false).
+		Group("ficha_caracterizacion_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, rw := range rows {
+		out[rw.FichaID] = rw.Total
+	}
+	return out, nil
 }
 
 func (r *aprendizRepository) CountActivosByFichaIDs(fichaIDs []uint) (map[uint]int, error) {

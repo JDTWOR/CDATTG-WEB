@@ -701,12 +701,15 @@ export interface AsistenciaAnalisisResponse {
     promedio_hora: string;
     promedio_minutos_dia: number;
     total_sesiones: number;
+    total_dias_con_sesion: number;
     detalle_por_ficha: Array<{
       ficha_id: number;
       ficha_numero: string;
+      programa_nombre: string;
       jornada_nombre: string;
       promedio_hora: string;
       total_sesiones: number;
+      dias_con_sesion: number;
     }>;
   };
   cumplimiento: {
@@ -718,11 +721,26 @@ export interface AsistenciaAnalisisResponse {
       sede_nombre: string;
       dias_programados: number;
       dias_con_sesion: number;
+      total_sesiones: number;
       pct_cumplimiento: number;
+      resumen_detalle: {
+        dias_cumplidos: number;
+        dias_sin_toma: number;
+        sesiones_fuera_programacion: number;
+      };
+      detalle_dias: Array<{
+        fecha: string;
+        dia_semana: string;
+        programado: boolean;
+        tiene_sesion: boolean;
+      }>;
     }>;
   };
   dia_semana: {
-    por_dia_jornada: Array<{
+    semana_desde: string;
+    semana_hasta: string;
+    por_dia: Array<{
+      fecha: string;
       dia_semana_id: number;
       dia_semana: string;
       jornada_nombre: string;
@@ -731,6 +749,7 @@ export interface AsistenciaAnalisisResponse {
       pct: number;
     }>;
     dias_mas_asistencia: Array<{
+      fecha?: string;
       dia_semana_id: number;
       dia_semana: string;
       vinieron: number;

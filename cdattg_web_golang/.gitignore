@@ -39,6 +39,8 @@ logs/
 
 # Reportes de asistencia generados al finalizar sesión
 storage/asistencia_pdfs/
+storage/personas_fotos/
+storage/carnets_fotos/
 
 # Diagnóstico del scraper de SofiaPlus (capturas/HTML con datos personales)
 storage/sofia_diagnostico/

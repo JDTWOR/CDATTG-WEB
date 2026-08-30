@@ -31,6 +31,7 @@ var exclusiveSeedRoles = map[string]struct{}{
 	"FPI":                   {},
 	"VIGILANTE":             {},
 	"BIENESTAR AL APRENDIZ": {},
+	"BIBLIOTECARIO":         {},
 }
 
 var userSeeds = []UserSeed{
@@ -48,6 +49,7 @@ var userSeeds = []UserSeed{
 	{"formacionprofesionalintegralcomplementaria@dataguaviare.com.co", seedPasswordDefault, 9100, "FPI"},
 	// Usuario módulo vigilancia (portería / accesos)
 	{"vigilanciasena@dataguaviare.com.co", seedPasswordDefault, 9101, "VIGILANTE"},
+	{"biblioteca@dataguaviare.com.co", seedPasswordDefault, 9200, "BIBLIOTECARIO"},
 }
 
 func isExclusiveSeedRole(role string) bool {

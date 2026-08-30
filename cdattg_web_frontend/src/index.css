@@ -41,6 +41,33 @@
     @apply bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
   }
 
+  .btn-sena {
+    @apply bg-sena-green hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .carnet-sello {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .carnet-sello::after {
+    content: '';
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 40%, rgb(57 181 74 / 0.12) 50%, transparent 60%);
+    animation: carnet-sello-luz 4s linear infinite;
+  }
+
+  @keyframes carnet-sello-luz {
+    0% {
+      transform: translateX(-40%);
+    }
+    100% {
+      transform: translateX(40%);
+    }
+  }
+
   .input-field {
     @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100;
   }

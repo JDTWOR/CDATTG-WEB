@@ -6,6 +6,7 @@ import {
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import { EscanerQR } from '../components/EscanerQR';
+import { VigilanciaAccesoFoto } from './VigilanciaAccesoFoto';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
 import { normalizarDocumentoEscaneado } from './asistencia/asistenciaUtils';
@@ -34,6 +35,8 @@ const TIPO_LABELS: Record<string, string> = {
   APRENDIZ: 'Aprendiz',
   INSTRUCTOR: 'Instructor',
   ADMINISTRATIVO: 'Administrativo',
+  PERSONAL_OPERATIVO_APOYO: 'Personal operativo y de apoyo',
+  CONTRATISTA: 'Contratista de prestación de servicios',
   VISITANTE: 'Visitante',
 };
 
@@ -167,19 +170,27 @@ function FichaPersonaResumen({
 }>) {
   const lista = fichas?.length ? fichas : [];
   return (
-    <dl className="space-y-2 text-sm">
-      <FichaRow label="Documento" value={persona.numero_documento} />
-      <FichaRow label="Nombre" value={persona.nombre_completo || 'Sin nombre'} />
-      <FichaRow label="Contacto" value={persona.celular || persona.email || persona.telefono || '—'} />
-      <FichaRow label="Tipo" value={labelTiposPersona(persona)} />
-      {visitaLabel ? <FichaRow label="Dentro desde" value={visitaLabel} /> : null}
-      <FichasVinculadasPanel fichas={lista} />
-      {persona.es_nueva ? (
-        <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-          Usuario creado automáticamente. Deberá completar sus datos al iniciar sesión en el sistema.
-        </p>
-      ) : null}
-    </dl>
+    <div className="space-y-3">
+      <VigilanciaAccesoFoto documento={persona.numero_documento} tieneFoto={Boolean(persona.tiene_foto)} />
+      <dl className="space-y-2 text-sm">
+        <FichaRow label="Documento" value={persona.numero_documento} />
+        <FichaRow label="Nombre" value={persona.nombre_completo || 'Sin nombre'} />
+        <FichaRow label="Contacto" value={persona.celular || persona.email || persona.telefono || '—'} />
+        <FichaRow label="Tipo" value={labelTiposPersona(persona)} />
+        {visitaLabel ? <FichaRow label="Dentro desde" value={visitaLabel} /> : null}
+        {persona.foto_desde_carnet ? (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Nombre y foto del carnet que validó el instructor.
+          </p>
+        ) : null}
+        <FichasVinculadasPanel fichas={lista} />
+        {persona.es_nueva ? (
+          <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+            Usuario creado automáticamente. Deberá completar sus datos al iniciar sesión en el sistema.
+          </p>
+        ) : null}
+      </dl>
+    </div>
   );
 }
 

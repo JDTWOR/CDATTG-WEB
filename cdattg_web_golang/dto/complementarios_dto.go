@@ -17,10 +17,17 @@ const (
 	VerificacionNoVerificado = "NO_VERIFICADO" // SofiaPlus falló / se cayó: hay que reintentar
 )
 
-// LoteDocumento una fila del Excel de carga masiva.
+// LoteDocumento una fila del Excel de carga masiva (también se recibe por JSON
+// en el reintento de verificación).
 type LoteDocumento struct {
-	NumeroDocumento string
-	TipoDocumento   string // código corto opcional (CC, TI, ...)
+	NumeroDocumento string `json:"numero_documento"`
+	TipoDocumento   string `json:"tipo_documento"` // código corto opcional (CC, TI, ...)
+}
+
+// ReintentarVerificacionRequest documentos (NO_VERIFICADO / NO_REGISTRADO)
+// de un lote anterior que se quieren volver a consultar, sin pasar por Excel.
+type ReintentarVerificacionRequest struct {
+	Documentos []LoteDocumento `json:"documentos" binding:"required,dive"`
 }
 
 // VerificarLoteResponse resultado de una verificación por Excel, con resumen.
@@ -112,11 +119,18 @@ type ConsultarInscripcionesResponse struct {
 	Mensaje            string                     `json:"mensaje,omitempty"`
 }
 
-// LoteInscripcionFila fila del Excel de carga masiva (documento + programa).
+// LoteInscripcionFila fila del Excel de carga masiva (documento + programa);
+// también se recibe por JSON en el reintento de inscripciones.
 type LoteInscripcionFila struct {
-	NumeroDocumento string
-	Programa        string
-	TipoDocumento   string
+	NumeroDocumento string `json:"numero_documento"`
+	Programa        string `json:"programa"`
+	TipoDocumento   string `json:"tipo_documento"`
+}
+
+// ReintentarInscripcionesRequest filas (NO_VERIFICADO / NO_ENCONTRADO) de un
+// lote anterior de inscripciones que se quieren volver a consultar, sin Excel.
+type ReintentarInscripcionesRequest struct {
+	Documentos []LoteInscripcionFila `json:"documentos" binding:"required,dive"`
 }
 
 // ConsultarInscripcionesLoteResponse resumen de carga masiva por programa.

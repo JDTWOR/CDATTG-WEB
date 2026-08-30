@@ -23,6 +23,7 @@ import {
   EyeIcon,
   IdentificationIcon,
   AcademicCapIcon,
+  DocumentCheckIcon,
 } from '@heroicons/react/24/outline';
 import { AppBreadcrumb } from './navigation/AppBreadcrumb';
 import { useAuth } from '../context/AuthContext';
@@ -49,10 +50,14 @@ function readSidebarHidden(): boolean {
 
 const ICONS: Record<string, ReactNode> = {
   perfil: <UsersIcon className="w-5 h-5" />,
+  carnet: <IdentificationIcon className="w-5 h-5" />,
   dashboard: <HomeIcon className="w-5 h-5" />,
   programas: <BookOpenIcon className="w-5 h-5" />,
   fichas: <DocumentTextIcon className="w-5 h-5" />,
   instructores: <BriefcaseIcon className="w-5 h-5" />,
+  'personal-operativo-apoyo': <ShieldCheckIcon className="w-5 h-5" />,
+  'personal-administrativo': <BriefcaseIcon className="w-5 h-5" />,
+  contratistas: <DocumentCheckIcon className="w-5 h-5" />,
   aprendices: <UserGroupIcon className="w-5 h-5" />,
   personas: <UsersIcon className="w-5 h-5" />,
   asistencia: <ClipboardDocumentListIcon className="w-5 h-5" />,

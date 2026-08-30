@@ -16,6 +16,8 @@ const TIPO_LABELS: Record<string, string> = {
   APRENDIZ: 'Aprendiz',
   INSTRUCTOR: 'Instructor',
   ADMINISTRATIVO: 'Administrativo',
+  PERSONAL_OPERATIVO_APOYO: 'Personal operativo y de apoyo',
+  CONTRATISTA: 'Contratista de prestación de servicios',
   VISITANTE: 'Visitante',
 };
 

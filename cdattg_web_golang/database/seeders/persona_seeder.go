@@ -36,6 +36,7 @@ var personaSeeds = []PersonaSeed{
 	// ID alto: no reutilizar IDs bajos (pueden ser aprendices reales; el sync les asignaría APRENDIZ/fichas).
 	{9100, "9000000010", "FORMACION", "PROFESIONAL", "INTEGRAL", "COMPLEMENTARIA", "3071010101", "formacionprofesionalintegralcomplementaria@dataguaviare.com.co", "CALLE 10 #10-10", "1991-02-01"},
 	{9101, "9000000011", "VIGILANCIA", "SENA", "CDATTG", "PRUEBAS", "3081111110", "vigilanciasena@dataguaviare.com.co", "CALLE 11 #11-11", "1992-03-01"},
+	{9200, "9000000012", "BIBLIOTECA", "SENA", "CDATTG", "PRUEBAS", "3091212120", "biblioteca@dataguaviare.com.co", "CALLE 12 #12-12", "1993-04-01"},
 }
 
 // RunPersonaSeeder crea las personas de prueba (IDs 1-8) igual que cdattg_web.

@@ -15,7 +15,7 @@ func validatePersonaCreate(repo repositories.PersonaRepository, req dto.PersonaR
 	if req.Celular != "" && repo.ExistsByCelular(req.Celular) {
 		return errPersonaCelularDuplicado
 	}
-	return nil
+	return validarPersonaRH(req.Rh)
 }
 
 func validatePersonaUpdate(repo repositories.PersonaRepository, id uint, req dto.PersonaRequest) error {
@@ -32,7 +32,7 @@ func validatePersonaUpdate(repo repositories.PersonaRepository, id uint, req dto
 			return errPersonaCelularDuplicado
 		}
 	}
-	return nil
+	return validarPersonaRH(req.Rh)
 }
 
 func validatePersonaSelfUpdate(repo repositories.PersonaRepository, id uint, req dto.PersonaSelfUpdateRequest) error {
@@ -46,5 +46,5 @@ func validatePersonaSelfUpdate(repo repositories.PersonaRepository, id uint, req
 			return errPersonaCelularDuplicado
 		}
 	}
-	return nil
+	return validarPersonaRH(req.Rh)
 }

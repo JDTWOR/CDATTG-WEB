@@ -48,6 +48,8 @@ type AccesoPersonaFicha struct {
 	PerfilCompleto  bool     `json:"perfil_completo"`
 	TipoSugerido    string   `json:"tipo_sugerido"` // tipo principal para registrar ingreso
 	Tipos           []string `json:"tipos"`         // todos los roles detectados (aprendiz, instructor, …)
+	TieneFoto       bool     `json:"tiene_foto"`
+	FotoDesdeCarnet bool     `json:"foto_desde_carnet"`
 }
 
 // AccesoFichaResumen ficha de caracterización activa ligada a la persona (solo si status=true).

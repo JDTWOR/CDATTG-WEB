@@ -19,6 +19,12 @@ var RoleNames = []string{
 	"BIENESTAR AL APRENDIZ",
 	// Rol solo para módulo FPI (Sofía / Betowa / complementarios)
 	"FPI",
+	// Ve carnets regulares ya validados para imprimir el físico
+	"BIBLIOTECARIO",
+	// Roles del módulo Personal (se toman rol al vincular una persona a un rol de personal)
+	"PERSONAL OPERATIVO Y DE APOYO",
+	"PERSONAL ADMINISTRATIVO",
+	"CONTRATISTA PRESTACIÓN DE SERVICIOS",
 }
 
 // Permisos por objeto (obj). Se usan en Casbin como (roleName o userID, obj, act).
@@ -41,6 +47,15 @@ var (
 	PermisosInstructor = []string{
 		"VER INSTRUCTORES", "CREAR INSTRUCTOR", "EDITAR INSTRUCTOR", "ELIMINAR INSTRUCTOR",
 	}
+	PermisosPersonalOperativoYDeApoyo = []string{
+		"VER PERSONAL OPERATIVO Y DE APOYO", "CREAR PERSONAL OPERATIVO Y DE APOYO", "EDITAR PERSONAL OPERATIVO Y DE APOYO", "ELIMINAR PERSONAL OPERATIVO Y DE APOYO",
+	}
+	PermisosPersonalAdministrativo = []string{
+		"VER PERSONAL ADMINISTRATIVO", "CREAR PERSONAL ADMINISTRATIVO", "EDITAR PERSONAL ADMINISTRATIVO", "ELIMINAR PERSONAL ADMINISTRATIVO",
+	}
+	PermisosContratista = []string{
+		"VER CONTRATISTAS PRESTACIÓN DE SERVICIOS", "CREAR CONTRATISTAS PRESTACIÓN DE SERVICIOS", "EDITAR CONTRATISTAS PRESTACIÓN DE SERVICIOS", "ELIMINAR CONTRATISTAS PRESTACIÓN DE SERVICIOS",
+	}
 	PermisosAsistencia = []string{
 		"VER ASISTENCIA", "TOMAR ASISTENCIA", "VER MI AGENDA", "VER MIS INASISTENCIAS",
 	}
@@ -61,6 +76,7 @@ var (
 		ActEntrarAulaLMS,
 		ActPublicarActividadLMS,
 	}
+	PermisosCarnet = []string{ActVerCarnetDigital, ActValidarCarnetDigital, ActVerCarnetBiblioteca}
 )
 
 // ObjPersona, ObjPrograma, ... nombres de objeto usados en rutas y Casbin.
@@ -73,17 +89,24 @@ const (
 	ActVerLMS               = "VER LMS"
 	ActEntrarAulaLMS        = "ENTRAR AULA"
 	ActPublicarActividadLMS = "PUBLICAR ACTIVIDAD"
+	ActVerCarnetDigital     = "VER CARNET DIGITAL"
+	ActValidarCarnetDigital = "VALIDAR CARNET DIGITAL"
+	ActVerCarnetBiblioteca  = "VER CARNET BIBLIOTECA"
 
 	ObjPersona     = "persona"
 	ObjPrograma    = "programa"
 	ObjFicha       = "ficha"
 	ObjAprendiz    = "aprendiz"
 	ObjInstructor  = "instructor"
+	ObjPersonalOperativoYDeApoyo = "personal-operativo-apoyo"
+	ObjPersonalAdministrativo = "personal-administrativo"
+	ObjContratista         = "contratista"
 	ObjAsistencia  = "asistencia"
 	ObjEleccion    = "eleccion"
 	ObjUsuario     = "usuario"
 	ObjVigilancia  = "vigilancia"
 	ObjLMS         = "lms"
+	ObjCarnet      = "carnet"
 	ObjInventario = "inventario"
 	ObjProducto   = "producto"
 	ObjOrden      = "orden"
@@ -92,6 +115,14 @@ const (
 	ObjCategoria  = "categoria"
 	ObjMarca      = "marca"
 	ObjContrato   = "contrato"
+)
+
+// Roles del módulo Personal: usados al vincular una persona a un rol de personal.
+const (
+	RolPersonalOperativoYDeApoyo       = "PERSONAL OPERATIVO Y DE APOYO"
+	RolPersonalAdministrativo          = "PERSONAL ADMINISTRATIVO"
+	RolContratistaPrestacionServicios = "CONTRATISTA PRESTACIÓN DE SERVICIOS"
+	RolBibliotecario                  = "BIBLIOTECARIO"
 )
 
 // IsValidPermiso indica si (obj, act) es un permiso definido en el sistema.
@@ -122,6 +153,15 @@ func AllPermissionPairs() []struct{ Obj, Act string } {
 	for _, act := range PermisosInstructor {
 		out = append(out, struct{ Obj, Act string }{ObjInstructor, act})
 	}
+	for _, act := range PermisosPersonalOperativoYDeApoyo {
+		out = append(out, struct{ Obj, Act string }{ObjPersonalOperativoYDeApoyo, act})
+	}
+	for _, act := range PermisosPersonalAdministrativo {
+		out = append(out, struct{ Obj, Act string }{ObjPersonalAdministrativo, act})
+	}
+	for _, act := range PermisosContratista {
+		out = append(out, struct{ Obj, Act string }{ObjContratista, act})
+	}
 	for _, act := range PermisosAsistencia {
 		out = append(out, struct{ Obj, Act string }{ObjAsistencia, act})
 	}
@@ -136,6 +176,9 @@ func AllPermissionPairs() []struct{ Obj, Act string } {
 	}
 	for _, act := range PermisosLMS {
 		out = append(out, struct{ Obj, Act string }{ObjLMS, act})
+	}
+	for _, act := range PermisosCarnet {
+		out = append(out, struct{ Obj, Act string }{ObjCarnet, act})
 	}
 	// Inventario desactivado: no se añaden permisos de inventario a AllPermissionPairs
 	return out

@@ -27,6 +27,8 @@ type Persona struct {
 	ConDocumento       *bool      `gorm:"column:condocumento" json:"condocumento"`
 	PersonaCaracterizacionID *uint `gorm:"column:parametro_id" json:"parametro_id"`
 	NivelEscolaridadID       *uint `gorm:"column:nivel_escolaridad_id" json:"nivel_escolaridad_id"`
+	Rh                       string `gorm:"column:rh;size:8" json:"rh"`
+	FotoPath                 string `gorm:"column:foto_path;size:255" json:"foto_path"`
 
 	// Relaciones
 	Pais                   *Pais                   `gorm:"foreignKey:PaisID" json:"pais,omitempty"`

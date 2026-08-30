@@ -5,21 +5,21 @@ import {
   MapPinIcon,
   PhoneIcon,
   DevicePhoneMobileIcon,
-  ShieldCheckIcon,
   UserCircleIcon,
   ChevronDownIcon,
-  PencilSquareIcon,
 } from '@heroicons/react/24/outline';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
-import { formatRoleLabel } from '../utils/roles';
 import { AlertaConsecutivaBanner } from '../components/bienestar/AlertaConsecutivaBanner';
 import { useMisAlertasConsecutivas } from '../hooks/useMisAlertasConsecutivas';
 import { canViewMisInasistencias } from './aprendiz/misInasistenciasPermissions';
 import { PersonaModal } from '../components/PersonaModal';
 import type { PersonaRequest, PersonaResponse, PersonaSelfUpdateRequest, UserResponse } from '../types';
+import { PerfilAcciones } from './perfil/PerfilAcciones';
+import { PerfilFotoCamara } from './perfil/PerfilFotoCamara';
+import { PerfilHeroSection } from './perfil/PerfilHeroSection';
 
 const PERM_EDITAR_MI_PERSONA = 'EDITAR MI PERSONA';
 
@@ -49,6 +49,7 @@ function personaRequestToSelfUpdate(data: PersonaRequest): PersonaSelfUpdateRequ
     direccion: data.direccion,
     parametro_id: data.parametro_id,
     nivel_escolaridad_id: data.nivel_escolaridad_id,
+    rh: data.rh,
   };
 }
 
@@ -149,12 +150,15 @@ function AlertBanner({ message }: Readonly<{ message: string }>) {
   );
 }
 
-type PerfilPageHeaderProps = Readonly<{
-  showEdit: boolean;
+function PerfilPageHeader({
+  showAcciones,
+  onEdit,
+  onFoto,
+}: Readonly<{
+  showAcciones: boolean;
   onEdit: () => void;
-}>;
-
-function PerfilPageHeader({ showEdit, onEdit }: PerfilPageHeaderProps) {
+  onFoto: () => void;
+}>) {
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
@@ -163,16 +167,7 @@ function PerfilPageHeader({ showEdit, onEdit }: PerfilPageHeaderProps) {
           Tus datos, roles y permisos en el sistema.
         </p>
       </div>
-      {showEdit ? (
-        <button
-          type="button"
-          onClick={onEdit}
-          className="btn-primary inline-flex shrink-0 items-center justify-center gap-2 self-start"
-        >
-          <PencilSquareIcon className="h-5 w-5" />
-          Editar datos
-        </button>
-      ) : null}
+      <PerfilAcciones show={showAcciones} onEdit={onEdit} onFoto={onFoto} />
     </header>
   );
 }
@@ -209,66 +204,6 @@ function PerfilIncompletoBanner({
   );
 }
 
-type PerfilHeroSectionProps = Readonly<{
-  loading: boolean;
-  fullName: string;
-  email: string;
-  initial: string;
-  user: UserResponse | null;
-  roles: string[];
-}>;
-
-function PerfilHeroSection({ loading, fullName, email, initial, user, roles }: PerfilHeroSectionProps) {
-  const displayName = loading && !fullName ? 'Cargando…' : fullName || 'Usuario sin nombre';
-  const statusActive = Boolean(user?.status);
-
-  return (
-    <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-600 dark:bg-gray-800">
-      <div className="bg-gradient-to-br from-primary-600 to-primary-800 px-4 pb-8 pt-6 sm:px-6">
-        <div className="flex flex-col items-center text-center sm:flex-row sm:items-end sm:gap-5 sm:text-left">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-white/30 bg-white/20 text-3xl font-bold text-white shadow-lg sm:h-24 sm:w-24">
-            {initial}
-          </div>
-          <div className="mt-4 min-w-0 sm:mt-0 sm:pb-1">
-            <h2 className="text-xl font-bold leading-tight text-white sm:text-2xl">{displayName}</h2>
-            {email ? <p className="mt-1 break-all text-sm text-primary-100">{email}</p> : null}
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                  statusActive
-                    ? 'bg-emerald-500/25 text-emerald-50 ring-1 ring-emerald-300/50'
-                    : 'bg-red-500/25 text-red-50 ring-1 ring-red-300/50'
-                }`}
-              >
-                {statusActive ? 'Usuario activo' : 'Usuario inactivo'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {roles.length > 0 ? (
-        <div className="border-t border-gray-100 px-4 py-4 dark:border-gray-700 sm:px-6">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            <ShieldCheckIcon className="h-4 w-4" />
-            Roles
-          </p>
-          <ul className="flex flex-wrap justify-center gap-2 sm:justify-start">
-            {roles.map((rol) => (
-              <li
-                key={rol}
-                className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-800 dark:bg-primary-900/50 dark:text-primary-200"
-              >
-                {formatRoleLabel(rol)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
 type PerfilContactoSectionProps = Readonly<{
   loading: boolean;
   persona: PersonaResponse | null;
@@ -296,6 +231,11 @@ function PerfilContactoSection({ loading, persona, email }: PerfilContactoSectio
             icon={<IdentificationIcon className="h-5 w-5" />}
             label="Documento"
             value={persona.numero_documento}
+          />
+          <InfoRow
+            icon={<IdentificationIcon className="h-5 w-5" />}
+            label="RH"
+            value={persona.rh || 'Sin registrar'}
           />
           <InfoRow
             icon={<EnvelopeIcon className="h-5 w-5" />}
@@ -400,6 +340,7 @@ function PerfilContent({
         initial={initial}
         user={user}
         roles={roles}
+        tieneFoto={persona?.tiene_foto}
       />
       <PerfilContactoSection loading={loading} persona={persona} email={email} />
       <PerfilPermisosSection permissions={permissions} />
@@ -414,6 +355,7 @@ export const Perfil = () => {
   const location = useLocation();
   const { persona, setPersona, loading, error } = usePerfilPersona(user);
   const [editOpen, setEditOpen] = useState(false);
+  const [fotoOpen, setFotoOpen] = useState(false);
   const [saveError, setSaveError] = useState('');
 
   const puedeEditarPerfil = hasPermission(PERM_EDITAR_MI_PERSONA) && Boolean(user?.persona_id);
@@ -455,7 +397,11 @@ export const Perfil = () => {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 pb-8 sm:space-y-6">
-      <PerfilPageHeader showEdit={puedeEditarPerfil && Boolean(persona)} onEdit={openEdit} />
+      <PerfilPageHeader
+        showAcciones={puedeEditarPerfil && Boolean(persona)}
+        onEdit={openEdit}
+        onFoto={() => setFotoOpen(true)}
+      />
 
       {perfilIncompleto ? (
         <PerfilIncompletoBanner
@@ -481,6 +427,10 @@ export const Perfil = () => {
           permissions={permissions}
           persona={persona}
         />
+      ) : null}
+
+      {fotoOpen && persona ? (
+        <PerfilFotoCamara onCerrar={() => setFotoOpen(false)} onGuardada={setPersona} />
       ) : null}
 
       {editOpen && persona ? (

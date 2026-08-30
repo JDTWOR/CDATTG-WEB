@@ -265,6 +265,14 @@ func patchAutoMigrateSofiaCredencial() error {
 	return nil
 }
 
+func patchFichaStatusManual() error {
+	return execSchemaPatch(
+		"Esquema: columna fichas_caracterizacion.status_manual verificada (nulo = automático por fechas)",
+		`ALTER TABLE fichas_caracterizacion
+		ADD COLUMN IF NOT EXISTS status_manual BOOLEAN`,
+	)
+}
+
 // EnsureSchemaPatches aplica cambios incrementales de esquema sin ejecutar Migrate() completo.
 func EnsureSchemaPatches() error {
 	if DB == nil {
@@ -285,6 +293,8 @@ func EnsureSchemaPatches() error {
 		patchFichaNombreYProgramaOpcional,
 		patchAutoMigrateSofiaCredencial,
 		patchAutoMigrateLmsModels,
+		patchFichaStatusManual,
+		patchAutoMigrateCarnetSolicitud,
 	}
 	for _, patch := range patches {
 		if err := patch(); err != nil {

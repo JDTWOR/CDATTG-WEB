@@ -36,6 +36,7 @@ const emptyForm = (programaId = 0, tipoFormacion: TipoFormacion = 'FORMACION_REG
   jornada_id: undefined,
   total_horas: undefined,
   status: true,
+  status_manual: null,
   dias_formacion_ids: [],
   horarios: [],
 });

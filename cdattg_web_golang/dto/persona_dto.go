@@ -20,6 +20,7 @@ type PersonaSelfUpdateRequest struct {
 	Direccion          string    `json:"direccion"`
 	ParametroID        *uint     `json:"parametro_id"`
 	NivelEscolaridadID *uint     `json:"nivel_escolaridad_id"`
+	Rh                 string    `json:"rh"`
 }
 
 // PersonaRequest representa la solicitud de creación/actualización de persona
@@ -42,6 +43,7 @@ type PersonaRequest struct {
 	Status             *bool     `json:"status"`
 	ParametroID        *uint     `json:"parametro_id"`
 	NivelEscolaridadID *uint     `json:"nivel_escolaridad_id"`
+	Rh                 string    `json:"rh"`
 }
 
 // PersonaResponse representa la respuesta de persona
@@ -65,4 +67,6 @@ type PersonaResponse struct {
 	Direccion       string     `json:"direccion"`
 	Status          bool       `json:"status"`
 	ParametroID     *uint      `json:"parametro_id"`
+	Rh              string     `json:"rh"`
+	TieneFoto       bool       `json:"tiene_foto"`
 }

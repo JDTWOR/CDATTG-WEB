@@ -49,6 +49,7 @@ export interface PersonaRequest {
   status?: boolean;
   parametro_id?: number;
   nivel_escolaridad_id?: number;
+  rh?: string;
 }
 
 /** Actualización de perfil propio (sin número de documento ni estado). */
@@ -69,6 +70,7 @@ export interface PersonaSelfUpdateRequest {
   direccion?: string;
   parametro_id?: number;
   nivel_escolaridad_id?: number;
+  rh?: string;
 }
 
 export interface PersonaResponse {
@@ -91,6 +93,8 @@ export interface PersonaResponse {
   direccion?: string;
   status: boolean;
   parametro_id?: number;
+  rh?: string;
+  tiene_foto?: boolean;
 }
 
 export interface PaginatedResponse<T> {
@@ -425,6 +429,8 @@ export interface FichaCaracterizacionRequest {
   jornada_id?: number | null;
   total_horas?: number;
   status?: boolean;
+  /** true/false fuerza el estado manualmente; null = automático según fecha inicio/fin. */
+  status_manual?: boolean | null;
   dias_formacion_ids?: number[];
   dias_formacion_nombres?: string[];
   dias_formacion?: FichaDiaFormacionItem[];
@@ -454,6 +460,8 @@ export interface FichaCaracterizacionResponse {
   jornada_nombre?: string;
   total_horas?: number;
   status: boolean;
+  /** true/false = override manual; null = automático según fecha inicio/fin. */
+  status_manual?: boolean | null;
   dias_formacion_ids?: number[];
   dias_formacion_nombres?: string[];
   dias_formacion?: FichaDiaFormacionItem[];
@@ -1205,6 +1213,8 @@ export interface AccesoPersonaFicha {
   tipo_sugerido: string;
   /** Todos los roles detectados (ej. aprendiz e instructor a la vez). */
   tipos?: string[];
+  tiene_foto?: boolean;
+  foto_desde_carnet?: boolean;
 }
 
 export interface AccesoVisitaAbierta {
@@ -1336,6 +1346,12 @@ export interface VerificarAspiranteRequest {
   tipo_documento?: string;
 }
 
+// Documento a reintentar de un lote anterior (NO_VERIFICADO / NO_REGISTRADO).
+export interface ReintentarDocumento {
+  numero_documento: string;
+  tipo_documento?: string;
+}
+
 export interface VerificarAspiranteResponse {
   numero_documento: string;
   estado: VerificacionEstado;
@@ -1416,4 +1432,11 @@ export interface ConsultarInscripcionesLoteResponse {
   no_encontrados: number;
   no_verificados: number;
   resultados: ConsultarInscripcionesResponse[];
+}
+
+// Fila a reintentar de un lote anterior de inscripciones (NO_VERIFICADO / NO_ENCONTRADO).
+export interface ReintentarInscripcionDocumento {
+  numero_documento: string;
+  programa: string;
+  tipo_documento?: string;
 }

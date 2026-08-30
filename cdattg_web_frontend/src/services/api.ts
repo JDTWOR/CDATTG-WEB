@@ -71,6 +71,8 @@ import type {
   VerificarLoteResponse,
   LoteIniciadoResponse,
   ProgresoLoteResponse,
+  ReintentarDocumento,
+  ReintentarInscripcionDocumento,
   GuardarCredencialSofiaRequest,
   CredencialSofiaEstado,
   ConsultarInscripcionesRequest,
@@ -116,6 +118,13 @@ import type {
   AccesoHistorialResponse,
   AccesoEstadisticasResponse,
 } from '../types';
+import type {
+  CreatePersonalRolRequest,
+  PersonalRolImportLogItem,
+  PersonalRolImportResult,
+  PersonalRolItem,
+  UpdatePersonalRolRequest,
+} from '../features/personalRol/types';
 import type { InstructorAgendaResponse } from '../types/agenda';
 import type {
   EleccionDesempateRequest,
@@ -845,6 +854,162 @@ class ApiService {
     return response.data.data;
   }
 
+  // Personal operativo y de apoyo
+  async getPersonalOperativoApoyo(page = 1, pageSize = 20, search?: string): Promise<PaginatedResponse<PersonalRolItem>> {
+    const response = await this.api.get<PaginatedResponse<PersonalRolItem>>('/personal-operativo-apoyo', {
+      params: { page, page_size: pageSize, search: search || undefined },
+    });
+    return response.data;
+  }
+
+  async getPersonalOperativoApoyoById(id: number): Promise<PersonalRolItem> {
+    const response = await this.api.get<PersonalRolItem>(`/personal-operativo-apoyo/${id}`);
+    return response.data;
+  }
+
+  async updatePersonalOperativoApoyo(id: number, data: UpdatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.put<PersonalRolItem>(`/personal-operativo-apoyo/${id}`, data);
+    return response.data;
+  }
+
+  async deletePersonalOperativoApoyo(id: number): Promise<void> {
+    await this.api.delete(`/personal-operativo-apoyo/${id}`);
+  }
+
+  // Crear personal operativo y de apoyo desde persona
+  async createPersonalOperativoApoyoFromPersona(data: CreatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.post<PersonalRolItem>('/personal-operativo-apoyo', data);
+    return response.data;
+  }
+
+  /** Importación masiva de personal operativo y de apoyo desde Excel. */
+  async uploadPersonalOperativoApoyoImport(file: File): Promise<PersonalRolImportResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.api.post<PersonalRolImportResult>('/personal-operativo-apoyo/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async getPersonalOperativoApoyoImports(limit: number = 50): Promise<PersonalRolImportLogItem[]> {
+    const response = await this.api.get<{ data: PersonalRolImportLogItem[] }>('/personal-operativo-apoyo/imports', {
+      params: { limit },
+    });
+    return response.data.data;
+  }
+
+  async downloadPersonalOperativoApoyoImportTemplate(): Promise<Blob> {
+    const response = await this.api.get<Blob>('/personal-operativo-apoyo/import/template', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  // Contratistas de prestación de servicios
+  async getContratistas(page = 1, pageSize = 20, search?: string): Promise<PaginatedResponse<PersonalRolItem>> {
+    const response = await this.api.get<PaginatedResponse<PersonalRolItem>>('/contratistas', {
+      params: { page, page_size: pageSize, search: search || undefined },
+    });
+    return response.data;
+  }
+
+  async getContratistaById(id: number): Promise<PersonalRolItem> {
+    const response = await this.api.get<PersonalRolItem>(`/contratistas/${id}`);
+    return response.data;
+  }
+
+  async updateContratista(id: number, data: UpdatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.put<PersonalRolItem>(`/contratistas/${id}`, data);
+    return response.data;
+  }
+
+  async deleteContratista(id: number): Promise<void> {
+    await this.api.delete(`/contratistas/${id}`);
+  }
+
+  // Crear contratista desde persona
+  async createContratistaFromPersona(data: CreatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.post<PersonalRolItem>('/contratistas', data);
+    return response.data;
+  }
+
+  /** Importación masiva de contratistas desde Excel. */
+  async uploadContratistasImport(file: File): Promise<PersonalRolImportResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.api.post<PersonalRolImportResult>('/contratistas/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async getContratistaImports(limit: number = 50): Promise<PersonalRolImportLogItem[]> {
+    const response = await this.api.get<{ data: PersonalRolImportLogItem[] }>('/contratistas/imports', {
+      params: { limit },
+    });
+    return response.data.data;
+  }
+
+  async downloadContratistaImportTemplate(): Promise<Blob> {
+    const response = await this.api.get<Blob>('/contratistas/import/template', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  // Personal administrativo
+  async getPersonalAdministrativo(page = 1, pageSize = 20, search?: string): Promise<PaginatedResponse<PersonalRolItem>> {
+    const response = await this.api.get<PaginatedResponse<PersonalRolItem>>('/personal-administrativo', {
+      params: { page, page_size: pageSize, search: search || undefined },
+    });
+    return response.data;
+  }
+
+  async getPersonalAdministrativoById(id: number): Promise<PersonalRolItem> {
+    const response = await this.api.get<PersonalRolItem>(`/personal-administrativo/${id}`);
+    return response.data;
+  }
+
+  async updatePersonalAdministrativo(id: number, data: UpdatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.put<PersonalRolItem>(`/personal-administrativo/${id}`, data);
+    return response.data;
+  }
+
+  async deletePersonalAdministrativo(id: number): Promise<void> {
+    await this.api.delete(`/personal-administrativo/${id}`);
+  }
+
+  // Crear personal administrativo desde persona
+  async createPersonalAdministrativoFromPersona(data: CreatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.post<PersonalRolItem>('/personal-administrativo', data);
+    return response.data;
+  }
+
+  /** Importación masiva de personal administrativo desde Excel. */
+  async uploadPersonalAdministrativoImport(file: File): Promise<PersonalRolImportResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.api.post<PersonalRolImportResult>('/personal-administrativo/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async getPersonalAdministrativoImports(limit: number = 50): Promise<PersonalRolImportLogItem[]> {
+    const response = await this.api.get<{ data: PersonalRolImportLogItem[] }>('/personal-administrativo/imports', {
+      params: { limit },
+    });
+    return response.data.data;
+  }
+
+  async downloadPersonalAdministrativoImportTemplate(): Promise<Blob> {
+    const response = await this.api.get<Blob>('/personal-administrativo/import/template', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
   // Asistencias
   async getAsistenciaReglas(): Promise<AsistenciaReglasResponse> {
     const response = await this.api.get<AsistenciaReglasResponse>('/asistencias/reglas');
@@ -1545,6 +1710,24 @@ class ApiService {
     const response = await this.api.get<{ data: VerificarLoteResponse }>(
       `/complementarios/verificar-lote/resultados/${loteId}`,
       { timeout: 15000 },
+    );
+    return response.data.data;
+  }
+
+  async reintentarVerificacionLote(documentos: ReintentarDocumento[]): Promise<LoteIniciadoResponse> {
+    const response = await this.api.post<{ data: LoteIniciadoResponse }>(
+      '/complementarios/verificar-lote/reintentar',
+      { documentos },
+      { timeout: 30000 },
+    );
+    return response.data.data;
+  }
+
+  async reintentarInscripcionesLote(documentos: ReintentarInscripcionDocumento[]): Promise<LoteIniciadoResponse> {
+    const response = await this.api.post<{ data: LoteIniciadoResponse }>(
+      '/complementarios/inscripciones/consultar-lote/reintentar',
+      { documentos },
+      { timeout: 30000 },
     );
     return response.data.data;
   }

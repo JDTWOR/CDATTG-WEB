@@ -11,4 +11,12 @@ export const authRoutes: RouteObject[] = [
       return { Component: Login };
     },
   },
+  {
+    path: '/registro',
+    hydrateFallbackElement: createElement(RouteLoadingFallback),
+    lazy: async () => {
+      const { RegistroPage } = await import('../../pages/registro/RegistroPage');
+      return { Component: RegistroPage };
+    },
+  },
 ];

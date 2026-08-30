@@ -270,7 +270,7 @@ class ApiService {
       (response) => response,
       (error: AxiosError) => {
         if (error.response?.status === 401) {
-          const isLoginRequest = error.config?.url?.includes('/auth/login');
+          const isLoginRequest = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register');
           if (!isLoginRequest) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');

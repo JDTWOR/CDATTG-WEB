@@ -77,6 +77,9 @@ var (
 		ActPublicarActividadLMS,
 	}
 	PermisosCarnet = []string{ActVerCarnetDigital, ActValidarCarnetDigital, ActVerCarnetBiblioteca}
+	PermisosSemillero = []string{
+		ActGestionarSemillero,
+	}
 )
 
 // ObjPersona, ObjPrograma, ... nombres de objeto usados en rutas y Casbin.
@@ -92,6 +95,7 @@ const (
 	ActVerCarnetDigital     = "VER CARNET DIGITAL"
 	ActValidarCarnetDigital = "VALIDAR CARNET DIGITAL"
 	ActVerCarnetBiblioteca  = "VER CARNET BIBLIOTECA"
+	ActGestionarSemillero   = "GESTIONAR SEMILLERO"
 
 	ObjPersona     = "persona"
 	ObjPrograma    = "programa"
@@ -107,6 +111,7 @@ const (
 	ObjVigilancia  = "vigilancia"
 	ObjLMS         = "lms"
 	ObjCarnet      = "carnet"
+	ObjSemillero   = "semillero"
 	ObjInventario = "inventario"
 	ObjProducto   = "producto"
 	ObjOrden      = "orden"
@@ -179,6 +184,9 @@ func AllPermissionPairs() []struct{ Obj, Act string } {
 	}
 	for _, act := range PermisosCarnet {
 		out = append(out, struct{ Obj, Act string }{ObjCarnet, act})
+	}
+	for _, act := range PermisosSemillero {
+		out = append(out, struct{ Obj, Act string }{ObjSemillero, act})
 	}
 	// Inventario desactivado: no se añaden permisos de inventario a AllPermissionPairs
 	return out

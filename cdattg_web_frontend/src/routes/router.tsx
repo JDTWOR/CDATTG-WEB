@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { RouteLoadingFallback } from '../components/RouteLoadingFallback';
 import { ProtectedLayout } from './layouts/ProtectedLayout';
 import { authRoutes } from './modules/auth.routes';
@@ -23,6 +23,9 @@ import { aprendizRoutes } from './modules/aprendiz.routes';
 import { bibliotecaRoutes } from './modules/biblioteca.routes';
 import { complementariosRoutes } from './modules/complementarios.routes';
 import { lmsRoutes } from './modules/lms.routes';
+import { portalPublicRoutes } from './modules/portal.routes';
+import { semilleroAdminRoutes } from './modules/semillero.routes';
+import { portalPaths } from './paths';
 
 /**
  * Árbol de rutas (React Router v7 data router).
@@ -31,6 +34,9 @@ import { lmsRoutes } from './modules/lms.routes';
  */
 export const appRouter = createBrowserRouter([
   ...authRoutes,
+  portalPublicRoutes,
+  { path: '/portal', element: createElement(Navigate, { to: '/', replace: true }) },
+  { path: '/portal/*', element: createElement(Navigate, { to: '/', replace: true }) },
   {
     Component: ProtectedLayout,
     hydrateFallbackElement: createElement(RouteLoadingFallback),
@@ -48,6 +54,7 @@ export const appRouter = createBrowserRouter([
       ...fichasRoutes,
       asistenciaRoutes,
       complementariosRoutes,
+      semilleroAdminRoutes,
       bienestarRoutes,
       lmsRoutes,
       ...inventarioRoutes,
@@ -57,4 +64,5 @@ export const appRouter = createBrowserRouter([
       ...administracionRoutes,
     ],
   },
+  { path: '*', element: createElement(Navigate, { to: portalPaths.index, replace: true }) },
 ]);

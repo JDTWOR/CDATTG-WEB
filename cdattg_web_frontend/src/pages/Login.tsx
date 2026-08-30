@@ -1,5 +1,5 @@
 import { useState, type ComponentProps } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { MoonIcon, SunIcon } from '@heroicons/react/24/outline';
 import LogoSena from '../../logo-sena-verde-complementario-svg-2022.svg';
 import { useAuth } from '../context/AuthContext';
@@ -113,6 +113,11 @@ export const Login = () => {
                 {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
               </button>
             </div>
+            <p className="text-center text-sm">
+              <Link to="/registro" className="text-primary-700 hover:underline dark:text-primary-300">Crear cuenta</Link>
+              {' · '}
+              <Link to="/" className="text-primary-700 hover:underline dark:text-primary-300">Portal público</Link>
+            </p>
           </form>
         </div>
       </div>

@@ -160,6 +160,7 @@ export const administracionPaths = {
   configuracionAsistencia: '/administracion/configuracion-asistencia',
   elecciones: '/administracion/elecciones',
   eleccionDetalle: (id: number | string) => `/administracion/elecciones/${id}`,
+  carrusel: '/administracion/carrusel',
 } as const;
 
 export const eleccionAprendizPaths = {
@@ -189,4 +190,38 @@ export const lmsPaths = {
   auditoriaPersona: (personaId: number | string) => `/lms/auditoria/${personaId}`,
   auditoriaTipo: (personaId: number | string, tipo: string) =>
     `/lms/auditoria/${personaId}/${encodeURIComponent(tipo)}`,
+} as const;
+
+/** Direcciones del portal público (inicio, investigación, revista, semilleros). */
+export const portalPaths = {
+  index: '/',
+  investigacion: '/investigacion',
+  presentacion: '/investigacion/presentacion',
+  semilleros: '/investigacion/semilleros',
+  semillero: (slug: string) => `/investigacion/semilleros/${encodeURIComponent(slug)}`,
+  revista: '/investigacion/revista',
+  revistaDetalle: (slug: string) => `/investigacion/revista/${encodeURIComponent(slug)}`,
+  boletines: '/investigacion/boletines',
+  boletin: (id: number | string) => `/investigacion/boletines/${id}`,
+  podcast: '/investigacion/podcast',
+  podcastDetalle: (id: number | string) => `/investigacion/podcast/${id}`,
+  convocatorias: '/investigacion/convocatorias',
+  convocatoria: (id: number | string) => `/investigacion/convocatorias/${id}`,
+  actividades: '/investigacion/actividades',
+  actividad: (id: number | string) => `/investigacion/actividades/${id}`,
+} as const;
+
+export const registroPath = '/registro';
+
+export const semilleroAdminPaths = {
+  index: '/semilleros',
+  nuevo: '/semilleros/nuevo',
+  editar: (id: number | string) => `/semilleros/${id}/editar`,
+  contenido: '/semilleros/contenido',
+  banners: '/semilleros/banners',
+  revista: '/semilleros/revista',
+  boletines: '/semilleros/boletines',
+  podcast: '/semilleros/podcast',
+  convocatorias: '/semilleros/convocatorias',
+  actividades: '/semilleros/actividades',
 } as const;

@@ -295,6 +295,7 @@ func EnsureSchemaPatches() error {
 		patchAutoMigrateLmsModels,
 		patchFichaStatusManual,
 		patchAutoMigrateCarnetSolicitud,
+		patchAutoMigratePortalModels,
 	}
 	for _, patch := range patches {
 		if err := patch(); err != nil {

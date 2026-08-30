@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getHomeRouteForUser } from '../utils/roles';
 
-/** Redirige "/" a la pantalla principal según rol del usuario autenticado. */
+/** Redirige usuarios autenticados a su home; si no hay sesión, al portal público. */
 export const HomeRedirect = () => {
   const { roles, permissions, loading, isAuthenticated } = useAuth();
 
@@ -15,7 +15,7 @@ export const HomeRedirect = () => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <Navigate to={getHomeRouteForUser(roles, permissions)} replace />;

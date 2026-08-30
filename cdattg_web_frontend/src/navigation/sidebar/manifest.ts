@@ -21,6 +21,7 @@ import {
   contratistasPaths,
   vigilanciaPaths,
   complementariosPaths,
+  semilleroAdminPaths,
 } from '../../routes/paths';
 import type { SidebarManifestItem } from './types';
 
@@ -344,7 +345,72 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     iconKey: 'vigilancia/ambientes',
   },
 
+  {
+    section: 'Investigación',
+    path: semilleroAdminPaths.index,
+    label: 'Semilleros',
+    permission: 'GESTIONAR SEMILLERO',
+    iconKey: 'semilleros',
+  },
+  {
+    section: 'Investigación',
+    path: semilleroAdminPaths.contenido,
+    label: 'Presentación institucional',
+    permission: 'GESTIONAR SEMILLERO',
+    iconKey: 'investigacion/presentacion',
+  },
+  {
+    section: 'Investigación',
+    path: semilleroAdminPaths.banners,
+    label: 'Banners del portal',
+    permission: 'GESTIONAR SEMILLERO',
+    iconKey: 'investigacion/banners',
+  },
+  {
+    section: 'Investigación',
+    path: semilleroAdminPaths.revista,
+    label: 'Revista Rupícola',
+    permission: 'GESTIONAR SEMILLERO',
+    iconKey: 'investigacion/revista',
+  },
+  {
+    section: 'Investigación',
+    path: semilleroAdminPaths.boletines,
+    label: 'Boletines',
+    permission: 'GESTIONAR SEMILLERO',
+    iconKey: 'investigacion/boletines',
+  },
+  {
+    section: 'Investigación',
+    path: semilleroAdminPaths.podcast,
+    label: 'Podcast',
+    permission: 'GESTIONAR SEMILLERO',
+    iconKey: 'investigacion/podcast',
+  },
+  {
+    section: 'Investigación',
+    path: semilleroAdminPaths.convocatorias,
+    label: 'Convocatorias',
+    permission: 'GESTIONAR SEMILLERO',
+    iconKey: 'investigacion/convocatorias',
+  },
+  {
+    section: 'Investigación',
+    path: semilleroAdminPaths.actividades,
+    label: 'Actividades',
+    permission: 'GESTIONAR SEMILLERO',
+    iconKey: 'investigacion/actividades',
+  },
+
   // —— Administración ——
+  {
+    section: 'Administración',
+    path: administracionPaths.carrusel,
+    label: 'Carrusel de destacados',
+    permission: 'GESTIONAR SEMILLERO',
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
+    iconKey: 'administracion/carrusel',
+  },
   {
     section: 'Administración',
     path: administracionPaths.jornadas,

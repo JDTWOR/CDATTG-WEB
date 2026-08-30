@@ -46,4 +46,12 @@ export const administracionRoutes: RouteObject[] = [
       return { Component: EleccionProcesoDetallePage };
     },
   },
+  {
+    path: administracionPaths.carrusel,
+    handle: { breadcrumb: { label: 'Carrusel de destacados' } },
+    lazy: async () => {
+      const { CarruselDestacadosPage } = await import('../../pages/administracion/CarruselDestacadosPage');
+      return { Component: CarruselDestacadosPage };
+    },
+  },
 ];

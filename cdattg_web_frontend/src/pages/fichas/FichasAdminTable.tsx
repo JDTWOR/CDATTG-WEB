@@ -59,12 +59,12 @@ function AccionesFicha({
 
   return (
     <div className={`flex ${layout === 'card' ? 'flex-wrap gap-2' : 'items-center justify-end gap-0.5'}`}>
-      <Link to={fichasPaths.detalle(item.id, item.tipo_formacion)} className={btn} title="Ver ficha">
+      <Link to={fichasPaths.detalle(item.ficha, item.tipo_formacion)} className={btn} title="Ver ficha">
         <EyeIcon className="h-5 w-5" />
       </Link>
       {puedeProgramarInstructores ? (
         <Link
-          to={`${fichasPaths.detalle(item.id, item.tipo_formacion)}?tab=programacion`}
+          to={`${fichasPaths.detalle(item.ficha, item.tipo_formacion)}?tab=programacion`}
           className={btn}
           title="Programar instructores"
         >

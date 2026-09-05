@@ -122,6 +122,21 @@ func (h *FichaHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, f)
 }
 
+// GetByNumero GET /fichas-caracterizacion/por-numero/:fichaNumero
+func (h *FichaHandler) GetByNumero(c *gin.Context) {
+	numero := strings.TrimSpace(c.Param("fichaNumero"))
+	if numero == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Número de ficha requerido"})
+		return
+	}
+	f, err := h.svc.FindByNumero(numero)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, f)
+}
+
 func (h *FichaHandler) GetByIDWithDetail(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {

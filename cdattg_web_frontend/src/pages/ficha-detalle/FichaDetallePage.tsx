@@ -30,8 +30,7 @@ export function FichaDetallePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { pathname, search } = location;
-  const { fichaId: fichaIdParam } = useParams<{ fichaId: string }>();
-  const fichaId = fichaIdParam ? Number.parseInt(fichaIdParam, 10) : 0;
+  const { fichaNumero: fichaNumeroParam } = useParams<{ fichaNumero: string }>();
   const { setLabel, clearLabel } = useBreadcrumbOverride();
 
   const puedeEditarFicha = canManageFichas(roles);
@@ -39,10 +38,11 @@ export function FichaDetallePage() {
   const puedeProgramarInstructores = canProgramarInstructores(roles, hasPermission);
   const [tab, setTab] = useFichaDetalleTab(puedeProgramarInstructores);
   const [weekStart, setWeekStart] = useInitialWeekStart();
-  const agenda = useFichaAgenda(fichaId, weekStart, puedeProgramarInstructores);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  const data = useFichaDetalleData(fichaId);
+  const data = useFichaDetalleData(fichaNumeroParam);
+  const fichaId = data.ficha?.id ?? 0;
+  const agenda = useFichaAgenda(fichaId, weekStart, puedeProgramarInstructores);
   const aprendicesModel = useFichaAprendices(fichaId, data.loadFicha);
   const instructoresModel = useFichaInstructores({
     fichaId,
@@ -52,13 +52,14 @@ export function FichaDetallePage() {
     reloadAgenda: agenda.reload,
   });
 
-  const { ficha, setFicha, loading, setLoading, error, isValidFichaId, diasLabel, loadFicha } = data;
+  const { ficha, setFicha, loading, setLoading, error, isValidFichaNumero, legacyIdRedirect, diasLabel, loadFicha } =
+    data;
   const { loadInstructores, setInstructorLiderId } = instructoresModel;
   const { loadAprendices, loadPersonas } = aprendicesModel;
 
   useFichaDetallePage({
     fichaId,
-    isValidFichaId,
+    isValidFichaId: isValidFichaNumero,
     tab,
     setLoading,
     loadFicha,
@@ -76,16 +77,16 @@ export function FichaDetallePage() {
     return () => clearLabel(pathname);
   }, [ficha?.ficha, pathname, setLabel, clearLabel]);
 
-  // Mantener el detalle dentro del submódulo correcto (Regular / Media Técnica / Complementaria).
+  // Canonical: número de ficha en la URL (redirige enlaces viejos con ID interno).
   useEffect(() => {
-    if (!ficha?.id) return;
-    const canonical = fichasPaths.detalle(ficha.id, ficha.tipo_formacion);
-    if (pathname !== canonical) {
+    if (!ficha?.ficha) return;
+    const canonical = fichasPaths.detalle(ficha.ficha, ficha.tipo_formacion);
+    if (pathname !== canonical || legacyIdRedirect != null) {
       navigate({ pathname: canonical, search }, { replace: true });
     }
-  }, [ficha?.id, ficha?.tipo_formacion, pathname, search, navigate]);
+  }, [ficha?.ficha, ficha?.tipo_formacion, legacyIdRedirect, pathname, search, navigate]);
 
-  if (!isValidFichaId) {
+  if (!isValidFichaNumero) {
     return <FichaDetalleInvalidIdState />;
   }
 
@@ -129,7 +130,11 @@ export function FichaDetallePage() {
       )}
 
       {tab === 'aprendices' && (
-        <FichaDetalleAprendicesTab {...aprendicesModel} puedeGestionarAprendices={puedeGestionarAprendices} />
+        <FichaDetalleAprendicesTab
+          {...aprendicesModel}
+          ficha={ficha}
+          puedeGestionarAprendices={puedeGestionarAprendices}
+        />
       )}
 
       {puedeEditarFicha && (

@@ -14,7 +14,11 @@ const lazyFichaDetalle = async () => {
 function detalleBreadcrumb(listLabel: string, listPath: string) {
   return (params: Record<string, string | undefined>) => [
     { label: listLabel, to: listPath },
-    { label: params.fichaId ? `Ficha ${params.fichaId}` : 'Ficha' },
+    {
+      label: params.fichaNumero
+        ? `Ficha ${decodeURIComponent(params.fichaNumero)}`
+        : 'Ficha',
+    },
   ];
 }
 
@@ -35,21 +39,21 @@ export const fichasRoutes: RouteObject[] = [
     lazy: lazyFichasList,
   },
   {
-    path: `${fichasPaths.mediaTecnica}/:fichaId`,
+    path: `${fichasPaths.mediaTecnica}/:fichaNumero`,
     handle: {
       breadcrumb: detalleBreadcrumb('Media Técnica', fichasPaths.mediaTecnica),
     },
     lazy: lazyFichaDetalle,
   },
   {
-    path: `${fichasPaths.complementaria}/:fichaId`,
+    path: `${fichasPaths.complementaria}/:fichaNumero`,
     handle: {
       breadcrumb: detalleBreadcrumb('Formación Complementaria', fichasPaths.complementaria),
     },
     lazy: lazyFichaDetalle,
   },
   {
-    path: `${fichasPaths.index}/:fichaId`,
+    path: `${fichasPaths.index}/:fichaNumero`,
     handle: {
       breadcrumb: detalleBreadcrumb('Formación Regular', fichasPaths.index),
     },

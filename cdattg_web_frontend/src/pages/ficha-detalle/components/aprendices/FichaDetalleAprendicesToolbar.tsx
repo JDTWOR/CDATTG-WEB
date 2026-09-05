@@ -1,4 +1,4 @@
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 
 type FichaDetalleAprendicesToolbarProps = Readonly<{
   stats: { total: number; ocultos: number };
@@ -6,6 +6,9 @@ type FichaDetalleAprendicesToolbarProps = Readonly<{
   onBusquedaChange: (value: string) => void;
   puedeGestionar: boolean;
   onAsignarClick: () => void;
+  exportando: boolean;
+  onExportarClick: () => void;
+  puedeExportar: boolean;
 }>;
 
 export function FichaDetalleAprendicesToolbar({
@@ -14,6 +17,9 @@ export function FichaDetalleAprendicesToolbar({
   onBusquedaChange,
   puedeGestionar,
   onAsignarClick,
+  exportando,
+  onExportarClick,
+  puedeExportar,
 }: FichaDetalleAprendicesToolbarProps) {
   const statsLabel =
     stats.ocultos > 0
@@ -27,11 +33,25 @@ export function FichaDetalleAprendicesToolbar({
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Aprendices asignados</h2>
           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{statsLabel}</p>
         </div>
-        {puedeGestionar && (
-          <button type="button" onClick={onAsignarClick} className="btn-primary shrink-0">
-            Asignar aprendices
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {puedeExportar && (
+            <button
+              type="button"
+              onClick={onExportarClick}
+              disabled={exportando || stats.total === 0}
+              className="btn-secondary inline-flex items-center gap-2"
+              title="Exportar lista en PDF con membrete SENA (GD-F-008)"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4" aria-hidden />
+              {exportando ? 'Generando…' : 'Exportar PDF'}
+            </button>
+          )}
+          {puedeGestionar && (
+            <button type="button" onClick={onAsignarClick} className="btn-primary">
+              Asignar aprendices
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="relative max-w-md">

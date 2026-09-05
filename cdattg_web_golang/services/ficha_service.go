@@ -24,6 +24,7 @@ const (
 type FichaService interface {
 	FindAll(page, pageSize int, programaID *uint, instructorID *uint, search string, tipoFormacion string) ([]dto.FichaCaracterizacionResponse, int64, error)
 	FindByID(id uint) (*dto.FichaCaracterizacionResponse, error)
+	FindByNumero(numero string) (*dto.FichaCaracterizacionResponse, error)
 	FindByIDWithDetail(id uint) (*dto.FichaCaracterizacionResponse, error)
 	GetCodigo(id uint) (string, error)
 	Create(req dto.FichaCaracterizacionRequest) (*dto.FichaCaracterizacionResponse, error)
@@ -235,10 +236,25 @@ func (s *fichaService) FindByID(id uint) (*dto.FichaCaracterizacionResponse, err
 	if err != nil {
 		return nil, errors.New(msgFichaNoEncontrada)
 	}
+	return s.fichaModelToResponse(f)
+}
+
+func (s *fichaService) FindByNumero(numero string) (*dto.FichaCaracterizacionResponse, error) {
+	f, err := s.fichaRepo.FindByFicha(numero)
+	if err != nil {
+		return nil, errors.New(msgFichaNoEncontrada)
+	}
+	return s.fichaModelToResponse(f)
+}
+
+func (s *fichaService) fichaModelToResponse(f *models.FichaCaracterizacion) (*dto.FichaCaracterizacionResponse, error) {
+	if f == nil {
+		return nil, errors.New(msgFichaNoEncontrada)
+	}
 	var count int64
-	database.GetDB().Model(&models.Aprendiz{}).Where("ficha_caracterizacion_id = ?", id).Count(&count)
+	database.GetDB().Model(&models.Aprendiz{}).Where("ficha_caracterizacion_id = ?", f.ID).Count(&count)
 	r := s.fichaToResponse(*f, int(count))
-	diaIDsByFicha, err := diaFormacionIDsPorFichaIDs([]uint{id})
+	diaIDsByFicha, err := diaFormacionIDsPorFichaIDs([]uint{f.ID})
 	if err != nil {
 		return nil, err
 	}

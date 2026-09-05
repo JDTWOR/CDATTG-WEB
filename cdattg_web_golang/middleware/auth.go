@@ -327,6 +327,47 @@ func RequirePermissionLeerFichaIndividual() gin.HandlerFunc {
 	}
 }
 
+// RequirePermissionLeerFichaPorNumero permite GET /fichas-caracterizacion/por-numero/:fichaNumero.
+func RequirePermissionLeerFichaPorNumero() gin.HandlerFunc {
+	acts := []string{actVerFicha, actVerFichas, "EDITAR FICHA", "CREAR FICHA"}
+	return func(c *gin.Context) {
+		userID, ok := requireAuthenticatedUserID(c)
+		if !ok {
+			return
+		}
+		e, ok := getEnforcerOrAbort(c)
+		if !ok {
+			return
+		}
+		sub := strconv.FormatUint(uint64(userID), 10)
+		for _, act := range acts {
+			if allowed, errEnf := authz.Enforce(e, sub, authz.ObjFicha, act); errEnf == nil && allowed {
+				c.Next()
+				return
+			}
+		}
+		numero := strings.TrimSpace(c.Param("fichaNumero"))
+		if numero == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Número de ficha requerido"})
+			c.Abort()
+			return
+		}
+		fichaRepo := repositories.NewFichaRepository()
+		ficha, err := fichaRepo.FindByFicha(numero)
+		if err != nil || ficha == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Ficha no encontrada"})
+			c.Abort()
+			return
+		}
+		if instructorTieneFichaAsignada(c, ficha.ID) {
+			c.Next()
+			return
+		}
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene permiso para ver esta ficha"})
+		c.Abort()
+	}
+}
+
 func uintFromParam(c *gin.Context, name string) (uint, bool) {
 	idStr := c.Param(name)
 	if idStr == "" {

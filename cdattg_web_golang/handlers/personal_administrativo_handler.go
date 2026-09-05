@@ -1,6 +1,6 @@
 // @module personal_administrativo_handler
 // @description Endpoints HTTP del módulo Personal Administrativo: CRUD e importación masiva.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package handlers
 

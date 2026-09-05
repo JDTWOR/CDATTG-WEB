@@ -1,6 +1,6 @@
 // @module personal_rol_import
 // @description Procesamiento de importación masiva de Personal Operativo, Administrativo y Contratistas.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package services
 

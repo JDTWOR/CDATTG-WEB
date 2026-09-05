@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/components/RolModalShell
  * @description Contenedor de diálogo modal reutilizado por los diálogos del módulo Personal.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import type { ReactNode } from 'react';

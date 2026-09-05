@@ -1,6 +1,6 @@
 // @module personal_operativo_apoyo
 // @description Modelo de base de datos para la entidad Personal Operativo y de Apoyo.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package models
 

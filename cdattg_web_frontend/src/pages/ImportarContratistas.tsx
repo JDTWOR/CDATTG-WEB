@@ -1,7 +1,7 @@
 /**
  * @module pages/ImportarContratistas
  * @description Página de importación masiva de Contratistas de Prestación de Servicios desde Excel.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-15
  */
 import { contratistasConfig } from '../features/personalRol/config';

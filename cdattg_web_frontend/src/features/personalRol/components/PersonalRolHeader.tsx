@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/components/PersonalRolHeader
  * @description Encabezado con título, subtítulo y acciones (importar y crear) del módulo Personal.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { Link } from 'react-router-dom';

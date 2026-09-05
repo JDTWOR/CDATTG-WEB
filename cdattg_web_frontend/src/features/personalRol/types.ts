@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/types
  * @description Tipos compartidos del módulo Personal (Operativo y de Apoyo, Administrativo y Contratistas).
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 

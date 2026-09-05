@@ -1,6 +1,6 @@
 // @module vigencia_sync
 // @description Control de frecuencia para las sincronizaciones de vigencia (fichas e instructores).
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-15
 package repositories
 

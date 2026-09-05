@@ -1,6 +1,6 @@
 // @module personal_rol_import_log
 // @description Consulta del historial de importaciones de Guardas/Personal Administrativo.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package services
 

@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/PersonalRolImportPage
  * @description Página genérica de importación de los roles del módulo Personal.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { useCallback, useEffect, useState } from 'react';

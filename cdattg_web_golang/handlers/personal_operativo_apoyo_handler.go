@@ -1,6 +1,6 @@
 // @module personal_operativo_apoyo_handler
 // @description Endpoints HTTP de Personal Operativo y de Apoyo: CRUD e importación masiva desde Excel.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package handlers
 

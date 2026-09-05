@@ -1,6 +1,6 @@
 // @module contratista_repository
 // @description Acceso a datos de Contratistas de Prestación de Servicios (listado paginado y CRUD).
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-15
 package repositories
 

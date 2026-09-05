@@ -1,7 +1,7 @@
 /**
  * @module pages/PersonalAdministrativo
  * @description Página de Personal Administrativo: CRUD e importación (compone el feature personalRol).
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { personalAdministrativoConfig } from '../features/personalRol/config';

@@ -118,15 +118,18 @@ function FichaRow({ label, value }: Readonly<{ label: string; value: string }>) 
   );
 }
 
-function FeedbackBanner({ accion, mensaje }: Readonly<{ accion: 'INGRESO' | 'SALIDA'; mensaje: string }>) {
+type FeedbackAccion = 'INGRESO' | 'SALIDA' | 'CANCELADO';
+
+function FeedbackBanner({ accion, mensaje }: Readonly<{ accion: FeedbackAccion; mensaje: string }>) {
   const esIngreso = accion === 'INGRESO';
+  const esSalida = accion === 'SALIDA';
+  const color = esIngreso ? 'bg-emerald-600' : esSalida ? 'bg-amber-500' : 'bg-red-600';
+  const etiqueta = esIngreso ? 'INGRESO' : esSalida ? 'SALIDA' : 'CANCELADO';
   return (
     <output
-      className={`block rounded-2xl px-6 py-5 text-center text-2xl font-bold tracking-wide text-white shadow-lg sm:text-3xl ${
-        esIngreso ? 'bg-emerald-600' : 'bg-amber-500'
-      }`}
+      className={`block rounded-2xl px-6 py-5 text-center text-2xl font-bold tracking-wide text-white shadow-lg sm:text-3xl ${color}`}
     >
-      {esIngreso ? 'INGRESO' : 'SALIDA'} — {mensaje}
+      {etiqueta} — {mensaje}
     </output>
   );
 }
@@ -294,8 +297,10 @@ function puedeConfirmarLookup(
   modo: AccesoModo,
   salidaAutoDesdeEntrada: boolean,
   forzarSinIngreso: boolean,
+  bloqueadoAutomatico: boolean,
 ): boolean {
   if (!lookup) return false;
+  if (bloqueadoAutomatico) return false;
   const esIngreso = modo === 'ENTRADA' && !salidaAutoDesdeEntrada;
   const puedeNormal = lookup.puede_confirmar;
   const puedeIrregular = !esIngreso && lookup.permite_salida_sin_ingreso && forzarSinIngreso;
@@ -310,10 +315,15 @@ function PanelFicha({
   confirmando,
   forzarSinIngreso,
   salidaAutoDesdeEntrada,
+  registro,
+  autoIngresando,
+  cancelando,
   onMotivo,
   onObservacion,
   onConfirmar,
   onCancelar,
+  onCancelarIngreso,
+  onOcultarIngreso,
 }: Readonly<{
   lookup: AccesoLookupResponse | null;
   modo: AccesoModo;
@@ -322,11 +332,54 @@ function PanelFicha({
   confirmando: boolean;
   forzarSinIngreso: boolean;
   salidaAutoDesdeEntrada: boolean;
+  registro?: AccesoRegistroResponse | null;
+  autoIngresando?: boolean;
+  cancelando?: boolean;
   onMotivo: (v: AccesoMotivoSalida) => void;
   onObservacion: (v: string) => void;
   onConfirmar: () => void;
   onCancelar: () => void;
+  onCancelarIngreso: () => void;
+  onOcultarIngreso: () => void;
 }>) {
+  if (registro) {
+    // Vista posterior a la entrada automática: solo comprobar la persona y cancelar si fue error.
+    return (
+      <>
+        <div className="rounded-xl bg-emerald-600 px-4 py-3 text-center text-lg font-bold text-white">
+          ENTRADA REGISTRADA
+        </div>
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
+          Ingreso automático. Verifique los datos; si no corresponde a esta persona pulse{' '}
+          <strong>Cancelar entrada</strong>.
+        </p>
+        <FichaPersonaResumen persona={registro.persona} fichas={fichasParaResumenLookup(registro)} />
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn-secondary min-h-[48px] flex-1 text-base"
+            disabled={cancelando}
+            onClick={onOcultarIngreso}
+          >
+            Ocultar
+          </button>
+          <button
+            type="button"
+            className="btn-secondary min-h-[48px] flex-1 text-base !bg-red-600 hover:!bg-red-700 !text-white"
+            disabled={cancelando}
+            onClick={onCancelarIngreso}
+          >
+            {cancelando ? 'Cancelando…' : 'Cancelar entrada'}
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  if (autoIngresando) {
+    return <p className="text-sm text-gray-500 dark:text-gray-400">Registrando entrada automática…</p>;
+  }
+
   if (!lookup) {
     return (
       <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -342,7 +395,7 @@ function PanelFicha({
     ? `${formatHora(lookup.visita_abierta.timestamp_entrada)} (${labelTipo(lookup.visita_abierta.tipo_persona)})`
     : undefined;
   const puedeNormal = lookup.puede_confirmar;
-  const puedeConfirmar = puedeConfirmarLookup(lookup, modo, salidaAutoDesdeEntrada, forzarSinIngreso);
+  const puedeConfirmar = puedeConfirmarLookup(lookup, modo, salidaAutoDesdeEntrada, forzarSinIngreso, false);
   const titulo = tituloFicha(esIngreso, Boolean(lookup.alerta), forzarSinIngreso, salidaAutoDesdeEntrada);
 
   return (
@@ -459,8 +512,13 @@ export function VigilanciaPorteria() {
   const [salidaAutoDesdeEntrada, setSalidaAutoDesdeEntrada] = useState(false);
   const [loadingLookup, setLoadingLookup] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+  /** Entrada automática ya registrada; su vista solo ofrece cancelarla. */
+  const [registro, setRegistro] = useState<AccesoRegistroResponse | null>(null);
+  /** Petición de ingreso automático en vuelo (evita confirmación manual duplicada). */
+  const [autoIngresando, setAutoIngresando] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
   const [error, setError] = useState('');
-  const [feedback, setFeedback] = useState<{ accion: 'INGRESO' | 'SALIDA'; mensaje: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ accion: FeedbackAccion; mensaje: string } | null>(null);
   const [dentro, setDentro] = useState<AccesoDentroItem[]>([]);
   const [catalogError, setCatalogError] = useState('');
 
@@ -505,7 +563,7 @@ export function VigilanciaPorteria() {
     };
   }, [contextoListo, sedeId, refreshDentro]);
 
-  const showFeedback = useCallback((accion: 'INGRESO' | 'SALIDA', mensaje: string) => {
+  const showFeedback = useCallback((accion: FeedbackAccion, mensaje: string) => {
     setFeedback({ accion, mensaje });
     if (feedbackTimerRef.current) globalThis.clearTimeout(feedbackTimerRef.current);
     feedbackTimerRef.current = globalThis.setTimeout(() => setFeedback(null), FEEDBACK_MS);
@@ -514,6 +572,7 @@ export function VigilanciaPorteria() {
   const resetTrasRegistro = useCallback(() => {
     setDocumento('');
     setLookup(null);
+    setRegistro(null);
     setObservacionSalida('');
     setForzarSinIngreso(false);
     setSalidaAutoDesdeEntrada(false);
@@ -530,6 +589,7 @@ export function VigilanciaPorteria() {
     setError('');
     setLookup(null);
     setSalidaAutoDesdeEntrada(false);
+    setRegistro(null);
     void refreshDentro(sedeId);
     focusDocInput();
   };
@@ -539,12 +599,38 @@ export function VigilanciaPorteria() {
     setLookup(null);
     setForzarSinIngreso(false);
     setSalidaAutoDesdeEntrada(false);
+    setRegistro(null);
     setError('');
     if (contextoListo && regionalId && sedeId) {
       saveContexto({ regionalId, sedeId, modo: next });
     }
     focusDocInput();
   };
+
+  const registrarIngresoAuto = useCallback(
+    async (doc: string, metodoRegistro: AccesoMetodoRegistro) => {
+      if (!sedeId) return;
+      setAutoIngresando(true);
+      setError('');
+      try {
+        const res = await apiService.accesoIngreso({
+          numero_documento: doc,
+          metodo_registro: metodoRegistro,
+          sede_id: sedeId,
+        });
+        setRegistro(res);
+        setLookup(null);
+        setDocumento('');
+        void refreshDentro(sedeId);
+      } catch (e: unknown) {
+        setError(axiosErrorMessage(e, 'No se pudo registrar la entrada automática.'));
+      } finally {
+        setAutoIngresando(false);
+        focusDocInput();
+      }
+    },
+    [sedeId, refreshDentro],
+  );
 
   const runLookup = useCallback(
     async (rawDoc: string, metodoRegistro: AccesoMetodoRegistro) => {
@@ -567,6 +653,7 @@ export function VigilanciaPorteria() {
       setFeedback(null);
       setForzarSinIngreso(false);
       setSalidaAutoDesdeEntrada(false);
+      setRegistro(null);
       setMetodo(metodoRegistro);
       try {
         const res = await apiService.accesoLookup({
@@ -597,6 +684,10 @@ export function VigilanciaPorteria() {
             setMotivoSalida(res.motivos_salida[0] as AccesoMotivoSalida);
           }
           setForzarSinIngreso(modo === 'SALIDA' && Boolean(res.permite_salida_sin_ingreso));
+          // Entrada instantánea solo para personas ya registradas y libres de bloqueos.
+          if (modo === 'ENTRADA' && !res.persona.es_nueva && res.puede_confirmar) {
+            void registrarIngresoAuto(doc, metodoRegistro);
+          }
         }
       } catch (e: unknown) {
         setLookup(null);
@@ -610,7 +701,7 @@ export function VigilanciaPorteria() {
         focusDocInput();
       }
     },
-    [contextoListo, sedeId, modo],
+    [contextoListo, sedeId, modo, registrarIngresoAuto],
   );
 
   const handleEscaneoCamara = useCallback(
@@ -622,7 +713,7 @@ export function VigilanciaPorteria() {
 
   // Consulta automática al digitar o al terminar el barrido del láser (sin clic en Buscar).
   useEffect(() => {
-    if (!contextoListo || !sedeId || confirmando || loadingLookup) return;
+    if (!contextoListo || !sedeId || confirmando || loadingLookup || autoIngresando) return;
     const doc = normalizarDocumentoEscaneado(documento);
     if (doc.length < DOC_MIN_LEN) return;
     if (lookup?.persona.numero_documento === doc) return;
@@ -637,13 +728,14 @@ export function VigilanciaPorteria() {
     sedeId,
     confirmando,
     loadingLookup,
+    autoIngresando,
     lookup?.persona.numero_documento,
     runLookup,
   ]);
 
   const handleConfirmar = useCallback(async () => {
-    if (!lookup || confirmando || !sedeId) return;
-    if (!puedeConfirmarLookup(lookup, modo, salidaAutoDesdeEntrada, forzarSinIngreso)) return;
+    if (!lookup || confirmando || autoIngresando || registro || !sedeId) return;
+    if (!puedeConfirmarLookup(lookup, modo, salidaAutoDesdeEntrada, forzarSinIngreso, autoIngresando || registro !== null)) return;
     const doc = lookup.persona.numero_documento;
     const registrarSalida = modo === 'SALIDA' || salidaAutoDesdeEntrada;
     setConfirmando(true);
@@ -685,6 +777,8 @@ export function VigilanciaPorteria() {
   }, [
     lookup,
     confirmando,
+    autoIngresando,
+    registro,
     sedeId,
     modo,
     salidaAutoDesdeEntrada,
@@ -700,9 +794,15 @@ export function VigilanciaPorteria() {
   /** Enter: busca si hay documento nuevo; con ficha lista confirma ingreso/salida. */
   const handleSubmitDocumento: ComponentProps<'form'>['onSubmit'] = (e) => {
     e.preventDefault();
-    if (confirmando || loadingLookup) return;
+    if (confirmando || loadingLookup || autoIngresando) return;
     const doc = normalizarDocumentoEscaneado(documento);
-    const puedeConfirmar = puedeConfirmarLookup(lookup, modo, salidaAutoDesdeEntrada, forzarSinIngreso);
+    const puedeConfirmar = puedeConfirmarLookup(
+      lookup,
+      modo,
+      salidaAutoDesdeEntrada,
+      forzarSinIngreso,
+      autoIngresando || registro !== null,
+    );
     if (!doc) {
       if (puedeConfirmar) void handleConfirmar();
       return;
@@ -718,8 +818,8 @@ export function VigilanciaPorteria() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
-      if (confirmando || loadingLookup) return;
-      if (!puedeConfirmarLookup(lookup, modo, salidaAutoDesdeEntrada, forzarSinIngreso)) return;
+      if (confirmando || loadingLookup || autoIngresando || registro) return;
+      if (!puedeConfirmarLookup(lookup, modo, salidaAutoDesdeEntrada, forzarSinIngreso, autoIngresando || registro !== null)) return;
 
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
@@ -738,6 +838,8 @@ export function VigilanciaPorteria() {
   }, [
     confirmando,
     loadingLookup,
+    autoIngresando,
+    registro,
     lookup,
     modo,
     salidaAutoDesdeEntrada,
@@ -745,6 +847,29 @@ export function VigilanciaPorteria() {
     documento,
     handleConfirmar,
   ]);
+
+  const handleCancelarIngreso = useCallback(async () => {
+    if (!registro || cancelando || autoIngresando || !sedeId) return;
+    setCancelando(true);
+    setError('');
+    try {
+      await apiService.accesoCancelarIngreso({ visita_id: registro.visita_id, sede_id: sedeId });
+      showFeedback('CANCELADO', 'Entrada cancelada');
+      void refreshDentro(sedeId);
+      resetTrasRegistro();
+    } catch (e: unknown) {
+      setError(axiosErrorMessage(e, 'No se pudo cancelar la entrada.'));
+    } finally {
+      setCancelando(false);
+      focusDocInput();
+    }
+  }, [registro, cancelando, autoIngresando, sedeId, refreshDentro, showFeedback, resetTrasRegistro]);
+
+  const handleOcultarIngreso = useCallback(() => {
+    if (!registro || autoIngresando) return;
+    // Oculta la vista SIN cancelar: la persona sí ingresó y el vigilante sigue escaneando.
+    resetTrasRegistro();
+  }, [registro, autoIngresando, resetTrasRegistro]);
 
   const escaneoHabilitado = contextoListo && !!sedeId;
 
@@ -906,11 +1031,11 @@ export function VigilanciaPorteria() {
                 }}
                 placeholder="Apunte el láser o digite el documento"
                 className="input-field min-h-[48px] flex-1 text-center text-lg"
-                disabled={!escaneoHabilitado || loadingLookup || confirmando}
+                disabled={!escaneoHabilitado || loadingLookup || confirmando || autoIngresando}
               />
               <button
                 type="submit"
-                disabled={!escaneoHabilitado || loadingLookup || confirmando || !documento.trim()}
+                disabled={!escaneoHabilitado || loadingLookup || confirmando || autoIngresando || !documento.trim()}
                 className="btn-primary min-h-[48px] shrink-0 touch-manipulation px-5"
               >
                 {loadingLookup ? 'Buscando…' : 'Buscar'}
@@ -944,7 +1069,7 @@ export function VigilanciaPorteria() {
               activo={camaraActiva && escaneoHabilitado}
               continuo
               embedded
-              registroEnCurso={loadingLookup || confirmando}
+              registroEnCurso={loadingLookup || confirmando || autoIngresando}
               onEscaneado={handleEscaneoCamara}
             />
           </div>
@@ -963,6 +1088,9 @@ export function VigilanciaPorteria() {
             confirmando={confirmando}
             forzarSinIngreso={forzarSinIngreso}
             salidaAutoDesdeEntrada={salidaAutoDesdeEntrada}
+            registro={registro}
+            autoIngresando={autoIngresando}
+            cancelando={cancelando}
             onMotivo={setMotivoSalida}
             onObservacion={setObservacionSalida}
             onConfirmar={() => void handleConfirmar()}
@@ -973,6 +1101,8 @@ export function VigilanciaPorteria() {
               setSalidaAutoDesdeEntrada(false);
               focusDocInput();
             }}
+            onCancelarIngreso={() => void handleCancelarIngreso()}
+            onOcultarIngreso={() => void handleOcultarIngreso()}
           />
         </section>
       </div>

@@ -113,6 +113,7 @@ import type {
   DefinicionesPermisosResponse,
   AccesoLookupResponse,
   AccesoRegistroResponse,
+  AccesoCancelarIngresoResponse,
   AccesoDentroItem,
   AccesoHistorialParams,
   AccesoHistorialResponse,
@@ -1349,6 +1350,14 @@ class ApiService {
     tipo_persona?: string;
   }): Promise<AccesoRegistroResponse> {
     const response = await this.api.post<{ data: AccesoRegistroResponse }>('/vigilancia/acceso/salida', data);
+    return response.data.data;
+  }
+
+  async accesoCancelarIngreso(data: {
+    visita_id: number;
+    sede_id: number;
+  }): Promise<AccesoCancelarIngresoResponse> {
+    const response = await this.api.post<{ data: AccesoCancelarIngresoResponse }>('/vigilancia/acceso/cancelar-ingreso', data);
     return response.data.data;
   }
 

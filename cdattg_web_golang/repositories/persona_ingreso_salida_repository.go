@@ -40,6 +40,7 @@ type AccesoStatsResult struct {
 
 // PersonaIngresoSalidaRepository acceso a registros de portería.
 type PersonaIngresoSalidaRepository interface {
+	FindByID(id uint) (*models.PersonaIngresoSalida, error)
 	FindAbiertaByPersonaAndSede(personaID, sedeID uint) (*models.PersonaIngresoSalida, error)
 	Create(row *models.PersonaIngresoSalida) error
 	Update(row *models.PersonaIngresoSalida) error
@@ -58,10 +59,18 @@ func NewPersonaIngresoSalidaRepository() PersonaIngresoSalidaRepository {
 	return &personaIngresoSalidaRepository{db: database.GetDB()}
 }
 
+func (r *personaIngresoSalidaRepository) FindByID(id uint) (*models.PersonaIngresoSalida, error) {
+	var row models.PersonaIngresoSalida
+	if err := r.db.First(&row, id).Error; err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
 func (r *personaIngresoSalidaRepository) FindAbiertaByPersonaAndSede(personaID, sedeID uint) (*models.PersonaIngresoSalida, error) {
 	var row models.PersonaIngresoSalida
 	err := r.db.
-		Where("persona_id = ? AND sede_id = ? AND timestamp_salida IS NULL", personaID, sedeID).
+		Where("persona_id = ? AND sede_id = ? AND timestamp_salida IS NULL AND ingreso_cancelado = false", personaID, sedeID).
 		Order("timestamp_entrada DESC").
 		First(&row).Error
 	if err != nil {
@@ -82,7 +91,7 @@ func (r *personaIngresoSalidaRepository) ListAbiertasBySede(sedeID uint) ([]mode
 	var rows []models.PersonaIngresoSalida
 	err := r.db.
 		Preload("Persona").
-		Where("sede_id = ? AND timestamp_salida IS NULL", sedeID).
+		Where("sede_id = ? AND timestamp_salida IS NULL AND ingreso_cancelado = false", sedeID).
 		Order("timestamp_entrada DESC").
 		Find(&rows).Error
 	return rows, err
@@ -115,7 +124,7 @@ func (r *personaIngresoSalidaRepository) baseQuery(q AccesoHistorialQuery) *gorm
 	}
 	switch strings.ToLower(strings.TrimSpace(q.Estado)) {
 	case "abierto":
-		tx = tx.Where("persona_ingreso_salida.timestamp_salida IS NULL")
+		tx = tx.Where("persona_ingreso_salida.timestamp_salida IS NULL AND persona_ingreso_salida.ingreso_cancelado = false")
 	case "cerrado":
 		tx = tx.Where("persona_ingreso_salida.timestamp_salida IS NOT NULL")
 	}

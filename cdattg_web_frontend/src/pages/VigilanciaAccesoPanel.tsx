@@ -823,10 +823,16 @@ export function VigilanciaAccesoPanel() {
                       className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
                         item.estado === 'abierto'
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
-                          : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                          : item.estado === 'cancelado'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
+                            : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                       }`}
                     >
-                      {item.estado === 'abierto' ? 'Dentro' : 'Cerrado'}
+                      {item.estado === 'abierto'
+                        ? 'Dentro'
+                        : item.estado === 'cancelado'
+                          ? 'Cancelado'
+                          : 'Cerrado'}
                     </span>
                   </td>
                 </tr>

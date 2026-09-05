@@ -258,6 +258,17 @@ func patchFichaStatusManual() error {
 	)
 }
 
+func patchPersonaIngresoSalidaCancelado() error {
+	// El vigilante puede anular una entrada automática recién registrada.
+	return execSchemaPatch(
+		"Esquema: columnas persona_ingreso_salida para ingreso cancelado verificadas",
+		`ALTER TABLE persona_ingreso_salida
+		ADD COLUMN IF NOT EXISTS ingreso_cancelado BOOLEAN NOT NULL DEFAULT false,
+		ADD COLUMN IF NOT EXISTS ingreso_cancelado_at TIMESTAMPTZ,
+		ADD COLUMN IF NOT EXISTS ingreso_cancelado_por_user_id BIGINT`,
+	)
+}
+
 func patchPersonaAceptaTerminos() error {
 	return execSchemaPatch(
 		"Esquema: columnas personas.acepta_terminos y acepta_terminos_at verificadas",
@@ -290,6 +301,7 @@ func EnsureSchemaPatches() error {
 		patchAutoMigrateCarnetSolicitud,
 		patchAutoMigrateConfiguracionCarnet,
 		patchAutoMigratePersonaCambioPendiente,
+		patchPersonaIngresoSalidaCancelado,
 		patchPersonaAceptaTerminos,
 	}
 	for _, patch := range patches {

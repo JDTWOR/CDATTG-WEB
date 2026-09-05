@@ -30,6 +30,9 @@ func (m *mockVigAccesoFoto) Ingreso(dto.AccesoIngresoRequest, uint) (*dto.Acceso
 func (m *mockVigAccesoFoto) Salida(dto.AccesoSalidaRequest, uint) (*dto.AccesoRegistroResponse, error) {
 	return nil, m.err
 }
+func (m *mockVigAccesoFoto) CancelarIngreso(dto.AccesoCancelarIngresoRequest, uint) (*dto.AccesoCancelarIngresoResponse, error) {
+	return nil, m.err
+}
 func (m *mockVigAccesoFoto) ListDentro(*uint) ([]dto.AccesoDentroItem, error) { return nil, m.err }
 func (m *mockVigAccesoFoto) Historial(dto.AccesoHistorialFiltros) (*dto.AccesoHistorialResponse, error) {
 	return nil, m.err

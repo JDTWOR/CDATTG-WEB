@@ -34,6 +34,7 @@ export function useFichaDetallePage({
 
   useEffect(() => {
     if (!isValidFichaId) return;
+    if (fichaId <= 0) return;
     if (tab === 'instructores') void loadInstructores();
     else if (tab === 'aprendices') void loadAprendices();
   }, [tab, fichaId, isValidFichaId, loadInstructores, loadAprendices]);

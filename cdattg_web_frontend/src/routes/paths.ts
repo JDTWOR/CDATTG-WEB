@@ -59,9 +59,9 @@ export const fichasPaths = {
     if (tipoFormacion === 'FORMACION_COMPLEMENTARIA') return '/fichas/complementaria';
     return '/fichas';
   },
-  /** Detalle anidado en el mismo submódulo del listado. */
-  detalle: (fichaId: number | string, tipoFormacion?: string | null) =>
-    `${fichasPaths.listado(tipoFormacion)}/${fichaId}`,
+  /** Detalle anidado en el mismo submódulo del listado (usa número de ficha, no ID interno). */
+  detalle: (fichaNumero: string, tipoFormacion?: string | null) =>
+    `${fichasPaths.listado(tipoFormacion)}/${encodeURIComponent(fichaNumero)}`,
 } as const;
 
 export const asistenciaPaths = {

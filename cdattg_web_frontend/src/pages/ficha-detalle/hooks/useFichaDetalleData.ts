@@ -4,13 +4,19 @@ import { axiosErrorMessage } from '../../../utils/httpError';
 import type { DiaFormacionItem, FichaCaracterizacionResponse } from '../../../types';
 import { diasTexto } from '../fichaDetalleUtils';
 
-export function useFichaDetalleData(fichaId: number) {
+function esIdInternoLegacy(valor: string): boolean {
+  return /^\d{1,6}$/.test(valor.trim());
+}
+
+export function useFichaDetalleData(fichaNumeroParam: string | undefined) {
+  const fichaNumero = decodeURIComponent(fichaNumeroParam ?? '').trim();
   const [ficha, setFicha] = useState<FichaCaracterizacionResponse | null>(null);
   const [diasFormacionCat, setDiasFormacionCat] = useState<DiaFormacionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [legacyIdRedirect, setLegacyIdRedirect] = useState<number | null>(null);
 
-  const isValidFichaId = fichaId > 0 && !Number.isNaN(fichaId);
+  const isValidFichaNumero = fichaNumero.length > 0;
 
   const diasFichaDisponibles = useMemo(
     () => diasFormacionCat.filter((d) => ficha?.dias_formacion_ids?.includes(d.id)),
@@ -28,20 +34,33 @@ export function useFichaDetalleData(fichaId: number) {
   );
 
   const loadFicha = useCallback(async () => {
-    if (!fichaId) return;
+    if (!fichaNumero) return;
     try {
       setError('');
-      const data = await apiService.getFichaCaracterizacionById(fichaId);
+      const data = await apiService.getFichaCaracterizacionByNumero(fichaNumero);
       setFicha(data);
+      setLegacyIdRedirect(null);
     } catch (err: unknown) {
+      if (esIdInternoLegacy(fichaNumero)) {
+        const id = Number.parseInt(fichaNumero, 10);
+        try {
+          const porId = await apiService.getFichaCaracterizacionById(id);
+          setFicha(porId);
+          setLegacyIdRedirect(id);
+          return;
+        } catch {
+          // sigue al error original
+        }
+      }
       const msg = axiosErrorMessage(err, 'Error al cargar ficha');
       setError(msg);
       setFicha(null);
+      setLegacyIdRedirect(null);
     }
-  }, [fichaId]);
+  }, [fichaNumero]);
 
   useEffect(() => {
-    if (!isValidFichaId) return;
+    if (!isValidFichaNumero) return;
     let cancelled = false;
     (async () => {
       try {
@@ -54,7 +73,7 @@ export function useFichaDetalleData(fichaId: number) {
     return () => {
       cancelled = true;
     };
-  }, [fichaId, isValidFichaId]);
+  }, [fichaNumero, isValidFichaNumero]);
 
   return {
     ficha,
@@ -63,7 +82,8 @@ export function useFichaDetalleData(fichaId: number) {
     loading,
     setLoading,
     error,
-    isValidFichaId,
+    isValidFichaNumero,
+    legacyIdRedirect,
     diasFichaDisponibles,
     defaultDiasIds,
     diasLabel,

@@ -778,7 +778,7 @@ export const AsistenciaHistorialFicha = () => {
           }
           actions={
             <Link
-              to={fichasPaths.detalle(ficha.id, ficha.tipo_formacion)}
+              to={fichasPaths.detalle(ficha.ficha, ficha.tipo_formacion)}
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700/50"
             >
               <EyeIcon className="h-4 w-4" aria-hidden />

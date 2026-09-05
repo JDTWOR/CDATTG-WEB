@@ -694,7 +694,7 @@ export function AdminDashboardView() {
 
                           <Link
 
-                            to={fichasPaths.detalle(f.ficha_id)}
+                            to={fichasPaths.detalle(f.ficha_numero, f.tipo_formacion)}
 
                             className="text-primary-600 hover:text-primary-800 dark:text-primary-400 font-medium"
 

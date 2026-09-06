@@ -14,6 +14,7 @@ import { CarnetReverso } from '../shared/CarnetReverso';
 import { CarnetVideoBoton } from './CarnetVideoBoton';
 import { puedeVerCarnetDigital } from './carnetAcceso';
 import { fichaCarnetAprobado } from './carnetEstado';
+import { mostrarToastApp } from '../../../utils/appToast';
 import type { CarnetDigitalResponse } from '../../../types/carnet';
 
 /**
@@ -65,7 +66,20 @@ export function CarnetDigitalPage() {
   const ficha = data.fichas.find((f) => f.id === fichaId) ?? data.fichas[0];
   const enviar = () => {
     if (!ficha) return;
-    void solicitarMiCarnet(ficha.id).then(setData).catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error'));
+    void solicitarMiCarnet(ficha.id)
+      .then((c) => {
+        setData(c);
+        const renovando = ficha.accion === 'renovar';
+        mostrarToastApp({
+          icon: 'success',
+          titulo: renovando ? 'Renovación enviada' : 'Solicitud enviada',
+          texto: renovando
+            ? 'Su renovación fue enviada al instructor líder de la ficha.'
+            : 'Su solicitud fue enviada al instructor líder de la ficha.',
+          timer: 3000,
+        });
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error'));
   };
 
   return (

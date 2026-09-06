@@ -69,6 +69,8 @@ func (s *carnetDigitalService) Decidir(instructorID, solicitudID uint, aprobar b
 	if aprobar {
 		fijarFotoCopiaSolicitud(s.solicitudRepo, sol)
 	}
+	// Aviso al aprendiz del resultado; si la devolvió, va con su motivo.
+	s.notif.ResultadoAprendiz(sol, aprobar)
 	return nil
 }
 

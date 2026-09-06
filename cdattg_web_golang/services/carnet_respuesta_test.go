@@ -17,7 +17,17 @@ func TestArmarRespuestaCarnetSinAprobacion(t *testing.T) {
 	p := models.Persona{PrimerNombre: "Ana", PrimerApellido: "Rojas", NumeroDocumento: "1", Rh: "O+", FotoPath: "a.jpg"}
 	fichas := []dto.CarnetFichaOpcion{{ID: 1, Numero: "1", Accion: carnetAccionCrear}}
 	r := armarRespuestaCarnet(p, fichas, nil, "")
-	if r.Habilitado || r.Motivo != carnetMotivoSinSolicitud || !r.PuedeSolicitar {
+	if r.Habilitado || r.Motivo != carnetMotivoSinSolicitud || !r.PuedeSolicitar || !r.DatosListos {
+		t.Fatalf("%+v", r)
+	}
+}
+
+func TestArmarRespuestaCarnetDatosIncompletos(t *testing.T) {
+	t.Parallel()
+	p := models.Persona{PrimerNombre: "Ana"}
+	fichas := []dto.CarnetFichaOpcion{{ID: 1, Numero: "1"}}
+	r := armarRespuestaCarnet(p, fichas, nil, "")
+	if r.DatosListos || r.PuedeSolicitar {
 		t.Fatalf("%+v", r)
 	}
 }

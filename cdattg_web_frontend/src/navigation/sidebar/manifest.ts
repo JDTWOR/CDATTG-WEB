@@ -22,6 +22,7 @@ import {
    vigilanciaPaths,
    complementariosPaths,
    carnetPaths,
+   carnetPerdidaPaths,
  } from '../../routes/paths';
 import type { SidebarManifestItem } from './types';
 
@@ -67,6 +68,15 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     permission: null,
     rolesRequired: ['APRENDIZ'],
     alsoVisibleForPermissions: ['VER CARNET DIGITAL'],
+    iconKey: 'carnet',
+  },
+  {
+    section: 'Carnet',
+    path: carnetPerdidaPaths.solicitar,
+    label: 'Pérdida de carnet',
+    permission: 'SOLICITAR CARNET PERDIDA',
+    rolesRequired: ['APRENDIZ'],
+    alsoVisibleForPermissions: ['SOLICITAR CARNET PERDIDA'],
     iconKey: 'carnet',
   },
   {

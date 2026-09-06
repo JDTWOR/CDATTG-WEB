@@ -140,6 +140,8 @@ func SetupRouter() *gin.Engine {
 				personas.POST("/:id/reset-password", middleware.RequirePermission("persona", "EDITAR PERSONA"), personaHandler.ResetPassword)
 			}
 
+			registerCarnetPerdida(protected)
+
 			programas := protected.Group("/programas-formacion")
 			{
 				programas.GET("", middleware.RequirePermission("programa", "VER PROGRAMAS"), programaHandler.GetAll)

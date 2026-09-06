@@ -1,22 +1,25 @@
 /**
  * El aprendiz de formación regular reporta el carnet físico perdido.
- * Sube dos comprobantes (PDF, JPG, PNG o WEBP) con vista previa; el historial
- * de reposiciones se suma al flujo de consultas del propio aprendiz.
+ * Sube dos comprobantes con vista previa; abajo ve su historial de
+ * reposiciones y no envía otra solicitud si ya tiene una en revisión.
  *
  * @author Cristian Deysdayr Jiménez
  */
 import { useEffect, useState } from 'react';
-import { crearSolicitudPerdida } from '../../../services/carnetPerdidaApi';
+import { crearSolicitudPerdida, listarMiHistorialPerdida } from '../../../services/carnetPerdidaApi';
 import { getMiCarnet } from '../../../services/carnetApi';
 import type { CarnetFichaOpcion } from '../../../types/carnet';
+import type { CarnetPerdidaItem } from '../../../types/carnetPerdida';
 import { validarComprobantesSeleccionados } from '../../../utils/carnetPerdidaArchivos';
 import { CarnetPerdidaArchivoInput } from './CarnetPerdidaArchivoInput';
+import { CarnetPerdidaHistorial } from './CarnetPerdidaHistorial';
 
 export function CarnetPerdidaPage() {
   const [fichas, setFichas] = useState<CarnetFichaOpcion[]>([]);
   const [fichaId, setFichaId] = useState(0);
   const [pago, setPago] = useState<File | null>(null);
   const [demanda, setDemanda] = useState<File | null>(null);
+  const [historial, setHistorial] = useState<CarnetPerdidaItem[]>([]);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -25,7 +28,12 @@ export function CarnetPerdidaPage() {
     void getMiCarnet()
       .then((c) => setFichas(c.fichas.filter((f) => f.tipo_formacion === 'FORMACION_REGULAR')))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error'));
+    void listarMiHistorialPerdida()
+      .then(setHistorial)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error'));
   }, []);
+
+  const enRevision = historial.some((h) => h.estado === 'pendiente');
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +47,7 @@ export function CarnetPerdidaPage() {
     setEnviando(true);
     try {
       await crearSolicitudPerdida(fichaId, pago as File, demanda as File);
+      setHistorial(await listarMiHistorialPerdida());
       setMensaje('Solicitud enviada. El bibliotecario la revisará.');
       setPago(null);
       setDemanda(null);
@@ -67,6 +76,11 @@ export function CarnetPerdidaPage() {
 
       <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-600 dark:bg-gray-800">
         <h2 className="mb-3 font-medium text-gray-900 dark:text-white">Reportar pérdida</h2>
+        {enRevision ? (
+          <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+            Ya tiene una solicitud en revisión; espere el resultado antes de reportar otra.
+          </p>
+        ) : null}
         <form onSubmit={(e) => void enviar(e)} className="space-y-4">
           <label className="block text-sm text-gray-700 dark:text-gray-300">
             Ficha de formación regular
@@ -98,14 +112,15 @@ export function CarnetPerdidaPage() {
             archivo={demanda}
             onChange={setDemanda}
           />
-          <button
-            type="submit"
-            disabled={enviando || fichas.length === 0}
-            className="btn-primary w-full"
-          >
+          <button type="submit" disabled={enviando || fichas.length === 0 || enRevision} className="btn-primary w-full">
             {enviando ? 'Enviando...' : 'Enviar solicitud'}
           </button>
         </form>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-600 dark:bg-gray-800">
+        <h2 className="mb-3 font-medium text-gray-900 dark:text-white">Mi historial</h2>
+        <CarnetPerdidaHistorial items={historial} />
       </section>
     </main>
   );

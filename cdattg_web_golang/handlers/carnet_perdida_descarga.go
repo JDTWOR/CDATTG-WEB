@@ -64,6 +64,30 @@ func (h *CarnetPerdidaHandler) ComprobantesZip(c *gin.Context) {
 	c.Data(http.StatusOK, "application/zip", data)
 }
 
+// FotoZip GET /carnets/perdida/:id/foto/zip descarga la foto en un zip aparte.
+func (h *CarnetPerdidaHandler) FotoZip(c *gin.Context) {
+	userID, ok := userIDDelContexto(c)
+	if !ok {
+		return
+	}
+	personaID, ok := personaIDDelContexto(c)
+	if !ok {
+		return
+	}
+	solID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	if !h.descargaPermitida(userID, uint(solID), personaID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tiene permiso para descargar la foto"})
+		return
+	}
+	data, err := h.svc.LeerFotoZip(uint(solID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.Header("Content-Disposition", `attachment; filename="foto_carnet.zip"`)
+	c.Data(http.StatusOK, "application/zip", data)
+}
+
 // VerFoto GET /carnets/perdida/:id/foto, la foto del solicitante.
 func (h *CarnetPerdidaHandler) VerFoto(c *gin.Context) {
 	userID, ok := userIDDelContexto(c)

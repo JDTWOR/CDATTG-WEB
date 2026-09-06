@@ -10,6 +10,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"errors"
+	"strings"
+
+	"github.com/sena/cdattg-web-golang/models"
 )
 
 // LeerComprobante devuelve el archivo (pago o demanda) listo para servir.
@@ -60,6 +63,40 @@ func (s *carnetPerdidaService) LeerComprobantesZip(solicitudID uint) ([]byte, er
 		return nil, errors.New("no se pudo empaquetar")
 	}
 	return buf.Bytes(), nil
+}
+
+// LeerFotoZip empaqueta la foto del solicitante en un zip para descargarla sola.
+func (s *carnetPerdidaService) LeerFotoZip(solicitudID uint) ([]byte, error) {
+	sol, err := s.perdidaRepo.FindByID(solicitudID)
+	if err != nil {
+		return nil, errCarnetPerdidaNoEncontrada
+	}
+	return zipDeFotoPerdida(*sol)
+}
+
+// zipDeFotoPerdida junta la foto sin recomprimirla: va tal cual quedó guardada.
+func zipDeFotoPerdida(sol models.CarnetPerdidaSolicitud) ([]byte, error) {
+	arch, err := leerFotoPersona(sol.FotoPath)
+	if err != nil {
+		return nil, err
+	}
+	buf := new(bytes.Buffer)
+	zipW := zip.NewWriter(buf)
+	if err := zipPut(zipW, nombreFotoPerdidaZip(sol), arch.Bytes); err != nil {
+		return nil, err
+	}
+	if err := zipW.Close(); err != nil {
+		return nil, errors.New("no se pudo empaquetar")
+	}
+	return buf.Bytes(), nil
+}
+
+// nombreFotoPerdidaZip arma "cédula nombres apellidos.jpg" sin signos raros.
+func nombreFotoPerdidaZip(sol models.CarnetPerdidaSolicitud) string {
+	base := strings.TrimSpace(strings.Join([]string{
+		sol.NumeroDocumento, sol.Nombres, sol.Apellidos,
+	}, " "))
+	return nombreLimpioFotosZip(base) + ".jpg"
 }
 
 // zipPut escribe un archivo dentro del zip y lo cierra.

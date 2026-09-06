@@ -31,4 +31,5 @@ func registerCarnetPerdida(protected *gin.RouterGroup) {
 	g.GET("/:id/comprobante", h.Comprobante)
 	g.GET("/:id/comprobantes/zip", h.ComprobantesZip)
 	g.GET("/:id/foto", h.VerFoto)
+	g.GET("/:id/foto/zip", h.FotoZip)
 }

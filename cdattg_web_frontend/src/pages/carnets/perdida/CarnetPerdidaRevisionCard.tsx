@@ -12,6 +12,7 @@ import { BellIcon, DocumentArrowDownIcon, EyeIcon, PhotoIcon } from '@heroicons/
 import {
   abrirComprobantePerdida,
   abrirComprobantesZipPerdida,
+  abrirFotoZipPerdida,
 } from '../../../services/carnetPerdidaApi';
 import type { CarnetPerdidaRevision } from '../../../types/carnetPerdida';
 import { CarnetPerdidaFoto } from './CarnetPerdidaFoto';
@@ -36,6 +37,12 @@ function verComprobante(id: number, tipo: 'pago' | 'demanda') {
 function verZip(id: number) {
   abrirComprobantesZipPerdida(id).catch((e: unknown) =>
     window.alert(e instanceof Error ? e.message : 'No pude descargar el ZIP'),
+  );
+}
+
+function verZipFoto(id: number) {
+  abrirFotoZipPerdida(id).catch((e: unknown) =>
+    window.alert(e instanceof Error ? e.message : 'No pude descargar el ZIP de la foto'),
   );
 }
 
@@ -88,6 +95,10 @@ export function CarnetPerdidaRevisionCard({
             <button type="button" onClick={() => verZip(item.id)} className="btn-outline-primary px-2.5 py-1.5 text-xs">
               <PhotoIcon className="h-3.5 w-3.5" aria-hidden />
               ZIP
+            </button>
+            <button type="button" onClick={() => verZipFoto(item.id)} className="btn-outline-primary px-2.5 py-1.5 text-xs">
+              <PhotoIcon className="h-3.5 w-3.5" aria-hidden />
+              ZIP foto
             </button>
             <button type="button" onClick={() => onVerFoto(item)} className="btn-outline-primary px-2.5 py-1.5 text-xs">
               <EyeIcon className="h-3.5 w-3.5" aria-hidden />

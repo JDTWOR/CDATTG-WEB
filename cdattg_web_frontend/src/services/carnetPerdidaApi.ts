@@ -119,6 +119,14 @@ export async function abrirComprobantesZipPerdida(id: number): Promise<void> {
   );
 }
 
+/** Descargo el ZIP con la foto del solicitante. */
+export async function abrirFotoZipPerdida(id: number): Promise<void> {
+  return abrirBlobProtegido(
+    `${API_BASE_URL}/carnets/perdida/${id}/foto/zip`,
+    'No pude descargar el ZIP de la foto',
+  );
+}
+
 function urlFotoPerdida(id: number): string {
   return `${API_BASE_URL}/carnets/perdida/${id}/foto`;
 }

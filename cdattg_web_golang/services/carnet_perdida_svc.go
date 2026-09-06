@@ -27,6 +27,7 @@ type CarnetPerdidaService interface {
 	LeerComprobante(solicitudID uint, tipo string) (*ArchivoComprobante, error)
 	LeerComprobantesZip(solicitudID uint) ([]byte, error)
 	LeerFoto(solicitudID uint) (*PersonaFotoArchivo, error)
+	LeerFotoZip(solicitudID uint) ([]byte, error)
 }
 
 type carnetPerdidaService struct {

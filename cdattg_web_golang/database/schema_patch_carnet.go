@@ -21,3 +21,12 @@ func patchAutoMigrateCarnetSolicitud() error {
 	log.Println("Esquema: tabla carnet_solicitudes verificada")
 	return nil
 }
+
+// patchAutoMigrateCarnetPerdida deja lista la tabla de reposición física.
+func patchAutoMigrateCarnetPerdida() error {
+	if err := DB.AutoMigrate(&models.CarnetPerdidaSolicitud{}); err != nil {
+		return err
+	}
+	log.Println("Esquema: tabla carnet_perdida_solicitudes verificada")
+	return nil
+}

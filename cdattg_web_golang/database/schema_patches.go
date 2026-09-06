@@ -300,6 +300,7 @@ func EnsureSchemaPatches() error {
 		patchFichaStatusManual,
 		patchAutoMigrateCarnetSolicitud,
 		patchAutoMigrateConfiguracionCarnet,
+		patchAutoMigrateCarnetPerdida,
 		patchAutoMigrateNotificaciones,
 		patchAutoMigratePersonaCambioPendiente,
 		patchPersonaIngresoSalidaCancelado,

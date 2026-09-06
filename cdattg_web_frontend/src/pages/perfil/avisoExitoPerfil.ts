@@ -18,3 +18,15 @@ export function avisoPerfilGuardado(): void {
     timer: 3000,
   });
 }
+
+/**
+ * Muestra el toast de éxito al guardar la foto de perfil directo.
+ */
+export function avisoFotoGuardada(): void {
+  mostrarToastApp({
+    icon: 'success',
+    titulo: 'Foto guardada',
+    texto: 'Su foto de perfil se guardó correctamente.',
+    timer: 3000,
+  });
+}

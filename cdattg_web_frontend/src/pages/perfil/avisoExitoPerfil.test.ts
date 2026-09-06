@@ -9,13 +9,22 @@ vi.mock('../../utils/appToast', () => ({
 }));
 
 import { mostrarToastApp } from '../../utils/appToast';
-import { avisoPerfilGuardado } from './avisoExitoPerfil';
+import { avisoFotoGuardada, avisoPerfilGuardado } from './avisoExitoPerfil';
 
 describe('avisoPerfilGuardado', () => {
   it('muestra toast success indicando que los datos se guardaron', () => {
     avisoPerfilGuardado();
     expect(mostrarToastApp).toHaveBeenCalledWith(
       expect.objectContaining({ icon: 'success', titulo: 'Perfil actualizado' }),
+    );
+  });
+});
+
+describe('avisoFotoGuardada', () => {
+  it('muestra toast success indicando que la foto se guardó', () => {
+    avisoFotoGuardada();
+    expect(mostrarToastApp).toHaveBeenCalledWith(
+      expect.objectContaining({ icon: 'success', titulo: 'Foto guardada' }),
     );
   });
 });

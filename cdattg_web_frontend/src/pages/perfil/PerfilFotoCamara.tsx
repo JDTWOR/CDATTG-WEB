@@ -8,6 +8,7 @@ import { archivoEsJpg } from './comprimirJpg';
 import { prepararFotoPerfil } from './prepararFotoPerfil';
 import { subirMiFoto } from '../../services/personaFotoApi';
 import { avisoAprobacionPorteria } from './avisoAprobacion';
+import { avisoFotoGuardada } from './avisoExitoPerfil';
 import type { PersonaResponse } from '../../types';
 
 type PerfilFotoCamaraProps = Readonly<{
@@ -50,6 +51,7 @@ export function PerfilFotoCamara({ onCerrar, onGuardada }: PerfilFotoCamaraProps
       const resultado = await subirMiFoto(await prepararFotoPerfil(fuente));
       if ('id' in resultado) {
         onGuardada(resultado);
+        avisoFotoGuardada();
       } else {
         avisoAprobacionPorteria('foto');
       }

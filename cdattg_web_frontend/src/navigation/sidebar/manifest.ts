@@ -81,6 +81,15 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
   },
   {
     section: 'Carnet',
+    path: carnetPerdidaPaths.revisar,
+    label: 'Reposiciones de carnet',
+    permission: 'VALIDAR CARNET PERDIDA',
+    rolesRequired: ['BIBLIOTECARIO', 'SUPER ADMINISTRADOR'],
+    alsoVisibleForPermissions: ['VALIDAR CARNET PERDIDA'],
+    iconKey: 'carnet',
+  },
+  {
+    section: 'Carnet',
     path: instructorPaths.validarCarnet,
     label: 'Validar carnet',
     permission: 'VALIDAR CARNET DIGITAL',

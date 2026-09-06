@@ -1,6 +1,6 @@
 /**
- * Ruta del aprendiz para reportar la pérdida del carnet físico.
- * La bandeja de revisión del bibliotecario llega con el módulo de reposiciones.
+ * Rutas del submódulo de pérdida de carnet: el aprendiz solicita y revisa su
+ * historial; el bibliotecario valida desde la bandeja de reposiciones.
  *
  * @author Cristian Deysdayr Jiménez
  */
@@ -14,6 +14,14 @@ export const carnetPerdidaRoutes: RouteObject[] = [
     lazy: async () => {
       const { CarnetPerdidaPage } = await import('../../pages/carnets/perdida/CarnetPerdidaPage');
       return { Component: CarnetPerdidaPage };
+    },
+  },
+  {
+    path: carnetPerdidaPaths.revisar,
+    handle: { breadcrumb: { label: 'Reposiciones de carnet' } },
+    lazy: async () => {
+      const { CarnetPerdidaRevisionPage } = await import('../../pages/carnets/perdida/CarnetPerdidaRevisionPage');
+      return { Component: CarnetPerdidaRevisionPage };
     },
   },
 ];

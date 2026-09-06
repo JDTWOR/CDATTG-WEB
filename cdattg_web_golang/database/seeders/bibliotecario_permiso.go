@@ -18,9 +18,13 @@ import (
 
 const correoBibliotecaSeed = "biblioteca@dataguaviare.com.co"
 
-// seedBibliotecarioPermissions da ver carnet de biblioteca y su propia persona.
+// seedBibliotecarioPermissions da ver carnet de biblioteca, ver fichas (catálogos) y su propia persona.
 func seedBibliotecarioPermissions(e *casbin.Enforcer) error {
 	if _, err := authz.AddPermissionForRole(e, authz.RolBibliotecario, authz.ObjCarnet, authz.ActVerCarnetBiblioteca); err != nil {
+		return err
+	}
+	// VER FICHAS habilita los catálogos de ficha (sedes, ambientes, modalidades, jornadas, días).
+	if _, err := authz.AddPermissionForRole(e, authz.RolBibliotecario, authz.ObjFicha, "VER FICHAS"); err != nil {
 		return err
 	}
 	return seedVerPersonaForRoles(e, []string{authz.RolBibliotecario})

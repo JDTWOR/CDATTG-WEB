@@ -36,6 +36,9 @@ func main() {
 	if err := seeders.SyncCarnetPerdidaPermission(database.GetDB()); err != nil {
 		log.Fatal("Error sincronizando permiso de carnet por pérdida:", err)
 	}
+	if err := seeders.SyncAccesoEstudiosRoles(database.GetDB()); err != nil {
+		log.Fatal("Error sincronizando permisos de perfiles de formación:", err)
+	}
 	if err := seeders.RunFestivosColombiaSeeder(database.GetDB()); err != nil {
 		log.Fatal("Error sembrando festivos Colombia:", err)
 	}

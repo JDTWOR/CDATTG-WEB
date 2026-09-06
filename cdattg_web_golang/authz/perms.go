@@ -21,6 +21,10 @@ var RoleNames = []string{
 	"FPI",
 	// Ve carnets regulares ya validados para imprimir el físico
 	"BIBLIOTECARIO",
+	// Perfiles que administran la formación: gestionan fichas, programas,
+	// aprendices e instructores, consultan asistencia y usan bienestar e infraestructura.
+	"MEDIA TECNICA",
+	"FORMACION COMPLEMENTARIA",
 	// Roles del módulo Personal (se toman rol al vincular una persona a un rol de personal)
 	"PERSONAL OPERATIVO Y DE APOYO",
 	"PERSONAL ADMINISTRATIVO",
@@ -118,6 +122,9 @@ const (
 	RolPersonalAdministrativo         = "PERSONAL ADMINISTRATIVO"
 	RolContratistaPrestacionServicios = "CONTRATISTA PRESTACIÓN DE SERVICIOS"
 	RolBibliotecario                  = "BIBLIOTECARIO"
+	// Perfiles que administran la formación académica (fichas, programas y personal).
+	RolMediaTecnica            = "MEDIA TECNICA"
+	RolFormacionComplementaria = "FORMACION COMPLEMENTARIA"
 )
 
 // IsValidPermiso indica si (obj, act) es un permiso definido en el sistema.

@@ -242,20 +242,20 @@ func SetupRouter() *gin.Engine {
 
 			asistencias := protected.Group("/asistencias")
 			// Dashboard de asistencia: SUPER ADMINISTRADOR y BIENESTAR AL APRENDIZ
-			asistencias.GET("/dashboard", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.GetDashboard)
+			asistencias.GET("/dashboard", middleware.RequireReporteAsistencia(), asistenciaHandler.GetDashboard)
 			// Casos de Bienestar: oficina (superadmin/bienestar) o instructor líder (alcance a sus fichas)
 			asistencias.GET("/dashboard/casos-bienestar", middleware.RequireSuperAdminBienestarOrInstructor(), asistenciaHandler.GetCasosBienestar)
 			asistencias.GET("/dashboard/casos-bienestar/ficha/:fichaNumero/aprendiz/:aprendizId/detalle", middleware.RequireSuperAdminBienestarOrInstructor(), asistenciaHandler.GetDetalleInasistenciasAprendiz)
 			asistencias.GET("/dashboard/alertas-consecutivas", middleware.RequireSuperAdminBienestarOrInstructor(), asistenciaHandler.GetAlertasConsecutivas)
 			asistencias.GET("/mis-inasistencias", middleware.RequirePermission("asistencia", permVerMisInasistencias), asistenciaHandler.GetMisInasistencias)
 			asistencias.GET("/mis-alertas-consecutivas", middleware.RequirePermission("asistencia", permVerMisInasistencias), asistenciaHandler.GetMisAlertasConsecutivas)
-			asistencias.GET("/dashboard/pendientes-revision-instructor", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.ListPendientesRevisionAdmin)
-			asistencias.GET("/dashboard/sesiones-sin-asistencia-tomada", middleware.RequireSuperAdminAdminOrCoordinator(), asistenciaHandler.GetSesionesSinAsistenciaTomada)
+			asistencias.GET("/dashboard/pendientes-revision-instructor", middleware.RequireReporteAsistencia(), asistenciaHandler.ListPendientesRevisionAdmin)
+			asistencias.GET("/dashboard/sesiones-sin-asistencia-tomada", middleware.RequireAsistenciaPaneles(), asistenciaHandler.GetSesionesSinAsistenciaTomada)
 			// Entrar a tomar asistencia: solo requiere estar autenticado; el servicio valida que el usuario sea instructor asignado a la ficha.
 			asistencias.POST("/entrar-tomar-asistencia", asistenciaHandler.EntrarTomarAsistencia)
 			asistencias.GET("/reglas", asistenciaHandler.GetReglas)
 			asistencias.POST("", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.CreateSesion)
-			asistencias.POST("/carga-retroactiva", middleware.RequireSuperAdmin(), asistenciaHandler.RegistrarAsistenciaRetroactiva)
+			asistencias.POST("/carga-retroactiva", middleware.RequireSuperAdminOrGestorFormacion(), asistenciaHandler.RegistrarAsistenciaRetroactiva)
 			asistencias.GET("/instructor-ficha/:instructorFichaId", middleware.RequirePermission("asistencia", permVerAsistencia), asistenciaHandler.ListByInstructorFicha)
 			asistencias.GET("/ficha/:fichaId", middleware.RequirePermissionListAsistenciasPorFicha(), asistenciaHandler.ListByFichaAndFechas)
 			// Pendientes de revisión:
@@ -415,9 +415,9 @@ func SetupRouter() *gin.Engine {
 				aprendices.DELETE("/:id", middleware.RequirePermission("aprendiz", "ELIMINAR APRENDIZ"), aprendizHandler.Delete)
 			}
 
-			// Infraestructura: CRUD de sedes, bloques, pisos y ambientes (sólo SUPER ADMINISTRADOR)
+			// Infraestructura: CRUD de sedes, bloques, pisos y ambientes (superadmin y perfiles de formación)
 			infraestructura := protected.Group("/infraestructura")
-			infraestructura.Use(middleware.RequireSuperAdmin())
+			infraestructura.Use(middleware.RequireSuperAdminOrGestorFormacion())
 			{
 				infraestructura.GET(routeSedes, sedeInfraHandler.List)
 				infraestructura.POST(routeSedes, sedeInfraHandler.Create)

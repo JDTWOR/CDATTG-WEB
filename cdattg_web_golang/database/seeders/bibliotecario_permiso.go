@@ -8,6 +8,7 @@ package seeders
 
 import (
 	"errors"
+	"log"
 	"strconv"
 
 	casbin "github.com/casbin/casbin/v3"
@@ -18,14 +19,28 @@ import (
 
 const correoBibliotecaSeed = "biblioteca@dataguaviare.com.co"
 
-// seedBibliotecarioPermissions da ver carnet de biblioteca, ver fichas (catálogos) y su propia persona.
+// seedBibliotecarioPermissions da ver carnets regulares (con fotos, Excel y ZIP), revisar
+// reposiciones de carnet y mirar aprendices en modo lectura. Sin gestión de fichas ni instructores.
 func seedBibliotecarioPermissions(e *casbin.Enforcer) error {
 	if _, err := authz.AddPermissionForRole(e, authz.RolBibliotecario, authz.ObjCarnet, authz.ActVerCarnetBiblioteca); err != nil {
 		return err
 	}
-	// VER FICHAS habilita los catálogos de ficha (sedes, ambientes, modalidades, jornadas, días).
-	if _, err := authz.AddPermissionForRole(e, authz.RolBibliotecario, authz.ObjFicha, "VER FICHAS"); err != nil {
+	if _, err := authz.AddPermissionForRole(e, authz.RolBibliotecario, authz.ObjCarnet, authz.ActValidarCarnetPerdida); err != nil {
 		return err
+	}
+	// VER APRENDICES/APRENDIZ solo lectura: el bibliotecario mira el aprendiz al buscar su carnet.
+	if _, err := authz.AddPermissionForRole(e, authz.RolBibliotecario, authz.ObjAprendiz, "VER APRENDICES"); err != nil {
+		return err
+	}
+	if _, err := authz.AddPermissionForRole(e, authz.RolBibliotecario, authz.ObjAprendiz, "VER APRENDIZ"); err != nil {
+		return err
+	}
+	// Limpieza: bases con versiones previas pudieron dejar (ficha, VER FICHAS) en el rol;
+	// ese permiso abría el módulo de Fichas e Instructores.
+	if removed, err := e.RemovePolicy(authz.RolBibliotecario, authz.ObjFicha, "VER FICHAS"); err != nil {
+		return err
+	} else if removed {
+		log.Println("Eliminado permiso (ficha, VER FICHAS) del rol BIBLIOTECARIO")
 	}
 	return seedVerPersonaForRoles(e, []string{authz.RolBibliotecario})
 }

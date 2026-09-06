@@ -38,6 +38,7 @@ func registerPersonaFotoYCarnet(protected *gin.RouterGroup, personas *gin.Router
 	carnets.GET("/pendientes", middleware.RequirePermission("carnet", permValidarCarnetDigital), carnetHandler.ListarPendientes)
 	carnets.GET("/biblioteca", middleware.RequirePermission("carnet", permVerCarnetBiblioteca), carnetHandler.ListarBiblioteca)
 	carnets.GET("/biblioteca/excel", middleware.RequirePermission("carnet", permVerCarnetBiblioteca), carnetHandler.DescargarExcelBiblioteca)
+	carnets.GET("/biblioteca/fotos/zip", middleware.RequirePermission("carnet", permVerCarnetBiblioteca), carnetHandler.DescargarFotosBibliotecaZip)
 	carnets.GET("/biblioteca/:id/foto", middleware.RequirePermission("carnet", permVerCarnetBiblioteca), carnetHandler.VerFotoBiblioteca)
 	carnets.GET("/:id", middleware.RequirePermission("carnet", permValidarCarnetDigital), carnetHandler.VerSolicitud)
 	carnets.GET("/:id/foto", middleware.RequirePermission("carnet", permValidarCarnetDigital), carnetHandler.VerFotoSolicitud)

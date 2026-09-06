@@ -89,6 +89,16 @@ export async function bajarExcelBiblioteca(fichaId?: number): Promise<Blob> {
   return res.blob();
 }
 
+/** ZIP con las fotos de los carnets regulares, en el mismo orden del Excel. */
+export async function bajarFotosBibliotecaZip(fichaId?: number): Promise<Blob> {
+  const q = fichaId && fichaId > 0 ? `?ficha_id=${fichaId}` : '';
+  const res = await fetch(`${API_BASE_URL}/carnets/biblioteca/fotos/zip${q}`, { headers: auth() });
+  if (!res.ok) {
+    throw new Error('No pude bajar las fotos de biblioteca');
+  }
+  return res.blob();
+}
+
 /** Traigo el carnet completo de una solicitud para el líder. */
 export async function getVistaSolicitud(id: number): Promise<CarnetVistaInstructor> {
   const res = await fetch(`${API_BASE_URL}/carnets/${id}`, { headers: auth() });

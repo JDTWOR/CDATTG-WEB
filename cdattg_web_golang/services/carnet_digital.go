@@ -35,6 +35,7 @@ type CarnetDigitalService interface {
 	LeerFotoBiblioteca(solicitudID uint) (*PersonaFotoArchivo, error)
 	LeerFotoBibliotecaPorDocumento(documento string) (*PersonaFotoArchivo, error)
 	ExcelBiblioteca(fichaID uint) ([]byte, error)
+	FotosBibliotecaZip(fichaID uint) ([]byte, error)
 }
 
 type carnetDigitalService struct {

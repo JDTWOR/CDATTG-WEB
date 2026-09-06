@@ -9,7 +9,7 @@ import (
 
 // Literales Casbin y segmentos de ruta reutilizados (Sonar: evitar duplicación).
 const (
-	routeUsuarios         = "/usuarios"
+	routeUsuarios       = "/usuarios"
 	routeImport         = "/import"
 	routeImportTemplate = "/import/template"
 	routeImports        = "/imports"
@@ -17,42 +17,42 @@ const (
 	objPersOpApoyo      = "personal-operativo-apoyo"
 	objPersAdmin        = "personal-administrativo"
 
-	routeSedes      = "/sedes"
-	routeAmbientes  = "/ambientes"
-	routeBloques    = "/bloques"
-	routePisos      = "/pisos"
-	routeJornadas   = "/jornadas"
-	routeDiasSinFormacion = "/dias-sin-formacion"
-	routeDiasSinFormacionFicha = "/dias-sin-formacion-ficha"
+	routeSedes                   = "/sedes"
+	routeAmbientes               = "/ambientes"
+	routeBloques                 = "/bloques"
+	routePisos                   = "/pisos"
+	routeJornadas                = "/jornadas"
+	routeDiasSinFormacion        = "/dias-sin-formacion"
+	routeDiasSinFormacionFicha   = "/dias-sin-formacion-ficha"
 	routeConfiguracionAsistencia = "/configuracion-asistencia"
 
-	permVerPersonas     = "VER PERSONAS"
-	permCrearPersona    = "CREAR PERSONA"
-	permEditarMiPersona = "EDITAR MI PERSONA"
-	permVerFichas       = "VER FICHAS"
-	permCrearFicha      = "CREAR FICHA"
-	permCrearInstructor = "CREAR INSTRUCTOR"
-	permTomarAsistencia = "TOMAR ASISTENCIA"
-	permVerAsistencia          = "VER ASISTENCIA"
-	permVerMisInasistencias    = "VER MIS INASISTENCIAS"
-	permProgramarInstructores  = "PROGRAMAR INSTRUCTORES"
-	permGestionarAprendicesFicha = "GESTIONAR APRENDICES FICHA"
-	permVerPersonalOperativoYDeApoyo = "VER PERSONAL OPERATIVO Y DE APOYO"
-	permCrearPersonalOperativoYDeApoyo = "CREAR PERSONAL OPERATIVO Y DE APOYO"
-	permEditarPersonalOperativoYDeApoyo = "EDITAR PERSONAL OPERATIVO Y DE APOYO"
+	permVerPersonas                       = "VER PERSONAS"
+	permCrearPersona                      = "CREAR PERSONA"
+	permEditarMiPersona                   = "EDITAR MI PERSONA"
+	permVerFichas                         = "VER FICHAS"
+	permCrearFicha                        = "CREAR FICHA"
+	permCrearInstructor                   = "CREAR INSTRUCTOR"
+	permTomarAsistencia                   = "TOMAR ASISTENCIA"
+	permVerAsistencia                     = "VER ASISTENCIA"
+	permVerMisInasistencias               = "VER MIS INASISTENCIAS"
+	permProgramarInstructores             = "PROGRAMAR INSTRUCTORES"
+	permGestionarAprendicesFicha          = "GESTIONAR APRENDICES FICHA"
+	permVerPersonalOperativoYDeApoyo      = "VER PERSONAL OPERATIVO Y DE APOYO"
+	permCrearPersonalOperativoYDeApoyo    = "CREAR PERSONAL OPERATIVO Y DE APOYO"
+	permEditarPersonalOperativoYDeApoyo   = "EDITAR PERSONAL OPERATIVO Y DE APOYO"
 	permEliminarPersonalOperativoYDeApoyo = "ELIMINAR PERSONAL OPERATIVO Y DE APOYO"
-	permVerContratista         = "VER CONTRATISTAS PRESTACIÓN DE SERVICIOS"
-	permCrearContratista       = "CREAR CONTRATISTAS PRESTACIÓN DE SERVICIOS"
-	permEditarContratista      = "EDITAR CONTRATISTAS PRESTACIÓN DE SERVICIOS"
-	permEliminarContratista    = "ELIMINAR CONTRATISTAS PRESTACIÓN DE SERVICIOS"
-	permVerPersonalAdministrativo = "VER PERSONAL ADMINISTRATIVO"
-	permCrearPersonalAdministrativo = "CREAR PERSONAL ADMINISTRATIVO"
-	permEditarPersonalAdministrativo = "EDITAR PERSONAL ADMINISTRATIVO"
-	permEliminarPersonalAdministrativo = "ELIMINAR PERSONAL ADMINISTRATIVO"
-	permVerMiAgenda            = "VER MI AGENDA"
-	permRegistrarAccesoSede    = "REGISTRAR ACCESO SEDE"
-	permVerAccesoSede          = "VER ACCESO SEDE"
-	permRegistrarPersona       = "REGISTRAR PERSONA"
+	permVerContratista                    = "VER CONTRATISTAS PRESTACIÓN DE SERVICIOS"
+	permCrearContratista                  = "CREAR CONTRATISTAS PRESTACIÓN DE SERVICIOS"
+	permEditarContratista                 = "EDITAR CONTRATISTAS PRESTACIÓN DE SERVICIOS"
+	permEliminarContratista               = "ELIMINAR CONTRATISTAS PRESTACIÓN DE SERVICIOS"
+	permVerPersonalAdministrativo         = "VER PERSONAL ADMINISTRATIVO"
+	permCrearPersonalAdministrativo       = "CREAR PERSONAL ADMINISTRATIVO"
+	permEditarPersonalAdministrativo      = "EDITAR PERSONAL ADMINISTRATIVO"
+	permEliminarPersonalAdministrativo    = "ELIMINAR PERSONAL ADMINISTRATIVO"
+	permVerMiAgenda                       = "VER MI AGENDA"
+	permRegistrarAccesoSede               = "REGISTRAR ACCESO SEDE"
+	permVerAccesoSede                     = "VER ACCESO SEDE"
+	permRegistrarPersona                  = "REGISTRAR PERSONA"
 )
 
 func SetupRouter() *gin.Engine {
@@ -132,6 +132,7 @@ func SetupRouter() *gin.Engine {
 				personas.POST(routeImport, middleware.RequirePermission("persona", permCrearPersona), personaHandler.ImportPersonas)
 				personas.PUT("/mi-perfil", middleware.RequirePermission("persona", permEditarMiPersona), personaHandler.UpdateMiPerfil)
 				registerPersonaFotoYCarnet(protected, personas, database.DB)
+				registerNotificaciones(protected)
 				personas.GET("/:id", middleware.RequirePermission("persona", "VER PERSONA"), personaHandler.GetByID)
 				personas.POST("", middleware.RequirePermission("persona", permCrearPersona), personaHandler.Create)
 				personas.PUT("/:id", middleware.RequirePermission("persona", "EDITAR PERSONA"), personaHandler.Update)
@@ -357,21 +358,21 @@ func SetupRouter() *gin.Engine {
 				vigilancia.GET("/estadisticas", middleware.RequirePermission("vigilancia", permVerAccesoSede), vigilanciaAccesoHandler.Estadisticas)
 			}
 
-	vigilanciaPersonas := protected.Group("/vigilancia/personas")
-		{
-			vigilanciaPersonas.GET("/lookup", middleware.RequirePermission("persona", permRegistrarPersona), vigilanciaPersonaHandler.Lookup)
-			vigilanciaPersonas.PUT("/:id/datos-basicos", middleware.RequirePermission("persona", permRegistrarPersona), vigilanciaPersonaHandler.ActualizarDatosBasicos)
-			vigilanciaPersonas.POST("/:id/foto", middleware.RequirePermission("persona", permRegistrarPersona), vigilanciaPersonaHandler.SubirFoto)
-		}
+			vigilanciaPersonas := protected.Group("/vigilancia/personas")
+			{
+				vigilanciaPersonas.GET("/lookup", middleware.RequirePermission("persona", permRegistrarPersona), vigilanciaPersonaHandler.Lookup)
+				vigilanciaPersonas.PUT("/:id/datos-basicos", middleware.RequirePermission("persona", permRegistrarPersona), vigilanciaPersonaHandler.ActualizarDatosBasicos)
+				vigilanciaPersonas.POST("/:id/foto", middleware.RequirePermission("persona", permRegistrarPersona), vigilanciaPersonaHandler.SubirFoto)
+			}
 
-		cambiosPendientes := protected.Group("/cambios-pendientes")
-		{
-			cambiosPendientes.GET("", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().ListarPendientes)
-			cambiosPendientes.GET("/mi-estado", handlers.NewPersonaCambioPendienteHandler().VerificarPendiente)
-			cambiosPendientes.GET("/:id/foto", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().VerFotoPendiente)
-			cambiosPendientes.PUT("/:id/aprobar", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().Aprobar)
-			cambiosPendientes.PUT("/:id/rechazar", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().Rechazar)
-		}
+			cambiosPendientes := protected.Group("/cambios-pendientes")
+			{
+				cambiosPendientes.GET("", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().ListarPendientes)
+				cambiosPendientes.GET("/mi-estado", handlers.NewPersonaCambioPendienteHandler().VerificarPendiente)
+				cambiosPendientes.GET("/:id/foto", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().VerFotoPendiente)
+				cambiosPendientes.PUT("/:id/aprobar", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().Aprobar)
+				cambiosPendientes.PUT("/:id/rechazar", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().Rechazar)
+			}
 
 			// Complementarios (FPI): credenciales SofiaPlus por operador + verificación de aspirantes
 			const rutaCredencialesSofia = "/credenciales"

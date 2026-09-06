@@ -4,6 +4,7 @@ import { RouteLoadingFallback } from '../components/RouteLoadingFallback';
 import { ProtectedLayout } from './layouts/ProtectedLayout';
 import { authRoutes } from './modules/auth.routes';
 import { homeRoutes } from './modules/home.routes';
+import { notificacionesRoutes } from './modules/notificaciones.routes';
 import { personasRoutes } from './modules/personas.routes';
 import { instructoresRoutes } from './modules/instructores.routes';
 import { personalOperativoApoyoRoutes } from './modules/personalOperativoApoyo.routes';
@@ -35,6 +36,7 @@ export const appRouter = createBrowserRouter([
     hydrateFallbackElement: createElement(RouteLoadingFallback),
     children: [
       ...homeRoutes,
+      ...notificacionesRoutes,
       ...aprendizRoutes,
       ...bibliotecaRoutes,
       ...personasRoutes,

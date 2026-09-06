@@ -2,6 +2,10 @@
 export const DASHBOARD_PATH = '/dashboard';
 export const PERFIL_PATH = '/perfil';
 
+export const notificacionesPaths = {
+  index: '/notificaciones',
+} as const;
+
 export const personasPaths = {
   index: '/personas',
   importar: '/personas/importar',

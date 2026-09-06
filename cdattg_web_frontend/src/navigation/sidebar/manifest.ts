@@ -10,6 +10,7 @@ import {
   administracionPaths,
   permisosPaths,
   PERFIL_PATH,
+  notificacionesPaths,
   personasPaths,
   programasPaths,
   instructoresPaths,
@@ -42,6 +43,13 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     label: 'Mi perfil',
     permission: null,
     iconKey: 'perfil',
+  },
+  {
+    section: 'Inicio',
+    path: notificacionesPaths.index,
+    label: 'Notificaciones',
+    permission: null,
+    iconKey: 'notificaciones',
   },
   {
     section: 'Inicio',

@@ -7,6 +7,7 @@ package services
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/sena/cdattg-web-golang/dto"
@@ -50,7 +51,7 @@ func pendientesAItems(list []models.CarnetSolicitud) []dto.CarnetPendienteItem {
 }
 
 // Decidir aprueba o devuelve si el instructor es líder de esa ficha.
-func (s *carnetDigitalService) Decidir(instructorID, solicitudID uint, aprobar bool, _ string) error {
+func (s *carnetDigitalService) Decidir(instructorID, solicitudID uint, aprobar bool, motivo string) error {
 	sol, err := s.solicitudRepo.FindByID(solicitudID)
 	if err != nil {
 		return err
@@ -61,7 +62,7 @@ func (s *carnetDigitalService) Decidir(instructorID, solicitudID uint, aprobar b
 	if !s.esLiderDeSolicitud(instructorID, sol) {
 		return errCarnetNoLider
 	}
-	aplicarDecision(sol, instructorID, aprobar, time.Now())
+	aplicarDecision(sol, instructorID, aprobar, motivo, time.Now())
 	if err := s.solicitudRepo.Update(sol); err != nil {
 		return err
 	}
@@ -74,7 +75,7 @@ func (s *carnetDigitalService) Decidir(instructorID, solicitudID uint, aprobar b
 	return nil
 }
 
-func aplicarDecision(sol *models.CarnetSolicitud, instructorID uint, aprobar bool, ahora time.Time) {
+func aplicarDecision(sol *models.CarnetSolicitud, instructorID uint, aprobar bool, motivo string, ahora time.Time) {
 	sol.ValidadorInstructorID = &instructorID
 	sol.ValidadoEn = &ahora
 	sol.MotivoRechazo = ""
@@ -83,6 +84,7 @@ func aplicarDecision(sol *models.CarnetSolicitud, instructorID uint, aprobar boo
 		return
 	}
 	sol.Estado = models.CarnetEstadoDevuelto
+	sol.MotivoRechazo = strings.TrimSpace(motivo)
 }
 
 func (s *carnetDigitalService) esLiderDeSolicitud(instructorID uint, sol *models.CarnetSolicitud) bool {

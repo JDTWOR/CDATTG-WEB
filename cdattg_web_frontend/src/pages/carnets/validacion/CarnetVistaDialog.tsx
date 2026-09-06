@@ -1,5 +1,6 @@
 /**
  * El instructor líder ve cara, reverso y foto antes de decidir.
+ * Al devolver escribe el motivo, que llega al aprendiz en su notificación.
  *
  * @author Cristian Deysdayr Jiménez
  */
@@ -12,16 +13,19 @@ import type { CarnetVistaInstructor } from '../../../types/carnet';
 type Props = Readonly<{
   id: number;
   onClose: () => void;
-  onDecidir: (aprobar: boolean) => void;
+  onDecidir: (aprobar: boolean, motivo: string) => void;
+  soloDevolver?: boolean;
 }>;
 
 /**
- * Abro la vista completa de la solicitud.
+ * Abro la vista completa de la solicitud con la opción de devolución.
  */
-export function CarnetVistaDialog({ id, onClose, onDecidir }: Props) {
+export function CarnetVistaDialog({ id, onClose, onDecidir, soloDevolver = false }: Props) {
   const [vista, setVista] = useState<CarnetVistaInstructor | null>(null);
   const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [reverso, setReverso] = useState(false);
+  const [devolviendo, setDevolviendo] = useState(soloDevolver);
+  const [motivo, setMotivo] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -54,10 +58,39 @@ export function CarnetVistaDialog({ id, onClose, onDecidir }: Props) {
             </button>
           </>
         ) : <p className="mt-2 text-sm text-gray-500">Cargando…</p>}
+        {devolviendo ? (
+          <label className="mt-3 block">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Motivo de la devolución</span>
+            <textarea
+              className="input-field mt-1 w-full"
+              rows={4}
+              value={motivo}
+              autoFocus
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Explique al aprendiz qué debe corregir"
+            />
+          </label>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" className="btn-sena" onClick={() => onDecidir(true)}>Aceptar</button>
-          <button type="button" className="btn-danger" onClick={() => onDecidir(false)}>Devolver</button>
-          <button type="button" className="btn-secondary" onClick={onClose}>Cerrar</button>
+          {devolviendo ? (
+            <>
+              <button
+                type="button"
+                className="btn-danger disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={motivo.trim() === ''}
+                onClick={() => onDecidir(false, motivo.trim())}
+              >
+                Confirmar devolución
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setDevolviendo(false)}>Cancelar</button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn-sena" onClick={() => onDecidir(true, '')}>Aceptar</button>
+              <button type="button" className="btn-danger" onClick={() => setDevolviendo(true)}>Devolver</button>
+              <button type="button" className="btn-secondary" onClick={onClose}>Cerrar</button>
+            </>
+          )}
         </div>
       </dialog>
     </div>

@@ -16,6 +16,7 @@ export function CarnetValidarPage() {
   const [rows, setRows] = useState<CarnetPendienteItem[]>([]);
   const [error, setError] = useState('');
   const [verId, setVerId] = useState<number | null>(null);
+  const [soloDevolver, setSoloDevolver] = useState(false);
 
   const cargar = () => {
     void listarCarnetsPendientes().then(setRows).catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error'));
@@ -25,9 +26,9 @@ export function CarnetValidarPage() {
     cargar();
   }, []);
 
-  const decidir = async (id: number, aprobar: boolean) => {
+  const decidir = async (id: number, aprobar: boolean, motivo: string) => {
     try {
-      await decidirCarnet(id, aprobar);
+      await decidirCarnet(id, aprobar, motivo);
       setVerId(null);
       cargar();
     } catch (e: unknown) {
@@ -56,16 +57,21 @@ export function CarnetValidarPage() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn-secondary" onClick={() => setVerId(r.id)}>Ver</button>
-                <button type="button" className="btn-sena" onClick={() => void decidir(r.id, true)}>Aceptar</button>
-                <button type="button" className="btn-danger" onClick={() => void decidir(r.id, false)}>Devolver</button>
+                <button type="button" className="btn-secondary" onClick={() => { setSoloDevolver(false); setVerId(r.id); }}>Ver</button>
+                <button type="button" className="btn-sena" onClick={() => void decidir(r.id, true, '')}>Aceptar</button>
+                <button type="button" className="btn-danger" onClick={() => { setSoloDevolver(true); setVerId(r.id); }}>Devolver</button>
               </div>
             </article>
           </li>
         ))}
       </ul>
       {verId === null ? null : (
-        <CarnetVistaDialog id={verId} onClose={() => setVerId(null)} onDecidir={(ok) => void decidir(verId, ok)} />
+        <CarnetVistaDialog
+          id={verId}
+          soloDevolver={soloDevolver}
+          onClose={() => setVerId(null)}
+          onDecidir={(ok, m) => void decidir(verId, ok, m)}
+        />
       )}
     </main>
   );

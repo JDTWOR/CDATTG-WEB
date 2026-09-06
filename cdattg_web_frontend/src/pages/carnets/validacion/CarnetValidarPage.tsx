@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import { decidirCarnet, listarCarnetsPendientes } from '../../../services/carnetApi';
+import { mostrarToastApp } from '../../../utils/appToast';
 import { CarnetPendienteFoto } from '../shared/CarnetPendienteFoto';
 import { CarnetVistaDialog } from './CarnetVistaDialog';
 import type { CarnetPendienteItem } from '../../../types/carnet';
@@ -31,6 +32,14 @@ export function CarnetValidarPage() {
       await decidirCarnet(id, aprobar, motivo);
       setVerId(null);
       cargar();
+      mostrarToastApp({
+        icon: 'success',
+        titulo: aprobar ? 'Carnet aceptado' : 'Carnet devuelto',
+        texto: aprobar
+          ? 'La solicitud quedó aprobada y el aprendiz fue notificado.'
+          : `La solicitud quedó devuelta${motivo ? ` con motivo: ${motivo}` : ''} y el aprendiz fue notificado.`,
+        timer: 3000,
+      });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error');
     }

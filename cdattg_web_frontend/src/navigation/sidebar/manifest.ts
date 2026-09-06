@@ -26,6 +26,9 @@ import {
  } from '../../routes/paths';
 import type { SidebarManifestItem } from './types';
 
+/** Perfiles que administran la formación (media técnica y formación complementaria). */
+const ROLES_FORMACION = ['MEDIA TECNICA', 'FORMACION COMPLEMENTARIA'] as const;
+
 /** Orden y agrupación del menú lateral (de arriba hacia abajo). */
 export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
   // —— Inicio (accesos directos, sin acordeón) ——
@@ -208,6 +211,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: asistenciaPaths.fichas,
     label: 'Tomar asistencia',
     permission: 'VER ASISTENCIA',
+    hiddenForRoles: [...ROLES_FORMACION],
     iconKey: 'asistencia',
   },
   {
@@ -222,7 +226,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: asistenciaPaths.sesionesSinAsistenciaTomada,
     label: 'Panel de toma de asistencia',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR', ...ROLES_FORMACION],
     iconKey: 'asistencia/sin-asistencia',
   },
   {
@@ -230,7 +234,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: asistenciaPaths.analisis,
     label: 'Panel analítico de asistencia',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR', ...ROLES_FORMACION],
     iconKey: 'asistencia/dashboard',
   },
   {
@@ -238,7 +242,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: asistenciaPaths.index,
     label: 'Reporte de asistencia',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', ...ROLES_FORMACION],
     iconKey: 'asistencia/dashboard',
   },
   {
@@ -246,7 +250,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: asistenciaPaths.cargaRetroactiva,
     label: 'Carga retroactiva',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', ...ROLES_FORMACION],
     iconKey: 'asistencia/historial',
   },
   {
@@ -290,7 +294,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: bienestarPaths.casos.index,
     label: 'Casos bienestar',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', 'INSTRUCTOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', 'INSTRUCTOR', ...ROLES_FORMACION],
     iconKey: 'bienestar/casos',
   },
   {
@@ -298,7 +302,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: bienestarPaths.alertasConsecutivas.index,
     label: 'Alertas consecutivas',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', 'INSTRUCTOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', 'INSTRUCTOR', ...ROLES_FORMACION],
     iconKey: 'bienestar/casos',
   },
 
@@ -308,7 +312,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: infraestructuraPaths.sedes,
     label: 'Sedes',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', ...ROLES_FORMACION],
     iconKey: 'infraestructura/sedes',
   },
   {
@@ -316,7 +320,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: infraestructuraPaths.bloques,
     label: 'Bloques',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', ...ROLES_FORMACION],
     iconKey: 'infraestructura/bloques',
   },
   {
@@ -324,7 +328,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: infraestructuraPaths.pisos,
     label: 'Pisos',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', ...ROLES_FORMACION],
     iconKey: 'infraestructura/pisos',
   },
   {
@@ -332,7 +336,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: infraestructuraPaths.ambientes,
     label: 'Ambientes',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', ...ROLES_FORMACION],
     iconKey: 'infraestructura/ambientes',
   },
 

@@ -8,6 +8,7 @@ package services
 
 import (
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -64,6 +65,12 @@ func (s *carnetDigitalService) Solicitar(personaID, fichaID uint) (*dto.CarnetDi
 	}
 	// Guardo una copia: si luego cambia la foto de perfil, el carnet no se altera.
 	fijarFotoCopiaSolicitud(s.solicitudRepo, &sol)
+	// Aviso al instructor líder de la ficha que hay un carnet por validar.
+	if liderPersonaID, err := s.solicitudRepo.FindLiderPersonaIDDeFicha(ficha.ID); err == nil {
+		s.notif.SolicitudPendiente(&sol, liderPersonaID)
+	} else {
+		log.Printf("Carnet digital: no pude avisar al líder de la ficha %d: %v", ficha.ID, err)
+	}
 	return s.ObtenerMiCarnet(personaID)
 }
 

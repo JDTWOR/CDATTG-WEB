@@ -43,6 +43,7 @@ type carnetDigitalService struct {
 	solicitudRepo repositories.CarnetSolicitudRepository
 	fichaRepo     repositories.FichaRepository
 	configSvc     *CarnetConfigService
+	notif         *CarnetDigitalNotificacion
 }
 
 // NewCarnetDigitalService crea el servicio del carnet.
@@ -52,6 +53,7 @@ func NewCarnetDigitalService() CarnetDigitalService {
 		aprendizRepo:  repositories.NewAprendizRepository(),
 		solicitudRepo: repositories.NewCarnetSolicitudRepository(),
 		fichaRepo:     repositories.NewFichaRepository(),
+		notif:         NewCarnetDigitalNotificacion(),
 	}
 }
 
@@ -63,6 +65,7 @@ func NewCarnetDigitalServiceWithConfig(configSvc *CarnetConfigService) CarnetDig
 		solicitudRepo: repositories.NewCarnetSolicitudRepository(),
 		fichaRepo:     repositories.NewFichaRepository(),
 		configSvc:     configSvc,
+		notif:         NewCarnetDigitalNotificacion(),
 	}
 }
 

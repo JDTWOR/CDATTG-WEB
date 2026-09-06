@@ -1,10 +1,10 @@
 /**
- * Dejo la foto en JPG de máximo 20 KB para el perfil y el carnet.
+ * Dejo la foto en JPG de hasta 2 MB para el perfil y el carnet.
  *
  * @author Cristian Deysdayr Jiménez
  */
 
-export const FOTO_MAX_BYTES = 20 * 1024;
+export const FOTO_MAX_BYTES = 2 * 1024 * 1024;
 
 /**
  * Comprime un canvas a JPG hasta caber en el tope.
@@ -27,7 +27,7 @@ export async function comprimirCanvasAJpg(canvas: HTMLCanvasElement, topeBytes =
     blob = await canvasAJpg(chico, 0.45);
   }
   if (blob.size > topeBytes) {
-    throw new Error('La foto quedó por encima de 20 KB. Use una toma más cercana.');
+    throw new Error('La foto quedó por encima de 2 MB. Use una toma más cercana.');
   }
   return blob;
 }

@@ -16,7 +16,7 @@ type PerfilFotoCamaraProps = Readonly<{
 }>;
 
 const CONDICIONES =
-  'La foto debe ser de medio cuerpo, con camisa presentable (cualquier color). Solo se acepta JPG y queda en 20 KB.';
+  'La foto debe ser de medio cuerpo, con camisa presentable (cualquier color). Solo se acepta JPG (hasta 2 MB).';
 
 /**
  * Pinto tomar foto y cargar foto en verde, con las condiciones.

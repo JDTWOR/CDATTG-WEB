@@ -17,6 +17,8 @@ type FichaCaracterizacionRequest struct {
 	JornadaID            *uint                   `json:"jornada_id"`
 	TotalHoras           *int                    `json:"total_horas"`
 	Status               *bool                   `json:"status"`
+	// StatusManual override manual del estado (true/false fuerza, null = automático por fechas).
+	StatusManual         *bool                   `json:"status_manual"`
 	DiasFormacionIDs     []uint                  `json:"dias_formacion_ids"`
 	DiasFormacion        []FichaDiaFormacionItem `json:"dias_formacion,omitempty"`
 	Horarios             []FichaDiaFormacionItem `json:"horarios,omitempty"`
@@ -44,6 +46,7 @@ type FichaCaracterizacionResponse struct {
 	JornadaNombre            string                  `json:"jornada_nombre"`
 	TotalHoras               *int                    `json:"total_horas"`
 	Status                   bool                    `json:"status"`
+	StatusManual             *bool                   `json:"status_manual"`
 	DiasFormacionIDs         []uint                  `json:"dias_formacion_ids"`
 	DiasFormacionNombres     []string                `json:"dias_formacion_nombres"`
 	DiasFormacion            []FichaDiaFormacionItem `json:"dias_formacion,omitempty"`

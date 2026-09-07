@@ -76,6 +76,7 @@ func (s *stubFichaRepoHorario) Delete(uint) error                               
 func (s *stubFichaRepoHorario) ExistsByFicha(string) bool                           { return false }
 func (s *stubFichaRepoHorario) ExistsByFichaExcludingID(string, uint) bool          { return false }
 func (s *stubFichaRepoHorario) CountAll(*uint) (int64, error)                       { return 0, nil }
+func (s *stubFichaRepoHorario) SincronizarVigencia() error                          { return nil }
 
 type stubInstFichaDiasRepo struct {
 	dias []models.InstructorFichaDias

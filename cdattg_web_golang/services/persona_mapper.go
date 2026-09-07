@@ -28,6 +28,8 @@ func mapPersonaToResponse(persona models.Persona) dto.PersonaResponse {
 		Direccion:       persona.Direccion,
 		Status:          persona.Status,
 		ParametroID:     persona.PersonaCaracterizacionID,
+		Rh:              persona.Rh,
+		TieneFoto:       persona.FotoPath != "",
 	}
 }
 
@@ -50,6 +52,7 @@ func mapPersonaRequestToModel(req dto.PersonaRequest) models.Persona {
 		Direccion:                req.Direccion,
 		PersonaCaracterizacionID: req.ParametroID,
 		NivelEscolaridadID:       req.NivelEscolaridadID,
+		Rh:                       normalizarPersonaRH(req.Rh),
 	}
 }
 
@@ -71,6 +74,7 @@ func applyPersonaRequest(persona *models.Persona, req dto.PersonaRequest) {
 	persona.Direccion = req.Direccion
 	persona.PersonaCaracterizacionID = req.ParametroID
 	persona.NivelEscolaridadID = req.NivelEscolaridadID
+	persona.Rh = normalizarPersonaRH(req.Rh)
 }
 
 func applyPersonaSelfUpdate(persona *models.Persona, req dto.PersonaSelfUpdateRequest) {
@@ -90,6 +94,7 @@ func applyPersonaSelfUpdate(persona *models.Persona, req dto.PersonaSelfUpdateRe
 	persona.Direccion = req.Direccion
 	persona.PersonaCaracterizacionID = req.ParametroID
 	persona.NivelEscolaridadID = req.NivelEscolaridadID
+	persona.Rh = normalizarPersonaRH(req.Rh)
 }
 
 func personaStatusFromRequest(req dto.PersonaRequest) bool {

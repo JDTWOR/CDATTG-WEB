@@ -1,9 +1,9 @@
-# CDATTG - API (Go). Copiar a /etc/nginx/sites-available/apicdattg.dataguaviare.com.co
-# Luego: sudo ln -s /etc/nginx/sites-available/apicdattg.dataguaviare.com.co /etc/nginx/sites-enabled/
-# Certbot: sudo certbot --nginx -d apicdattg.dataguaviare.com.co
+# CDATTG - API (Go). Copiar a /etc/nginx/sites-available/apicdattg.dataguaviare.site
+# Luego: sudo ln -s /etc/nginx/sites-available/apicdattg.dataguaviare.site /etc/nginx/sites-enabled/
+# Certbot: sudo certbot --nginx -d apicdattg.dataguaviare.site
 
 server {
-    server_name apicdattg.dataguaviare.com.co;
+    server_name apicdattg.dataguaviare.site;
 
     access_log /var/log/nginx/apicdattg.access.log;
     error_log  /var/log/nginx/apicdattg.error.log;

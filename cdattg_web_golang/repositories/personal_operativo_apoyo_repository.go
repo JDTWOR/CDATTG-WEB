@@ -1,6 +1,6 @@
 // @module personal_operativo_apoyo_repository
 // @description Acceso a datos de Personal Operativo y de Apoyo (listado paginado con JOIN a Persona y CRUD).
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package repositories
 

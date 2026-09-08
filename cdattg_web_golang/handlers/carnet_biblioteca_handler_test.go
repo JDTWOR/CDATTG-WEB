@@ -89,3 +89,24 @@ func TestDescargarExcelBibliotecaFelizYError(t *testing.T) {
 		t.Fatalf("error %d", w.Code)
 	}
 }
+
+func TestDescargarZipFotosBibliotecaFelizYError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := NewCarnetHandlerWithService(&mockCarnetSvc{})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/carnets/biblioteca/fotos/zip", nil)
+	h.DescargarFotosBibliotecaZip(c)
+	if w.Code != http.StatusOK || w.Body.Len() == 0 {
+		t.Fatalf("feliz %d", w.Code)
+	}
+
+	h = NewCarnetHandlerWithService(&mockCarnetSvc{err: errors.New("falló")})
+	w = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/carnets/biblioteca/fotos/zip", nil)
+	h.DescargarFotosBibliotecaZip(c)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("error %d", w.Code)
+	}
+}

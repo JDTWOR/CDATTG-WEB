@@ -10,16 +10,16 @@ import (
 
 // PersonaSeed define datos de una persona de prueba (igual que cdattg_web PersonaSeeder).
 type PersonaSeed struct {
-	ID             uint
+	ID              uint
 	NumeroDocumento string
-	PrimerNombre   string
-	SegundoNombre  string
-	PrimerApellido string
+	PrimerNombre    string
+	SegundoNombre   string
+	PrimerApellido  string
 	SegundoApellido string
-	Celular        string
-	Email          string
-	Direccion      string
-	FechaNac       string
+	Celular         string
+	Email           string
+	Direccion       string
+	FechaNac        string
 }
 
 var personaSeeds = []PersonaSeed{
@@ -37,6 +37,8 @@ var personaSeeds = []PersonaSeed{
 	{9100, "9000000010", "FORMACION", "PROFESIONAL", "INTEGRAL", "COMPLEMENTARIA", "3071010101", "formacionprofesionalintegralcomplementaria@dataguaviare.com.co", "CALLE 10 #10-10", "1991-02-01"},
 	{9101, "9000000011", "VIGILANCIA", "SENA", "CDATTG", "PRUEBAS", "3081111110", "vigilanciasena@dataguaviare.com.co", "CALLE 11 #11-11", "1992-03-01"},
 	{9200, "9000000012", "BIBLIOTECA", "SENA", "CDATTG", "PRUEBAS", "3091212120", "biblioteca@dataguaviare.com.co", "CALLE 12 #12-12", "1993-04-01"},
+	{9201, "9000000013", "MEDIA", "TECNICA", "CDATTG", "PRUEBAS", "3101313131", "mediatecnica@dataguaviare.com.co", "CALLE 13 #13-13", "1994-05-01"},
+	{9202, "9000000014", "FORMACION", "COMPLEMENTARIA", "CDATTG", "PRUEBAS", "3111424242", "formacioncomplementaria@dataguaviare.com.co", "CALLE 14 #14-14", "1995-06-01"},
 }
 
 // RunPersonaSeeder crea las personas de prueba (IDs 1-8) igual que cdattg_web.
@@ -45,10 +47,10 @@ func RunPersonaSeeder(db *gorm.DB) error {
 	for _, s := range personaSeeds {
 		t, _ := time.Parse("2006-01-02", s.FechaNac)
 		persona := models.Persona{
-			UserAuditModel:   models.UserAuditModel{BaseModel: models.BaseModel{ID: s.ID}},
-			NumeroDocumento:  s.NumeroDocumento,
-			PrimerNombre:     s.PrimerNombre,
-			SegundoNombre:    s.SegundoNombre,
+			UserAuditModel:  models.UserAuditModel{BaseModel: models.BaseModel{ID: s.ID}},
+			NumeroDocumento: s.NumeroDocumento,
+			PrimerNombre:    s.PrimerNombre,
+			SegundoNombre:   s.SegundoNombre,
 			PrimerApellido:  s.PrimerApellido,
 			SegundoApellido: s.SegundoApellido,
 			Celular:         s.Celular,

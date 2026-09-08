@@ -19,9 +19,9 @@ type CarnetHandler struct {
 	svc services.CarnetDigitalService
 }
 
-// NewCarnetHandler crea el handler del carnet.
-func NewCarnetHandler() *CarnetHandler {
-	return &CarnetHandler{svc: services.NewCarnetDigitalService()}
+// NewCarnetHandler crea el handler del carnet con el servicio de configuración.
+func NewCarnetHandler(configSvc *services.CarnetConfigService) *CarnetHandler {
+	return &CarnetHandler{svc: services.NewCarnetDigitalServiceWithConfig(configSvc)}
 }
 
 // NewCarnetHandlerWithService inyecto el servicio en las pruebas.

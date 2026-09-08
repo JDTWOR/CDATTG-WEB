@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/components/RolEditDialog
  * @description Diálogo de edición de estado de un rol de personal.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { useState, type ComponentProps } from 'react';

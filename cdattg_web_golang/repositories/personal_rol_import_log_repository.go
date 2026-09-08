@@ -1,6 +1,6 @@
 // @module personal_rol_import_log_repository
 // @description Acceso a datos del log de importaciones de roles de personal.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package repositories
 

@@ -139,6 +139,60 @@ func (h *PersonaHandler) UpdateMiPerfil(c *gin.Context) {
 		return
 	}
 
+	// Consulto los roles reales del usuario en Casbin (RequirePermission no los inyecta en el contexto).
+	// Así detecto si es VISITANTE para bloquear la edición directa y crear un cambio pendiente.
+	isVisitante := esVisitante(c)
+
+	if isVisitante {
+		// Para el visitante, los campos de nombre/apellido/RH van a un cambio pendiente y el
+		// resto (teléfono, celular, email, dirección, etc.) se aplica de inmediato.
+		// Construyo un req "seguro" que conserva los valores actuales de los campos vigilados
+		// y aplica los directos, para no pisar los que aún no aprueba el vigilante.
+		actual, errAct := h.personaService.FindByID(*user.PersonaID)
+		if errAct != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": errAct.Error()})
+			return
+		}
+
+		reqSeguro := req
+		reqSeguro.PrimerNombre = actual.PrimerNombre
+		reqSeguro.SegundoNombre = actual.SegundoNombre
+		reqSeguro.PrimerApellido = actual.PrimerApellido
+		reqSeguro.SegundoApellido = actual.SegundoApellido
+		reqSeguro.Rh = actual.Rh
+
+		personaUpdated, errUpdate := h.personaService.UpdateSelf(*user.PersonaID, reqSeguro)
+		if errUpdate != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": errUpdate.Error()})
+			return
+		}
+
+		// Solo pido aprobación si algún campo vigilado (nombres, apellidos, RH) cambió.
+		hayCambioVigilado :=
+			(req.PrimerNombre != "" && req.PrimerNombre != actual.PrimerNombre) ||
+				(req.SegundoNombre != "" && req.SegundoNombre != actual.SegundoNombre) ||
+				(req.PrimerApellido != "" && req.PrimerApellido != actual.PrimerApellido) ||
+				(req.SegundoApellido != "" && req.SegundoApellido != actual.SegundoApellido) ||
+				(req.Rh != "" && req.Rh != actual.Rh)
+
+		if !hayCambioVigilado {
+			c.JSON(http.StatusOK, personaUpdated)
+			return
+		}
+
+		svc := services.NewPersonaCambioPendienteService()
+		cambio, err := svc.CrearCambioPendiente(*user.PersonaID, req, "")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Sus cambios han sido enviados para aprobación. Acérquese a porteria para validar los cambios.",
+			"cambio_pendiente_id": cambio.ID,
+		})
+		return
+	}
+
 	persona, err := h.personaService.UpdateSelf(*user.PersonaID, req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

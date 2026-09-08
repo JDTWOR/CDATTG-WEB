@@ -11,7 +11,7 @@ export const bibliotecaRoutes: RouteObject[] = [
     path: bibliotecaPaths.carnets,
     handle: { breadcrumb: { label: 'Carnets regulares' } },
     lazy: async () => {
-      const { CarnetBibliotecaPage } = await import('../../pages/carnets/CarnetBibliotecaPage');
+      const { CarnetBibliotecaPage } = await import('../../pages/carnets/biblioteca/CarnetBibliotecaPage');
       return { Component: CarnetBibliotecaPage };
     },
   },

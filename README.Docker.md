@@ -6,8 +6,8 @@ Proyecto CDATTG (backend Go + frontend React) con PostgreSQL. Nginx en el host h
 
 | Servicio | URL pública |
 |----------|-------------|
-| Frontend | `https://cdattg.dataguaviare.com.co` |
-| API      | `https://apicdattg.dataguaviare.com.co` |
+| Frontend | `https://cdattg.dataguaviare.site` |
+| API      | `https://apicdattg.dataguaviare.site` |
 
 Los puertos internos del host (`9080`, `9081`) no deben exponerse a Internet; Nginx hace de proxy.
 
@@ -48,24 +48,62 @@ Nginx en el host debe hacer proxy a esos puertos (plantillas en `docker/nginx/`)
 1. Copiar y habilitar los sitios:
 
    ```bash
-   sudo cp docker/nginx/cdattg.dataguaviare.com.co.example /etc/nginx/sites-available/cdattg.dataguaviare.com.co
-   sudo cp docker/nginx/apicdattg.dataguaviare.com.co.example /etc/nginx/sites-available/apicdattg.dataguaviare.com.co
+   sudo cp docker/nginx/cdattg.dataguaviare.site.example /etc/nginx/sites-available/cdattg.dataguaviare.site
+   sudo cp docker/nginx/apicdattg.dataguaviare.site.example /etc/nginx/sites-available/apicdattg.dataguaviare.site
 
-   sudo ln -s /etc/nginx/sites-available/cdattg.dataguaviare.com.co /etc/nginx/sites-enabled/
-   sudo ln -s /etc/nginx/sites-available/apicdattg.dataguaviare.com.co /etc/nginx/sites-enabled/
+   sudo ln -sf /etc/nginx/sites-available/cdattg.dataguaviare.site /etc/nginx/sites-enabled/
+   sudo ln -sf /etc/nginx/sites-available/apicdattg.dataguaviare.site /etc/nginx/sites-enabled/
    ```
 
-2. Comprobar y recargar Nginx:
+2. Si quedan sitios del dominio anterior (`.com.co`), deshabilitarlos:
+
+   ```bash
+   sudo rm -f /etc/nginx/sites-enabled/cdattg.dataguaviare.com.co
+   sudo rm -f /etc/nginx/sites-enabled/apicdattg.dataguaviare.com.co
+   ```
+
+3. Comprobar y recargar Nginx:
 
    ```bash
    sudo nginx -t && sudo systemctl reload nginx
    ```
 
-3. Certificados SSL con Certbot:
+4. Certificados SSL con Certbot:
 
    ```bash
-   sudo certbot --nginx -d cdattg.dataguaviare.com.co -d apicdattg.dataguaviare.com.co
+   sudo certbot --nginx -d cdattg.dataguaviare.site -d apicdattg.dataguaviare.site
    ```
+
+## Migración de dominio (VPS) — runbook
+
+Tras cambiar DNS a `*.dataguaviare.site`, en el directorio del proyecto en el servidor:
+
+```bash
+# 1) .env de producción (no versionado)
+# CORS_ALLOWED_ORIGINS=https://cdattg.dataguaviare.site
+# VITE_API_BASE_URL=https://apicdattg.dataguaviare.site/api
+
+# 2) Rebuild (VITE_API_BASE_URL se inyecta en build del frontend)
+docker compose up -d --build frontend backend
+
+# 3) Nginx + TLS (pasos de la sección anterior)
+sudo cp docker/nginx/cdattg.dataguaviare.site.example /etc/nginx/sites-available/cdattg.dataguaviare.site
+sudo cp docker/nginx/apicdattg.dataguaviare.site.example /etc/nginx/sites-available/apicdattg.dataguaviare.site
+sudo ln -sf /etc/nginx/sites-available/cdattg.dataguaviare.site /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/apicdattg.dataguaviare.site /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/cdattg.dataguaviare.com.co
+sudo rm -f /etc/nginx/sites-enabled/apicdattg.dataguaviare.com.co
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d cdattg.dataguaviare.site -d apicdattg.dataguaviare.site
+```
+
+Verificación:
+
+- `https://cdattg.dataguaviare.site` carga la UI
+- Login / API sin error CORS
+- `https://apicdattg.dataguaviare.site/api/` responde
+
+No ejecutar `db-fresh` / `db-reset` ni rotar `JWT_SECRET` solo por el cambio de dominio.
 
 ## Acceso remoto a PostgreSQL (resumen)
 

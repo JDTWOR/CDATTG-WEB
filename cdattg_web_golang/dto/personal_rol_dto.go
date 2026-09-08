@@ -1,6 +1,6 @@
 // @module personal_rol_dto
 // @description DTOs de Personal Operativo y de Apoyo, Personal Administrativo y Contratistas.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package dto
 

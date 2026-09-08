@@ -31,15 +31,18 @@ export type CarnetDigitalResponse = {
   motivo?: string;
   estado_solicitud: string;
   puede_solicitar: boolean;
+  datos_listos: boolean;
   motivo_rechazo?: string;
   persona: CarnetPersonaDatos;
   fichas: CarnetFichaOpcion[];
+  cargo_regional: string;
 };
 
 export type CarnetVistaInstructor = {
   id: number;
   persona: CarnetPersonaDatos;
   ficha: CarnetFichaOpcion;
+  cargo_regional: string;
 };
 
 export type CarnetPendienteItem = {

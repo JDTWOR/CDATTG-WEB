@@ -14,7 +14,7 @@ export const aprendizRoutes: RouteObject[] = [
     path: aprendizPaths.carnetDigital,
     handle: { breadcrumb: { label: 'Carnet digital' } },
     lazy: async () => {
-      const { CarnetDigitalPage } = await import('../../pages/carnets/CarnetDigitalPage');
+      const { CarnetDigitalPage } = await import('../../pages/carnets/digital/CarnetDigitalPage');
       return { Component: CarnetDigitalPage };
     },
   },

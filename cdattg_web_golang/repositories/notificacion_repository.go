@@ -12,6 +12,10 @@ type NotificacionRepository interface {
 	FindByRecipientUserID(userID uint, limit, offset int) ([]inventario.Notificacion, int64, error)
 	MarcarLeida(id uint, userID uint) error
 	CountNoLeidas(userID uint) (int64, error)
+	// Eliminar quita una notificación puntual del dueño.
+	Eliminar(id uint, userID uint) error
+	// EliminarTodas limpia el buzón completo del dueño.
+	EliminarTodas(userID uint) error
 }
 
 type notificacionRepository struct {
@@ -55,4 +59,12 @@ func (r *notificacionRepository) CountNoLeidas(userID uint) (int64, error) {
 	var n int64
 	err := r.db.Model(&inventario.Notificacion{}).Where("recipient_user_id = ? AND leida_en IS NULL", userID).Count(&n).Error
 	return n, err
+}
+
+func (r *notificacionRepository) Eliminar(id uint, userID uint) error {
+	return r.db.Where("id = ? AND recipient_user_id = ?", id, userID).Delete(&inventario.Notificacion{}).Error
+}
+
+func (r *notificacionRepository) EliminarTodas(userID uint) error {
+	return r.db.Where("recipient_user_id = ?", userID).Delete(&inventario.Notificacion{}).Error
 }

@@ -35,6 +35,7 @@ type CarnetDigitalService interface {
 	LeerFotoBiblioteca(solicitudID uint) (*PersonaFotoArchivo, error)
 	LeerFotoBibliotecaPorDocumento(documento string) (*PersonaFotoArchivo, error)
 	ExcelBiblioteca(fichaID uint) ([]byte, error)
+	FotosBibliotecaZip(fichaID uint) ([]byte, error)
 }
 
 type carnetDigitalService struct {
@@ -42,6 +43,8 @@ type carnetDigitalService struct {
 	aprendizRepo  repositories.AprendizRepository
 	solicitudRepo repositories.CarnetSolicitudRepository
 	fichaRepo     repositories.FichaRepository
+	configSvc     *CarnetConfigService
+	notif         *CarnetDigitalNotificacion
 }
 
 // NewCarnetDigitalService crea el servicio del carnet.
@@ -51,6 +54,19 @@ func NewCarnetDigitalService() CarnetDigitalService {
 		aprendizRepo:  repositories.NewAprendizRepository(),
 		solicitudRepo: repositories.NewCarnetSolicitudRepository(),
 		fichaRepo:     repositories.NewFichaRepository(),
+		notif:         NewCarnetDigitalNotificacion(),
+	}
+}
+
+// NewCarnetDigitalServiceWithConfig inyecta el servicio de configuración en las pruebas.
+func NewCarnetDigitalServiceWithConfig(configSvc *CarnetConfigService) CarnetDigitalService {
+	return &carnetDigitalService{
+		personaRepo:   repositories.NewPersonaRepository(),
+		aprendizRepo:  repositories.NewAprendizRepository(),
+		solicitudRepo: repositories.NewCarnetSolicitudRepository(),
+		fichaRepo:     repositories.NewFichaRepository(),
+		configSvc:     configSvc,
+		notif:         NewCarnetDigitalNotificacion(),
 	}
 }
 
@@ -69,7 +85,11 @@ func (s *carnetDigitalService) ObtenerMiCarnet(personaID uint) (*dto.CarnetDigit
 	aprobada, _ := s.solicitudRepo.FindUltimaAprobadaByPersonaID(personaID)
 	ultimas, _ := s.solicitudRepo.FindUltimasPorPersona(personaID)
 	aplicarEstadosFichas(fichas, ultimas, datosListosParaCarnet(*persona))
-	return armarRespuestaCarnet(*persona, fichas, aprobada), nil
+	var cargo string
+	if s.configSvc != nil {
+		cargo = s.configSvc.CargoRegional()
+	}
+	return armarRespuestaCarnet(*persona, fichas, aprobada, cargo), nil
 }
 
 func personaACarnetDatos(p models.Persona) dto.CarnetPersonaDatos {

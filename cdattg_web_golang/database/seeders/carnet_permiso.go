@@ -29,6 +29,9 @@ func SyncCarnetDigitalPermission(db *gorm.DB) error {
 	if _, err := authz.AddPermissionForRole(e, "INSTRUCTOR", authz.ObjPersona, authz.ActEditarMiPersona); err != nil {
 		return err
 	}
+	if _, err := authz.AddPermissionForRole(e, "SUPER ADMINISTRADOR", authz.ObjCarnet, authz.ActConfigurarCarnet); err != nil {
+		return err
+	}
 	if err := seedBibliotecarioPermissions(e); err != nil {
 		return err
 	}

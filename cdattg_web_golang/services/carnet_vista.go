@@ -21,12 +21,12 @@ func (s *carnetDigitalService) VerSolicitud(instructorID, solicitudID uint) (*dt
 		return nil, errCarnetNoLider
 	}
 	ficha, _ := s.fichaRepo.FindByID(sol.FichaID)
-	vista := vistaDesdeSolicitud(*sol, ficha)
+	vista := s.vistaDesdeSolicitud(*sol, ficha)
 	return &vista, nil
 }
 
 // vistaDesdeSolicitud junta el paquete enviado con la ficha viva (regional y vencimiento).
-func vistaDesdeSolicitud(sol models.CarnetSolicitud, ficha *models.FichaCaracterizacion) dto.CarnetVistaInstructor {
+func (s *carnetDigitalService) vistaDesdeSolicitud(sol models.CarnetSolicitud, ficha *models.FichaCaracterizacion) dto.CarnetVistaInstructor {
 	op := dto.CarnetFichaOpcion{
 		ID:            sol.FichaID,
 		Numero:        sol.FichaNumero,
@@ -48,5 +48,9 @@ func vistaDesdeSolicitud(sol models.CarnetSolicitud, ficha *models.FichaCaracter
 			op.Programa = live.Programa
 		}
 	}
-	return dto.CarnetVistaInstructor{ID: sol.ID, Persona: solicitudACarnetDatos(sol), Ficha: op}
+	var cargo string
+	if s.configSvc != nil {
+		cargo = s.configSvc.CargoRegional()
+	}
+	return dto.CarnetVistaInstructor{ID: sol.ID, Persona: solicitudACarnetDatos(sol), Ficha: op, CargoRegional: cargo}
 }

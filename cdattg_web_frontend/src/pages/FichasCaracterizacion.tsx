@@ -306,8 +306,7 @@ export const FichasCaracterizacion = () => {
 
   const fetchProgramas = async () => {
     try {
-      const res = await apiService.getProgramasFormacion(1, 200);
-      setProgramas(res.data);
+      setProgramas(await apiService.getAllProgramasFormacion());
     } catch {
       setProgramas([]);
     }

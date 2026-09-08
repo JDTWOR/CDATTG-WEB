@@ -26,10 +26,14 @@ export async function bajarMiFoto(): Promise<Blob | null> {
 
 /**
  * Subo la foto ya sin fondo.
+ * Para el visitante la foto no se aplica directo: el backend responde con un
+ * mensaje de aprobación pendiente.
  * @param archivo png o jpg
- * @returns persona actualizada
+ * @returns persona actualizada o mensaje de aprobación pendiente
  */
-export async function subirMiFoto(archivo: Blob): Promise<PersonaResponse> {
+export async function subirMiFoto(
+  archivo: Blob
+): Promise<PersonaResponse | { message: string }> {
   const body = new FormData();
   body.append('file', archivo, 'foto.png');
   const res = await fetch(`${API_BASE_URL}/personas/mi-foto`, {
@@ -41,5 +45,5 @@ export async function subirMiFoto(archivo: Blob): Promise<PersonaResponse> {
     const err = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(err.error ?? 'No pude guardar la foto');
   }
-  return res.json() as Promise<PersonaResponse>;
+  return res.json() as Promise<PersonaResponse | { message: string }>;
 }

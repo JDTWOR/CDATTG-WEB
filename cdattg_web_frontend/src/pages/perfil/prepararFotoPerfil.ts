@@ -1,18 +1,18 @@
 /**
- * Dejo la foto lista para subir: sin fondo, sobre blanco, JPG de 20 KB.
+ * Dejo la foto lista para subir: sin fondo, sobre blanco, JPG de hasta 2 MB.
  *
  * @author Cristian Deysdayr Jiménez
  */
 import { comprimirCanvasAJpg } from './comprimirJpg';
 import { quitarFondoConModelo, quitarFondoFoto } from './quitarFondoFoto';
 
-const ANCHO = 240;
-const ALTO = 300;
+const ANCHO = 480;
+const ALTO = 600;
 
 /**
  * Quito fondo, recorto a medio cuerpo y comprimo.
  * @param fuente captura o JPG del aparato
- * @returns jpg ≤ 20 KB
+ * @returns jpg ≤ 2 MB
  */
 export async function prepararFotoPerfil(fuente: Blob): Promise<Blob> {
   let sinFondo: Blob;

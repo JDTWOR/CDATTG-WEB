@@ -1,6 +1,6 @@
 // @module contratista
 // @description Modelo de base de datos para la entidad Contratista de Prestación de Servicios.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-15
 package models
 

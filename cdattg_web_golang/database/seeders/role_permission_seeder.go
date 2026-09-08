@@ -57,7 +57,10 @@ func RunRolePermissionSeeder(db *gorm.DB) error {
 	if err := seedBibliotecarioPermissions(e); err != nil {
 		return err
 	}
-	if err := seedSemilleroPermissions(e); err != nil {
+if err := seedSemilleroPermissions(e); err != nil {
+		return err
+	}
+	if err := seedAccesoEstudiosPermissions(e); err != nil {
 		return err
 	}
 
@@ -236,6 +239,9 @@ func seedVigilanciaPermissions(e *casbin.Enforcer) error {
 			return err
 		}
 		if _, err := authz.AddPermissionForRole(e, role, authz.ObjPersona, authz.ActEditarMiPersona); err != nil {
+			return err
+		}
+		if _, err := authz.AddPermissionForRole(e, role, authz.ObjPersona, authz.ActRegistrarPersonaVig); err != nil {
 			return err
 		}
 	}

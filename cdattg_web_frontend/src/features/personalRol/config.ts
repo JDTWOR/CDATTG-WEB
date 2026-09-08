@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/config
  * @description Configuración por rol (Personal Operativo y de Apoyo / Personal Administrativo / Contratistas).
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import type { ComponentType } from 'react';

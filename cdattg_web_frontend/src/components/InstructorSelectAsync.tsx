@@ -113,9 +113,9 @@ export function InstructorSelectAsync({
   const excludeKey = excludeIds.join(',');
   const loadOptions = useCallback(async (inputValue: string): Promise<SelectOption[]> => {
     const search = inputValue.trim();
-    const res = await apiService.getInstructores(1, 50, search || undefined);
+    const res = await apiService.getAllInstructores(search || undefined);
     const excluded = new Set(excludeIds);
-    return res.data
+    return res
       .filter((i) => !excluded.has(i.id))
       .map((i) => ({
         value: i.id,

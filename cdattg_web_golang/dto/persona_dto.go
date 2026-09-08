@@ -70,3 +70,15 @@ type PersonaResponse struct {
 	Rh              string     `json:"rh"`
 	TieneFoto       bool       `json:"tiene_foto"`
 }
+
+// VigilanciaDatosBasicosRequest datos básicos que el vigilante puede actualizar.
+type VigilanciaDatosBasicosRequest struct {
+	TipoDocumento   *uint  `json:"tipo_documento"`
+	PrimerNombre    string `json:"primer_nombre" binding:"required"`
+	SegundoNombre   string `json:"segundo_nombre"`
+	PrimerApellido  string `json:"primer_apellido" binding:"required"`
+	SegundoApellido string `json:"segundo_apellido"`
+	Celular         string `json:"celular"`
+	Rh              string `json:"rh"`
+	AceptaTerminos  bool   `json:"acepta_terminos"`
+}

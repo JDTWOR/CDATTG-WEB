@@ -1,6 +1,6 @@
 // @module personal_rol_import_template
 // @description Generación de plantilla Excel para importar roles de personal.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package services
 

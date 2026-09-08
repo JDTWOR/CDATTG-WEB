@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/PersonalRolPage
  * @description Página genérica de CRUD de los roles del módulo Personal.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { useState } from 'react';

@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/rolEstadoHelpers
  * @description Utilidades de estado activo/inactivo para el módulo Personal.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 

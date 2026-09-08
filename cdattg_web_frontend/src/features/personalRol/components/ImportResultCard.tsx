@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/components/ImportResultCard
  * @description Resumen del resultado de una importación Excel del módulo Personal.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import type { PersonalRolImportResult } from '../types';

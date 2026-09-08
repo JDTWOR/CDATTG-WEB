@@ -18,11 +18,14 @@ func armarRespuestaCarnet(
 	persona models.Persona,
 	fichas []dto.CarnetFichaOpcion,
 	aprobada *models.CarnetSolicitud,
+	cargoRegional string,
 ) *dto.CarnetDigitalResponse {
 	resp := &dto.CarnetDigitalResponse{
 		Fichas:          fichas,
 		EstadoSolicitud: "ninguna",
 		Persona:         personaACarnetDatos(persona),
+		CargoRegional:   cargoRegional,
+		DatosListos:     datosListosParaCarnet(persona),
 	}
 	if len(fichas) == 0 {
 		resp.Motivo = carnetMotivoSinVigente
@@ -34,7 +37,7 @@ func armarRespuestaCarnet(
 		resp.Persona = solicitudACarnetDatos(*aprobada)
 	}
 	aplicarMotivoGlobal(resp)
-	resp.PuedeSolicitar = datosListosParaCarnet(persona) && algunaAccionFicha(fichas)
+	resp.PuedeSolicitar = resp.DatosListos && algunaAccionFicha(fichas)
 	return resp
 }
 

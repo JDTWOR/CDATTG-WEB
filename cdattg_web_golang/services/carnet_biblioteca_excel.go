@@ -6,12 +6,14 @@
 package services
 
 import (
+	"strings"
+
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/xuri/excelize/v2"
 )
 
 var cabeceraExcelBiblioteca = []string{
-	"Primer nombre", "Segundo nombre", "Primer apellido", "Segundo apellido",
+	"Nombres", "Apellidos",
 	"Cédula", "RH", "Programa", "Número de grupo",
 }
 
@@ -41,7 +43,8 @@ func filtrarItemsBiblioteca(items []dto.CarnetBibliotecaItem, fichaID uint) []dt
 
 func filaExcelBiblioteca(it dto.CarnetBibliotecaItem) []string {
 	return []string{
-		it.PrimerNombre, it.SegundoNombre, it.PrimerApellido, it.SegundoApellido,
+		strings.TrimSpace(it.PrimerNombre + " " + it.SegundoNombre),
+		strings.TrimSpace(it.PrimerApellido + " " + it.SegundoApellido),
 		it.NumeroDocumento, it.Rh, it.Programa, it.FichaNumero,
 	}
 }

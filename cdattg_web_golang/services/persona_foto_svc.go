@@ -17,6 +17,9 @@ import (
 // PersonaFotoService guarda y sirve la foto de perfil.
 type PersonaFotoService interface {
 	Guardar(personaID uint, r io.Reader) (*dto.PersonaResponse, error)
+	// GuardarPendiente valida y escribe la foto en la ruta de pendiente, sin tocar
+	// la persona. Devuelve la ruta para guardarla en un cambio pendiente.
+	GuardarPendiente(personaID uint, r io.Reader) (string, error)
 	Leer(personaID uint) (*PersonaFotoArchivo, error)
 }
 
@@ -49,6 +52,16 @@ func (s *personaFotoService) Guardar(personaID uint, r io.Reader) (*dto.PersonaR
 	}
 	resp := mapPersonaToResponse(*persona)
 	return &resp, nil
+}
+
+// GuardarPendiente valida y escribe la foto del visitante en la ruta aparte de
+// pendiente, sin actualizar la persona. Devuelve la ruta del archivo.
+func (s *personaFotoService) GuardarPendiente(personaID uint, r io.Reader) (string, error) {
+	data, err := io.ReadAll(io.LimitReader(r, personaFotoMaxBytes+1))
+	if err != nil {
+		return "", fmt.Errorf("no pude leer la foto: %w", err)
+	}
+	return guardarFotoPersonaPendiente(personaID, data)
 }
 
 // Leer trae los bytes de la foto guardada.

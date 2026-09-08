@@ -20,6 +20,8 @@ import type { PersonaRequest, PersonaResponse, PersonaSelfUpdateRequest, UserRes
 import { PerfilAcciones } from './perfil/PerfilAcciones';
 import { PerfilFotoCamara } from './perfil/PerfilFotoCamara';
 import { PerfilHeroSection } from './perfil/PerfilHeroSection';
+import { avisoAprobacionPorteria } from './perfil/avisoAprobacion';
+import { avisoPerfilGuardado } from './perfil/avisoExitoPerfil';
 
 const PERM_EDITAR_MI_PERSONA = 'EDITAR MI PERSONA';
 
@@ -377,8 +379,15 @@ export const Perfil = () => {
     async (data: PersonaRequest) => {
       try {
         setSaveError('');
-        const updated = await apiService.updateMiPersona(personaRequestToSelfUpdate(data));
-        setPersona(updated);
+        const result = await apiService.updateMiPersona(personaRequestToSelfUpdate(data));
+        if (result && 'cambio_pendiente_id' in result) {
+          setSaveError('');
+          avisoAprobacionPorteria('datos');
+          setEditOpen(false);
+          return;
+        }
+        setPersona(result as PersonaResponse);
+        avisoPerfilGuardado();
         setEditOpen(false);
         await refreshUser();
       } catch (e: unknown) {

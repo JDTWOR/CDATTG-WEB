@@ -35,9 +35,11 @@ type CarnetDigitalResponse struct {
 	Motivo          string              `json:"motivo,omitempty"`
 	EstadoSolicitud string              `json:"estado_solicitud"`
 	PuedeSolicitar  bool                `json:"puede_solicitar"`
+	DatosListos     bool                `json:"datos_listos"`
 	MotivoRechazo   string              `json:"motivo_rechazo,omitempty"`
 	Persona         CarnetPersonaDatos  `json:"persona"`
 	Fichas          []CarnetFichaOpcion `json:"fichas"`
+	CargoRegional   string              `json:"cargo_regional"`
 }
 
 // CarnetPendienteItem fila para el instructor líder.
@@ -67,7 +69,8 @@ type CarnetDecisionRequest struct {
 
 // CarnetVistaInstructor es el carnet completo que el líder revisa.
 type CarnetVistaInstructor struct {
-	ID      uint               `json:"id"`
-	Persona CarnetPersonaDatos `json:"persona"`
-	Ficha   CarnetFichaOpcion  `json:"ficha"`
+	ID            uint               `json:"id"`
+	Persona       CarnetPersonaDatos `json:"persona"`
+	Ficha         CarnetFichaOpcion  `json:"ficha"`
+	CargoRegional string             `json:"cargo_regional"`
 }

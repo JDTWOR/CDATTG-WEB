@@ -28,10 +28,12 @@ type UserSeed struct {
 
 // exclusiveSeedRoles: cuentas de módulo; no deben acumular APRENDIZ/INSTRUCTOR por sync de matrícula.
 var exclusiveSeedRoles = map[string]struct{}{
-	"FPI":                   {},
-	"VIGILANTE":             {},
-	"BIENESTAR AL APRENDIZ": {},
-	"BIBLIOTECARIO":         {},
+	"FPI":                      {},
+	"VIGILANTE":                {},
+	"BIENESTAR AL APRENDIZ":    {},
+	"BIBLIOTECARIO":            {},
+	"MEDIA TECNICA":            {},
+	"FORMACION COMPLEMENTARIA": {},
 }
 
 var userSeeds = []UserSeed{
@@ -50,6 +52,8 @@ var userSeeds = []UserSeed{
 	// Usuario módulo vigilancia (portería / accesos)
 	{"vigilanciasena@dataguaviare.com.co", seedPasswordDefault, 9101, "VIGILANTE"},
 	{"biblioteca@dataguaviare.com.co", seedPasswordDefault, 9200, "BIBLIOTECARIO"},
+	{"mediatecnica@dataguaviare.com.co", seedPasswordDefault, 9201, "MEDIA TECNICA"},
+	{"formacioncomplementaria@dataguaviare.com.co", seedPasswordDefault, 9202, "FORMACION COMPLEMENTARIA"},
 }
 
 func isExclusiveSeedRole(role string) bool {

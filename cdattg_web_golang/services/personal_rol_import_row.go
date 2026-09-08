@@ -1,6 +1,6 @@
 // @module personal_rol_import_row
 // @description Procesamiento de una fila del Excel de importación de roles de personal.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package services
 

@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/components/ImportHistory
  * @description Tabla del historial de importaciones del módulo Personal con botón de actualización.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';

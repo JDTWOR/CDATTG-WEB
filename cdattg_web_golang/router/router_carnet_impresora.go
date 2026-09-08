@@ -10,10 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sena/cdattg-web-golang/handlers"
 	"github.com/sena/cdattg-web-golang/middleware"
+	"github.com/sena/cdattg-web-golang/services"
+	"gorm.io/gorm"
 )
 
-func registerCarnetImpresora(api *gin.RouterGroup) {
-	h := handlers.NewCarnetHandler()
+func registerCarnetImpresora(api *gin.RouterGroup, db *gorm.DB) {
+	configSvc := services.NewCarnetConfigService(db)
+	h := handlers.NewCarnetHandler(configSvc)
 	g := api.Group("/impresora/carnets")
 	g.Use(middleware.RequireClaveImpresora())
 	g.GET("", h.ListarBiblioteca)

@@ -1,6 +1,6 @@
 // @module personal_administrativo_service
 // @description Lógica de negocio de Personal Administrativo: creación desde Persona con rol Casbin, CRUD y DTO.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package services
 

@@ -89,8 +89,36 @@ export async function bajarExcelBiblioteca(fichaId?: number): Promise<Blob> {
   return res.blob();
 }
 
+/** ZIP con las fotos de los carnets regulares, en el mismo orden del Excel. */
+export async function bajarFotosBibliotecaZip(fichaId?: number): Promise<Blob> {
+  const q = fichaId && fichaId > 0 ? `?ficha_id=${fichaId}` : '';
+  const res = await fetch(`${API_BASE_URL}/carnets/biblioteca/fotos/zip${q}`, { headers: auth() });
+  if (!res.ok) {
+    throw new Error('No pude bajar las fotos de biblioteca');
+  }
+  return res.blob();
+}
+
 /** Traigo el carnet completo de una solicitud para el líder. */
 export async function getVistaSolicitud(id: number): Promise<CarnetVistaInstructor> {
   const res = await fetch(`${API_BASE_URL}/carnets/${id}`, { headers: auth() });
   return leerJson(res, 'No pude cargar la solicitud');
+}
+
+/** Traigo la configuración del carnet (cargo y regional para el QR). */
+export async function getConfiguracionCarnet(): Promise<{ nombre: string; cargo: string; regional: string }> {
+  const res = await fetch(`${API_BASE_URL}/carnets/configuracion`, { headers: auth() });
+  return leerJson(res, 'No pude cargar la configuración');
+}
+
+/** Actualizo la configuración del carnet (requiere permiso CONFIGURAR CARNET). */
+export async function actualizarConfiguracionCarnet(
+  dato: { nombre: string; cargo: string; regional: string },
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/carnets/configuracion`, {
+    method: 'PUT',
+    headers: { ...auth(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(dato),
+  });
+  await leerJson(res, 'No pude guardar la configuración');
 }

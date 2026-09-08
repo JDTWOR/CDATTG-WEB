@@ -6,7 +6,7 @@ export const instructoresRoutes: RouteObject[] = [
     path: instructorPaths.validarCarnet,
     handle: { breadcrumb: { label: 'Validar carnet' } },
     lazy: async () => {
-      const { CarnetValidarPage } = await import('../../pages/carnets/CarnetValidarPage');
+      const { CarnetValidarPage } = await import('../../pages/carnets/validacion/CarnetValidarPage');
       return { Component: CarnetValidarPage };
     },
   },

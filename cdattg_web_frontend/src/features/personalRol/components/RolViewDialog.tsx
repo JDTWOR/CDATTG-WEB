@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/components/RolViewDialog
  * @description Diálogo de detalle (solo lectura) de un rol de personal.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { rolEstadoBadgeClass, rolEstaActivo } from '../rolEstadoHelpers';

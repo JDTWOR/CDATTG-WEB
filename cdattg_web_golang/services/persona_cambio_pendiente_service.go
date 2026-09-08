@@ -12,6 +12,7 @@ import (
 type PersonaCambioPendienteService interface {
 	CrearCambioPendiente(personaID uint, req dto.PersonaSelfUpdateRequest, fotoPath string) (*models.PersonaCambioPendiente, error)
 	ListarPendientes() ([]models.PersonaCambioPendiente, error)
+	LeerFoto(id uint) (*PersonaFotoArchivo, error)
 	Aprobar(id uint, validadorID uint) error
 	Rechazar(id uint, validadorID uint, motivo string) error
 	TieneCambioPendiente(personaID uint) bool
@@ -81,6 +82,19 @@ func (s *personaCambioPendienteService) CrearCambioPendiente(personaID uint, req
 
 func (s *personaCambioPendienteService) ListarPendientes() ([]models.PersonaCambioPendiente, error) {
 	return s.repo.ListarPendientes()
+}
+
+// LeerFoto devuelve la foto propuesta en un cambio pendiente para que el
+// vigilante la compare con la vigente antes de decidir.
+func (s *personaCambioPendienteService) LeerFoto(id uint) (*PersonaFotoArchivo, error) {
+	cambio, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("cambio pendiente no encontrado")
+	}
+	if cambio.FotoPath == "" {
+		return nil, errPersonaFotoAusente
+	}
+	return leerFotoPersona(cambio.FotoPath)
 }
 
 func (s *personaCambioPendienteService) Aprobar(id uint, validadorID uint) error {

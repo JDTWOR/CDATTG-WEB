@@ -2,13 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CameraIcon,
   MagnifyingGlassIcon,
-  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { urlFotoAcceso } from '../services/vigilanciaAccesoFoto';
 import { archivoEsJpg } from './perfil/comprimirJpg';
 import { prepararFotoPerfil } from './perfil/prepararFotoPerfil';
 import { axiosErrorMessage } from '../utils/httpError';
+import { mostrarToastApp } from '../utils/appToast';
+import { TerminosUsoModal } from '../components/TerminosUsoModal';
 import type { PersonaResponse } from '../types';
 
 const RH_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -25,7 +26,6 @@ export function VigilanciaRegistroPersonas() {
   const [docInput, setDocInput] = useState('');
   const [persona, setPersona] = useState<PersonaResponse | null>(null);
   const [error, setError] = useState('');
-  const [exito, setExito] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [fotoSrc, setFotoSrc] = useState<string | null>(null);
@@ -48,13 +48,14 @@ export function VigilanciaRegistroPersonas() {
   const [segundoApellido, setSegundoApellido] = useState('');
   const [celular, setCelular] = useState('');
   const [rh, setRh] = useState('');
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [terminosAbiertos, setTerminosAbiertos] = useState(false);
 
   const buscar = useCallback(async () => {
     const doc = docInput.trim();
     if (!doc) return;
     setBuscando(true);
     setError('');
-    setExito('');
     setPersona(null);
     setFotoSrc(null);
     setFotoBlob(null);
@@ -151,9 +152,12 @@ export function VigilanciaRegistroPersonas() {
       setError('Primer nombre y primer apellido son requeridos');
       return;
     }
+    if (!aceptaTerminos) {
+      setError('Debe aceptar los términos de uso y confidencialidad para guardar.');
+      return;
+    }
     setGuardando(true);
     setError('');
-    setExito('');
     try {
       await apiService.vigilanciaActualizarDatosBasicos(persona.id, {
         tipo_documento: tipoDocumento,
@@ -163,12 +167,18 @@ export function VigilanciaRegistroPersonas() {
         segundo_apellido: segundoApellido.trim(),
         celular: celular.trim(),
         rh,
+        acepta_terminos: true,
       });
       if (fotoBlob) {
         // Ya viene lista de prepararFotoPerfil: JPG 240x300 sin fondo sobre blanco.
         await apiService.vigilanciaSubirFoto(persona.id, fotoBlob);
       }
-      setExito('Datos actualizados correctamente');
+      mostrarToastApp({
+        icon: 'success',
+        titulo: 'Persona actualizada',
+        texto: 'Los datos de la persona se guardaron correctamente.',
+        timer: 3000,
+      });
       focusDocInput();
     } catch (e: unknown) {
       setError(axiosErrorMessage(e, 'Error al guardar'));
@@ -207,12 +217,6 @@ export function VigilanciaRegistroPersonas() {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {exito && (
-        <div className="flex items-center gap-2 rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400">
-          <CheckCircleIcon className="h-5 w-5" />
-          {exito}
-        </div>
-      )}
 
       {persona && (
         <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -358,11 +362,36 @@ export function VigilanciaRegistroPersonas() {
             </div>
           </div>
 
+          {/* Aviso de obligatorios y aceptación de términos */}
+          <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+            <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
+              Los campos marcados con <span className="text-red-600">*</span> son obligatorios.
+            </p>
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
+              <input
+                type="checkbox"
+                checked={aceptaTerminos}
+                onChange={(e) => setAceptaTerminos(e.target.checked)}
+                className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-green-700"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Acepto los{' '}
+                <button
+                  type="button"
+                  onClick={() => setTerminosAbiertos(true)}
+                  className="font-semibold text-green-700 underline hover:text-green-800 dark:text-green-400"
+                >
+                  términos de uso y confidencialidad
+                </button>
+              </span>
+            </label>
+          </div>
+
           {/* Botones */}
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              onClick={() => { setPersona(null); setFotoSrc(null); setFotoBlob(null); setDocInput(''); setError(''); setExito(''); }}
+              onClick={() => { setPersona(null); setFotoSrc(null); setFotoBlob(null); setDocInput(''); setError(''); }}
               className="btn-secondary"
             >
               Cancelar
@@ -455,6 +484,9 @@ export function VigilanciaRegistroPersonas() {
           </div>
         </div>
       ) : null}
+
+      {/* Modal de términos de uso */}
+      <TerminosUsoModal abierto={terminosAbiertos} onCerrar={() => setTerminosAbiertos(false)} />
     </div>
   );
 }

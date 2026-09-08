@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/components/ImportGuidelines
  * @description Tarjeta de buenas prácticas para la importación Excel del módulo Personal.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { LightBulbIcon } from '@heroicons/react/24/outline';

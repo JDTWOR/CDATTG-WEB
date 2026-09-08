@@ -29,6 +29,8 @@ type Persona struct {
 	NivelEscolaridadID       *uint `gorm:"column:nivel_escolaridad_id" json:"nivel_escolaridad_id"`
 	Rh                       string `gorm:"column:rh;size:8" json:"rh"`
 	FotoPath                 string `gorm:"column:foto_path;size:255" json:"foto_path"`
+	AceptaTerminos           bool      `gorm:"column:acepta_terminos;default:false" json:"acepta_terminos"`
+	AceptaTerminosAt         *time.Time `gorm:"column:acepta_terminos_at" json:"acepta_terminos_at"`
 
 	// Relaciones
 	Pais                   *Pais                   `gorm:"foreignKey:PaisID" json:"pais,omitempty"`

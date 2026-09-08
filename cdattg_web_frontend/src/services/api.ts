@@ -113,6 +113,7 @@ import type {
   DefinicionesPermisosResponse,
   AccesoLookupResponse,
   AccesoRegistroResponse,
+  AccesoCancelarIngresoResponse,
   AccesoDentroItem,
   AccesoHistorialParams,
   AccesoHistorialResponse,
@@ -245,6 +246,21 @@ async function openPersonasImportStreamReader(
 class ApiService {
   private readonly api: AxiosInstance;
 
+  /** Recorre todas las páginas de un endpoint paginado y acumula los datos. */
+  private async fetchAllPages<T>(getPage: (page: number) => Promise<PaginatedResponse<T>>): Promise<T[]> {
+    const pageSize = 200;
+    const first = await getPage(1);
+    const out = [...first.data];
+    const pages = Math.ceil(first.total / pageSize);
+    if (pages > 1) {
+      const rest = await Promise.all(
+        Array.from({ length: pages - 1 }, (_, i) => getPage(i + 2)),
+      );
+      rest.forEach((r) => out.push(...r.data));
+    }
+    return out;
+  }
+
   constructor() {
     this.api = axios.create({
       baseURL: API_BASE_URL,
@@ -305,6 +321,11 @@ class ApiService {
       params: { page, page_size: pageSize, search: search || undefined },
     });
     return response.data;
+  }
+
+  /** Todas las personas que coinciden con la búsqueda (recorre todas las páginas). */
+  async getAllPersonas(search: string = ''): Promise<PersonaResponse[]> {
+    return this.fetchAllPages((page) => this.getPersonas(page, 200, search));
   }
 
   async getPersonaById(id: number): Promise<PersonaResponse> {
@@ -381,6 +402,11 @@ class ApiService {
       params: { page, page_size: pageSize, search: search || undefined },
     });
     return response.data;
+  }
+
+  /** Todos los programas de formación (recorre todas las páginas). */
+  async getAllProgramasFormacion(): Promise<ProgramaFormacionResponse[]> {
+    return this.fetchAllPages((page) => this.getProgramasFormacion(page, 200));
   }
 
   async getProgramaFormacionById(id: number): Promise<ProgramaFormacionResponse> {
@@ -791,6 +817,11 @@ class ApiService {
       params: { page, page_size: pageSize, search: search || undefined },
     });
     return response.data;
+  }
+
+  /** Todos los instructores que coinciden con la búsqueda (recorre todas las páginas). */
+  async getAllInstructores(search?: string): Promise<InstructorItem[]> {
+    return this.fetchAllPages((page) => this.getInstructores(page, 200, search));
   }
 
   async getInstructorById(id: number): Promise<InstructorItem> {
@@ -1352,6 +1383,14 @@ class ApiService {
     return response.data.data;
   }
 
+  async accesoCancelarIngreso(data: {
+    visita_id: number;
+    sede_id: number;
+  }): Promise<AccesoCancelarIngresoResponse> {
+    const response = await this.api.post<{ data: AccesoCancelarIngresoResponse }>('/vigilancia/acceso/cancelar-ingreso', data);
+    return response.data.data;
+  }
+
   async accesoListDentro(sedeId: number): Promise<AccesoDentroItem[]> {
     const response = await this.api.get<{ data: AccesoDentroItem[] }>('/vigilancia/acceso/dentro', {
       params: { sede_id: sedeId },
@@ -1389,6 +1428,7 @@ class ApiService {
     segundo_apellido?: string;
     celular?: string;
     rh?: string;
+    acepta_terminos?: boolean;
   }): Promise<PersonaResponse> {
     const response = await this.api.put<PersonaResponse>(`/vigilancia/personas/${id}/datos-basicos`, data);
     return response.data;

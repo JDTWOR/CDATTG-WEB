@@ -1,6 +1,6 @@
 // @module vigencia_fechas
 // @description Comparación de fechas de vigencia por día calendario (evita desfases de zona horaria).
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-15
 package services
 

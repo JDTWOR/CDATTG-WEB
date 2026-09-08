@@ -1,6 +1,6 @@
 // @module personal_administrativo
 // @description Modelo de base de datos para la entidad Personal Administrativo.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package models
 

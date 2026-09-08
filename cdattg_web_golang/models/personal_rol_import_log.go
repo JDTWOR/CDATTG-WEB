@@ -1,6 +1,6 @@
 // @module personal_rol_import_log
 // @description Modelo de base de datos para el log de importaciones de roles de personal.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package models
 

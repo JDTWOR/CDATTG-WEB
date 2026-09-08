@@ -14,3 +14,12 @@ import { API_BASE_URL } from '../config/api';
 export function urlFotoAcceso(documento: string): string {
   return `${API_BASE_URL}/vigilancia/acceso/foto?documento=${encodeURIComponent(documento)}`;
 }
+
+/**
+ * Ruta de la foto propuesta en un cambio pendiente.
+ * @param id del cambio pendiente
+ * @returns url de la API
+ */
+export function urlFotoCambioPendiente(id: number): string {
+  return `${API_BASE_URL}/cambios-pendientes/${id}/foto`;
+}

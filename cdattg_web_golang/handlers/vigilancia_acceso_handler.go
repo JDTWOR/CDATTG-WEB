@@ -123,6 +123,21 @@ func (h *VigilanciaAccesoHandler) Salida(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": res})
 }
 
+// CancelarIngreso POST /vigilancia/acceso/cancelar-ingreso
+func (h *VigilanciaAccesoHandler) CancelarIngreso(c *gin.Context) {
+	var req dto.AccesoCancelarIngresoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	res, err := h.svc.CancelarIngreso(req, userIDFromContext(c))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": res})
+}
+
 // ListDentro GET /vigilancia/acceso/dentro?sede_id=
 func (h *VigilanciaAccesoHandler) ListDentro(c *gin.Context) {
 	sedeID, err := parseUintPtrQuery(c, "sede_id")

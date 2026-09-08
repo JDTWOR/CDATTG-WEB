@@ -23,6 +23,7 @@ type CarnetSolicitudRepository interface {
 	FindAprobadosRegular() ([]models.CarnetSolicitud, error)
 	FindAprobadoRegularPorDocumento(documento string) (*models.CarnetSolicitud, error)
 	FindNombresLiderPorFicha(fichaIDs []uint) (map[uint]string, error)
+	FindLiderPersonaIDDeFicha(fichaID uint) (uint, error)
 	FindPersonasPorIDs(ids []uint) (map[uint]models.Persona, error)
 	Create(s *models.CarnetSolicitud) error
 	Update(s *models.CarnetSolicitud) error
@@ -105,6 +106,17 @@ func (r *carnetSolicitudRepository) FindFichaIDsDeLider(instructorID uint) ([]ui
 		Where("instructor_id = ?", instructorID).
 		Pluck("id", &ids).Error
 	return ids, err
+}
+
+// FindLiderPersonaIDDeFicha devuelve la persona del instructor líder de la ficha.
+// La tabla del modelo es fichas_caracterizacion (plural), por eso el JOIN la nombra así.
+func (r *carnetSolicitudRepository) FindLiderPersonaIDDeFicha(fichaID uint) (uint, error) {
+	var personaID uint
+	err := r.db.Model(&models.FichaCaracterizacion{}).
+		Joins("JOIN instructors i ON i.id = fichas_caracterizacion.instructor_id").
+		Where("fichas_caracterizacion.id = ?", fichaID).
+		Pluck("i.persona_id", &personaID).Error
+	return personaID, err
 }
 
 func (r *carnetSolicitudRepository) Create(s *models.CarnetSolicitud) error {

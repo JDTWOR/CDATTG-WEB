@@ -1,34 +1,28 @@
-import { useCallback, useEffect, useState } from 'react';
-import {
-  CheckCircleIcon,
-  XCircleIcon,
-  ClockIcon,
-} from '@heroicons/react/24/outline';
+/**
+ * Cambios que los visitantes quieren aplicar y que el vigilante aprueba o
+ * rechaza. Se agrupan por persona en carpetas buscables por nombre o CC.
+ * @author Cristian Deysdayr Jiménez
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ClockIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { apiService } from '../services/api';
 import { axiosErrorMessage } from '../utils/httpError';
-
-interface CambioPendiente {
-  id: number;
-  persona_id: number;
-  campos: string;
-  estado: string;
-  foto_path: string;
-  created_at: string;
-  persona?: {
-    id: number;
-    primer_nombre: string;
-    primer_apellido: string;
-    numero_documento: string;
-  };
-}
+import { mostrarToastApp } from '../utils/appToast';
+import type { AccionCambio, CambioPendiente } from './vigilancia/CambioPendienteCard';
+import { CambioPendienteCarpeta } from './vigilancia/CambioPendienteCarpeta';
+import { agruparPorPersona, filtrarGrupos } from './vigilancia/cambioPendienteGrupos';
 
 export function VigilanciaCambiosPendientes() {
   const [cambios, setCambios] = useState<CambioPendiente[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [busqueda, setBusqueda] = useState('');
   const [procesando, setProcesando] = useState<number | null>(null);
+  // Quiénes tienen la carpeta abierta: vive aquí para que no se cierre al
+  // aprobar o rechazar un cambio (que recarga la lista).
+  const [carpetasAbiertas, setCarpetasAbiertas] = useState<Set<number>>(new Set());
   // Validación doble: primero se presiona el botón y luego se confirma la decisión.
-  const [confirmandoAccion, setConfirmandoAccion] = useState<{ id: number; accion: 'aprobar' | 'rechazar' } | null>(null);
+  const [confirmandoAccion, setConfirmandoAccion] = useState<{ id: number; accion: AccionCambio } | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -45,63 +39,58 @@ export function VigilanciaCambiosPendientes() {
 
   useEffect(() => { void cargar(); }, [cargar]);
 
-  const aprobar = async (id: number) => {
+  const grupos = useMemo(() => filtrarGrupos(agruparPorPersona(cambios), busqueda), [cambios, busqueda]);
+
+  const finalizarAccion = async (
+    id: number,
+    accion: AccionCambio,
+    ejecutar: () => Promise<void>,
+    tituloOk: string,
+    textoOk: string,
+  ) => {
     setProcesando(id);
     setError('');
     try {
-      await apiService.aprobarCambioPendiente(id);
+      await ejecutar();
       setConfirmandoAccion(null);
+      mostrarToastApp({ icon: 'success', titulo: tituloOk, texto: textoOk, timer: 3000 });
       await cargar();
     } catch (e: unknown) {
-      setError(axiosErrorMessage(e, 'Error al aprobar'));
+      mostrarToastApp({
+        icon: 'error',
+        titulo: accion === 'aprobar' ? 'No se pudo aprobar' : 'No se pudo rechazar',
+        texto: axiosErrorMessage(e, accion === 'aprobar' ? 'Error al aprobar' : 'Error al rechazar'),
+        timer: 4000,
+      });
     } finally {
       setProcesando(null);
     }
   };
 
-  const rechazar = async (id: number) => {
-    setProcesando(id);
-    setError('');
-    try {
-      await apiService.rechazarCambioPendiente(id);
-      setConfirmandoAccion(null);
-      await cargar();
-    } catch (e: unknown) {
-      setError(axiosErrorMessage(e, 'Error al rechazar'));
-    } finally {
-      setProcesando(null);
-    }
-  };
+  const alConfirmar = (id: number, accion: AccionCambio) =>
+    void (accion === 'aprobar'
+      ? finalizarAccion(
+          id,
+          'aprobar',
+          () => apiService.aprobarCambioPendiente(id),
+          'Cambio aprobado',
+          'Los cambios fueron aprobados y ya están vigentes.',
+        )
+      : finalizarAccion(
+          id,
+          'rechazar',
+          () => apiService.rechazarCambioPendiente(id),
+          'Cambio rechazado',
+          'Los cambios fueron rechazados y no se aplican.',
+        ));
 
-  const parsearCampos = (camposJson: string): Record<string, unknown> => {
-    try {
-      return JSON.parse(camposJson);
-    } catch {
-      return {};
-    }
-  };
-
-  const nombreCampo = (key: string): string => {
-    const map: Record<string, string> = {
-      tipo_documento: 'Tipo de documento',
-      primer_nombre: 'Primer nombre',
-      segundo_nombre: 'Segundo nombre',
-      primer_apellido: 'Primer apellido',
-      segundo_apellido: 'Segundo apellido',
-      fecha_nacimiento: 'Fecha de nacimiento',
-      genero: 'Género',
-      telefono: 'Teléfono',
-      celular: 'Celular',
-      email: 'Email',
-      pais_id: 'País',
-      departamento_id: 'Departamento',
-      municipio_id: 'Municipio',
-      direccion: 'Dirección',
-      parametro_id: 'Parametro',
-      nivel_escolaridad_id: 'Nivel escolaridad',
-      rh: 'Rh',
-    };
-    return map[key] || key;
+  const alternarCarpeta = (personaId: number) => {
+    setCarpetasAbiertas((prev) => {
+      const siguiente = new Set(prev);
+      if (siguiente.has(personaId)) siguiente.delete(personaId);
+      else siguiente.add(personaId);
+      return siguiente;
+    });
   };
 
   return (
@@ -111,113 +100,43 @@ export function VigilanciaCambiosPendientes() {
         Los cambios realizados por visitantes requieren aprobación del vigilante antes de aplicarse.
       </p>
 
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar por nombre o CC"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+        />
+        <span className="btn-sena pointer-events-none flex items-center justify-center">
+          <MagnifyingGlassIcon className="h-5 w-5" />
+        </span>
+      </div>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {cargando ? (
         <p className="text-sm text-gray-500">Cargando…</p>
-      ) : cambios.length === 0 ? (
+      ) : grupos.length === 0 ? (
         <div className="flex items-center gap-2 rounded-lg bg-gray-50 p-4 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-400">
           <ClockIcon className="h-5 w-5" />
-          No hay cambios pendientes de aprobación.
+          {busqueda.trim() ? 'No se encontraron personas con ese nombre o CC.' : 'No hay cambios pendientes de aprobación.'}
         </div>
       ) : (
-        <div className="space-y-4">
-          {cambios.map((c) => {
-            const campos = parsearCampos(c.campos);
-            const nombre = c.persona
-              ? `${c.persona.primer_nombre} ${c.persona.primer_apellido}`
-              : `Persona #${c.persona_id}`;
-            return (
-              <div
-                key={c.id}
-                className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
-              >
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{nombre}</h3>
-                    {c.persona?.numero_documento && (
-                      <p className="text-xs text-gray-500">Doc: {c.persona.numero_documento}</p>
-                    )}
-                    <p className="text-xs text-gray-400">
-                      {new Date(c.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
-                    <ClockIcon className="h-3 w-3" />
-                    Pendiente
-                  </span>
-                </div>
-
-                <div className="mb-3 space-y-1">
-                  {Object.entries(campos).map(([key, value]) => (
-                    <div key={key} className="flex gap-2 text-sm">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">{nombreCampo(key)}:</span>
-                      <span className="text-gray-600 dark:text-gray-400">{String(value)}</span>
-                    </div>
-                  ))}
-                  {c.foto_path && (
-                    <div className="flex gap-2 text-sm">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">Foto:</span>
-                      <span className="text-green-600">Nueva foto adjunta</span>
-                    </div>
-                  )}
-                </div>
-
-                {confirmandoAccion?.id === c.id ? (
-                  <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-950/30">
-                    <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                      {confirmandoAccion.accion === 'aprobar'
-                        ? '¿Confirmar la aprobación de estos cambios?'
-                        : '¿Confirmar el rechazo de estos cambios?'}
-                    </p>
-                    <div className="flex shrink-0 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setConfirmandoAccion(null)}
-                        disabled={procesando === c.id}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void (confirmandoAccion.accion === 'aprobar' ? aprobar(c.id) : rechazar(c.id))
-                        }
-                        disabled={procesando === c.id}
-                        className={`rounded-lg px-3 py-2 text-sm text-white ${
-                          confirmandoAccion.accion === 'aprobar' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
-                        }`}
-                      >
-                        {procesando === c.id ? 'Procesando…' : 'Confirmar'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setConfirmandoAccion({ id: c.id, accion: 'rechazar' })}
-                      disabled={procesando === c.id}
-                      className="flex items-center gap-1 rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                    >
-                      <XCircleIcon className="h-4 w-4" />
-                      Rechazar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmandoAccion({ id: c.id, accion: 'aprobar' })}
-                      disabled={procesando === c.id}
-                      className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
-                    >
-                      <CheckCircleIcon className="h-4 w-4" />
-                      Aprobar
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="space-y-3">
+          {grupos.map((grupo) => (
+            <CambioPendienteCarpeta
+              key={grupo.personaId}
+              grupo={grupo}
+              abierta={carpetasAbiertas.has(grupo.personaId)}
+              onToggleAbierta={() => alternarCarpeta(grupo.personaId)}
+              procesandoId={procesando}
+              confirmandoAccion={confirmandoAccion}
+              onIniciarConfirmacion={(id, accion) => setConfirmandoAccion({ id, accion })}
+              onCancelarConfirmacion={() => setConfirmandoAccion(null)}
+              onConfirmar={alConfirmar}
+            />
+          ))}
         </div>
       )}
     </div>

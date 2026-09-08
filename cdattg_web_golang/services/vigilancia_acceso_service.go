@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -33,6 +34,8 @@ const (
 
 	errDocObligatorio  = "número de documento obligatorio"
 	errSedeObligatoria = "debe seleccionar la sede antes de escanear o registrar"
+	// cancelarIngresoVentana es el máximo de minutos para anular una entrada automática.
+	cancelarIngresoVentana = 5 * time.Minute
 )
 
 var tiposPersonaAcceso = []string{tipoAprendiz, tipoInstructor, tipoAdministrativo, tipoPersonalOperativoApoyo, tipoContratista, tipoVisitante}
@@ -52,6 +55,7 @@ type VigilanciaAccesoService interface {
 	Lookup(req dto.AccesoLookupRequest) (*dto.AccesoLookupResponse, error)
 	Ingreso(req dto.AccesoIngresoRequest, registradoPorUserID uint) (*dto.AccesoRegistroResponse, error)
 	Salida(req dto.AccesoSalidaRequest, registradoPorUserID uint) (*dto.AccesoRegistroResponse, error)
+	CancelarIngreso(req dto.AccesoCancelarIngresoRequest, canceladoPorUserID uint) (*dto.AccesoCancelarIngresoResponse, error)
 	ListDentro(sedeID *uint) ([]dto.AccesoDentroItem, error)
 	Historial(f dto.AccesoHistorialFiltros) (*dto.AccesoHistorialResponse, error)
 	Estadisticas(f dto.AccesoHistorialFiltros) (*dto.AccesoEstadisticasResponse, error)
@@ -443,20 +447,37 @@ func (s *vigilanciaAccesoService) Lookup(req dto.AccesoLookupRequest) (*dto.Acce
 		return nil, err
 	}
 
-	persona, esNueva, err := s.findOrCreatePersona(doc)
-	if err != nil {
+	// Buscar sin crear: el usuario/persona nueva SOLO se crea al confirmar el ingreso.
+	persona, err := s.personaRepo.FindByNumeroDocumento(doc)
+	var tipos []string
+	var fichas []dto.AccesoFichaResumen
+	var abierta *models.PersonaIngresoSalida
+	esNueva := false
+	switch {
+	case err == nil && persona != nil:
+		// Persona ya registrada: roles, fichas y visita abierta como siempre.
+		tipos, fichas = s.resolverVistaAcceso(persona.ID)
+		abierta, err = s.accesoRepo.FindAbiertaByPersonaAndSede(persona.ID, sedeID)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		err = nil
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		// Persona inexistente: solo se muestra la "vista de persona nueva".
+		// Cancelar aquí NO deja nada creado en la base de datos.
+		err = nil
+		esNueva = true
+		persona = &models.Persona{NumeroDocumento: doc, Status: true}
+		tipos = []string{tipoVisitante}
+	default:
 		return nil, err
 	}
 
-	tipos, fichas := s.resolverVistaAcceso(persona.ID)
-	abierta, err := s.accesoRepo.FindAbiertaByPersonaAndSede(persona.ID, sedeID)
 	dentro := false
 	var visita *dto.AccesoVisitaAbierta
-	if err == nil && abierta != nil {
+	if abierta != nil {
 		dentro = true
 		visita = visitaDTO(abierta)
-	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
 	}
 
 	modo := normalizeModo(req.Modo)
@@ -568,6 +589,60 @@ func (s *vigilanciaAccesoService) Ingreso(req dto.AccesoIngresoRequest, registra
 		Fichas:        fichas,
 		SedeID:        sedeID,
 	}, nil
+}
+
+// Cancela el ingreso automático recién registrado: la persona no llegó a entrar.
+func (s *vigilanciaAccesoService) CancelarIngreso(req dto.AccesoCancelarIngresoRequest, canceladoPorUserID uint) (*dto.AccesoCancelarIngresoResponse, error) {
+	if req.VisitaID == 0 {
+		return nil, errors.New("visita_id obligatorio")
+	}
+	sedeID, err := s.requireSedeID(req.SedeID)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.accesoRepo.FindByID(req.VisitaID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("ingreso no encontrado")
+		}
+		return nil, err
+	}
+	if !visitaIngresoCancelable(row, sedeID, time.Now(), cancelarIngresoVentana) {
+		return nil, errors.New("la entrada ya no se puede cancelar: no está abierta, ya fue cancelada o pasó la ventana")
+	}
+	now := time.Now()
+	row.IngresoCancelado = true
+	row.IngresoCanceladoAt = &now
+	row.IngresoCanceladoPor = &canceladoPorUserID
+	traza := "ingreso_cancelado=true; cancelado_por_user_id=" + strconv.FormatUint(uint64(canceladoPorUserID), 10)
+	if strings.TrimSpace(row.Observaciones) == "" {
+		row.Observaciones = traza
+	} else {
+		row.Observaciones = row.Observaciones + "; " + traza
+	}
+	if err := s.accesoRepo.Update(row); err != nil {
+		return nil, err
+	}
+	return &dto.AccesoCancelarIngresoResponse{
+		VisitaID:  row.ID,
+		Cancelado: true,
+		Mensaje:   "Entrada cancelada.",
+	}, nil
+}
+
+// visitaIngresoCancelable indica si una visita abierta puede anularse como ingreso automático
+// (misma sede, sin salida, sin cancelación previa y dentro de la ventana de tiempo).
+func visitaIngresoCancelable(row *models.PersonaIngresoSalida, sedeID uint, ahora time.Time, ventana time.Duration) bool {
+	if row == nil || row.SedeID != sedeID {
+		return false
+	}
+	if row.TimestampSalida != nil || row.IngresoCancelado {
+		return false
+	}
+	if ahora.Before(row.TimestampEntrada) {
+		return false
+	}
+	return ahora.Sub(row.TimestampEntrada) <= ventana
 }
 
 func (s *vigilanciaAccesoService) resolvePersonaParaSalida(doc string, permitirSinIngreso bool) (*models.Persona, error) {
@@ -810,6 +885,9 @@ func indiceSalidaIngreso(ingresos, salidas int64) float64 {
 
 func (s *vigilanciaAccesoService) historialItemFromRow(row *models.PersonaIngresoSalida) dto.AccesoHistorialItem {
 	estado := "abierto"
+	if row.IngresoCancelado {
+		estado = "cancelado"
+	}
 	var tsSalida *string
 	if row.TimestampSalida != nil {
 		estado = "cerrado"

@@ -20,7 +20,8 @@ func TestVistaDesdeSolicitudSinFicha(t *testing.T) {
 		Rh: "O+", FotoPath: "a.jpg", TipoFormacion: models.TipoFormacionRegular,
 	}
 	sol.ID = 9
-	v := vistaDesdeSolicitud(sol, nil)
+	s := &carnetDigitalService{}
+	v := s.vistaDesdeSolicitud(sol, nil)
 	if v.ID != 9 || v.Persona.Nombres != "ANA" || v.Ficha.Numero != "3173334" {
 		t.Fatalf("%+v", v)
 	}
@@ -35,7 +36,8 @@ func TestVistaDesdeSolicitudConFicha(t *testing.T) {
 	ficha := models.FichaCaracterizacion{Status: true, Ficha: "99", FechaFin: &fin, Nombre: "Redes"}
 	ficha.ID = 52
 	sol := models.CarnetSolicitud{FichaID: 52, FichaNumero: "", Programa: ""}
-	v := vistaDesdeSolicitud(sol, &ficha)
+	s := &carnetDigitalService{}
+	v := s.vistaDesdeSolicitud(sol, &ficha)
 	if v.Ficha.Numero != "99" || v.Ficha.Programa != "Redes" || v.Ficha.FechaFin != "2026-12-01" {
 		t.Fatalf("%+v", v.Ficha)
 	}

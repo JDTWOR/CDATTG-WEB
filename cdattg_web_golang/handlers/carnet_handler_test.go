@@ -56,6 +56,12 @@ func (m *mockCarnetSvc) ExcelBiblioteca(uint) ([]byte, error) {
 	}
 	return []byte("xlsx"), nil
 }
+func (m *mockCarnetSvc) FotosBibliotecaZip(uint) ([]byte, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return []byte("zip"), nil
+}
 func (m *mockCarnetSvc) LeerFotoBiblioteca(uint) (*services.PersonaFotoArchivo, error) {
 	return m.foto, m.err
 }

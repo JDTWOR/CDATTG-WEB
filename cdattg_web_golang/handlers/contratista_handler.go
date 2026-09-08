@@ -1,6 +1,6 @@
 // @module contratista_handler
 // @description Endpoints HTTP de Contratistas de Prestación de Servicios: CRUD e importación masiva.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-15
 package handlers
 

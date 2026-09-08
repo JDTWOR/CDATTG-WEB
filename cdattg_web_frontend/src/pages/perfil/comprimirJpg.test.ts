@@ -16,7 +16,7 @@ describe('archivoEsJpg', () => {
     expect(archivoEsJpg(new File([], 'foto.png', { type: 'image/png' }))).toBe(false);
   });
 
-  it('el tope son 20 KB', () => {
-    expect(FOTO_MAX_BYTES).toBe(20 * 1024);
+  it('el tope son 2 MB', () => {
+    expect(FOTO_MAX_BYTES).toBe(2 * 1024 * 1024);
   });
 });

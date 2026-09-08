@@ -102,6 +102,19 @@ type AccesoRegistroResponse struct {
 	SalidaSinIngreso bool                 `json:"salida_sin_ingreso,omitempty"`
 }
 
+// AccesoCancelarIngresoRequest anula la entrada recién registrada en portería.
+type AccesoCancelarIngresoRequest struct {
+	VisitaID uint  `json:"visita_id" binding:"required"`
+	SedeID   *uint `json:"sede_id"`
+}
+
+// AccesoCancelarIngresoResponse confirma la anulación del ingreso.
+type AccesoCancelarIngresoResponse struct {
+	VisitaID  uint   `json:"visita_id"`
+	Cancelado bool   `json:"cancelado"`
+	Mensaje   string `json:"mensaje"`
+}
+
 // AccesoDentroItem persona actualmente dentro del centro.
 type AccesoDentroItem struct {
 	VisitaID         uint               `json:"visita_id"`

@@ -16,13 +16,13 @@ func TestAplicarDecision(t *testing.T) {
 	t.Parallel()
 	ahora := time.Date(2026, 8, 29, 10, 0, 0, 0, time.UTC)
 	ok := models.CarnetSolicitud{Estado: models.CarnetEstadoPendiente}
-	aplicarDecision(&ok, 74, true, ahora)
+	aplicarDecision(&ok, 74, true, "", ahora)
 	if ok.Estado != models.CarnetEstadoAprobado || ok.ValidadorInstructorID == nil {
 		t.Fatalf("aprobar %+v", ok)
 	}
 	dev := models.CarnetSolicitud{Estado: models.CarnetEstadoPendiente}
-	aplicarDecision(&dev, 74, false, ahora)
-	if dev.Estado != models.CarnetEstadoDevuelto || dev.MotivoRechazo != "" {
+	aplicarDecision(&dev, 74, false, "  foto borrosa  ", ahora)
+	if dev.Estado != models.CarnetEstadoDevuelto || dev.MotivoRechazo != "foto borrosa" {
 		t.Fatalf("devolver %+v", dev)
 	}
 }

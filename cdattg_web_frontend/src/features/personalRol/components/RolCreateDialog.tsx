@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/components/RolCreateDialog
  * @description Diálogo de creación de un rol de personal desde una persona existente.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { useState, type ComponentProps } from 'react';

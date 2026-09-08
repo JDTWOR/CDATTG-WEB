@@ -1,6 +1,6 @@
 // @module personal_rol_mappers
 // @description Conversión de modelos de roles de personal (operativo, administrativo, contratista) a DTO.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package handlers
 

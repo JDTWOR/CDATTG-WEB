@@ -12,6 +12,7 @@ import { CarnetBibliotecaFiltro } from './CarnetBibliotecaFiltro';
 import { CarnetBibliotecaFotoDialog } from './CarnetBibliotecaFotoDialog';
 import { filtrarItemsBiblioteca } from './carnetBiblioteca';
 import { descargarExcelBiblioteca } from './carnetBibliotecaExcel';
+import { descargarFotosBibliotecaZip } from './carnetBibliotecaZip';
 
 /**
  * Cargo el catálogo, filtro por ficha y listo las personas.
@@ -37,14 +38,24 @@ export function CarnetBibliotecaPage() {
       </p>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <CarnetBibliotecaFiltro fichas={data.fichas} fichaId={fichaId} onChange={setFichaId} />
-      <button
-        type="button"
-        className="btn-sena w-full"
-        disabled={visibles.length === 0}
-        onClick={() => void descargarExcelBiblioteca(fichaId)}
-      >
-        Descargar Excel
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          className="btn-sena flex-1"
+          disabled={visibles.length === 0}
+          onClick={() => void descargarExcelBiblioteca(fichaId)}
+        >
+          Descargar Excel
+        </button>
+        <button
+          type="button"
+          className="btn-sena flex-1"
+          disabled={visibles.length === 0}
+          onClick={() => void descargarFotosBibliotecaZip(fichaId)}
+        >
+          Descargar fotos (ZIP)
+        </button>
+      </div>
       {visibles.length === 0 ? <p className="text-sm text-gray-500">No hay carnets validados en esta ficha.</p> : null}
       <ul className="space-y-3">
         {visibles.map((item) => (

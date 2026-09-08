@@ -1,6 +1,6 @@
 // @module personal_operativo_apoyo_service
 // @description Lógica de negocio de Personal Operativo y de Apoyo: creación desde Persona con rol Casbin y CRUD.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package services
 

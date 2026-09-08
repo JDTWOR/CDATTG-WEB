@@ -54,6 +54,9 @@ func RunRolePermissionSeeder(db *gorm.DB) error {
 	if err := seedBibliotecarioPermissions(e); err != nil {
 		return err
 	}
+	if err := seedAccesoEstudiosPermissions(e); err != nil {
+		return err
+	}
 
 	if err := e.SavePolicy(); err != nil {
 		return err

@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/components/ImportFilePicker
  * @description Carga del archivo Excel, descarga de plantilla y resumen del resultado.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { useRef, useState, type ChangeEvent } from 'react';

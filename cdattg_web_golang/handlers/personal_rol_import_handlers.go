@@ -1,6 +1,6 @@
 // @module personal_rol_import_handlers
 // @description Handlers HTTP de importación masiva, historial y plantilla Excel del módulo Personal.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-14
 package handlers
 

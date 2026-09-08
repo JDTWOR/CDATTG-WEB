@@ -21,6 +21,10 @@ var RoleNames = []string{
 	"FPI",
 	// Ve carnets regulares ya validados para imprimir el físico
 	"BIBLIOTECARIO",
+	// Perfiles que administran la formación: gestionan fichas, programas,
+	// aprendices e instructores, consultan asistencia y usan bienestar e infraestructura.
+	"MEDIA TECNICA",
+	"FORMACION COMPLEMENTARIA",
 	// Roles del módulo Personal (se toman rol al vincular una persona a un rol de personal)
 	"PERSONAL OPERATIVO Y DE APOYO",
 	"PERSONAL ADMINISTRATIVO",
@@ -64,58 +68,63 @@ var (
 	}
 	// PermisosInventario desactivado: módulo inventario no en uso
 	PermisosInventario = []string{}
-	PermisosUsuario = []string{
+	PermisosUsuario    = []string{
 		"CREAR USUARIO", "ASIGNAR PERMISOS",
 	}
 	PermisosVigilancia = []string{
 		ActRegistrarAccesoSede,
 		ActVerAccesoSede,
 	}
-	PermisosCarnet = []string{ActVerCarnetDigital, ActValidarCarnetDigital, ActVerCarnetBiblioteca, ActConfigurarCarnet}
+	PermisosCarnet = []string{ActVerCarnetDigital, ActValidarCarnetDigital, ActVerCarnetBiblioteca, ActConfigurarCarnet, ActSolicitarCarnetPerdida, ActValidarCarnetPerdida}
 )
 
 // ObjPersona, ObjPrograma, ... nombres de objeto usados en rutas y Casbin.
 // ActVerPersona y demás act* son acciones Casbin (act) reutilizables en seed y middleware.
 const (
-	ActVerPersona           = "VER PERSONA"
-	ActEditarMiPersona      = "EDITAR MI PERSONA"
-	ActRegistrarAccesoSede  = "REGISTRAR ACCESO SEDE"
-	ActVerAccesoSede        = "VER ACCESO SEDE"
-	ActVerCarnetDigital     = "VER CARNET DIGITAL"
-	ActValidarCarnetDigital = "VALIDAR CARNET DIGITAL"
-	ActVerCarnetBiblioteca  = "VER CARNET BIBLIOTECA"
-	ActConfigurarCarnet     = "CONFIGURAR CARNET"
-	ActRegistrarPersonaVig  = "REGISTRAR PERSONA"
+	ActVerPersona             = "VER PERSONA"
+	ActEditarMiPersona        = "EDITAR MI PERSONA"
+	ActRegistrarAccesoSede    = "REGISTRAR ACCESO SEDE"
+	ActVerAccesoSede          = "VER ACCESO SEDE"
+	ActVerCarnetDigital       = "VER CARNET DIGITAL"
+	ActValidarCarnetDigital   = "VALIDAR CARNET DIGITAL"
+	ActVerCarnetBiblioteca    = "VER CARNET BIBLIOTECA"
+	ActConfigurarCarnet       = "CONFIGURAR CARNET"
+	ActSolicitarCarnetPerdida = "SOLICITAR CARNET PERDIDA"
+	ActValidarCarnetPerdida   = "VALIDAR CARNET PERDIDA"
+	ActRegistrarPersonaVig    = "REGISTRAR PERSONA"
 
-	ObjPersona     = "persona"
-	ObjPrograma    = "programa"
-	ObjFicha       = "ficha"
-	ObjAprendiz    = "aprendiz"
-	ObjInstructor  = "instructor"
+	ObjPersona                   = "persona"
+	ObjPrograma                  = "programa"
+	ObjFicha                     = "ficha"
+	ObjAprendiz                  = "aprendiz"
+	ObjInstructor                = "instructor"
 	ObjPersonalOperativoYDeApoyo = "personal-operativo-apoyo"
-	ObjPersonalAdministrativo = "personal-administrativo"
-	ObjContratista         = "contratista"
-	ObjAsistencia  = "asistencia"
-	ObjEleccion    = "eleccion"
-	ObjUsuario     = "usuario"
-	ObjVigilancia  = "vigilancia"
-	ObjCarnet      = "carnet"
-	ObjInventario = "inventario"
-	ObjProducto   = "producto"
-	ObjOrden      = "orden"
-	ObjDevolucion = "devolucion"
-	ObjProveedor  = "proveedor"
-	ObjCategoria  = "categoria"
-	ObjMarca      = "marca"
-	ObjContrato   = "contrato"
+	ObjPersonalAdministrativo    = "personal-administrativo"
+	ObjContratista               = "contratista"
+	ObjAsistencia                = "asistencia"
+	ObjEleccion                  = "eleccion"
+	ObjUsuario                   = "usuario"
+	ObjVigilancia                = "vigilancia"
+	ObjCarnet                    = "carnet"
+	ObjInventario                = "inventario"
+	ObjProducto                  = "producto"
+	ObjOrden                     = "orden"
+	ObjDevolucion                = "devolucion"
+	ObjProveedor                 = "proveedor"
+	ObjCategoria                 = "categoria"
+	ObjMarca                     = "marca"
+	ObjContrato                  = "contrato"
 )
 
 // Roles del módulo Personal: usados al vincular una persona a un rol de personal.
 const (
-	RolPersonalOperativoYDeApoyo       = "PERSONAL OPERATIVO Y DE APOYO"
-	RolPersonalAdministrativo          = "PERSONAL ADMINISTRATIVO"
+	RolPersonalOperativoYDeApoyo      = "PERSONAL OPERATIVO Y DE APOYO"
+	RolPersonalAdministrativo         = "PERSONAL ADMINISTRATIVO"
 	RolContratistaPrestacionServicios = "CONTRATISTA PRESTACIÓN DE SERVICIOS"
 	RolBibliotecario                  = "BIBLIOTECARIO"
+	// Perfiles que administran la formación académica (fichas, programas y personal).
+	RolMediaTecnica            = "MEDIA TECNICA"
+	RolFormacionComplementaria = "FORMACION COMPLEMENTARIA"
 )
 
 // IsValidPermiso indica si (obj, act) es un permiso definido en el sistema.

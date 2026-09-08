@@ -2,12 +2,14 @@ package services
 
 import (
 	"errors"
+	"time"
 
 	"github.com/sena/cdattg-web-golang/dto"
 	"github.com/sena/cdattg-web-golang/repositories"
 )
 
 var errVigPersonaNoEncontrada = errors.New("persona no encontrada con ese número de documento")
+var errVigAceptaTerminos = errors.New("debe aceptar los términos de uso y confidencialidad")
 
 type VigilanciaPersonaService interface {
 	Lookup(numeroDocumento string) (*dto.PersonaResponse, error)
@@ -58,6 +60,14 @@ func (s *vigilanciaPersonaService) ActualizarDatosBasicos(id uint, req dto.Vigil
 	if req.Rh != "" {
 		persona.Rh = normalizarPersonaRH(req.Rh)
 	}
+
+	// La aceptación de términos es obligatoria y deja constancia de la fecha.
+	if !req.AceptaTerminos {
+		return nil, errVigAceptaTerminos
+	}
+	now := time.Now()
+	persona.AceptaTerminos = true
+	persona.AceptaTerminosAt = &now
 
 	if err := s.repo.Update(persona); err != nil {
 		return nil, err

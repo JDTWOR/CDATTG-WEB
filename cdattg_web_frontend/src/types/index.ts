@@ -1266,6 +1266,13 @@ export interface AccesoRegistroResponse {
   salida_sin_ingreso?: boolean;
 }
 
+/** Anulación de una entrada automática recién registrada en portería. */
+export interface AccesoCancelarIngresoResponse {
+  visita_id: number;
+  cancelado: boolean;
+  mensaje: string;
+}
+
 export interface AccesoDentroItem {
   visita_id: number;
   persona: AccesoPersonaFicha;
@@ -1288,7 +1295,7 @@ export interface AccesoHistorialItem {
   motivo_salida?: string;
   observacion_salida?: string;
   salida_sin_ingreso: boolean;
-  estado: 'abierto' | 'cerrado';
+  estado: 'abierto' | 'cerrado' | 'cancelado';
 }
 
 export interface AccesoHistorialResponse {

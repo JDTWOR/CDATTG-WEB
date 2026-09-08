@@ -80,4 +80,5 @@ type VigilanciaDatosBasicosRequest struct {
 	SegundoApellido string `json:"segundo_apellido"`
 	Celular         string `json:"celular"`
 	Rh              string `json:"rh"`
+	AceptaTerminos  bool   `json:"acepta_terminos"`
 }

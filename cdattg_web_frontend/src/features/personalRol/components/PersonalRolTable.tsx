@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/components/PersonalRolTable
  * @description Tabla paginada con acciones del listado del módulo Personal.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { EyeIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';

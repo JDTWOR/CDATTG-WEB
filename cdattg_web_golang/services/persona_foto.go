@@ -16,15 +16,15 @@ import (
 )
 
 const (
-	personaFotoDir     = "storage/personas_fotos"
-	personaFotoMaxBytes = 20 * 1024
+	personaFotoDir      = "storage/personas_fotos"
+	personaFotoMaxBytes = 2 * 1024 * 1024
 )
 
 var (
-	errPersonaFotoVacia    = errors.New("la foto está vacía")
-	errPersonaFotoGrande   = errors.New("la foto no puede pesar más de 20 KB")
-	errPersonaFotoTipo     = errors.New("la foto debe ser JPG")
-	errPersonaFotoAusente  = errors.New("esta persona no tiene foto")
+	errPersonaFotoVacia   = errors.New("la foto está vacía")
+	errPersonaFotoGrande  = errors.New("la foto no puede pesar más de 2 MB")
+	errPersonaFotoTipo    = errors.New("la foto debe ser JPG")
+	errPersonaFotoAusente = errors.New("esta persona no tiene foto")
 )
 
 // PersonaFotoArchivo es la foto lista para enviarla al navegador.

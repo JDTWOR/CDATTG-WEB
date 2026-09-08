@@ -1,7 +1,7 @@
 /**
  * @module features/personalRol/usePersonalRolCrud
  * @description Hook de estado, filtrado y operaciones CRUD para listados de personas con rol.
- * @author JDTWOR
+ * @author Cristian Deysdayr Jiménez
  * @created 2026-08-14
  */
 import { useCallback, useEffect, useState } from 'react';

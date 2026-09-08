@@ -33,6 +33,23 @@ func (h *PersonaCambioPendienteHandler) ListarPendientes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": cambios})
 }
 
+// VerFotoPendiente entrega la foto propuesta por el visitante en un cambio
+// pendiente, para que el vigilante la compare con la que tiene la persona.
+func (h *PersonaCambioPendienteHandler) VerFotoPendiente(c *gin.Context) {
+	var id uint
+	if _, err := fmt.Sscan(c.Param("id"), &id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	arch, err := h.svc.LeerFoto(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.Data(http.StatusOK, arch.ContentType, arch.Bytes)
+}
+
 // Aprobar aprueba un cambio pendiente y lo aplica a la persona.
 func (h *PersonaCambioPendienteHandler) Aprobar(c *gin.Context) {
 	user, _ := c.Get("user")

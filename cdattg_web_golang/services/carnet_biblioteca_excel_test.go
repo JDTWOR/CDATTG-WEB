@@ -18,7 +18,7 @@ func TestFilaExcelBiblioteca(t *testing.T) {
 		PrimerApellido: "Rojas", SegundoApellido: "Perez",
 		NumeroDocumento: "1", Rh: "O+", Programa: "ADSO", FichaNumero: "8",
 	})
-	want := []string{"Ana", "Maria", "Rojas", "Perez", "1", "O+", "ADSO", "8"}
+	want := []string{"Ana Maria", "Rojas Perez", "1", "O+", "ADSO", "8"}
 	if len(got) != len(want) {
 		t.Fatalf("%v", got)
 	}

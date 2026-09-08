@@ -1,6 +1,6 @@
 // @module contratista_service
 // @description Lógica de negocio de Contratistas: creación desde Persona con rol Casbin y CRUD.
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-15
 package services
 

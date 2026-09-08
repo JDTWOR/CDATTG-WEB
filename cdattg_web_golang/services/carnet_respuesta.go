@@ -25,6 +25,7 @@ func armarRespuestaCarnet(
 		EstadoSolicitud: "ninguna",
 		Persona:         personaACarnetDatos(persona),
 		CargoRegional:   cargoRegional,
+		DatosListos:     datosListosParaCarnet(persona),
 	}
 	if len(fichas) == 0 {
 		resp.Motivo = carnetMotivoSinVigente
@@ -36,7 +37,7 @@ func armarRespuestaCarnet(
 		resp.Persona = solicitudACarnetDatos(*aprobada)
 	}
 	aplicarMotivoGlobal(resp)
-	resp.PuedeSolicitar = datosListosParaCarnet(persona) && algunaAccionFicha(fichas)
+	resp.PuedeSolicitar = resp.DatosListos && algunaAccionFicha(fichas)
 	return resp
 }
 

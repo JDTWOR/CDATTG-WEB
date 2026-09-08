@@ -20,6 +20,8 @@ import type { PersonaRequest, PersonaResponse, PersonaSelfUpdateRequest, UserRes
 import { PerfilAcciones } from './perfil/PerfilAcciones';
 import { PerfilFotoCamara } from './perfil/PerfilFotoCamara';
 import { PerfilHeroSection } from './perfil/PerfilHeroSection';
+import { avisoAprobacionPorteria } from './perfil/avisoAprobacion';
+import { avisoPerfilGuardado } from './perfil/avisoExitoPerfil';
 
 const PERM_EDITAR_MI_PERSONA = 'EDITAR MI PERSONA';
 
@@ -380,11 +382,12 @@ export const Perfil = () => {
         const result = await apiService.updateMiPersona(personaRequestToSelfUpdate(data));
         if (result && 'cambio_pendiente_id' in result) {
           setSaveError('');
-          alert('Sus cambios han sido enviados para aprobación. Acérquese a porteria para validar los cambios.');
+          avisoAprobacionPorteria('datos');
           setEditOpen(false);
           return;
         }
         setPersona(result as PersonaResponse);
+        avisoPerfilGuardado();
         setEditOpen(false);
         await refreshUser();
       } catch (e: unknown) {

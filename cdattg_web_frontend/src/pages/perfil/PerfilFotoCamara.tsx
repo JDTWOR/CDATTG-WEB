@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from 'react';
 import { archivoEsJpg } from './comprimirJpg';
 import { prepararFotoPerfil } from './prepararFotoPerfil';
 import { subirMiFoto } from '../../services/personaFotoApi';
+import { avisoAprobacionPorteria } from './avisoAprobacion';
+import { avisoFotoGuardada } from './avisoExitoPerfil';
 import type { PersonaResponse } from '../../types';
 
 type PerfilFotoCamaraProps = Readonly<{
@@ -15,7 +17,7 @@ type PerfilFotoCamaraProps = Readonly<{
 }>;
 
 const CONDICIONES =
-  'La foto debe ser de medio cuerpo, con camisa presentable (cualquier color). Solo se acepta JPG y queda en 20 KB.';
+  'La foto debe ser de medio cuerpo, con camisa presentable (cualquier color). Solo se acepta JPG (hasta 2 MB).';
 
 /**
  * Pinto tomar foto y cargar foto en verde, con las condiciones.
@@ -49,8 +51,9 @@ export function PerfilFotoCamara({ onCerrar, onGuardada }: PerfilFotoCamaraProps
       const resultado = await subirMiFoto(await prepararFotoPerfil(fuente));
       if ('id' in resultado) {
         onGuardada(resultado);
+        avisoFotoGuardada();
       } else {
-        alert(resultado.message);
+        avisoAprobacionPorteria('foto');
       }
       onCerrar();
     } catch (e: unknown) {

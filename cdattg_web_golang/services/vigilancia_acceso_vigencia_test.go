@@ -1,6 +1,6 @@
 // @module vigilancia_acceso_vigencia
 // @description Tests de las reglas de vigencia de roles en portería (aprendiz por ficha, instructor por contrato).
-// @author JDTWOR
+// @author Cristian Deysdayr Jiménez
 // @created 2026-08-15
 package services
 

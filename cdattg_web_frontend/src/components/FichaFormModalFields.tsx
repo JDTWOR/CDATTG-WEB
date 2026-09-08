@@ -258,29 +258,47 @@ export function FichaFormModalFields({
         icon={<CalendarDaysIcon className="h-5 w-5" />}
         className="!bg-white dark:!bg-gray-800"
       >
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3 dark:border-gray-600 dark:bg-gray-800">
-          <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">Ficha activa</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {form.status ? 'Visible para instructores y toma de asistencia' : 'Oculta temporalmente del flujo operativo'}
-            </p>
-          </div>
-          <button
-            id={`${pid}-status`}
-            type="button"
-            role="switch"
-            aria-checked={form.status ?? true}
-            onClick={() => setForm((f) => ({ ...f, status: !(f.status ?? true) }))}
-            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-              form.status ?? true ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
-            }`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition ${
-                form.status ?? true ? 'translate-x-5' : 'translate-x-0.5'
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 dark:border-gray-600 dark:bg-gray-800">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">Ficha activa</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {form.status_manual === null
+                  ? `Automática según fecha inicio/fin (${form.status ? 'activa hoy' : 'inactiva hoy'}). Podrá activarla o inactivarla manualmente aquí.`
+                  : form.status_manual
+                    ? 'Activada manualmente (ignora la fecha fin, hasta que la desactive o vuelva a automático)'
+                    : 'Inactivada manualmente (ignora las fechas, hasta que la active o vuelva a automático)'}
+              </p>
+            </div>
+            <button
+              id={`${pid}-status`}
+              type="button"
+              role="switch"
+              aria-checked={form.status ?? true}
+              onClick={() => {
+                const nuevo = !(form.status ?? true);
+                setForm((f) => ({ ...f, status: nuevo, status_manual: nuevo }));
+              }}
+              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                form.status ?? true ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
               }`}
-            />
-          </button>
+            >
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition ${
+                  form.status ?? true ? 'translate-x-5' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+          {form.status_manual !== null ? (
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, status_manual: null }))}
+              className="mt-2 text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+            >
+              Volver a automático (por fechas)
+            </button>
+          ) : null}
         </div>
       </FichaFormSection>
     </div>

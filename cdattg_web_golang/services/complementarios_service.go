@@ -290,14 +290,57 @@ func (s *ComplementariosService) ConsultarInscripcionesLoteAsync(usuarioID uint,
 	}
 	cred.Rol = "Usuario SENA"
 
+	job := s.iniciarLoteInscripciones(cred, filas)
+	return dto.LoteIniciadoResponse{LoteID: job.LoteID, Total: len(filas)}, nil
+}
+
+// ReintentarInscripciones vuelve a consultar en SofiaPlus solo las filas que
+// quedaron NO_VERIFICADO / NO_ENCONTRADO en un lote anterior (sin Excel).
+func (s *ComplementariosService) ReintentarInscripciones(usuarioID uint, req dto.ReintentarInscripcionesRequest) (dto.LoteIniciadoResponse, error) {
+	filas := filasReintentoValidas(req.Documentos)
+	if len(filas) == 0 {
+		return dto.LoteIniciadoResponse{}, errors.New("no hay filas válidas (numero_documento y programa) para reintentar")
+	}
+	cred, err := s.credencialesDeUsuario(usuarioID)
+	if err != nil {
+		return dto.LoteIniciadoResponse{}, err
+	}
+	cred.Rol = "Usuario SENA"
+
+	job := s.iniciarLoteInscripciones(cred, filas)
+	return dto.LoteIniciadoResponse{LoteID: job.LoteID, Total: len(filas)}, nil
+}
+
+// filasReintentoValidas normaliza y descarta filas sin documento o programa del
+// reintento de inscripciones.
+func filasReintentoValidas(documentos []dto.LoteInscripcionFila) []dto.LoteInscripcionFila {
+	filas := make([]dto.LoteInscripcionFila, 0, len(documentos))
+	for _, d := range documentos {
+		numero := strings.TrimSpace(d.NumeroDocumento)
+		programa := strings.TrimSpace(d.Programa)
+		if numero == "" || programa == "" {
+			continue
+		}
+		filas = append(filas, dto.LoteInscripcionFila{
+			NumeroDocumento: numero,
+			Programa:        programa,
+			TipoDocumento:   strings.TrimSpace(d.TipoDocumento),
+		})
+	}
+	return filas
+}
+
+// iniciarLoteInscripciones arranca en segundo plano el escaneo Fase 2
+// (Consultar Inscripciones) de una lista de filas documento+programa; lo
+// comparten Excel y reintento.
+func (s *ComplementariosService) iniciarLoteInscripciones(cred SofiaCredenciales, filas []dto.LoteInscripcionFila) *loteJob {
 	job := registrarLote("inscripciones", len(filas))
 	go func() {
 		defer close(job.Done)
 		scraper := NewSofiaScraper()
 		job.Resultados = scraper.ConsultarInscripcionesLote(cred, filas, job.LoteID)
 	}()
-
-	return dto.LoteIniciadoResponse{LoteID: job.LoteID, Total: len(filas)}, nil
+	return job
 }
 
 // ResultadosLoteInscripciones devuelve el resultado final de un lote de
@@ -396,7 +439,38 @@ func (s *ComplementariosService) VerificarLoteAsync(usuarioID uint, contenido []
 	if len(docs) == 0 {
 		return dto.LoteIniciadoResponse{}, errors.New("el Excel no tiene documentos válidos (revisa la columna numero_documento)")
 	}
+	return s.iniciarLoteVerificar(usuarioID, docs)
+}
 
+// ReintentarVerificacion vuelve a consultar en SofiaPlus solo los documentos
+// que quedaron NO_VERIFICADO / NO_REGISTRADO en un lote anterior (sin Excel).
+func (s *ComplementariosService) ReintentarVerificacion(usuarioID uint, req dto.ReintentarVerificacionRequest) (dto.LoteIniciadoResponse, error) {
+	docs := docsReintentoValidos(req.Documentos)
+	if len(docs) == 0 {
+		return dto.LoteIniciadoResponse{}, errors.New("no hay documentos válidos para reintentar")
+	}
+	return s.iniciarLoteVerificar(usuarioID, docs)
+}
+
+// docsReintentoValidos normaliza y descarta documentos vacíos del reintento de verificación.
+func docsReintentoValidos(documentos []dto.LoteDocumento) []dto.LoteDocumento {
+	docs := make([]dto.LoteDocumento, 0, len(documentos))
+	for _, d := range documentos {
+		numero := strings.TrimSpace(d.NumeroDocumento)
+		if numero == "" {
+			continue
+		}
+		docs = append(docs, dto.LoteDocumento{
+			NumeroDocumento: numero,
+			TipoDocumento:   strings.TrimSpace(d.TipoDocumento),
+		})
+	}
+	return docs
+}
+
+// iniciarLoteVerificar arranca en segundo plano el escaneo Fase 1 (Consultar
+// Registro) de una lista de documentos; lo comparten Excel y reintento.
+func (s *ComplementariosService) iniciarLoteVerificar(usuarioID uint, docs []dto.LoteDocumento) (dto.LoteIniciadoResponse, error) {
 	cred, err := s.credencialesDeUsuario(usuarioID)
 	if err != nil {
 		return dto.LoteIniciadoResponse{}, err

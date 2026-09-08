@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -18,10 +19,12 @@ const (
 	metodoCamara = "CAMARA"
 	metodoManual = "MANUAL"
 
-	tipoAprendiz       = "APRENDIZ"
-	tipoInstructor     = "INSTRUCTOR"
-	tipoAdministrativo = "ADMINISTRATIVO"
-	tipoVisitante      = "VISITANTE"
+	tipoAprendiz              = "APRENDIZ"
+	tipoInstructor            = "INSTRUCTOR"
+	tipoAdministrativo        = "ADMINISTRATIVO"
+	tipoPersonalOperativoApoyo = "PERSONAL_OPERATIVO_APOYO"
+	tipoContratista           = "CONTRATISTA"
+	tipoVisitante             = "VISITANTE"
 
 	accionIngreso = "INGRESO"
 	accionSalida  = "SALIDA"
@@ -31,9 +34,11 @@ const (
 
 	errDocObligatorio  = "número de documento obligatorio"
 	errSedeObligatoria = "debe seleccionar la sede antes de escanear o registrar"
+	// cancelarIngresoVentana es el máximo de minutos para anular una entrada automática.
+	cancelarIngresoVentana = 5 * time.Minute
 )
 
-var tiposPersonaAcceso = []string{tipoAprendiz, tipoInstructor, tipoAdministrativo, tipoVisitante}
+var tiposPersonaAcceso = []string{tipoAprendiz, tipoInstructor, tipoAdministrativo, tipoPersonalOperativoApoyo, tipoContratista, tipoVisitante}
 
 var motivosSalidaAcceso = []string{
 	"DESCANSO",
@@ -50,19 +55,24 @@ type VigilanciaAccesoService interface {
 	Lookup(req dto.AccesoLookupRequest) (*dto.AccesoLookupResponse, error)
 	Ingreso(req dto.AccesoIngresoRequest, registradoPorUserID uint) (*dto.AccesoRegistroResponse, error)
 	Salida(req dto.AccesoSalidaRequest, registradoPorUserID uint) (*dto.AccesoRegistroResponse, error)
+	CancelarIngreso(req dto.AccesoCancelarIngresoRequest, canceladoPorUserID uint) (*dto.AccesoCancelarIngresoResponse, error)
 	ListDentro(sedeID *uint) ([]dto.AccesoDentroItem, error)
 	Historial(f dto.AccesoHistorialFiltros) (*dto.AccesoHistorialResponse, error)
 	Estadisticas(f dto.AccesoHistorialFiltros) (*dto.AccesoEstadisticasResponse, error)
+	LeerFotoAcceso(documento string) (*PersonaFotoArchivo, error)
 }
 
 type vigilanciaAccesoService struct {
-	personaRepo    repositories.PersonaRepository
-	accesoRepo     repositories.PersonaIngresoSalidaRepository
-	catalogo       repositories.CatalogoRepository
-	userAccounts   PersonaUserAccountService
-	instructorRepo repositories.InstructorRepository
-	aprendizRepo   repositories.AprendizRepository
-	fichaRepo      repositories.FichaRepository
+	personaRepo              repositories.PersonaRepository
+	accesoRepo               repositories.PersonaIngresoSalidaRepository
+	catalogo                 repositories.CatalogoRepository
+	userAccounts             PersonaUserAccountService
+	instructorRepo           repositories.InstructorRepository
+	aprendizRepo             repositories.AprendizRepository
+	fichaRepo                repositories.FichaRepository
+	personalOperativoApoyoRepo repositories.PersonalOperativoApoyoRepository
+	contratistaRepo          repositories.ContratistaRepository
+	solicitudRepo            repositories.CarnetSolicitudRepository
 }
 
 // NewVigilanciaAccesoService construye el servicio de portería.
@@ -76,6 +86,9 @@ func NewVigilanciaAccesoService() VigilanciaAccesoService {
 		instructorRepo: repositories.NewInstructorRepository(),
 		aprendizRepo:   repositories.NewAprendizRepository(),
 		fichaRepo:      repositories.NewFichaRepository(),
+		personalOperativoApoyoRepo: repositories.NewPersonalOperativoApoyoRepository(),
+		contratistaRepo: repositories.NewContratistaRepository(),
+		solicitudRepo:   repositories.NewCarnetSolicitudRepository(),
 	}
 }
 
@@ -183,25 +196,111 @@ func (s *vigilanciaAccesoService) requireSedeID(sedeID *uint) (uint, error) {
 	return 0, errors.New("sede no encontrada o inactiva")
 }
 
-// resolverTiposPersona detecta todos los roles de la persona (puede ser aprendiz e instructor a la vez).
-func (s *vigilanciaAccesoService) resolverTiposPersona(personaID uint) []string {
-	tipos := make([]string, 0, 3)
-	esAprendiz := false
-	if activos, err := s.aprendizRepo.FindActivosByPersonaID(personaID); err == nil && len(activos) > 0 {
-		esAprendiz = true
-	} else if apr, err := s.aprendizRepo.FindByPersonaID(personaID); err == nil && apr != nil {
-		esAprendiz = true
+// resolverVistaAcceso resuelve en UNA consulta los roles vigentes y las fichas activas de la persona,
+// evitando duplicar FindActivosByPersonaID por petición. Quien no pertenece a ningún rol queda como visitante.
+func (s *vigilanciaAccesoService) resolverVistaAcceso(personaID uint) ([]string, []dto.AccesoFichaResumen) {
+	tipos := make([]string, 0, 4)
+	hoy := time.Now()
+	activos, err := s.aprendizRepo.FindActivosByPersonaID(personaID)
+	var fichas []dto.AccesoFichaResumen
+	if err == nil {
+		cargarFicha := func(id uint) *models.FichaCaracterizacion {
+			ficha, errLoad := s.fichaRepo.FindByID(id)
+			if errLoad != nil {
+				return nil
+			}
+			return ficha
+		}
+		if hayMatriculaConFichaVigente(activos, hoy, cargarFicha) {
+			tipos = append(tipos, tipoAprendiz)
+		}
+		fichas = fichasVigentesDeMatriculas(activos, hoy, cargarFicha)
 	}
-	if esAprendiz {
-		tipos = append(tipos, tipoAprendiz)
-	}
-	if inst, err := s.instructorRepo.FindByPersonaID(personaID); err == nil && inst != nil {
+	if inst, err := s.instructorRepo.FindByPersonaID(personaID); err == nil && instructorVigenteParaAcceso(inst, hoy) {
 		tipos = append(tipos, tipoInstructor)
 	}
-	if len(tipos) == 0 {
-		return []string{tipoVisitante}
+	if poa, err := s.personalOperativoApoyoRepo.FindByPersonaID(personaID); err == nil && poa != nil && poa.Status {
+		tipos = append(tipos, tipoPersonalOperativoApoyo)
 	}
+	if ct, err := s.contratistaRepo.FindByPersonaID(personaID); err == nil && ct != nil && ct.Status {
+		tipos = append(tipos, tipoContratista)
+	}
+	if len(tipos) == 0 {
+		tipos = []string{tipoVisitante}
+	}
+	return tipos, fichas
+}
+
+// resolverTiposPersona roles vigentes de la persona (comparte la consulta única con resolveFichasActivas).
+func (s *vigilanciaAccesoService) resolverTiposPersona(personaID uint) []string {
+	tipos, _ := s.resolverVistaAcceso(personaID)
 	return tipos
+}
+
+// resolveFichasActivas fichas activas/vigentes donde la persona es aprendiz (comparte la consulta única con resolverTiposPersona).
+func (s *vigilanciaAccesoService) resolveFichasActivas(personaID uint) []dto.AccesoFichaResumen {
+	_, fichas := s.resolverVistaAcceso(personaID)
+	return fichas
+}
+
+// hayMatriculaConFichaVigente true si alguna matrícula activa tiene ficha activa y vigente hoy.
+func hayMatriculaConFichaVigente(activos []models.Aprendiz, hoy time.Time, cargarFicha func(uint) *models.FichaCaracterizacion) bool {
+	for i := range activos {
+		if fichaVigenteParaAcceso(fichaDeMatricula(&activos[i], cargarFicha), hoy) {
+			return true
+		}
+	}
+	return false
+}
+
+// fichasVigentesDeMatriculas resumenes de las fichas activas y vigentes (deduplicadas por ficha).
+func fichasVigentesDeMatriculas(activos []models.Aprendiz, hoy time.Time, cargarFicha func(uint) *models.FichaCaracterizacion) []dto.AccesoFichaResumen {
+	out := make([]dto.AccesoFichaResumen, 0, len(activos))
+	seen := make(map[uint]struct{}, len(activos))
+	for i := range activos {
+		ficha := fichaDeMatricula(&activos[i], cargarFicha)
+		if !fichaVigenteParaAcceso(ficha, hoy) {
+			continue
+		}
+		if _, dup := seen[ficha.ID]; dup {
+			continue
+		}
+		seen[ficha.ID] = struct{}{}
+		out = append(out, toAccesoFichaResumen(ficha))
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// fichaDeMatricula devuelve la ficha de la matrícula (cargándola si la preload no la trajo).
+func fichaDeMatricula(a *models.Aprendiz, cargarFicha func(uint) *models.FichaCaracterizacion) *models.FichaCaracterizacion {
+	if a.FichaCaracterizacion != nil {
+		return a.FichaCaracterizacion
+	}
+	if a.FichaCaracterizacionID > 0 {
+		return cargarFicha(a.FichaCaracterizacionID)
+	}
+	return nil
+}
+
+// instructorVigenteParaAcceso indica que el instructor pertenece hoy al rol: status activo y contrato dentro de fechas.
+func instructorVigenteParaAcceso(inst *models.Instructor, hoy time.Time) bool {
+	if inst == nil || !inst.Status {
+		return false
+	}
+	if fechaInicioFutura(inst.FechaInicioContrato, hoy) {
+		return false
+	}
+	return !fechaFinVencida(inst.FechaFinContrato, hoy)
+}
+
+// sincronizarVigenciaRoles aplica las reglas automáticas de vigencia antes de resolver roles en portería:
+// fichas por fecha inicio/fin y instructores por fecha fin de contrato. Errores no bloquean la portería.
+func (s *vigilanciaAccesoService) sincronizarVigenciaRoles() {
+	_ = s.fichaRepo.SincronizarVigencia()
+	_ = s.instructorRepo.SincronizarVigencia()
 }
 
 func primarioTipoPersona(tipos []string) string {
@@ -238,13 +337,10 @@ func fichaVigenteParaAcceso(ficha *models.FichaCaracterizacion, hoy time.Time) b
 	if config.IgnorarVigenciaFicha() {
 		return true
 	}
-	if ficha.FechaFin != nil && ficha.FechaFin.Before(hoy.Truncate(24*time.Hour)) {
+	if fechaFinVencida(ficha.FechaFin, hoy) {
 		return false
 	}
-	if ficha.FechaInicio != nil && ficha.FechaInicio.After(hoy) {
-		return false
-	}
-	return true
+	return !fechaInicioFutura(ficha.FechaInicio, hoy)
 }
 
 func toAccesoFichaResumen(ficha *models.FichaCaracterizacion) dto.AccesoFichaResumen {
@@ -271,37 +367,6 @@ func toAccesoFichaResumen(ficha *models.FichaCaracterizacion) dto.AccesoFichaRes
 		res.SedeNombre = ficha.Sede.Nombre
 	}
 	return res
-}
-
-// resolveFichasActivas todas las fichas activas/vigentes donde la persona es aprendiz.
-func (s *vigilanciaAccesoService) resolveFichasActivas(personaID uint) []dto.AccesoFichaResumen {
-	list, err := s.aprendizRepo.FindActivosByPersonaID(personaID)
-	if err != nil || len(list) == 0 {
-		return nil
-	}
-	hoy := time.Now()
-	out := make([]dto.AccesoFichaResumen, 0, len(list))
-	seen := make(map[uint]struct{}, len(list))
-	for i := range list {
-		ficha := list[i].FichaCaracterizacion
-		if ficha == nil && list[i].FichaCaracterizacionID > 0 {
-			if loaded, errLoad := s.fichaRepo.FindByID(list[i].FichaCaracterizacionID); errLoad == nil {
-				ficha = loaded
-			}
-		}
-		if !fichaVigenteParaAcceso(ficha, hoy) {
-			continue
-		}
-		if _, dup := seen[ficha.ID]; dup {
-			continue
-		}
-		seen[ficha.ID] = struct{}{}
-		out = append(out, toAccesoFichaResumen(ficha))
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }
 
 func primeraFichaAcceso(fichas []dto.AccesoFichaResumen) *dto.AccesoFichaResumen {
@@ -372,6 +437,7 @@ func (s *vigilanciaAccesoService) findOrCreatePersona(doc string) (*models.Perso
 }
 
 func (s *vigilanciaAccesoService) Lookup(req dto.AccesoLookupRequest) (*dto.AccesoLookupResponse, error) {
+	s.sincronizarVigenciaRoles()
 	doc := normalizeDocumentoAcceso(req.NumeroDocumento)
 	if doc == "" {
 		return nil, errors.New(errDocObligatorio)
@@ -381,20 +447,37 @@ func (s *vigilanciaAccesoService) Lookup(req dto.AccesoLookupRequest) (*dto.Acce
 		return nil, err
 	}
 
-	persona, esNueva, err := s.findOrCreatePersona(doc)
-	if err != nil {
+	// Buscar sin crear: el usuario/persona nueva SOLO se crea al confirmar el ingreso.
+	persona, err := s.personaRepo.FindByNumeroDocumento(doc)
+	var tipos []string
+	var fichas []dto.AccesoFichaResumen
+	var abierta *models.PersonaIngresoSalida
+	esNueva := false
+	switch {
+	case err == nil && persona != nil:
+		// Persona ya registrada: roles, fichas y visita abierta como siempre.
+		tipos, fichas = s.resolverVistaAcceso(persona.ID)
+		abierta, err = s.accesoRepo.FindAbiertaByPersonaAndSede(persona.ID, sedeID)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		err = nil
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		// Persona inexistente: solo se muestra la "vista de persona nueva".
+		// Cancelar aquí NO deja nada creado en la base de datos.
+		err = nil
+		esNueva = true
+		persona = &models.Persona{NumeroDocumento: doc, Status: true}
+		tipos = []string{tipoVisitante}
+	default:
 		return nil, err
 	}
 
-	tipos := s.resolverTiposPersona(persona.ID)
-	abierta, err := s.accesoRepo.FindAbiertaByPersonaAndSede(persona.ID, sedeID)
 	dentro := false
 	var visita *dto.AccesoVisitaAbierta
-	if err == nil && abierta != nil {
+	if abierta != nil {
 		dentro = true
 		visita = visitaDTO(abierta)
-	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
 	}
 
 	modo := normalizeModo(req.Modo)
@@ -422,9 +505,8 @@ func (s *vigilanciaAccesoService) Lookup(req dto.AccesoLookupRequest) (*dto.Acce
 		}
 	}
 
-	fichas := s.resolveFichasActivas(persona.ID)
 	return &dto.AccesoLookupResponse{
-		Persona:                 toFicha(persona, esNueva, tipos),
+		Persona:                 s.fichaAcceso(persona, esNueva, tipos),
 		Dentro:                  dentro,
 		AccionSugerida:          accion,
 		VisitaAbierta:           visita,
@@ -440,6 +522,7 @@ func (s *vigilanciaAccesoService) Lookup(req dto.AccesoLookupRequest) (*dto.Acce
 }
 
 func (s *vigilanciaAccesoService) Ingreso(req dto.AccesoIngresoRequest, registradoPorUserID uint) (*dto.AccesoRegistroResponse, error) {
+	s.sincronizarVigenciaRoles()
 	doc := normalizeDocumentoAcceso(req.NumeroDocumento)
 	if doc == "" {
 		return nil, errors.New(errDocObligatorio)
@@ -464,12 +547,12 @@ func (s *vigilanciaAccesoService) Ingreso(req dto.AccesoIngresoRequest, registra
 		return nil, err
 	}
 
-	// Tipo automático: aprendiz / instructor / visitante (no se pide en portería).
-	tipo := s.sugerirTipoPersona(persona.ID)
+	// Tipo automático: aprendiz / instructor / personal operativo y de apoyo / contratista / visitante (no se pide en portería).
+	tipos, fichas := s.resolverVistaAcceso(persona.ID)
+	tipo := primarioTipoPersona(tipos)
 
 	now := time.Now()
 	regID := registradoPorUserID
-	fichas := s.resolveFichasActivas(persona.ID)
 	fichaInfo := primeraFichaAcceso(fichas)
 	row := &models.PersonaIngresoSalida{
 		PersonaID:           persona.ID,
@@ -496,7 +579,7 @@ func (s *vigilanciaAccesoService) Ingreso(req dto.AccesoIngresoRequest, registra
 	}
 
 	return &dto.AccesoRegistroResponse{
-		Persona:       toFicha(persona, esNueva, s.resolverTiposPersona(persona.ID)),
+		Persona:       s.fichaAcceso(persona, esNueva, tipos),
 		Accion:        accionIngreso,
 		VisitaID:      row.ID,
 		Dentro:        true,
@@ -506,6 +589,60 @@ func (s *vigilanciaAccesoService) Ingreso(req dto.AccesoIngresoRequest, registra
 		Fichas:        fichas,
 		SedeID:        sedeID,
 	}, nil
+}
+
+// Cancela el ingreso automático recién registrado: la persona no llegó a entrar.
+func (s *vigilanciaAccesoService) CancelarIngreso(req dto.AccesoCancelarIngresoRequest, canceladoPorUserID uint) (*dto.AccesoCancelarIngresoResponse, error) {
+	if req.VisitaID == 0 {
+		return nil, errors.New("visita_id obligatorio")
+	}
+	sedeID, err := s.requireSedeID(req.SedeID)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.accesoRepo.FindByID(req.VisitaID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("ingreso no encontrado")
+		}
+		return nil, err
+	}
+	if !visitaIngresoCancelable(row, sedeID, time.Now(), cancelarIngresoVentana) {
+		return nil, errors.New("la entrada ya no se puede cancelar: no está abierta, ya fue cancelada o pasó la ventana")
+	}
+	now := time.Now()
+	row.IngresoCancelado = true
+	row.IngresoCanceladoAt = &now
+	row.IngresoCanceladoPor = &canceladoPorUserID
+	traza := "ingreso_cancelado=true; cancelado_por_user_id=" + strconv.FormatUint(uint64(canceladoPorUserID), 10)
+	if strings.TrimSpace(row.Observaciones) == "" {
+		row.Observaciones = traza
+	} else {
+		row.Observaciones = row.Observaciones + "; " + traza
+	}
+	if err := s.accesoRepo.Update(row); err != nil {
+		return nil, err
+	}
+	return &dto.AccesoCancelarIngresoResponse{
+		VisitaID:  row.ID,
+		Cancelado: true,
+		Mensaje:   "Entrada cancelada.",
+	}, nil
+}
+
+// visitaIngresoCancelable indica si una visita abierta puede anularse como ingreso automático
+// (misma sede, sin salida, sin cancelación previa y dentro de la ventana de tiempo).
+func visitaIngresoCancelable(row *models.PersonaIngresoSalida, sedeID uint, ahora time.Time, ventana time.Duration) bool {
+	if row == nil || row.SedeID != sedeID {
+		return false
+	}
+	if row.TimestampSalida != nil || row.IngresoCancelado {
+		return false
+	}
+	if ahora.Before(row.TimestampEntrada) {
+		return false
+	}
+	return ahora.Sub(row.TimestampEntrada) <= ventana
 }
 
 func (s *vigilanciaAccesoService) resolvePersonaParaSalida(doc string, permitirSinIngreso bool) (*models.Persona, error) {
@@ -527,7 +664,8 @@ func (s *vigilanciaAccesoService) crearSalidaSinIngreso(
 	_ string, // tipoPersona ignorado: se infiere automáticamente
 	registradoPorUserID uint,
 ) (*dto.AccesoRegistroResponse, error) {
-	tipo := s.sugerirTipoPersona(persona.ID)
+	tipos, fichas := s.resolverVistaAcceso(persona.ID)
+	tipo := primarioTipoPersona(tipos)
 	now := time.Now()
 	regID := registradoPorUserID
 	obs := strings.TrimSpace(observacion)
@@ -554,9 +692,8 @@ func (s *vigilanciaAccesoService) crearSalidaSinIngreso(
 	if err := s.accesoRepo.Create(row); err != nil {
 		return nil, err
 	}
-	fichas := s.resolveFichasActivas(persona.ID)
 	return &dto.AccesoRegistroResponse{
-		Persona:          toFicha(persona, false, s.resolverTiposPersona(persona.ID)),
+		Persona:          s.fichaAcceso(persona, false, tipos),
 		Accion:           accionSalida,
 		VisitaID:         row.ID,
 		Dentro:           false,
@@ -569,6 +706,7 @@ func (s *vigilanciaAccesoService) crearSalidaSinIngreso(
 }
 
 func (s *vigilanciaAccesoService) Salida(req dto.AccesoSalidaRequest, registradoPorUserID uint) (*dto.AccesoRegistroResponse, error) {
+	s.sincronizarVigenciaRoles()
 	doc := normalizeDocumentoAcceso(req.NumeroDocumento)
 	if doc == "" {
 		return nil, errors.New(errDocObligatorio)
@@ -633,9 +771,9 @@ func (s *vigilanciaAccesoService) cerrarVisita(
 		return nil, err
 	}
 
-	fichas := s.resolveFichasActivas(persona.ID)
+	tipos, fichas := s.resolverVistaAcceso(persona.ID)
 	return &dto.AccesoRegistroResponse{
-		Persona:  toFicha(persona, false, s.resolverTiposPersona(persona.ID)),
+		Persona:  s.fichaAcceso(persona, false, tipos),
 		Accion:   accionSalida,
 		VisitaID: abierta.ID,
 		Dentro:   false,
@@ -647,6 +785,7 @@ func (s *vigilanciaAccesoService) cerrarVisita(
 }
 
 func (s *vigilanciaAccesoService) ListDentro(sedeID *uint) ([]dto.AccesoDentroItem, error) {
+	s.sincronizarVigenciaRoles()
 	sid, err := s.requireSedeID(sedeID)
 	if err != nil {
 		return nil, err
@@ -660,11 +799,11 @@ func (s *vigilanciaAccesoService) ListDentro(sedeID *uint) ([]dto.AccesoDentroIt
 		row := rows[i]
 		var ficha dto.AccesoPersonaFicha
 		if row.Persona != nil {
-			ficha = toFicha(row.Persona, false, s.resolverTiposPersona(row.Persona.ID))
+			ficha = s.fichaAcceso(row.Persona, false, s.resolverTiposPersona(row.Persona.ID))
 		} else {
 			p, errP := s.personaRepo.FindByID(row.PersonaID)
 			if errP == nil && p != nil {
-				ficha = toFicha(p, false, s.resolverTiposPersona(p.ID))
+				ficha = s.fichaAcceso(p, false, s.resolverTiposPersona(p.ID))
 			}
 		}
 		out = append(out, dto.AccesoDentroItem{
@@ -746,6 +885,9 @@ func indiceSalidaIngreso(ingresos, salidas int64) float64 {
 
 func (s *vigilanciaAccesoService) historialItemFromRow(row *models.PersonaIngresoSalida) dto.AccesoHistorialItem {
 	estado := "abierto"
+	if row.IngresoCancelado {
+		estado = "cancelado"
+	}
 	var tsSalida *string
 	if row.TimestampSalida != nil {
 		estado = "cerrado"
@@ -765,7 +907,7 @@ func (s *vigilanciaAccesoService) historialItemFromRow(row *models.PersonaIngres
 		Estado:            estado,
 	}
 	if row.Persona != nil {
-		item.Persona = toFicha(row.Persona, false, s.resolverTiposPersona(row.Persona.ID))
+		item.Persona = s.fichaAcceso(row.Persona, false, s.resolverTiposPersona(row.Persona.ID))
 	}
 	if row.Sede != nil {
 		item.SedeNombre = row.Sede.Nombre
@@ -778,6 +920,7 @@ func (s *vigilanciaAccesoService) historialItemFromRow(row *models.PersonaIngres
 }
 
 func (s *vigilanciaAccesoService) Historial(f dto.AccesoHistorialFiltros) (*dto.AccesoHistorialResponse, error) {
+	s.sincronizarVigenciaRoles()
 	q, err := s.toRepoQuery(f)
 	if err != nil {
 		return nil, err
@@ -809,6 +952,7 @@ func (s *vigilanciaAccesoService) Historial(f dto.AccesoHistorialFiltros) (*dto.
 }
 
 func (s *vigilanciaAccesoService) Estadisticas(f dto.AccesoHistorialFiltros) (*dto.AccesoEstadisticasResponse, error) {
+	s.sincronizarVigenciaRoles()
 	q, err := s.toRepoQuery(f)
 	if err != nil {
 		return nil, err

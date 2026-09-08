@@ -6,6 +6,7 @@ export function isSidebarItemVisible(
   roles: string[],
   hasPermission: (permission: string) => boolean,
 ): boolean {
+  if (item.hiddenForRoles?.some((r) => hasAnyRole(roles, [r]))) return false;
   if (item.rolesRequired && item.rolesRequired.length > 0) {
     const matchRequired = hasAnyRole(roles, item.rolesRequired);
     const matchAlsoRole = item.alsoVisibleForRoles?.some((r) => hasAnyRole(roles, [r])) ?? false;

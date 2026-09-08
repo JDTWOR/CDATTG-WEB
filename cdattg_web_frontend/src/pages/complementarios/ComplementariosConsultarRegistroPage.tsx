@@ -404,6 +404,7 @@ const CargaMasivaPanel = () => {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [procesando, setProcesando] = useState(false);
+  const [reintentando, setReintentando] = useState(false);
   const [descargando, setDescargando] = useState(false);
   const [error, setError] = useState('');
   const [res, setRes] = useState<VerificarLoteResponse | null>(null);
@@ -420,6 +421,63 @@ const CargaMasivaPanel = () => {
 
   // Limpieza al desmontar: nunca dejar un intervalo vivo.
   useEffect(() => detenerPolling, [detenerPolling]);
+
+  // Une los resultados de un lote (inicial o reintento) conservando el orden
+  // de las filas originales: cada documento se actualiza en su misma posición.
+  const renuevaResultados = useCallback(
+    (prev: VerificarLoteResponse | null, nuevos: VerificarLoteResponse): VerificarLoteResponse => {
+      const base = prev?.resultados ?? [];
+      const porDoc = new Map(nuevos.resultados.map((r) => [r.numero_documento, r]));
+      const combinados = base.map((r) => porDoc.get(r.numero_documento) ?? r);
+      for (const r of nuevos.resultados) {
+        if (!base.some((b) => b.numero_documento === r.numero_documento)) {
+          combinados.push(r);
+        }
+      }
+      const out: VerificarLoteResponse = {
+        total: combinados.length,
+        registrados: 0,
+        no_registrados: 0,
+        no_verificados: 0,
+        resultados: combinados,
+      };
+      for (const r of combinados) {
+        if (r.estado === 'REGISTRADO') out.registrados += 1;
+        else if (r.estado === 'NO_REGISTRADO') out.no_registrados += 1;
+        else out.no_verificados += 1;
+      }
+      return out;
+    },
+    [],
+  );
+
+  // Polling del avance del lote (2 s) hasta que termina; alTerminar recibe los resultados.
+  const iniciarPolling = useCallback(
+    (loteId: string, alTerminar: (r: VerificarLoteResponse) => void) => {
+      detenerPolling();
+      pollingRef.current = setInterval(async () => {
+        try {
+          const p = await apiService.progresoLote(loteId);
+          setProgreso(p);
+          if (p.terminado) {
+            detenerPolling();
+            const r = await apiService.resultadosLote(loteId);
+            alTerminar(r);
+            setProcesando(false);
+            setReintentando(false);
+            setProgreso(null);
+          }
+        } catch (err: unknown) {
+          detenerPolling();
+          setProcesando(false);
+          setReintentando(false);
+          setProgreso(null);
+          setError(axiosErrorMessage(err, 'No se pudo consultar el avance del escaneo.'));
+        }
+      }, 2000);
+    },
+    [detenerPolling],
+  );
 
   const handleDescargarPlantilla = async () => {
     setDescargando(true);
@@ -446,33 +504,39 @@ const CargaMasivaPanel = () => {
     try {
       const iniciado = await apiService.verificarLote(file);
       setProgreso({ lote_id: iniciado.lote_id, total: iniciado.total, procesados: 0, terminado: false });
-
-      // Polling: consulta el avance del lote cada 2 s hasta que termine.
-      pollingRef.current = setInterval(async () => {
-        try {
-          const p = await apiService.progresoLote(iniciado.lote_id);
-          setProgreso(p);
-          if (p.terminado) {
-            detenerPolling();
-            const r = await apiService.resultadosLote(iniciado.lote_id);
-            setRes(r);
-            setProcesando(false);
-            setProgreso(null);
-          }
-        } catch (err: unknown) {
-          detenerPolling();
-          setProcesando(false);
-          setProgreso(null);
-          setError(axiosErrorMessage(err, 'No se pudo consultar el avance del escaneo.'));
-        }
-      }, 2000);
+      iniciarPolling(iniciado.lote_id, (r) => setRes(renuevaResultados(null, r)));
     } catch (err: unknown) {
       setProcesando(false);
       setError(axiosErrorMessage(err, 'No se pudo procesar el archivo.'));
     }
   };
 
+  // Reintenta solo los NO_VERIFICADO / NO_REGISTRADO (los REGISTRADO se dejan
+  // intactos en su fila). Al terminar, cada fila se actualiza en su posición.
+  const handleReintentarPendientes = async () => {
+    const pendientes = (res?.resultados ?? []).filter(
+      (r) => r.estado === 'NO_VERIFICADO' || r.estado === 'NO_REGISTRADO',
+    );
+    if (!pendientes.length) return;
+    setReintentando(true);
+    setProcesando(true);
+    setError('');
+    setProgreso(null);
+    try {
+      const iniciado = await apiService.reintentarVerificacionLote(
+        pendientes.map((r) => ({ numero_documento: r.numero_documento })),
+      );
+      setProgreso({ lote_id: iniciado.lote_id, total: iniciado.total, procesados: 0, terminado: false });
+      iniciarPolling(iniciado.lote_id, (r) => setRes((prev) => renuevaResultados(prev, r)));
+    } catch (err: unknown) {
+      setReintentando(false);
+      setError(axiosErrorMessage(err, 'No se pudo lanzar el reintento.'));
+    }
+  };
+
   const registrados = res?.resultados.filter((r) => r.estado === 'REGISTRADO') ?? [];
+  const pendientes =
+    res?.resultados.filter((r) => r.estado === 'NO_VERIFICADO' || r.estado === 'NO_REGISTRADO') ?? [];
 
   const exportarParaFase2 = () => {
     if (!registrados.length) return;
@@ -548,7 +612,8 @@ const CargaMasivaPanel = () => {
       <button type="button" className="btn-primary inline-flex items-center gap-2" onClick={handleProcesar} disabled={procesando || !file}>
         {procesando ? (
           <>
-            <ArrowPathIcon className="w-5 h-5 animate-spin" aria-hidden /> Escaneo completo en Sofía…{' '}
+            <ArrowPathIcon className="w-5 h-5 animate-spin" aria-hidden />{' '}
+            {reintentando ? 'Reintentando pendientes en Sofía…' : 'Escaneo completo en Sofía…'}{' '}
             {progreso ? `${progreso.procesados}/${progreso.total}` : ''}
           </>
         ) : (
@@ -586,6 +651,16 @@ const CargaMasivaPanel = () => {
             <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">No verificados: {res.no_verificados}</span>
           </div>
           <div className="flex flex-wrap gap-2">
+            {pendientes.length > 0 && (
+              <button
+                type="button"
+                className="btn-primary inline-flex items-center gap-1"
+                onClick={handleReintentarPendientes}
+                disabled={procesando}
+              >
+                <ArrowPathIcon className="w-4 h-4" aria-hidden /> Reintentar pendientes ({pendientes.length})
+              </button>
+            )}
             <button type="button" className="btn-secondary inline-flex items-center gap-1" onClick={exportarResultados}>
               <ArrowDownTrayIcon className="w-4 h-4" aria-hidden /> Descargar resultados
             </button>

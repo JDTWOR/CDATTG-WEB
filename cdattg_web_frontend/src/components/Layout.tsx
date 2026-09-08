@@ -22,7 +22,9 @@ import {
   BuildingOffice2Icon,
   EyeIcon,
   IdentificationIcon,
-  AcademicCapIcon,
+AcademicCapIcon,
+  DocumentCheckIcon,
+  BellIcon,
 } from '@heroicons/react/24/outline';
 import { AppBreadcrumb } from './navigation/AppBreadcrumb';
 import { useAuth } from '../context/AuthContext';
@@ -35,6 +37,7 @@ import { ChangePasswordModal } from './layout/ChangePasswordModal';
 import { LayoutBrandLink } from './layout/LayoutBrandLink';
 import { LayoutSidebar, sectionForPathname } from './layout/LayoutSidebar';
 import { LayoutUserMenu } from './layout/LayoutUserMenu';
+import { LayoutNotificationBell } from './layout/LayoutNotificationBell';
 
 interface LayoutProps {
   children: ReactNode;
@@ -49,10 +52,15 @@ function readSidebarHidden(): boolean {
 
 const ICONS: Record<string, ReactNode> = {
   perfil: <UsersIcon className="w-5 h-5" />,
+  notificaciones: <BellIcon className="w-5 h-5" />,
+  carnet: <IdentificationIcon className="w-5 h-5" />,
   dashboard: <HomeIcon className="w-5 h-5" />,
   programas: <BookOpenIcon className="w-5 h-5" />,
   fichas: <DocumentTextIcon className="w-5 h-5" />,
   instructores: <BriefcaseIcon className="w-5 h-5" />,
+  'personal-operativo-apoyo': <ShieldCheckIcon className="w-5 h-5" />,
+  'personal-administrativo': <BriefcaseIcon className="w-5 h-5" />,
+  contratistas: <DocumentCheckIcon className="w-5 h-5" />,
   aprendices: <UserGroupIcon className="w-5 h-5" />,
   personas: <UsersIcon className="w-5 h-5" />,
   asistencia: <ClipboardDocumentListIcon className="w-5 h-5" />,
@@ -82,6 +90,8 @@ const ICONS: Record<string, ReactNode> = {
   'vigilancia/porteria': <EyeIcon className="w-5 h-5" />,
   'vigilancia/reporte': <EyeIcon className="w-5 h-5" />,
   'vigilancia/ambientes': <EyeIcon className="w-5 h-5" />,
+  'vigilancia/registro': <UserGroupIcon className="w-5 h-5" />,
+  'vigilancia/cambios': <ClockIcon className="w-5 h-5" />,
 };
 
 export const Layout = ({ children }: LayoutProps) => {
@@ -200,6 +210,9 @@ export const Layout = ({ children }: LayoutProps) => {
                   <SunIcon className="h-5 w-5 text-yellow-400" />
                 )}
               </button>
+            </li>
+            <li className="nav-item">
+              <LayoutNotificationBell />
             </li>
             <li className="nav-item">
               <LayoutUserMenu

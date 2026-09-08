@@ -71,6 +71,8 @@ import type {
   VerificarLoteResponse,
   LoteIniciadoResponse,
   ProgresoLoteResponse,
+  ReintentarDocumento,
+  ReintentarInscripcionDocumento,
   GuardarCredencialSofiaRequest,
   CredencialSofiaEstado,
   ConsultarInscripcionesRequest,
@@ -111,11 +113,19 @@ import type {
   DefinicionesPermisosResponse,
   AccesoLookupResponse,
   AccesoRegistroResponse,
+  AccesoCancelarIngresoResponse,
   AccesoDentroItem,
   AccesoHistorialParams,
   AccesoHistorialResponse,
   AccesoEstadisticasResponse,
 } from '../types';
+import type {
+  CreatePersonalRolRequest,
+  PersonalRolImportLogItem,
+  PersonalRolImportResult,
+  PersonalRolItem,
+  UpdatePersonalRolRequest,
+} from '../features/personalRol/types';
 import type { InstructorAgendaResponse } from '../types/agenda';
 import type {
   EleccionDesempateRequest,
@@ -236,6 +246,21 @@ async function openPersonasImportStreamReader(
 class ApiService {
   private readonly api: AxiosInstance;
 
+  /** Recorre todas las páginas de un endpoint paginado y acumula los datos. */
+  private async fetchAllPages<T>(getPage: (page: number) => Promise<PaginatedResponse<T>>): Promise<T[]> {
+    const pageSize = 200;
+    const first = await getPage(1);
+    const out = [...first.data];
+    const pages = Math.ceil(first.total / pageSize);
+    if (pages > 1) {
+      const rest = await Promise.all(
+        Array.from({ length: pages - 1 }, (_, i) => getPage(i + 2)),
+      );
+      rest.forEach((r) => out.push(...r.data));
+    }
+    return out;
+  }
+
   constructor() {
     this.api = axios.create({
       baseURL: API_BASE_URL,
@@ -298,6 +323,11 @@ class ApiService {
     return response.data;
   }
 
+  /** Todas las personas que coinciden con la búsqueda (recorre todas las páginas). */
+  async getAllPersonas(search: string = ''): Promise<PersonaResponse[]> {
+    return this.fetchAllPages((page) => this.getPersonas(page, 200, search));
+  }
+
   async getPersonaById(id: number): Promise<PersonaResponse> {
     const response = await this.api.get<PersonaResponse>(`/personas/${id}`);
     return response.data;
@@ -313,7 +343,7 @@ class ApiService {
     return response.data;
   }
 
-  async updateMiPersona(data: PersonaSelfUpdateRequest): Promise<PersonaResponse> {
+  async updateMiPersona(data: PersonaSelfUpdateRequest): Promise<PersonaResponse | { cambio_pendiente_id: number; message: string }> {
     const response = await this.api.put<PersonaResponse>('/personas/mi-perfil', data);
     return response.data;
   }
@@ -372,6 +402,11 @@ class ApiService {
       params: { page, page_size: pageSize, search: search || undefined },
     });
     return response.data;
+  }
+
+  /** Todos los programas de formación (recorre todas las páginas). */
+  async getAllProgramasFormacion(): Promise<ProgramaFormacionResponse[]> {
+    return this.fetchAllPages((page) => this.getProgramasFormacion(page, 200));
   }
 
   async getProgramaFormacionById(id: number): Promise<ProgramaFormacionResponse> {
@@ -784,6 +819,11 @@ class ApiService {
     return response.data;
   }
 
+  /** Todos los instructores que coinciden con la búsqueda (recorre todas las páginas). */
+  async getAllInstructores(search?: string): Promise<InstructorItem[]> {
+    return this.fetchAllPages((page) => this.getInstructores(page, 200, search));
+  }
+
   async getInstructorById(id: number): Promise<InstructorItem> {
     const response = await this.api.get<InstructorItem>(`/instructores/${id}`);
     return response.data;
@@ -850,6 +890,162 @@ class ApiService {
       params: { limit },
     });
     return response.data.data;
+  }
+
+  // Personal operativo y de apoyo
+  async getPersonalOperativoApoyo(page = 1, pageSize = 20, search?: string): Promise<PaginatedResponse<PersonalRolItem>> {
+    const response = await this.api.get<PaginatedResponse<PersonalRolItem>>('/personal-operativo-apoyo', {
+      params: { page, page_size: pageSize, search: search || undefined },
+    });
+    return response.data;
+  }
+
+  async getPersonalOperativoApoyoById(id: number): Promise<PersonalRolItem> {
+    const response = await this.api.get<PersonalRolItem>(`/personal-operativo-apoyo/${id}`);
+    return response.data;
+  }
+
+  async updatePersonalOperativoApoyo(id: number, data: UpdatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.put<PersonalRolItem>(`/personal-operativo-apoyo/${id}`, data);
+    return response.data;
+  }
+
+  async deletePersonalOperativoApoyo(id: number): Promise<void> {
+    await this.api.delete(`/personal-operativo-apoyo/${id}`);
+  }
+
+  // Crear personal operativo y de apoyo desde persona
+  async createPersonalOperativoApoyoFromPersona(data: CreatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.post<PersonalRolItem>('/personal-operativo-apoyo', data);
+    return response.data;
+  }
+
+  /** Importación masiva de personal operativo y de apoyo desde Excel. */
+  async uploadPersonalOperativoApoyoImport(file: File): Promise<PersonalRolImportResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.api.post<PersonalRolImportResult>('/personal-operativo-apoyo/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async getPersonalOperativoApoyoImports(limit: number = 50): Promise<PersonalRolImportLogItem[]> {
+    const response = await this.api.get<{ data: PersonalRolImportLogItem[] }>('/personal-operativo-apoyo/imports', {
+      params: { limit },
+    });
+    return response.data.data;
+  }
+
+  async downloadPersonalOperativoApoyoImportTemplate(): Promise<Blob> {
+    const response = await this.api.get<Blob>('/personal-operativo-apoyo/import/template', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  // Contratistas de prestación de servicios
+  async getContratistas(page = 1, pageSize = 20, search?: string): Promise<PaginatedResponse<PersonalRolItem>> {
+    const response = await this.api.get<PaginatedResponse<PersonalRolItem>>('/contratistas', {
+      params: { page, page_size: pageSize, search: search || undefined },
+    });
+    return response.data;
+  }
+
+  async getContratistaById(id: number): Promise<PersonalRolItem> {
+    const response = await this.api.get<PersonalRolItem>(`/contratistas/${id}`);
+    return response.data;
+  }
+
+  async updateContratista(id: number, data: UpdatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.put<PersonalRolItem>(`/contratistas/${id}`, data);
+    return response.data;
+  }
+
+  async deleteContratista(id: number): Promise<void> {
+    await this.api.delete(`/contratistas/${id}`);
+  }
+
+  // Crear contratista desde persona
+  async createContratistaFromPersona(data: CreatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.post<PersonalRolItem>('/contratistas', data);
+    return response.data;
+  }
+
+  /** Importación masiva de contratistas desde Excel. */
+  async uploadContratistasImport(file: File): Promise<PersonalRolImportResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.api.post<PersonalRolImportResult>('/contratistas/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async getContratistaImports(limit: number = 50): Promise<PersonalRolImportLogItem[]> {
+    const response = await this.api.get<{ data: PersonalRolImportLogItem[] }>('/contratistas/imports', {
+      params: { limit },
+    });
+    return response.data.data;
+  }
+
+  async downloadContratistaImportTemplate(): Promise<Blob> {
+    const response = await this.api.get<Blob>('/contratistas/import/template', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  // Personal administrativo
+  async getPersonalAdministrativo(page = 1, pageSize = 20, search?: string): Promise<PaginatedResponse<PersonalRolItem>> {
+    const response = await this.api.get<PaginatedResponse<PersonalRolItem>>('/personal-administrativo', {
+      params: { page, page_size: pageSize, search: search || undefined },
+    });
+    return response.data;
+  }
+
+  async getPersonalAdministrativoById(id: number): Promise<PersonalRolItem> {
+    const response = await this.api.get<PersonalRolItem>(`/personal-administrativo/${id}`);
+    return response.data;
+  }
+
+  async updatePersonalAdministrativo(id: number, data: UpdatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.put<PersonalRolItem>(`/personal-administrativo/${id}`, data);
+    return response.data;
+  }
+
+  async deletePersonalAdministrativo(id: number): Promise<void> {
+    await this.api.delete(`/personal-administrativo/${id}`);
+  }
+
+  // Crear personal administrativo desde persona
+  async createPersonalAdministrativoFromPersona(data: CreatePersonalRolRequest): Promise<PersonalRolItem> {
+    const response = await this.api.post<PersonalRolItem>('/personal-administrativo', data);
+    return response.data;
+  }
+
+  /** Importación masiva de personal administrativo desde Excel. */
+  async uploadPersonalAdministrativoImport(file: File): Promise<PersonalRolImportResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.api.post<PersonalRolImportResult>('/personal-administrativo/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async getPersonalAdministrativoImports(limit: number = 50): Promise<PersonalRolImportLogItem[]> {
+    const response = await this.api.get<{ data: PersonalRolImportLogItem[] }>('/personal-administrativo/imports', {
+      params: { limit },
+    });
+    return response.data.data;
+  }
+
+  async downloadPersonalAdministrativoImportTemplate(): Promise<Blob> {
+    const response = await this.api.get<Blob>('/personal-administrativo/import/template', {
+      responseType: 'blob',
+    });
+    return response.data;
   }
 
   // Asistencias
@@ -1187,6 +1383,14 @@ class ApiService {
     return response.data.data;
   }
 
+  async accesoCancelarIngreso(data: {
+    visita_id: number;
+    sede_id: number;
+  }): Promise<AccesoCancelarIngresoResponse> {
+    const response = await this.api.post<{ data: AccesoCancelarIngresoResponse }>('/vigilancia/acceso/cancelar-ingreso', data);
+    return response.data.data;
+  }
+
   async accesoListDentro(sedeId: number): Promise<AccesoDentroItem[]> {
     const response = await this.api.get<{ data: AccesoDentroItem[] }>('/vigilancia/acceso/dentro', {
       params: { sede_id: sedeId },
@@ -1206,6 +1410,56 @@ class ApiService {
       params,
     });
     return response.data.data;
+  }
+
+  // --- Vigilancia / registro de personas ---
+  async vigilanciaPersonaLookup(numeroDocumento: string): Promise<PersonaResponse> {
+    const response = await this.api.get<PersonaResponse>('/vigilancia/personas/lookup', {
+      params: { numero_documento: numeroDocumento },
+    });
+    return response.data;
+  }
+
+  async vigilanciaActualizarDatosBasicos(id: number, data: {
+    tipo_documento?: number;
+    primer_nombre: string;
+    segundo_nombre?: string;
+    primer_apellido: string;
+    segundo_apellido?: string;
+    celular?: string;
+    rh?: string;
+    acepta_terminos?: boolean;
+  }): Promise<PersonaResponse> {
+    const response = await this.api.put<PersonaResponse>(`/vigilancia/personas/${id}/datos-basicos`, data);
+    return response.data;
+  }
+
+  async vigilanciaSubirFoto(id: number, archivo: Blob): Promise<PersonaResponse> {
+    const body = new FormData();
+    body.append('file', archivo, 'foto.jpg');
+    const response = await this.api.post<PersonaResponse>(`/vigilancia/personas/${id}/foto`, body, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  // Cambios pendientes
+  async listarCambiosPendientes(): Promise<{ data: any[] }> {
+    const response = await this.api.get('/cambios-pendientes');
+    return response.data;
+  }
+
+  async aprobarCambioPendiente(id: number): Promise<void> {
+    await this.api.put(`/cambios-pendientes/${id}/aprobar`);
+  }
+
+  async rechazarCambioPendiente(id: number): Promise<void> {
+    await this.api.put(`/cambios-pendientes/${id}/rechazar`);
+  }
+
+  async verificarCambioPendiente(): Promise<{ pendiente: boolean }> {
+    const response = await this.api.get('/cambios-pendientes/mi-estado');
+    return response.data;
   }
 
   // Inventario
@@ -1552,6 +1806,24 @@ class ApiService {
     const response = await this.api.get<{ data: VerificarLoteResponse }>(
       `/complementarios/verificar-lote/resultados/${loteId}`,
       { timeout: 15000 },
+    );
+    return response.data.data;
+  }
+
+  async reintentarVerificacionLote(documentos: ReintentarDocumento[]): Promise<LoteIniciadoResponse> {
+    const response = await this.api.post<{ data: LoteIniciadoResponse }>(
+      '/complementarios/verificar-lote/reintentar',
+      { documentos },
+      { timeout: 30000 },
+    );
+    return response.data.data;
+  }
+
+  async reintentarInscripcionesLote(documentos: ReintentarInscripcionDocumento[]): Promise<LoteIniciadoResponse> {
+    const response = await this.api.post<{ data: LoteIniciadoResponse }>(
+      '/complementarios/inscripciones/consultar-lote/reintentar',
+      { documentos },
+      { timeout: 30000 },
     );
     return response.data.data;
   }

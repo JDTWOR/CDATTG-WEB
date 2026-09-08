@@ -9,6 +9,7 @@ import type {
   MunicipioItem,
 } from '../types';
 import { SelectSearch } from './SelectSearch';
+import { RhSelect } from '../pages/perfil/RhSelect';
 
 interface PersonaModalProps {
   persona: PersonaResponse | null;
@@ -123,6 +124,7 @@ export const PersonaModal = ({ persona, onClose, onSave, selfService = false }: 
         direccion: persona.direccion || '',
         status: persona.status,
         parametro_id: persona.parametro_id,
+        rh: persona.rh || '',
       });
       if (persona.parametro_id) {
         setCaracterizacionIds([persona.parametro_id]);
@@ -300,6 +302,11 @@ export const PersonaModal = ({ persona, onClose, onSave, selfService = false }: 
                   ariaLabel="Género"
                 />
               </div>
+              <RhSelect
+                id="persona-modal-rh"
+                value={formData.rh}
+                onChange={(rh) => setFormData({ ...formData, rh })}
+              />
             </div>
           </section>
 

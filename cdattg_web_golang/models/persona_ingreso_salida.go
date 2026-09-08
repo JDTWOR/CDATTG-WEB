@@ -23,6 +23,10 @@ type PersonaIngresoSalida struct {
 	ObservacionSalida      string     `gorm:"column:observacion_salida;type:text" json:"observacion_salida"`
 	// SalidaSinIngreso: persona salió sin haber registrado entrada previa (registro irregular).
 	SalidaSinIngreso bool `gorm:"column:salida_sin_ingreso;not null;default:false;index" json:"salida_sin_ingreso"`
+	// IngresoCancelado: entrada registrada y luego cancelada por el vigilante (no cuenta como ingreso).
+	IngresoCancelado    bool       `gorm:"column:ingreso_cancelado;not null;default:false;index" json:"ingreso_cancelado"`
+	IngresoCanceladoAt  *time.Time `gorm:"column:ingreso_cancelado_at" json:"ingreso_cancelado_at"`
+	IngresoCanceladoPor *uint      `gorm:"column:ingreso_cancelado_por_user_id" json:"ingreso_cancelado_por_user_id"`
 
 	Persona              *Persona              `gorm:"foreignKey:PersonaID" json:"persona,omitempty"`
 	Sede                 *Sede                 `gorm:"foreignKey:SedeID" json:"sede,omitempty"`

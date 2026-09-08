@@ -34,6 +34,9 @@ type FichaRepository interface {
 	ExistsByFichaExcludingID(ficha string, excludeID uint) bool
 	// CountAll cuenta fichas activas (status=true, no eliminadas); sedeID opcional filtra por sede.
 	CountAll(sedeID *uint) (int64, error)
+	// SincronizarVigencia recalcula status de todas las fichas según el override manual
+	// (status_manual) o la vigencia automática por fecha_inicio/fecha_fin.
+	SincronizarVigencia() error
 }
 
 const (
@@ -44,12 +47,15 @@ const (
 )
 
 type fichaRepository struct {
-	db *gorm.DB
+	db               *gorm.DB
+	lastSyncVigencia time.Time
+	now              func() time.Time
 }
 
 func NewFichaRepository() FichaRepository {
 	return &fichaRepository{
-		db: database.GetDB(),
+		db:  database.GetDB(),
+		now: time.Now,
 	}
 }
 
@@ -283,4 +289,32 @@ func (r *fichaRepository) CountAll(sedeID *uint) (int64, error) {
 		return 0, err
 	}
 	return n, nil
+}
+
+// SincronizarVigencia recalcula status según el override manual o la vigencia automática por fechas.
+// Se ejecuta como máximo una vez por intervalo (throttle) para no recargar cada petición.
+func (r *fichaRepository) SincronizarVigencia() error {
+	ahora := r.now()
+	if !sincronizacionVigenciaPermitida(r.lastSyncVigencia, ahora, intervaloSyncVigencia) {
+		return nil
+	}
+	sql := `UPDATE fichas_caracterizacion
+		SET status = CASE
+			WHEN status_manual IS NOT NULL THEN status_manual
+			WHEN fecha_fin IS NOT NULL AND fecha_fin::date < CURRENT_DATE THEN false
+			WHEN fecha_inicio IS NOT NULL AND fecha_inicio::date > CURRENT_DATE THEN false
+			ELSE true
+		END
+		WHERE deleted_at IS NULL
+		  AND status <> CASE
+			WHEN status_manual IS NOT NULL THEN status_manual
+			WHEN fecha_fin IS NOT NULL AND fecha_fin::date < CURRENT_DATE THEN false
+			WHEN fecha_inicio IS NOT NULL AND fecha_inicio::date > CURRENT_DATE THEN false
+			ELSE true
+		  END`
+	if err := r.db.Exec(sql).Error; err != nil {
+		return err
+	}
+	r.lastSyncVigencia = ahora
+	return nil
 }

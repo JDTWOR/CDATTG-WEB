@@ -218,6 +218,7 @@ MSG_PRIMER_APELLIDO = "primer apellido"
 MSG_IDENT_FICHA = "identificador ficha"
 SEL_INPUT_TEXT = 'input[type="text"]'
 MSG_REINTENTE = " Reintente más tarde."
+MSG_SIN_RESPUESTA_SCRAPER = "No se obtuvo respuesta del scraper"
 MSG_NO_REG_TODOS = (
     "No está registrado en SofiaPlus (probados todos los tipos de documento)."
 )
@@ -359,36 +360,41 @@ def _redactar_cuerpo(cuerpo: str) -> str:
     return re.sub(r"(?i)(password|josso_password|clave|pass)=([^&\s]+)", r"\1=***", cuerpo)
 
 
+def _es_peticion_sofia(url: str) -> bool:
+    return _es_dominio_sofia(url) and not url.lower().endswith(_SOFIA_ASSETS)
+
+
 def _loguear_red(page: Page) -> None:
     """Registra cada petición del navegador a SofíaPlus (método, URL, body redactado, status, ms)."""
     activos: dict[int, tuple[str, float]] = {}
+    page.on("request", lambda req: _red_log_request(activos, req))
+    page.on("response", lambda resp: _red_log_response(activos, resp))
 
-    def on_request(req) -> None:
-        url = req.url
-        if not _es_dominio_sofia(url) or url.lower().endswith(_SOFIA_ASSETS):
-            return
-        metodo = req.method
-        activos[id(req)] = (url, time.time())
-        cuerpo = ""
-        if metodo in ("POST", "PUT", "PATCH"):
-            try:
-                datos = req.post_data
-                if datos:
-                    cuerpo = _redactar_cuerpo(datos)[:500]
-            except Exception:
-                pass
-        logger.info("RED>> %s %s%s", metodo, url, f" | body: {cuerpo}" if cuerpo else "")
 
-    def on_response(resp) -> None:
-        url = resp.url
-        if not _es_dominio_sofia(url) or url.lower().endswith(_SOFIA_ASSETS):
-            return
-        t0 = activos.pop(id(resp.request), None)
-        ms = f" en {(time.time() - t0[1]) * 1000:.0f}ms" if t0 else ""
-        logger.info("RED<< %s %s%s", resp.status, url, ms)
+def _red_log_request(activos: dict[int, tuple[str, float]], req) -> None:
+    url = req.url
+    if not _es_peticion_sofia(url):
+        return
+    metodo = req.method
+    activos[id(req)] = (url, time.time())
+    cuerpo = ""
+    if metodo in ("POST", "PUT", "PATCH"):
+        try:
+            datos = req.post_data
+            if datos:
+                cuerpo = _redactar_cuerpo(datos)[:500]
+        except Exception:
+            pass
+    logger.info("RED>> %s %s%s", metodo, url, f" | body: {cuerpo}" if cuerpo else "")
 
-    page.on("request", on_request)
-    page.on("response", on_response)
+
+def _red_log_response(activos: dict[int, tuple[str, float]], resp) -> None:
+    url = resp.url
+    if not _es_peticion_sofia(url):
+        return
+    t0 = activos.pop(id(resp.request), None)
+    ms = f" en {(time.time() - t0[1]) * 1000:.0f}ms" if t0 else ""
+    logger.info("RED<< %s %s%s", resp.status, url, ms)
 
 
 def _urls_pagina(page: Page) -> list[str]:
@@ -2086,15 +2092,37 @@ def _frame_consultar_registro(page: Page) -> Frame | Page | None:
     return _frame_por_url_consultar(page) or _frame_por_select_persona(page)
 
 
+def _texto_oculto_consultar(fr) -> str:
+    """textContent del iframe: incluye mensajes ocultos (dojoDialog display:none)."""
+    try:
+        return fr.evaluate("document.body.textContent || ''") or ""
+    except Exception:
+        return ""
+
+
+def _texto_frame_consultar(fr) -> str:
+    """Texto del iframe de Consultar Registro, visible + (si aplica) oculto."""
+    try:
+        texto = fr.inner_text("body") or ""
+    except Exception:
+        return ""
+    if not texto.strip():
+        # Sofía a veces renderiza el mensaje 100% oculto: textContent lo incluye.
+        return _texto_oculto_consultar(fr)
+    if MSG_NO_REGISTRADO not in texto:
+        # Mensaje oculto que confirma "no registrado" (inner_text no lo devuelve).
+        oculto = _texto_oculto_consultar(fr)
+        if oculto and MSG_NO_REGISTRADO in oculto:
+            texto = f"{texto}\n{oculto}"
+    return texto
+
+
 def _leer_cuerpo_consulta(page: Page) -> str:
     fr = _frame_consultar_registro(page)
     if fr is not None:
-        try:
-            texto = fr.inner_text("body")
-            if texto.strip():
-                return texto
-        except Exception:
-            pass
+        texto = _texto_frame_consultar(fr)
+        if texto.strip():
+            return texto
     # Concatenar todos los frames (el shell solo no basta).
     partes: list[str] = []
     for frame in _frames(page):
@@ -2186,6 +2214,31 @@ def _asegurar_form_sano(page: Page) -> bool:
     return _form_consultar_sano(page)
 
 
+def _numero_mencionado_en_no_reg(t: str) -> str:
+    """Número que Sofía menciona en el mensaje 'no se encuentra registrado'."""
+    idx = t.find(MSG_NO_REGISTRADO)
+    if idx < 0:
+        return ""
+    m = re.search(r"numero\s*:\s*([\d\s.]+)", t[max(0, idx - 160) : idx])
+    if not m:
+        return ""
+    return re.sub(r"\D", "", _normalizar_texto(m.group(1)))
+
+
+def _clasificar_es_vieja(page: Page, numero: str) -> bool:
+    """True si la respuesta visible pertenece a otro documento (mensaje o NIS)."""
+    num = _numero_compacto(numero)
+    num_dom = _dom_numero_resultado(page)
+    if num_dom and num and num_dom != num:
+        return True
+    t = _normalizar_texto(_leer_cuerpo_consulta(page))
+    if MSG_NO_REGISTRADO in t:
+        mencionado = _numero_mencionado_en_no_reg(t)
+        if mencionado and mencionado != num:
+            return True
+    return False
+
+
 def _clasificar_despues_ciclo(page: Page, numero: str) -> tuple[str, str]:
     """Clasifica solo DESPUÉS del ciclo de carga (respuesta de ESTA consulta)."""
     texto = _leer_cuerpo_consulta(page)
@@ -2193,14 +2246,20 @@ def _clasificar_despues_ciclo(page: Page, numero: str) -> tuple[str, str]:
     if _extraer_registro_desde_dom(page, numero) is not None:
         return "REGISTRADO", texto
     num = _numero_compacto(numero)
-    num_dom = _dom_numero_resultado(page)
-    if num_dom and num and num_dom != num:
-        return "PENDIENTE", texto
-    # Mensaje no-registrado gana salvo que el DOM tenga Registro de ESTA persona.
+    # Mensaje no-registrado gana salvo que el DOM tenga Registro de ESTA persona
+    # o el mensaje sea de OTRO documento (respuesta vieja sin reemplazar).
     if MSG_NO_REGISTRADO in t:
         if _extraer_registro_desde_dom(page, numero) is not None:
             return "REGISTRADO", texto
+        mencionado = _numero_mencionado_en_no_reg(t)
+        if mencionado and mencionado != num:
+            return "PENDIENTE", texto
+        # El mensaje es de ESTE número: gana aunque num_dom aún muestre el
+        # documento anterior (span viejo que Sofía tarda en reemplazar).
         return "NO_REGISTRADO", texto
+    num_dom = _dom_numero_resultado(page)
+    if num_dom and num and num_dom != num:
+        return "PENDIENTE", texto
     if num and num in _numero_compacto(texto) and _hay_marcadores_registro(t):
         if _extraer_registro(texto, numero) is not None:
             return "REGISTRADO", texto
@@ -2223,25 +2282,63 @@ def _esperar_arranque_carga(
     return None
 
 
-def _esperar_fin_carga(
-    page: Page, numero: str, to_ms: int, t0: float, vio_cargando: bool
-) -> tuple[str, str]:
-    """Fase 2: espera fin de #cargando / blockUI y clasifica."""
+def _respuesta_visible_consulta(page: Page) -> bool:
+    """Respuesta lista: mensaje no-registrado o número resultado del bloque."""
+    if MSG_NO_REGISTRADO in _normalizar_texto(_leer_cuerpo_consulta(page)):
+        return True
+    return bool(_dom_numero_resultado(page))
+
+
+def _clasificar_si_respuesta_este_doc(page: Page, numero: str) -> tuple[str, str] | None:
+    """Clasifica solo si la respuesta visible ya es de ESTE documento."""
+    t = _normalizar_texto(_leer_cuerpo_consulta(page))
+    if MSG_NO_REGISTRADO in t:
+        mencionado = _numero_mencionado_en_no_reg(t)
+        if not mencionado or mencionado == _numero_compacto(numero):
+            return _clasificar_despues_ciclo(page, numero)
+    num_dom = _dom_numero_resultado(page)
+    num = _numero_compacto(numero)
+    if num_dom and num and num_dom == num:
+        return _clasificar_despues_ciclo(page, numero)
+    return None
+
+
+def _esperar_fin_carga(page: Page, numero: str, to_ms: int) -> tuple[str, str]:
+    """Fase 2: espera fin de #cargando / blockUI y clasifica.
+    Solo clasifica cuando ya se ve la respuesta de ESTE documento (mensaje o
+    número resultado); nunca antes, para no leer la respuesta vieja o el
+    mensaje tardío de Sofía (renders 1-3 s después del fin del ciclo)."""
     t1 = time.time()
     while (time.time() - t1) * 1000 < to_ms:
         if _extraer_registro_desde_dom(page, numero) is not None:
             return "REGISTRADO", _leer_cuerpo_consulta(page)
         if _cargando_iframe_visible(page):
-            vio_cargando = True
             page.wait_for_timeout(POLL_MS)
             continue
         _esperar_sin_blockui(page, 3000)
-        if _cargando_iframe_visible(page):
+        # La pantalla aún muestra la respuesta de OTRO documento (A4J lento o caído):
+        # sigue esperando la de ESTE número antes de clasificar.
+        if _cargando_iframe_visible(page) or _clasificar_es_vieja(page, numero):
+            page.wait_for_timeout(POLL_MS)
             continue
-        if vio_cargando or (time.time() - t0) * 1000 >= 1500:
+        if _respuesta_visible_consulta(page):
             _pause(page, 150)
             return _clasificar_despues_ciclo(page, numero)
         page.wait_for_timeout(POLL_MS)
+    return _esperar_respuesta_tardia(page, numero)
+
+
+def _esperar_respuesta_tardia(page: Page, numero: str) -> tuple[str, str]:
+    """Fase extra: Sofía a veces renderiza la respuesta segundos DESPUÉS del
+    ciclo (A4J lento); antes de rendirse espera el mensaje/número de ESTE doc."""
+    t3 = time.time()
+    while (time.time() - t3) * 1000 < 8000:
+        if _extraer_registro_desde_dom(page, numero) is not None:
+            return "REGISTRADO", _leer_cuerpo_consulta(page)
+        clasificado = _clasificar_si_respuesta_este_doc(page, numero)
+        if clasificado is not None:
+            return clasificado
+        page.wait_for_timeout(250)
     if _extraer_registro_desde_dom(page, numero) is not None:
         return "REGISTRADO", _leer_cuerpo_consulta(page)
     return _clasificar_despues_ciclo(page, numero)
@@ -2255,13 +2352,11 @@ def _esperar_respuesta_consulta(
     if not huella_antes:
         huella_antes = _huella_respuesta(page)
 
-    t0 = time.time()
     temprano = _esperar_arranque_carga(page, numero, huella_antes, to)
     if temprano is not None:
         return temprano
 
-    vio_cargando = _cargando_iframe_visible(page)
-    return _esperar_fin_carga(page, numero, to, t0, vio_cargando)
+    return _esperar_fin_carga(page, numero, to)
 
 
 def _dump_iframe_consultar(page: Page, paso: str) -> None:
@@ -2371,6 +2466,115 @@ def _forzar_select_value(sel, codigo: str) -> bool:
         return False
 
 
+def _set_select_silencioso(fr: Frame | Page, selec: str, valor: str) -> bool:
+    """Setea el select por valor SIN disparar el handler onchange (A4J).
+
+    Sofía re-renderiza el formulario al cambiar tipo de usuario/tipo de documento
+    (A4J) y esas respuestas llegan a veces TARDÍAS, borrando los valores recién
+    puestos. Este setter permite re-colocar el valor y estabilizar el formulario
+    justo antes del envío (sin disparar otra re-renderización).
+    """
+    if fr is None:
+        return False
+    try:
+        loc = fr.locator(selec)
+        if loc.count() == 0:
+            return False
+        return bool(
+            loc.first.evaluate(
+                """(el, valor) => {
+                    const attr = el.getAttribute('onchange');
+                    el.onchange = null;
+                    el.setAttribute('onchange', '');
+                    let ok = false;
+                    for (const o of el.options) {
+                        if (String(o.value || '').trim().toUpperCase() === String(valor).trim().toUpperCase()) {
+                            el.selectedIndex = o.index;
+                            ok = true;
+                            break;
+                        }
+                    }
+                    if (!ok && el.options.length) el.selectedIndex = 0;
+                    el.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+                    if (attr) el.setAttribute('onchange', attr);
+                    return ok && String(el.value || '').trim().toUpperCase() === String(valor).trim().toUpperCase();
+                }""",
+                valor,
+            )
+        )
+    except Exception:
+        return False
+
+
+def _numero_escrito_consulta(page: Page) -> str:
+    fr = _frame_consultar_registro(page)
+    if fr is None:
+        return ""
+    try:
+        campo = fr.locator(SEL_NUMERO_DOC).first
+        if campo.count() > 0:
+            return _numero_compacto(campo.input_value() or "")
+    except Exception:
+        pass
+    return ""
+
+
+def _formulario_consulta_estable(
+    fr, page: Page, codigo: str, esperado: str
+) -> tuple[bool, str, str, bool]:
+    """(estable, usuario, doc, num_ok) del formulario; False si el frame no responde."""
+    try:
+        tiene_usuario = fr.locator(SEL_TIPO_USUARIO).count() > 0
+        usuario = _label_select_actual(fr.locator(SEL_TIPO_USUARIO).first) if tiene_usuario else ""
+        doc = _valor_tipo_doc_actual(page)
+        num_ok = _numero_escrito_consulta(page) == esperado
+    except Exception:
+        return False, "", "", False
+    estable = usuario == "Persona" and (not codigo or doc == codigo) and num_ok
+    return estable, usuario, doc, num_ok
+
+
+def _recolocar_valores_formulario(fr, page: Page, usuario: str, codigo: str, doc: str, num_ok: bool, numero: str) -> None:
+    """Re-coloca Persona/tipo/número tras un re-render de A4J (best-effort)."""
+    try:
+        if usuario != "Persona":
+            _set_select_silencioso(fr, SEL_TIPO_USUARIO, "Persona")
+        if codigo and doc != codigo:
+            # Options aún sin cargar: esperar el A4J en vuelo.
+            _set_select_silencioso(fr, SEL_TIPO_DOC, codigo)
+        if not num_ok:
+            _escribir_numero_consulta(page, numero)
+    except Exception:
+        pass
+
+
+def _estabilizar_formulario_consulta(page: Page, tipo: str, numero: str) -> bool:
+    """Re-coloca y verifica Persona + tipo documento + número hasta que aguanten.
+
+    Los onchange A4J de Sofía dejan respuestas tardías que re-renderizan el form
+    y borran lo recién escrito: sin esto el envío sale con campos vacíos y JSF
+    devuelve "valor requerido" (sin respuesta → NO_VERIFICADO aleatorio).
+    """
+    codigo = _codigo_desde_etiqueta_tipo(tipo)
+    esperado = _numero_compacto(numero)
+    estabilidad = 0
+    t0 = time.time()
+    while (time.time() - t0) * 1000 < 12000:
+        fr = _frame_consultar_registro(page)
+        if fr is None:
+            return False
+        estable, usuario, doc, num_ok = _formulario_consulta_estable(fr, page, codigo, esperado)
+        if estable:
+            estabilidad += 1
+            if estabilidad >= 5:
+                return True
+        else:
+            estabilidad = 0
+            _recolocar_valores_formulario(fr, page, usuario, codigo, doc, num_ok, numero)
+        page.wait_for_timeout(300)
+    return False
+
+
 def _elegir_persona_en_select(page: Page, sel: Any) -> bool:
     if _texto_coincide(_label_select_actual(sel), "Persona"):
         return True
@@ -2434,6 +2638,32 @@ def _valor_tipo_doc_actual(page: Page) -> str:
         return ""
 
 
+def _esperar_opciones_tipo_documento(page: Page, timeout_ms: int = 15000) -> bool:
+    """Espera a que el select tipo de documento tenga opciones (CC/TI/CE…).
+
+    Se pueblan con el A4J del cambio de tipo de usuario; si aún están vacías
+    el setter silencioso no puede fijar el valor sin disparar otro A4J.
+    """
+    fr = _frame_consultar_registro(page)
+    if fr is None:
+        return False
+    t0 = time.time()
+    while (time.time() - t0) * 1000 < timeout_ms:
+        try:
+            n = fr.evaluate(
+                """() => {
+                    const el = document.querySelector('[id$="tipoDocumentoSOL"]');
+                    return el ? el.options.length : 0;
+                }"""
+            )
+        except Exception:
+            n = 0
+        if n and n > 1:
+            return True
+        page.wait_for_timeout(200)
+    return False
+
+
 def _forzar_tipo_doc_en_iframe(page: Page, codigo: str) -> bool:
     fr = _frame_consultar_registro(page)
     if fr is None:
@@ -2444,10 +2674,20 @@ def _forzar_tipo_doc_en_iframe(page: Page, codigo: str) -> bool:
             return False
         if _valor_tipo_doc_actual(page) == codigo:
             return True
-        if not _forzar_select_value(sel.first, codigo):
-            return False
-        _esperar_sin_blockui(page, 5000)
-        return _valor_tipo_doc_actual(page) == codigo
+        # Setter silencioso (sin onchange → sin A4J extra): primero asegura que
+        # las opciones estén cargadas (las puebla el A4J del cambio de usuario).
+        if _set_select_silencioso(fr, SEL_TIPO_DOC, codigo):
+            return _valor_tipo_doc_actual(page) == codigo
+        if not _esperar_opciones_tipo_documento(page):
+            # Sin opciones ni A4J en vuelo: dispara el onchange de usuario una vez.
+            sel_usuario = fr.locator(SEL_TIPO_USUARIO).first
+            if sel_usuario.count() > 0:
+                _forzar_select_value(sel_usuario, "Persona")
+            if not _esperar_opciones_tipo_documento(page):
+                return False
+        if _set_select_silencioso(fr, SEL_TIPO_DOC, codigo):
+            return _valor_tipo_doc_actual(page) == codigo
+        return False
     except Exception:
         return False
 
@@ -2519,6 +2759,8 @@ def _consultar_un_tipo(page: Page, tipo: str, numero: str) -> tuple[str, str, st
     err_fill = _llenar_form_consulta(page, tipo, numero)
     if err_fill:
         return _nv(err_fill)
+    if not _estabilizar_formulario_consulta(page, tipo, numero):
+        return _nv("El formulario Consultar Registro no quedó estable (A4J). Reintente.")
 
     huella_antes = _huella_respuesta(page)
     if not _click_boton_consultar_registro(page):
@@ -2784,7 +3026,7 @@ def verificar_documento(numero: str, cred: Credenciales, tipo_codigo: str = "") 
     _ejecutar_flujo(ctx)
     if ctx.resultados:
         return ctx.resultados[0]
-    return _no_verificado(numero, "No se obtuvo respuesta del scraper")
+    return _no_verificado(numero, MSG_SIN_RESPUESTA_SCRAPER)
 
 
 def verificar_lote(
@@ -2809,8 +3051,8 @@ def verificar_lote(
         if ctx.resultados:
             progreso.terminar(lote_id)
             return ctx.resultados
-        progreso.terminar(lote_id, error="No se obtuvo respuesta del scraper")
-        return [_no_verificado(d.numero_documento, "No se obtuvo respuesta del scraper") for d in docs]
+        progreso.terminar(lote_id, error=MSG_SIN_RESPUESTA_SCRAPER)
+        return [_no_verificado(d.numero_documento, MSG_SIN_RESPUESTA_SCRAPER) for d in docs]
 
     # Round-robin: reparte documentos adyacentes entre workers (balance de carga).
     chunks: list[list[DocumentoLote]] = [docs[i::workers] for i in range(workers)]
@@ -2824,7 +3066,7 @@ def verificar_lote(
         _ejecutar_flujo(ctx)
         if not ctx.resultados:
             ctx.resultados = [
-                _no_verificado(d.numero_documento, "No se obtuvo respuesta del scraper") for d in chunk
+                _no_verificado(d.numero_documento, MSG_SIN_RESPUESTA_SCRAPER) for d in chunk
             ]
         for j, r in enumerate(ctx.resultados):
             resultados[chunk_idx + j * workers] = r

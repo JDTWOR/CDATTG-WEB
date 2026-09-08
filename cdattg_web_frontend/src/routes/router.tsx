@@ -4,8 +4,13 @@ import { RouteLoadingFallback } from '../components/RouteLoadingFallback';
 import { ProtectedLayout } from './layouts/ProtectedLayout';
 import { authRoutes } from './modules/auth.routes';
 import { homeRoutes } from './modules/home.routes';
+import { notificacionesRoutes } from './modules/notificaciones.routes';
+import { carnetPerdidaRoutes } from './modules/carnetPerdida.routes';
 import { personasRoutes } from './modules/personas.routes';
 import { instructoresRoutes } from './modules/instructores.routes';
+import { personalOperativoApoyoRoutes } from './modules/personalOperativoApoyo.routes';
+import { personalAdministrativoRoutes } from './modules/personalAdministrativo.routes';
+import { contratistasRoutes } from './modules/contratistas.routes';
 import { aprendicesRoutes } from './modules/aprendices.routes';
 import { programasRoutes } from './modules/programas.routes';
 import { fichasRoutes } from './modules/fichas.routes';
@@ -17,6 +22,7 @@ import { vigilanciaRoutes } from './modules/vigilancia.routes';
 import { permisosRoutes } from './modules/permisos.routes';
 import { administracionRoutes } from './modules/administracion.routes';
 import { aprendizRoutes } from './modules/aprendiz.routes';
+import { bibliotecaRoutes } from './modules/biblioteca.routes';
 import { complementariosRoutes } from './modules/complementarios.routes';
 import { portalPublicRoutes } from './modules/portal.routes';
 import { semilleroAdminRoutes } from './modules/semillero.routes';
@@ -37,9 +43,15 @@ export const appRouter = createBrowserRouter([
     hydrateFallbackElement: createElement(RouteLoadingFallback),
     children: [
       ...homeRoutes,
+      ...notificacionesRoutes,
+      ...carnetPerdidaRoutes,
       ...aprendizRoutes,
+      ...bibliotecaRoutes,
       ...personasRoutes,
       ...instructoresRoutes,
+      ...personalOperativoApoyoRoutes,
+      ...personalAdministrativoRoutes,
+      ...contratistasRoutes,
       ...aprendicesRoutes,
       ...programasRoutes,
       ...fichasRoutes,

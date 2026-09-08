@@ -32,6 +32,9 @@ type FichaCaracterizacion struct {
 	JornadaID            *uint      `gorm:"column:jornada_id" json:"jornada_id"`
 	TotalHoras           *int       `gorm:"column:total_horas" json:"total_horas"`
 	Status               bool       `gorm:"default:true" json:"status"`
+	// StatusManual override manual del administrador: true/false fuerza el estado;
+	// nulo significa que el estado se deriva automáticamente de fecha_inicio/fecha_fin.
+	StatusManual         *bool      `gorm:"column:status_manual" json:"status_manual"`
 	
 	// Relaciones
 	ProgramaFormacion   *ProgramaFormacion   `gorm:"foreignKey:ProgramaFormacionID" json:"programa_formacion,omitempty"`

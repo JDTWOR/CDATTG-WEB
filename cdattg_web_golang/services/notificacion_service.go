@@ -79,9 +79,9 @@ func (s *notificacionService) NotificarStockBajo(productoID uint, productoNombre
 			NotificableType: "Producto",
 			NotificableID:   productoID,
 			RecipientUserID: &uid,
-			Tipo:             "STOCK_BAJO",
-			Titulo:           "Stock bajo",
-			Mensaje:          "El producto " + productoNombre + " tiene stock bajo (cantidad: " + strconv.Itoa(cantidad) + ").",
+			Tipo:            "STOCK_BAJO",
+			Titulo:          "Stock bajo",
+			Mensaje:         "El producto " + productoNombre + " tiene stock bajo (cantidad: " + strconv.Itoa(cantidad) + ").",
 		}
 		_ = s.notifRepo.Create(&n)
 	}

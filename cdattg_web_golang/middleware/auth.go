@@ -638,10 +638,28 @@ func RequireSuperAdminOrBienestar() gin.HandlerFunc {
 	return requireAnyRole(roleSuperAdministrador, roleBienestarAprendiz)
 }
 
-// RequireSuperAdminBienestarOrInstructor permite Casos de Bienestar a oficina (superadmin/bienestar)
-// o a instructores (el handler limita a fichas donde son instructor líder).
+// RequireSuperAdminBienestarOrInstructor permite Casos de Bienestar a oficina (superadmin/bienestar),
+// a instructores (el handler limita a fichas donde son instructor líder) y a los perfiles de formación.
 func RequireSuperAdminBienestarOrInstructor() gin.HandlerFunc {
-	return requireAnyRole(roleSuperAdministrador, roleBienestarAprendiz, roleInstructor)
+	return requireAnyRole(roleSuperAdministrador, roleBienestarAprendiz, roleInstructor, authz.RolMediaTecnica, authz.RolFormacionComplementaria)
+}
+
+// RequireAsistenciaPaneles permite los paneles de coordinación de asistencia
+// (superadmin, admin, coordinador, FPI y los perfiles de formación).
+func RequireAsistenciaPaneles() gin.HandlerFunc {
+	return requireAnyRole(roleSuperAdministrador, roleAdministrador, roleCoordinador, roleFPI, authz.RolMediaTecnica, authz.RolFormacionComplementaria)
+}
+
+// RequireReporteAsistencia abre el reporte general de asistencia a superadmin,
+// bienestar y a los perfiles de formación.
+func RequireReporteAsistencia() gin.HandlerFunc {
+	return requireAnyRole(roleSuperAdministrador, roleBienestarAprendiz, authz.RolMediaTecnica, authz.RolFormacionComplementaria)
+}
+
+// RequireSuperAdminOrGestorFormacion abre infraestructura y carga retroactiva
+// a superadmin y a los perfiles de formación (sin abrir el resto de superadmin).
+func RequireSuperAdminOrGestorFormacion() gin.HandlerFunc {
+	return requireAnyRole(roleSuperAdministrador, authz.RolMediaTecnica, authz.RolFormacionComplementaria)
 }
 
 func requireAnyRole(allowed ...string) gin.HandlerFunc {

@@ -1,5 +1,5 @@
 import type { RouteObject } from 'react-router-dom';
-import { administracionPaths } from '../paths';
+import { administracionPaths, carnetPaths } from '../paths';
 
 export const administracionRoutes: RouteObject[] = [
   {
@@ -47,11 +47,19 @@ export const administracionRoutes: RouteObject[] = [
     },
   },
   {
-    path: administracionPaths.carrusel,
+path: administracionPaths.carrusel,
     handle: { breadcrumb: { label: 'Carrusel de destacados' } },
     lazy: async () => {
       const { CarruselDestacadosPage } = await import('../../pages/administracion/CarruselDestacadosPage');
       return { Component: CarruselDestacadosPage };
+    },
+  },
+  {
+    path: carnetPaths.configuracion,
+    handle: { breadcrumb: { label: 'Configuración carnet' } },
+    lazy: async () => {
+      const { CarnetConfigPage } = await import('../../pages/CarnetConfigPage');
+      return { Component: CarnetConfigPage };
     },
   },
 ];

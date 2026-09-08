@@ -19,13 +19,23 @@ var RoleNames = []string{
 	"BIENESTAR AL APRENDIZ",
 	// Rol solo para módulo FPI (Sofía / Betowa / complementarios)
 	"FPI",
+	// Ve carnets regulares ya validados para imprimir el físico
+	"BIBLIOTECARIO",
+	// Perfiles que administran la formación: gestionan fichas, programas,
+	// aprendices e instructores, consultan asistencia y usan bienestar e infraestructura.
+	"MEDIA TECNICA",
+	"FORMACION COMPLEMENTARIA",
+	// Roles del módulo Personal (se toman rol al vincular una persona a un rol de personal)
+	"PERSONAL OPERATIVO Y DE APOYO",
+	"PERSONAL ADMINISTRATIVO",
+	"CONTRATISTA PRESTACIÓN DE SERVICIOS",
 }
 
 // Permisos por objeto (obj). Se usan en Casbin como (roleName o userID, obj, act).
 var (
 	PermisosPersona = []string{
 		"CREAR PERSONA", ActVerPersona, ActEditarMiPersona, "VER PERSONAS", "EDITAR PERSONA", "ELIMINAR PERSONA",
-		"CAMBIAR ESTADO PERSONA", "RESTABLECER PASSWORD",
+		"CAMBIAR ESTADO PERSONA", "RESTABLECER PASSWORD", ActRegistrarPersonaVig,
 	}
 	PermisosPrograma = []string{
 		"VER PROGRAMAS", "VER PROGRAMA", "CREAR PROGRAMA", "EDITAR PROGRAMA", "ELIMINAR PROGRAMA",
@@ -41,6 +51,15 @@ var (
 	PermisosInstructor = []string{
 		"VER INSTRUCTORES", "CREAR INSTRUCTOR", "EDITAR INSTRUCTOR", "ELIMINAR INSTRUCTOR",
 	}
+	PermisosPersonalOperativoYDeApoyo = []string{
+		"VER PERSONAL OPERATIVO Y DE APOYO", "CREAR PERSONAL OPERATIVO Y DE APOYO", "EDITAR PERSONAL OPERATIVO Y DE APOYO", "ELIMINAR PERSONAL OPERATIVO Y DE APOYO",
+	}
+	PermisosPersonalAdministrativo = []string{
+		"VER PERSONAL ADMINISTRATIVO", "CREAR PERSONAL ADMINISTRATIVO", "EDITAR PERSONAL ADMINISTRATIVO", "ELIMINAR PERSONAL ADMINISTRATIVO",
+	}
+	PermisosContratista = []string{
+		"VER CONTRATISTAS PRESTACIÓN DE SERVICIOS", "CREAR CONTRATISTAS PRESTACIÓN DE SERVICIOS", "EDITAR CONTRATISTAS PRESTACIÓN DE SERVICIOS", "ELIMINAR CONTRATISTAS PRESTACIÓN DE SERVICIOS",
+	}
 	PermisosAsistencia = []string{
 		"VER ASISTENCIA", "TOMAR ASISTENCIA", "VER MI AGENDA", "VER MIS INASISTENCIAS",
 	}
@@ -49,45 +68,68 @@ var (
 	}
 	// PermisosInventario desactivado: módulo inventario no en uso
 	PermisosInventario = []string{}
-	PermisosUsuario = []string{
+	PermisosUsuario    = []string{
 		"CREAR USUARIO", "ASIGNAR PERMISOS",
 	}
 	PermisosVigilancia = []string{
 		ActRegistrarAccesoSede,
 		ActVerAccesoSede,
 	}
-	PermisosSemillero = []string{
+PermisosSemillero = []string{
 		ActGestionarSemillero,
 	}
+	PermisosCarnet = []string{ActVerCarnetDigital, ActValidarCarnetDigital, ActVerCarnetBiblioteca, ActConfigurarCarnet, ActSolicitarCarnetPerdida, ActValidarCarnetPerdida}
 )
 
 // ObjPersona, ObjPrograma, ... nombres de objeto usados en rutas y Casbin.
 // ActVerPersona y demás act* son acciones Casbin (act) reutilizables en seed y middleware.
 const (
-	ActVerPersona           = "VER PERSONA"
-	ActEditarMiPersona      = "EDITAR MI PERSONA"
-	ActRegistrarAccesoSede  = "REGISTRAR ACCESO SEDE"
-	ActVerAccesoSede        = "VER ACCESO SEDE"
-	ActGestionarSemillero   = "GESTIONAR SEMILLERO"
+ActVerPersona             = "VER PERSONA"
+	ActEditarMiPersona        = "EDITAR MI PERSONA"
+	ActRegistrarAccesoSede    = "REGISTRAR ACCESO SEDE"
+	ActVerAccesoSede          = "VER ACCESO SEDE"
+	ActGestionarSemillero     = "GESTIONAR SEMILLERO"
+	ActVerCarnetDigital       = "VER CARNET DIGITAL"
+	ActValidarCarnetDigital   = "VALIDAR CARNET DIGITAL"
+	ActVerCarnetBiblioteca    = "VER CARNET BIBLIOTECA"
+	ActConfigurarCarnet       = "CONFIGURAR CARNET"
+	ActSolicitarCarnetPerdida = "SOLICITAR CARNET PERDIDA"
+	ActValidarCarnetPerdida   = "VALIDAR CARNET PERDIDA"
+	ActRegistrarPersonaVig    = "REGISTRAR PERSONA"
 
-	ObjPersona     = "persona"
-	ObjPrograma    = "programa"
-	ObjFicha       = "ficha"
-	ObjAprendiz    = "aprendiz"
-	ObjInstructor  = "instructor"
-	ObjAsistencia  = "asistencia"
-	ObjEleccion    = "eleccion"
-	ObjUsuario     = "usuario"
-	ObjVigilancia  = "vigilancia"
-	ObjSemillero   = "semillero"
-	ObjInventario = "inventario"
-	ObjProducto   = "producto"
-	ObjOrden      = "orden"
-	ObjDevolucion = "devolucion"
-	ObjProveedor  = "proveedor"
-	ObjCategoria  = "categoria"
-	ObjMarca      = "marca"
-	ObjContrato   = "contrato"
+	ObjPersona                   = "persona"
+	ObjPrograma                  = "programa"
+	ObjFicha                     = "ficha"
+	ObjAprendiz                  = "aprendiz"
+	ObjInstructor                = "instructor"
+	ObjPersonalOperativoYDeApoyo = "personal-operativo-apoyo"
+	ObjPersonalAdministrativo    = "personal-administrativo"
+	ObjContratista               = "contratista"
+	ObjAsistencia                = "asistencia"
+	ObjEleccion                  = "eleccion"
+	ObjUsuario                   = "usuario"
+	ObjVigilancia                = "vigilancia"
+	ObjSemillero                 = "semillero"
+	ObjCarnet                    = "carnet"
+	ObjInventario                = "inventario"
+	ObjProducto                  = "producto"
+	ObjOrden                     = "orden"
+	ObjDevolucion                = "devolucion"
+	ObjProveedor                 = "proveedor"
+	ObjCategoria                 = "categoria"
+	ObjMarca                     = "marca"
+	ObjContrato                  = "contrato"
+)
+
+// Roles del módulo Personal: usados al vincular una persona a un rol de personal.
+const (
+	RolPersonalOperativoYDeApoyo      = "PERSONAL OPERATIVO Y DE APOYO"
+	RolPersonalAdministrativo         = "PERSONAL ADMINISTRATIVO"
+	RolContratistaPrestacionServicios = "CONTRATISTA PRESTACIÓN DE SERVICIOS"
+	RolBibliotecario                  = "BIBLIOTECARIO"
+	// Perfiles que administran la formación académica (fichas, programas y personal).
+	RolMediaTecnica            = "MEDIA TECNICA"
+	RolFormacionComplementaria = "FORMACION COMPLEMENTARIA"
 )
 
 // IsValidPermiso indica si (obj, act) es un permiso definido en el sistema.
@@ -118,6 +160,15 @@ func AllPermissionPairs() []struct{ Obj, Act string } {
 	for _, act := range PermisosInstructor {
 		out = append(out, struct{ Obj, Act string }{ObjInstructor, act})
 	}
+	for _, act := range PermisosPersonalOperativoYDeApoyo {
+		out = append(out, struct{ Obj, Act string }{ObjPersonalOperativoYDeApoyo, act})
+	}
+	for _, act := range PermisosPersonalAdministrativo {
+		out = append(out, struct{ Obj, Act string }{ObjPersonalAdministrativo, act})
+	}
+	for _, act := range PermisosContratista {
+		out = append(out, struct{ Obj, Act string }{ObjContratista, act})
+	}
 	for _, act := range PermisosAsistencia {
 		out = append(out, struct{ Obj, Act string }{ObjAsistencia, act})
 	}
@@ -130,8 +181,11 @@ func AllPermissionPairs() []struct{ Obj, Act string } {
 	for _, act := range PermisosVigilancia {
 		out = append(out, struct{ Obj, Act string }{ObjVigilancia, act})
 	}
-	for _, act := range PermisosSemillero {
+for _, act := range PermisosSemillero {
 		out = append(out, struct{ Obj, Act string }{ObjSemillero, act})
+	}
+	for _, act := range PermisosCarnet {
+		out = append(out, struct{ Obj, Act string }{ObjCarnet, act})
 	}
 	// Inventario desactivado: no se añaden permisos de inventario a AllPermissionPairs
 	return out

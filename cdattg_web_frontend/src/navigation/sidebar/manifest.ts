@@ -10,14 +10,25 @@ import {
   administracionPaths,
   permisosPaths,
   PERFIL_PATH,
+  notificacionesPaths,
   personasPaths,
   programasPaths,
   instructoresPaths,
-  vigilanciaPaths,
+vigilanciaPaths,
   complementariosPaths,
   semilleroAdminPaths,
+  instructorPaths,
+  bibliotecaPaths,
+  personalOperativoApoyoPaths,
+  personalAdministrativoPaths,
+  contratistasPaths,
+  carnetPaths,
+  carnetPerdidaPaths,
 } from '../../routes/paths';
 import type { SidebarManifestItem } from './types';
+
+/** Perfiles que administran la formación (media técnica y formación complementaria). */
+const ROLES_FORMACION = ['MEDIA TECNICA', 'FORMACION COMPLEMENTARIA'] as const;
 
 /** Orden y agrupación del menú lateral (de arriba hacia abajo). */
 export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
@@ -40,12 +51,73 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
   },
   {
     section: 'Inicio',
+    path: notificacionesPaths.index,
+    label: 'Notificaciones',
+    permission: null,
+    iconKey: 'notificaciones',
+  },
+  {
+    section: 'Inicio',
     path: aprendizPaths.misInasistencias,
     label: 'Mis inasistencias',
     permission: null,
     rolesRequired: ['APRENDIZ'],
     alsoVisibleForPermissions: ['VER MIS INASISTENCIAS'],
     iconKey: 'asistencia/mis-inasistencias',
+  },
+  {
+    section: 'Carnet',
+    path: aprendizPaths.carnetDigital,
+    label: 'Carnet digital',
+    permission: null,
+    rolesRequired: ['APRENDIZ'],
+    alsoVisibleForPermissions: ['VER CARNET DIGITAL'],
+    iconKey: 'carnet',
+  },
+  {
+    section: 'Carnet',
+    path: carnetPerdidaPaths.solicitar,
+    label: 'Pérdida de carnet',
+    permission: 'SOLICITAR CARNET PERDIDA',
+    rolesRequired: ['APRENDIZ'],
+    alsoVisibleForPermissions: ['SOLICITAR CARNET PERDIDA'],
+    iconKey: 'carnet',
+  },
+  {
+    section: 'Carnet',
+    path: carnetPerdidaPaths.revisar,
+    label: 'Reposiciones de carnet',
+    permission: 'VALIDAR CARNET PERDIDA',
+    rolesRequired: ['BIBLIOTECARIO', 'SUPER ADMINISTRADOR'],
+    alsoVisibleForPermissions: ['VALIDAR CARNET PERDIDA'],
+    iconKey: 'carnet',
+  },
+  {
+    section: 'Carnet',
+    path: instructorPaths.validarCarnet,
+    label: 'Validar carnet',
+    permission: 'VALIDAR CARNET DIGITAL',
+    rolesRequired: ['INSTRUCTOR'],
+    alsoVisibleForPermissions: ['VALIDAR CARNET DIGITAL'],
+    iconKey: 'carnet',
+  },
+  {
+    section: 'Carnet',
+    path: bibliotecaPaths.carnets,
+    label: 'Carnets regulares',
+    permission: 'VER CARNET BIBLIOTECA',
+    rolesRequired: ['BIBLIOTECARIO'],
+    alsoVisibleForPermissions: ['VER CARNET BIBLIOTECA'],
+    iconKey: 'carnet',
+  },
+  {
+    section: 'Carnet',
+    path: carnetPaths.configuracion,
+    label: 'Configuración carnet',
+    permission: 'CONFIGURAR CARNET',
+    rolesRequired: ['SUPER ADMINISTRADOR'],
+    alsoVisibleForPermissions: ['CONFIGURAR CARNET'],
+    iconKey: 'carnet',
   },
   {
     section: 'Inicio',
@@ -100,6 +172,27 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
   },
   {
     section: 'Personal',
+    path: personalOperativoApoyoPaths.index,
+    label: 'Personal operativo y de apoyo',
+    permission: 'VER PERSONAL OPERATIVO Y DE APOYO',
+    iconKey: 'personal-operativo-apoyo',
+  },
+  {
+    section: 'Personal',
+    path: personalAdministrativoPaths.index,
+    label: 'Personal administrativo',
+    permission: 'VER PERSONAL ADMINISTRATIVO',
+    iconKey: 'personal-administrativo',
+  },
+  {
+    section: 'Personal',
+    path: contratistasPaths.index,
+    label: 'Contratistas de prestación de servicios',
+    permission: 'VER CONTRATISTAS PRESTACIÓN DE SERVICIOS',
+    iconKey: 'contratistas',
+  },
+  {
+    section: 'Personal',
     path: aprendicesPaths.index,
     label: 'Aprendices',
     permission: 'VER APRENDICES',
@@ -119,6 +212,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: asistenciaPaths.fichas,
     label: 'Tomar asistencia',
     permission: 'VER ASISTENCIA',
+    hiddenForRoles: [...ROLES_FORMACION],
     iconKey: 'asistencia',
   },
   {
@@ -133,7 +227,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: asistenciaPaths.sesionesSinAsistenciaTomada,
     label: 'Panel de toma de asistencia',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR', ...ROLES_FORMACION],
     iconKey: 'asistencia/sin-asistencia',
   },
   {
@@ -141,7 +235,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: asistenciaPaths.analisis,
     label: 'Panel analítico de asistencia',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR', ...ROLES_FORMACION],
     iconKey: 'asistencia/dashboard',
   },
   {
@@ -149,7 +243,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: asistenciaPaths.index,
     label: 'Reporte de asistencia',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', ...ROLES_FORMACION],
     iconKey: 'asistencia/dashboard',
   },
   {
@@ -157,7 +251,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: asistenciaPaths.cargaRetroactiva,
     label: 'Carga retroactiva',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', ...ROLES_FORMACION],
     iconKey: 'asistencia/historial',
   },
   {
@@ -201,7 +295,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: bienestarPaths.casos.index,
     label: 'Casos bienestar',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', 'INSTRUCTOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', 'INSTRUCTOR', ...ROLES_FORMACION],
     iconKey: 'bienestar/casos',
   },
   {
@@ -209,7 +303,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: bienestarPaths.alertasConsecutivas.index,
     label: 'Alertas consecutivas',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', 'INSTRUCTOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', 'BIENESTAR AL APRENDIZ', 'INSTRUCTOR', ...ROLES_FORMACION],
     iconKey: 'bienestar/casos',
   },
 
@@ -219,7 +313,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: infraestructuraPaths.sedes,
     label: 'Sedes',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', ...ROLES_FORMACION],
     iconKey: 'infraestructura/sedes',
   },
   {
@@ -227,7 +321,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: infraestructuraPaths.bloques,
     label: 'Bloques',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', ...ROLES_FORMACION],
     iconKey: 'infraestructura/bloques',
   },
   {
@@ -235,7 +329,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: infraestructuraPaths.pisos,
     label: 'Pisos',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', ...ROLES_FORMACION],
     iconKey: 'infraestructura/pisos',
   },
   {
@@ -243,7 +337,7 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     path: infraestructuraPaths.ambientes,
     label: 'Ambientes',
     permission: null,
-    rolesRequired: ['SUPER ADMINISTRADOR'],
+    rolesRequired: ['SUPER ADMINISTRADOR', ...ROLES_FORMACION],
     iconKey: 'infraestructura/ambientes',
   },
 
@@ -271,6 +365,22 @@ export const SIDEBAR_MANIFEST: SidebarManifestItem[] = [
     permission: null,
     rolesRequired: ['VIGILANTE', 'SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
     iconKey: 'vigilancia/ambientes',
+  },
+  {
+    section: 'Vigilancia',
+    path: vigilanciaPaths.registroPersonas,
+    label: 'Registro de personas',
+    permission: 'REGISTRAR PERSONA',
+    rolesRequired: ['VIGILANTE', 'SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
+    iconKey: 'vigilancia/registro',
+  },
+  {
+    section: 'Vigilancia',
+    path: vigilanciaPaths.cambiosPendientes,
+    label: 'Cambios pendientes',
+    permission: 'REGISTRAR PERSONA',
+    rolesRequired: ['VIGILANTE', 'SUPER ADMINISTRADOR', 'ADMINISTRADOR', 'COORDINADOR'],
+    iconKey: 'vigilancia/cambios',
   },
 
   {

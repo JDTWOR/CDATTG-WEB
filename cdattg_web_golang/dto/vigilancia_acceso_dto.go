@@ -48,6 +48,8 @@ type AccesoPersonaFicha struct {
 	PerfilCompleto  bool     `json:"perfil_completo"`
 	TipoSugerido    string   `json:"tipo_sugerido"` // tipo principal para registrar ingreso
 	Tipos           []string `json:"tipos"`         // todos los roles detectados (aprendiz, instructor, …)
+	TieneFoto       bool     `json:"tiene_foto"`
+	FotoDesdeCarnet bool     `json:"foto_desde_carnet"`
 }
 
 // AccesoFichaResumen ficha de caracterización activa ligada a la persona (solo si status=true).
@@ -98,6 +100,19 @@ type AccesoRegistroResponse struct {
 	Fichas           []AccesoFichaResumen `json:"fichas,omitempty"`
 	SedeID           uint                 `json:"sede_id"`
 	SalidaSinIngreso bool                 `json:"salida_sin_ingreso,omitempty"`
+}
+
+// AccesoCancelarIngresoRequest anula la entrada recién registrada en portería.
+type AccesoCancelarIngresoRequest struct {
+	VisitaID uint  `json:"visita_id" binding:"required"`
+	SedeID   *uint `json:"sede_id"`
+}
+
+// AccesoCancelarIngresoResponse confirma la anulación del ingreso.
+type AccesoCancelarIngresoResponse struct {
+	VisitaID  uint   `json:"visita_id"`
+	Cancelado bool   `json:"cancelado"`
+	Mensaje   string `json:"mensaje"`
 }
 
 // AccesoDentroItem persona actualmente dentro del centro.

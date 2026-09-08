@@ -2,39 +2,57 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/sena/cdattg-web-golang/database"
 	"github.com/sena/cdattg-web-golang/handlers"
 	"github.com/sena/cdattg-web-golang/middleware"
 )
 
 // Literales Casbin y segmentos de ruta reutilizados (Sonar: evitar duplicación).
 const (
-	routeUsuarios         = "/usuarios"
-	routeImport       = "/import"
-	routeIDAprendices = "/:id/aprendices"
+	routeUsuarios       = "/usuarios"
+	routeImport         = "/import"
+	routeImportTemplate = "/import/template"
+	routeImports        = "/imports"
+	routeIDAprendices   = "/:id/aprendices"
+	objPersOpApoyo      = "personal-operativo-apoyo"
+	objPersAdmin        = "personal-administrativo"
 
-	routeSedes      = "/sedes"
-	routeAmbientes  = "/ambientes"
-	routeBloques    = "/bloques"
-	routePisos      = "/pisos"
-	routeJornadas   = "/jornadas"
-	routeDiasSinFormacion = "/dias-sin-formacion"
-	routeDiasSinFormacionFicha = "/dias-sin-formacion-ficha"
+	routeSedes                   = "/sedes"
+	routeAmbientes               = "/ambientes"
+	routeBloques                 = "/bloques"
+	routePisos                   = "/pisos"
+	routeJornadas                = "/jornadas"
+	routeDiasSinFormacion        = "/dias-sin-formacion"
+	routeDiasSinFormacionFicha   = "/dias-sin-formacion-ficha"
 	routeConfiguracionAsistencia = "/configuracion-asistencia"
 
-	permVerPersonas     = "VER PERSONAS"
-	permCrearPersona    = "CREAR PERSONA"
-	permEditarMiPersona = "EDITAR MI PERSONA"
-	permVerFichas       = "VER FICHAS"
-	permCrearFicha      = "CREAR FICHA"
-	permCrearInstructor = "CREAR INSTRUCTOR"
-	permTomarAsistencia = "TOMAR ASISTENCIA"
-	permVerAsistencia          = "VER ASISTENCIA"
-	permVerMisInasistencias    = "VER MIS INASISTENCIAS"
-	permProgramarInstructores  = "PROGRAMAR INSTRUCTORES"
-	permGestionarAprendicesFicha = "GESTIONAR APRENDICES FICHA"
-	permVerMiAgenda            = "VER MI AGENDA"
-	permRegistrarAccesoSede    = "REGISTRAR ACCESO SEDE"
-	permVerAccesoSede          = "VER ACCESO SEDE"
+	permVerPersonas                       = "VER PERSONAS"
+	permCrearPersona                      = "CREAR PERSONA"
+	permEditarMiPersona                   = "EDITAR MI PERSONA"
+	permVerFichas                         = "VER FICHAS"
+	permCrearFicha                        = "CREAR FICHA"
+	permCrearInstructor                   = "CREAR INSTRUCTOR"
+	permTomarAsistencia                   = "TOMAR ASISTENCIA"
+	permVerAsistencia                     = "VER ASISTENCIA"
+	permVerMisInasistencias               = "VER MIS INASISTENCIAS"
+	permProgramarInstructores             = "PROGRAMAR INSTRUCTORES"
+	permGestionarAprendicesFicha          = "GESTIONAR APRENDICES FICHA"
+	permVerPersonalOperativoYDeApoyo      = "VER PERSONAL OPERATIVO Y DE APOYO"
+	permCrearPersonalOperativoYDeApoyo    = "CREAR PERSONAL OPERATIVO Y DE APOYO"
+	permEditarPersonalOperativoYDeApoyo   = "EDITAR PERSONAL OPERATIVO Y DE APOYO"
+	permEliminarPersonalOperativoYDeApoyo = "ELIMINAR PERSONAL OPERATIVO Y DE APOYO"
+	permVerContratista                    = "VER CONTRATISTAS PRESTACIÓN DE SERVICIOS"
+	permCrearContratista                  = "CREAR CONTRATISTAS PRESTACIÓN DE SERVICIOS"
+	permEditarContratista                 = "EDITAR CONTRATISTAS PRESTACIÓN DE SERVICIOS"
+	permEliminarContratista               = "ELIMINAR CONTRATISTAS PRESTACIÓN DE SERVICIOS"
+	permVerPersonalAdministrativo         = "VER PERSONAL ADMINISTRATIVO"
+	permCrearPersonalAdministrativo       = "CREAR PERSONAL ADMINISTRATIVO"
+	permEditarPersonalAdministrativo      = "EDITAR PERSONAL ADMINISTRATIVO"
+	permEliminarPersonalAdministrativo    = "ELIMINAR PERSONAL ADMINISTRATIVO"
+	permVerMiAgenda                       = "VER MI AGENDA"
+	permRegistrarAccesoSede               = "REGISTRAR ACCESO SEDE"
+	permVerAccesoSede                     = "VER ACCESO SEDE"
+	permRegistrarPersona                  = "REGISTRAR PERSONA"
 )
 
 func SetupRouter() *gin.Engine {
@@ -56,6 +74,9 @@ func SetupRouter() *gin.Engine {
 	catalogoHandler := handlers.NewCatalogoHandler()
 	aprendizHandler := handlers.NewAprendizHandler()
 	instructorHandler := handlers.NewInstructorHandler()
+	personalOperativoApoyoHandler := handlers.NewPersonalOperativoApoyoHandler()
+	personalAdministrativoHandler := handlers.NewPersonalAdministrativoHandler()
+	contratistaHandler := handlers.NewContratistaHandler()
 	asistenciaHandler := handlers.NewAsistenciaHandler()
 	handlers.StartAsistenciaAutoFinalize(asistenciaHandler)
 	adminHandler := handlers.NewAdminHandler()
@@ -80,6 +101,7 @@ func SetupRouter() *gin.Engine {
 	configAsistenciaHandler := handlers.NewConfiguracionAsistenciaHandler()
 	eleccionHandler := handlers.NewEleccionHandler()
 	vigilanciaAccesoHandler := handlers.NewVigilanciaAccesoHandler()
+	vigilanciaPersonaHandler := handlers.NewVigilanciaPersonaHandler()
 	complementariosHandler := handlers.NewComplementariosHandler()
 
 	// Rutas públicas
@@ -89,6 +111,7 @@ func SetupRouter() *gin.Engine {
 
 		// WebSocket dashboard asistencia (token por query; solo superadmin; sin AuthMiddleware)
 		api.GET("/asistencias/dashboard/ws", handlers.DashboardWebSocket)
+		registerCarnetImpresora(api, database.DB)
 
 		auth := api.Group("/auth")
 		{
@@ -105,16 +128,20 @@ func SetupRouter() *gin.Engine {
 			personas := protected.Group("/personas")
 			{
 				personas.GET("", middleware.RequirePermission("persona", permVerPersonas), personaHandler.GetAll)
-				personas.GET("/import/template", middleware.RequirePermission("persona", permCrearPersona), personaHandler.DownloadPersonaImportTemplate)
-				personas.GET("/imports", middleware.RequirePermission("persona", permVerPersonas), personaHandler.ListPersonaImports)
+				personas.GET(routeImportTemplate, middleware.RequirePermission("persona", permCrearPersona), personaHandler.DownloadPersonaImportTemplate)
+				personas.GET(routeImports, middleware.RequirePermission("persona", permVerPersonas), personaHandler.ListPersonaImports)
 				personas.POST(routeImport, middleware.RequirePermission("persona", permCrearPersona), personaHandler.ImportPersonas)
 				personas.PUT("/mi-perfil", middleware.RequirePermission("persona", permEditarMiPersona), personaHandler.UpdateMiPerfil)
+				registerPersonaFotoYCarnet(protected, personas, database.DB)
+				registerNotificaciones(protected)
 				personas.GET("/:id", middleware.RequirePermission("persona", "VER PERSONA"), personaHandler.GetByID)
 				personas.POST("", middleware.RequirePermission("persona", permCrearPersona), personaHandler.Create)
 				personas.PUT("/:id", middleware.RequirePermission("persona", "EDITAR PERSONA"), personaHandler.Update)
 				personas.DELETE("/:id", middleware.RequirePermission("persona", "ELIMINAR PERSONA"), personaHandler.Delete)
 				personas.POST("/:id/reset-password", middleware.RequirePermission("persona", "EDITAR PERSONA"), personaHandler.ResetPassword)
 			}
+
+			registerCarnetPerdida(protected)
 
 			programas := protected.Group("/programas-formacion")
 			{
@@ -177,29 +204,59 @@ func SetupRouter() *gin.Engine {
 
 			instructorSelf := protected.Group("/instructor")
 			instructorSelf.GET("/agenda", middleware.RequirePermission("asistencia", permVerMiAgenda), agendaHandler.GetMiAgenda)
-			instructores.GET("/imports", middleware.RequirePermission("instructor", permCrearInstructor), instructorHandler.ListInstructorImports)
+			instructores.GET(routeImports, middleware.RequirePermission("instructor", permCrearInstructor), instructorHandler.ListInstructorImports)
 			instructores.POST(routeImport, middleware.RequirePermission("instructor", permCrearInstructor), instructorHandler.ImportInstructores)
 			instructores.GET("/:id", middleware.RequirePermission("ficha", permVerFichas), instructorHandler.GetByID)
 			instructores.POST("", middleware.RequirePermission("instructor", permCrearInstructor), instructorHandler.CreateFromPersona)
 			instructores.PUT("/:id", middleware.RequirePermission("instructor", "EDITAR INSTRUCTOR"), instructorHandler.Update)
 			instructores.DELETE("/:id", middleware.RequirePermission("instructor", "ELIMINAR INSTRUCTOR"), instructorHandler.Delete)
 
+			personalOperativoApoyo := protected.Group("/" + objPersOpApoyo)
+			personalOperativoApoyo.GET("", middleware.RequirePermission(objPersOpApoyo, permVerPersonalOperativoYDeApoyo), personalOperativoApoyoHandler.GetAll)
+			personalOperativoApoyo.GET(routeImportTemplate, middleware.RequirePermission(objPersOpApoyo, permCrearPersonalOperativoYDeApoyo), personalOperativoApoyoHandler.DownloadTemplate)
+			personalOperativoApoyo.GET(routeImports, middleware.RequirePermission(objPersOpApoyo, permVerPersonalOperativoYDeApoyo), personalOperativoApoyoHandler.ListImports)
+			personalOperativoApoyo.POST(routeImport, middleware.RequirePermission(objPersOpApoyo, permCrearPersonalOperativoYDeApoyo), personalOperativoApoyoHandler.ImportRolPersonal)
+			personalOperativoApoyo.GET("/:id", middleware.RequirePermission(objPersOpApoyo, permVerPersonalOperativoYDeApoyo), personalOperativoApoyoHandler.GetByID)
+			personalOperativoApoyo.POST("", middleware.RequirePermission(objPersOpApoyo, permCrearPersonalOperativoYDeApoyo), personalOperativoApoyoHandler.CreateFromPersona)
+			personalOperativoApoyo.PUT("/:id", middleware.RequirePermission(objPersOpApoyo, permEditarPersonalOperativoYDeApoyo), personalOperativoApoyoHandler.Update)
+			personalOperativoApoyo.DELETE("/:id", middleware.RequirePermission(objPersOpApoyo, permEliminarPersonalOperativoYDeApoyo), personalOperativoApoyoHandler.Delete)
+
+			contratistas := protected.Group("/contratistas")
+			contratistas.GET("", middleware.RequirePermission("contratista", permVerContratista), contratistaHandler.GetAll)
+			contratistas.GET(routeImportTemplate, middleware.RequirePermission("contratista", permCrearContratista), contratistaHandler.DownloadTemplate)
+			contratistas.GET(routeImports, middleware.RequirePermission("contratista", permVerContratista), contratistaHandler.ListImports)
+			contratistas.POST(routeImport, middleware.RequirePermission("contratista", permCrearContratista), contratistaHandler.ImportRolPersonal)
+			contratistas.GET("/:id", middleware.RequirePermission("contratista", permVerContratista), contratistaHandler.GetByID)
+			contratistas.POST("", middleware.RequirePermission("contratista", permCrearContratista), contratistaHandler.CreateFromPersona)
+			contratistas.PUT("/:id", middleware.RequirePermission("contratista", permEditarContratista), contratistaHandler.Update)
+			contratistas.DELETE("/:id", middleware.RequirePermission("contratista", permEliminarContratista), contratistaHandler.Delete)
+
+			personalAdministrativo := protected.Group("/" + objPersAdmin)
+			personalAdministrativo.GET("", middleware.RequirePermission(objPersAdmin, permVerPersonalAdministrativo), personalAdministrativoHandler.GetAll)
+			personalAdministrativo.GET(routeImportTemplate, middleware.RequirePermission(objPersAdmin, permCrearPersonalAdministrativo), personalAdministrativoHandler.DownloadTemplate)
+			personalAdministrativo.GET(routeImports, middleware.RequirePermission(objPersAdmin, permVerPersonalAdministrativo), personalAdministrativoHandler.ListImports)
+			personalAdministrativo.POST(routeImport, middleware.RequirePermission(objPersAdmin, permCrearPersonalAdministrativo), personalAdministrativoHandler.ImportRolPersonal)
+			personalAdministrativo.GET("/:id", middleware.RequirePermission(objPersAdmin, permVerPersonalAdministrativo), personalAdministrativoHandler.GetByID)
+			personalAdministrativo.POST("", middleware.RequirePermission(objPersAdmin, permCrearPersonalAdministrativo), personalAdministrativoHandler.CreateFromPersona)
+			personalAdministrativo.PUT("/:id", middleware.RequirePermission(objPersAdmin, permEditarPersonalAdministrativo), personalAdministrativoHandler.Update)
+			personalAdministrativo.DELETE("/:id", middleware.RequirePermission(objPersAdmin, permEliminarPersonalAdministrativo), personalAdministrativoHandler.Delete)
+
 			asistencias := protected.Group("/asistencias")
 			// Dashboard de asistencia: SUPER ADMINISTRADOR y BIENESTAR AL APRENDIZ
-			asistencias.GET("/dashboard", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.GetDashboard)
+			asistencias.GET("/dashboard", middleware.RequireReporteAsistencia(), asistenciaHandler.GetDashboard)
 			// Casos de Bienestar: oficina (superadmin/bienestar) o instructor líder (alcance a sus fichas)
 			asistencias.GET("/dashboard/casos-bienestar", middleware.RequireSuperAdminBienestarOrInstructor(), asistenciaHandler.GetCasosBienestar)
 			asistencias.GET("/dashboard/casos-bienestar/ficha/:fichaNumero/aprendiz/:aprendizId/detalle", middleware.RequireSuperAdminBienestarOrInstructor(), asistenciaHandler.GetDetalleInasistenciasAprendiz)
 			asistencias.GET("/dashboard/alertas-consecutivas", middleware.RequireSuperAdminBienestarOrInstructor(), asistenciaHandler.GetAlertasConsecutivas)
 			asistencias.GET("/mis-inasistencias", middleware.RequirePermission("asistencia", permVerMisInasistencias), asistenciaHandler.GetMisInasistencias)
 			asistencias.GET("/mis-alertas-consecutivas", middleware.RequirePermission("asistencia", permVerMisInasistencias), asistenciaHandler.GetMisAlertasConsecutivas)
-			asistencias.GET("/dashboard/pendientes-revision-instructor", middleware.RequireSuperAdminOrBienestar(), asistenciaHandler.ListPendientesRevisionAdmin)
-			asistencias.GET("/dashboard/sesiones-sin-asistencia-tomada", middleware.RequireSuperAdminAdminOrCoordinator(), asistenciaHandler.GetSesionesSinAsistenciaTomada)
+			asistencias.GET("/dashboard/pendientes-revision-instructor", middleware.RequireReporteAsistencia(), asistenciaHandler.ListPendientesRevisionAdmin)
+			asistencias.GET("/dashboard/sesiones-sin-asistencia-tomada", middleware.RequireAsistenciaPaneles(), asistenciaHandler.GetSesionesSinAsistenciaTomada)
 			// Entrar a tomar asistencia: solo requiere estar autenticado; el servicio valida que el usuario sea instructor asignado a la ficha.
 			asistencias.POST("/entrar-tomar-asistencia", asistenciaHandler.EntrarTomarAsistencia)
 			asistencias.GET("/reglas", asistenciaHandler.GetReglas)
 			asistencias.POST("", middleware.RequirePermission("asistencia", permTomarAsistencia), asistenciaHandler.CreateSesion)
-			asistencias.POST("/carga-retroactiva", middleware.RequireSuperAdmin(), asistenciaHandler.RegistrarAsistenciaRetroactiva)
+			asistencias.POST("/carga-retroactiva", middleware.RequireSuperAdminOrGestorFormacion(), asistenciaHandler.RegistrarAsistenciaRetroactiva)
 			asistencias.GET("/instructor-ficha/:instructorFichaId", middleware.RequirePermission("asistencia", permVerAsistencia), asistenciaHandler.ListByInstructorFicha)
 			asistencias.GET("/ficha/:fichaId", middleware.RequirePermissionListAsistenciasPorFicha(), asistenciaHandler.ListByFichaAndFechas)
 			// Pendientes de revisión:
@@ -297,9 +354,27 @@ func SetupRouter() *gin.Engine {
 				vigilancia.POST("/lookup", middleware.RequirePermission("vigilancia", permRegistrarAccesoSede), vigilanciaAccesoHandler.Lookup)
 				vigilancia.POST("/ingreso", middleware.RequirePermission("vigilancia", permRegistrarAccesoSede), vigilanciaAccesoHandler.Ingreso)
 				vigilancia.POST("/salida", middleware.RequirePermission("vigilancia", permRegistrarAccesoSede), vigilanciaAccesoHandler.Salida)
+				vigilancia.POST("/cancelar-ingreso", middleware.RequirePermission("vigilancia", permRegistrarAccesoSede), vigilanciaAccesoHandler.CancelarIngreso)
+				vigilancia.GET("/foto", middleware.RequirePermission("vigilancia", permRegistrarAccesoSede), vigilanciaAccesoHandler.VerFotoAcceso)
 				vigilancia.GET("/dentro", middleware.RequirePermission("vigilancia", permVerAccesoSede), vigilanciaAccesoHandler.ListDentro)
 				vigilancia.GET("/historial", middleware.RequirePermission("vigilancia", permVerAccesoSede), vigilanciaAccesoHandler.Historial)
 				vigilancia.GET("/estadisticas", middleware.RequirePermission("vigilancia", permVerAccesoSede), vigilanciaAccesoHandler.Estadisticas)
+			}
+
+			vigilanciaPersonas := protected.Group("/vigilancia/personas")
+			{
+				vigilanciaPersonas.GET("/lookup", middleware.RequirePermission("persona", permRegistrarPersona), vigilanciaPersonaHandler.Lookup)
+				vigilanciaPersonas.PUT("/:id/datos-basicos", middleware.RequirePermission("persona", permRegistrarPersona), vigilanciaPersonaHandler.ActualizarDatosBasicos)
+				vigilanciaPersonas.POST("/:id/foto", middleware.RequirePermission("persona", permRegistrarPersona), vigilanciaPersonaHandler.SubirFoto)
+			}
+
+			cambiosPendientes := protected.Group("/cambios-pendientes")
+			{
+				cambiosPendientes.GET("", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().ListarPendientes)
+				cambiosPendientes.GET("/mi-estado", handlers.NewPersonaCambioPendienteHandler().VerificarPendiente)
+				cambiosPendientes.GET("/:id/foto", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().VerFotoPendiente)
+				cambiosPendientes.PUT("/:id/aprobar", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().Aprobar)
+				cambiosPendientes.PUT("/:id/rechazar", middleware.RequirePermission("persona", permRegistrarPersona), handlers.NewPersonaCambioPendienteHandler().Rechazar)
 			}
 
 			// Complementarios (FPI): credenciales SofiaPlus por operador + verificación de aspirantes
@@ -314,10 +389,12 @@ func SetupRouter() *gin.Engine {
 				complementarios.POST("/consultar-inscripciones", complementariosHandler.ConsultarInscripciones)
 				complementarios.GET("/inscripciones/plantilla", complementariosHandler.DescargarPlantillaInscripciones)
 				complementarios.POST("/inscripciones/consultar-lote", complementariosHandler.ConsultarInscripcionesLote)
+				complementarios.POST("/inscripciones/consultar-lote/reintentar", complementariosHandler.ReintentarInscripciones)
 				complementarios.GET("/inscripciones/consultar-lote/progreso/:lote_id", complementariosHandler.ProgresoLote)
 				complementarios.GET("/inscripciones/consultar-lote/resultados/:lote_id", complementariosHandler.ResultadosLoteInscripciones)
 				complementarios.GET("/plantilla", complementariosHandler.DescargarPlantilla)
 				complementarios.POST("/verificar-lote", complementariosHandler.VerificarLote)
+				complementarios.POST("/verificar-lote/reintentar", complementariosHandler.ReintentarVerificacion)
 				complementarios.GET("/verificar-lote/progreso/:lote_id", complementariosHandler.ProgresoLote)
 				complementarios.GET("/verificar-lote/resultados/:lote_id", complementariosHandler.ResultadosLote)
 
@@ -339,9 +416,9 @@ func SetupRouter() *gin.Engine {
 				aprendices.DELETE("/:id", middleware.RequirePermission("aprendiz", "ELIMINAR APRENDIZ"), aprendizHandler.Delete)
 			}
 
-			// Infraestructura: CRUD de sedes, bloques, pisos y ambientes (sólo SUPER ADMINISTRADOR)
+			// Infraestructura: CRUD de sedes, bloques, pisos y ambientes (superadmin y perfiles de formación)
 			infraestructura := protected.Group("/infraestructura")
-			infraestructura.Use(middleware.RequireSuperAdmin())
+			infraestructura.Use(middleware.RequireSuperAdminOrGestorFormacion())
 			{
 				infraestructura.GET(routeSedes, sedeInfraHandler.List)
 				infraestructura.POST(routeSedes, sedeInfraHandler.Create)

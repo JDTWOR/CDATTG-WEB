@@ -2,6 +2,10 @@
 export const DASHBOARD_PATH = '/dashboard';
 export const PERFIL_PATH = '/perfil';
 
+export const notificacionesPaths = {
+  index: '/notificaciones',
+} as const;
+
 export const personasPaths = {
   index: '/personas',
   importar: '/personas/importar',
@@ -12,12 +16,36 @@ export const instructoresPaths = {
   importar: '/instructores/importar',
 } as const;
 
+export const personalOperativoApoyoPaths = {
+  index: '/personal-operativo-apoyo',
+  importar: '/personal-operativo-apoyo/importar',
+} as const;
+
+export const personalAdministrativoPaths = {
+  index: '/personal-administrativo',
+  importar: '/personal-administrativo/importar',
+} as const;
+
+export const contratistasPaths = {
+  index: '/contratistas',
+  importar: '/contratistas/importar',
+} as const;
+
 export const aprendicesPaths = {
   index: '/aprendices',
 } as const;
 
 export const aprendizPaths = {
   misInasistencias: '/mis-inasistencias',
+  carnetDigital: '/carnet-digital',
+} as const;
+
+export const instructorPaths = {
+  validarCarnet: '/instructor/validar-carnet',
+} as const;
+
+export const bibliotecaPaths = {
+  carnets: '/biblioteca/carnets',
 } as const;
 
 export const programasPaths = {
@@ -115,6 +143,8 @@ export const vigilanciaPaths = {
   porteria: '/vigilancia/porteria',
   reporte: '/vigilancia/accesos',
   ambientes: '/vigilancia/ambientes',
+  registroPersonas: '/vigilancia/registro-personas',
+  cambiosPendientes: '/vigilancia/cambios-pendientes',
 } as const;
 
 export const infraestructuraPaths = {
@@ -141,6 +171,15 @@ export const administracionPaths = {
 
 export const eleccionAprendizPaths = {
   index: '/eleccion-aprendices',
+} as const;
+
+export const carnetPaths = {
+  configuracion: '/carnet/configuracion',
+} as const;
+
+export const carnetPerdidaPaths = {
+  solicitar: '/carnets/perdida/solicitar',
+  revisar: '/carnets/perdida/revisar',
 } as const;
 
 export const complementariosPaths = {

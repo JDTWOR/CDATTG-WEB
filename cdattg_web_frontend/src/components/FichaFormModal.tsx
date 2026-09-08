@@ -36,6 +36,7 @@ const emptyForm = (programaId = 0, tipoFormacion: TipoFormacion = 'FORMACION_REG
   jornada_id: undefined,
   total_horas: undefined,
   status: true,
+  status_manual: null,
   dias_formacion_ids: [],
   horarios: [],
 });
@@ -117,20 +118,20 @@ export function FichaFormModal({
     try {
       setCatalogError('');
       const [progRes, s, a, m, j, d] = await Promise.all([
-        apiService.getProgramasFormacion(1, 200),
+        apiService.getAllProgramasFormacion(),
         apiService.getCatalogosSedes(),
         apiService.getCatalogosAmbientes(),
         apiService.getCatalogosModalidadesFormacion(),
         apiService.getCatalogosJornadas(),
         apiService.getCatalogosDiasFormacion(),
       ]);
-      setProgramas(progRes.data);
+      setProgramas(progRes);
       setSedes(s);
       setAmbientes(a);
       setModalidades(m);
       setJornadas(j);
       setDiasFormacion(d);
-      return progRes.data;
+      return progRes;
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||

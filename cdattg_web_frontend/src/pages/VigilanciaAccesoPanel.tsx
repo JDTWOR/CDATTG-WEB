@@ -16,10 +16,25 @@ const TIPO_LABELS: Record<string, string> = {
   APRENDIZ: 'Aprendiz',
   INSTRUCTOR: 'Instructor',
   ADMINISTRATIVO: 'Administrativo',
+  PERSONAL_OPERATIVO_APOYO: 'Personal operativo y de apoyo',
+  CONTRATISTA: 'Contratista de prestación de servicios',
   VISITANTE: 'Visitante',
 };
 
 const LIVE_REFRESH_MS = 5000;
+
+/** Filtros ya consultados: los que el reporte usa hasta el próximo "Consultar". */
+type FiltrosSnapshot = {
+  regionalId: string;
+  sedeId: string;
+  fechaDesde: string;
+  fechaHasta: string;
+  tipoPersona: string;
+  motivoSalida: string;
+  documento: string;
+  estado: string;
+  soloSinIngreso: boolean;
+};
 
 const MOTIVO_LABELS: Record<string, string> = {
   DESCANSO: 'Descanso',
@@ -255,6 +270,31 @@ export function VigilanciaAccesoPanel() {
   const [liveUpdating, setLiveUpdating] = useState(false);
   const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null);
   const liveInFlight = useRef(false);
+  /** Filtros aplicados (los que el usuario consultó). Los inputs, en cambio, son los editables. */
+  const [filtros, setFiltros] = useState<FiltrosSnapshot>({
+    regionalId: '',
+    sedeId: '',
+    fechaDesde: haceDiasISO(7),
+    fechaHasta: hoyISO(),
+    tipoPersona: '',
+    motivoSalida: '',
+    documento: '',
+    estado: 'todos',
+    soloSinIngreso: false,
+  });
+
+  /** Copia en un momento dado los valores editables del formulario de filtros. */
+  const filtrosDesdeUI = (): FiltrosSnapshot => ({
+    regionalId,
+    sedeId,
+    fechaDesde,
+    fechaHasta,
+    tipoPersona,
+    motivoSalida,
+    documento,
+    estado,
+    soloSinIngreso,
+  });
 
   const sedesFiltradas = useMemo(
     () => sedes.filter((s) => !regionalId || String(s.regional_id ?? '') === regionalId),
@@ -271,42 +311,37 @@ export function VigilanciaAccesoPanel() {
   }, []);
 
   const buildParams = useCallback(
-    (pageOverride?: number): AccesoHistorialParams => {
+    (pageOverride?: number, base?: FiltrosSnapshot): AccesoHistorialParams => {
+      const f = base ?? filtros;
       const params: AccesoHistorialParams = {
-        fecha_desde: fechaDesde || undefined,
-        fecha_hasta: fechaHasta || undefined,
-        tipo_persona: tipoPersona || undefined,
-        motivo_salida: motivoSalida || undefined,
-        documento: documento.trim() || undefined,
-        estado: estado === 'todos' ? undefined : estado,
+        fecha_desde: f.fechaDesde || undefined,
+        fecha_hasta: f.fechaHasta || undefined,
+        tipo_persona: f.tipoPersona || undefined,
+        motivo_salida: f.motivoSalida || undefined,
+        documento: f.documento.trim() || undefined,
+        estado: f.estado === 'todos' ? undefined : f.estado,
         page: pageOverride ?? page,
         page_size: 25,
       };
-      if (regionalId) params.regional_id = Number(regionalId);
-      if (sedeId) params.sede_id = Number(sedeId);
-      if (soloSinIngreso) params.salida_sin_ingreso = true;
+      if (f.regionalId) params.regional_id = Number(f.regionalId);
+      if (f.sedeId) params.sede_id = Number(f.sedeId);
+      if (f.soloSinIngreso) params.salida_sin_ingreso = true;
       return params;
     },
-    [
-      fechaDesde,
-      fechaHasta,
-      tipoPersona,
-      motivoSalida,
-      documento,
-      estado,
-      page,
-      regionalId,
-      sedeId,
-      soloSinIngreso,
-    ],
+    [filtros, page],
   );
 
   const cargarDiaGrafico = useCallback(
-    async (dia: string, overrides?: Partial<AccesoHistorialParams>, opts?: { silent?: boolean }) => {
+    async (
+      dia: string,
+      overrides?: Partial<AccesoHistorialParams>,
+      opts?: { silent?: boolean },
+      base?: FiltrosSnapshot,
+    ) => {
       if (!opts?.silent) setLoadingDia(true);
       try {
         const params: AccesoHistorialParams = {
-          ...buildParams(1),
+          ...buildParams(1, base),
           ...overrides,
           fecha_desde: dia,
           fecha_hasta: dia,
@@ -332,6 +367,7 @@ export function VigilanciaAccesoPanel() {
       overrides?: Partial<AccesoHistorialParams>,
       diaChart?: string,
       opts?: { silent?: boolean },
+      base?: FiltrosSnapshot,
     ) => {
       if (!opts?.silent) {
         setLoading(true);
@@ -339,7 +375,7 @@ export function VigilanciaAccesoPanel() {
       } else {
         setLiveUpdating(true);
       }
-      const params = { ...buildParams(pageOverride), ...overrides };
+      const params = { ...buildParams(pageOverride, base), ...overrides };
       try {
         const [hist, est] = await Promise.all([
           apiService.accesoHistorial(params),
@@ -350,7 +386,7 @@ export function VigilanciaAccesoPanel() {
         if (pageOverride && !opts?.silent) setPage(pageOverride);
         const dia = diaChart ?? diaGrafico;
         if (diaChart) setDiaGrafico(diaChart);
-        await cargarDiaGrafico(dia, overrides, { silent: opts?.silent });
+        await cargarDiaGrafico(dia, overrides, { silent: opts?.silent }, base);
       } catch (e: unknown) {
         if (!opts?.silent) {
           setError(axiosErrorMessage(e, 'No se pudo cargar el reporte.'));
@@ -548,7 +584,12 @@ export function VigilanciaAccesoPanel() {
             type="button"
             className="btn-primary inline-flex items-center gap-2"
             disabled={loading}
-            onClick={() => void cargar(1)}
+            onClick={() => {
+              const f = filtrosDesdeUI();
+              setFiltros(f);
+              setPage(1);
+              void cargar(1, undefined, undefined, undefined, f);
+            }}
           >
             <MagnifyingGlassIcon className="h-5 w-5" />
             {loading ? 'Cargando…' : 'Consultar'}
@@ -561,7 +602,10 @@ export function VigilanciaAccesoPanel() {
               const hoy = hoyISO();
               setFechaDesde(hoy);
               setFechaHasta(hoy);
-              void cargar(1, { fecha_desde: hoy, fecha_hasta: hoy }, hoy);
+              const f = { ...filtrosDesdeUI(), fechaDesde: hoy, fechaHasta: hoy };
+              setFiltros(f);
+              setPage(1);
+              void cargar(1, { fecha_desde: hoy, fecha_hasta: hoy }, hoy, undefined, f);
             }}
           >
             Solo hoy
@@ -575,7 +619,10 @@ export function VigilanciaAccesoPanel() {
               const hasta = hoyISO();
               setFechaDesde(desde);
               setFechaHasta(hasta);
-              void cargar(1, { fecha_desde: desde, fecha_hasta: hasta });
+              const f = { ...filtrosDesdeUI(), fechaDesde: desde, fechaHasta: hasta };
+              setFiltros(f);
+              setPage(1);
+              void cargar(1, { fecha_desde: desde, fecha_hasta: hasta }, undefined, undefined, f);
             }}
           >
             Últimos 7 días
@@ -589,7 +636,10 @@ export function VigilanciaAccesoPanel() {
               const hasta = hoyISO();
               setFechaDesde(desde);
               setFechaHasta(hasta);
-              void cargar(1, { fecha_desde: desde, fecha_hasta: hasta });
+              const f = { ...filtrosDesdeUI(), fechaDesde: desde, fechaHasta: hasta };
+              setFiltros(f);
+              setPage(1);
+              void cargar(1, { fecha_desde: desde, fecha_hasta: hasta }, undefined, undefined, f);
             }}
           >
             Últimos 30 días
@@ -600,7 +650,10 @@ export function VigilanciaAccesoPanel() {
             disabled={loading}
             onClick={() => {
               setTipoPersona('APRENDIZ');
-              void cargar(1, { tipo_persona: 'APRENDIZ' });
+              const f = { ...filtrosDesdeUI(), tipoPersona: 'APRENDIZ' };
+              setFiltros(f);
+              setPage(1);
+              void cargar(1, { tipo_persona: 'APRENDIZ' }, undefined, undefined, f);
             }}
           >
             Solo aprendices
@@ -770,10 +823,16 @@ export function VigilanciaAccesoPanel() {
                       className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
                         item.estado === 'abierto'
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
-                          : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                          : item.estado === 'cancelado'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
+                            : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                       }`}
                     >
-                      {item.estado === 'abierto' ? 'Dentro' : 'Cerrado'}
+                      {item.estado === 'abierto'
+                        ? 'Dentro'
+                        : item.estado === 'cancelado'
+                          ? 'Cancelado'
+                          : 'Cerrado'}
                     </span>
                   </td>
                 </tr>

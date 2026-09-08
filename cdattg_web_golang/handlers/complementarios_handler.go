@@ -155,6 +155,27 @@ func (h *ComplementariosHandler) VerificarLote(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": res})
 }
 
+// ReintentarVerificacion POST /complementarios/verificar-lote/reintentar
+// Recibe JSON {documentos:[{numero_documento, tipo_documento?}]} y arranca un
+// nuevo lote solo con los pendientes (NO_VERIFICADO / NO_REGISTRADO).
+func (h *ComplementariosHandler) ReintentarVerificacion(c *gin.Context) {
+	userID, ok := requireUsuarioComplementarios(c)
+	if !ok {
+		return
+	}
+	var req dto.ReintentarVerificacionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "el cuerpo debe traer la lista 'documentos'"})
+		return
+	}
+	res, err := h.svc.ReintentarVerificacion(userID, req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": res})
+}
+
 // ProgresoLote GET /complementarios/verificar-lote/progreso/:lote_id
 func (h *ComplementariosHandler) ProgresoLote(c *gin.Context) {
 	if _, ok := requireUsuarioComplementarios(c); !ok {
@@ -227,6 +248,27 @@ func (h *ComplementariosHandler) ResultadosLoteInscripciones(c *gin.Context) {
 		return
 	}
 	res, err := h.svc.ResultadosLoteInscripciones(c.Param("lote_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": res})
+}
+
+// ReintentarInscripciones POST /complementarios/inscripciones/consultar-lote/reintentar
+// Recibe JSON {documentos:[{numero_documento, programa, tipo_documento?}]} y
+// arranca un nuevo lote solo con las filas pendientes (NO_VERIFICADO / NO_ENCONTRADO).
+func (h *ComplementariosHandler) ReintentarInscripciones(c *gin.Context) {
+	userID, ok := requireUsuarioComplementarios(c)
+	if !ok {
+		return
+	}
+	var req dto.ReintentarInscripcionesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "el cuerpo debe traer la lista 'documentos' con numero_documento y programa"})
+		return
+	}
+	res, err := h.svc.ReintentarInscripciones(userID, req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

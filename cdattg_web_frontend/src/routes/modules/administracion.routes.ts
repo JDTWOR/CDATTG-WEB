@@ -1,5 +1,5 @@
 import type { RouteObject } from 'react-router-dom';
-import { administracionPaths } from '../paths';
+import { administracionPaths, carnetPaths } from '../paths';
 
 export const administracionRoutes: RouteObject[] = [
   {
@@ -44,6 +44,14 @@ export const administracionRoutes: RouteObject[] = [
     lazy: async () => {
       const { EleccionProcesoDetallePage } = await import('../../pages/elecciones/EleccionProcesoDetallePage');
       return { Component: EleccionProcesoDetallePage };
+    },
+  },
+  {
+    path: carnetPaths.configuracion,
+    handle: { breadcrumb: { label: 'Configuración carnet' } },
+    lazy: async () => {
+      const { CarnetConfigPage } = await import('../../pages/CarnetConfigPage');
+      return { Component: CarnetConfigPage };
     },
   },
 ];

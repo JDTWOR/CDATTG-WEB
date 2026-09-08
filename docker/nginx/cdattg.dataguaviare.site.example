@@ -1,9 +1,9 @@
-# CDATTG - Frontend (React). Copiar a /etc/nginx/sites-available/cdattg.dataguaviare.com.co
-# Luego: sudo ln -s /etc/nginx/sites-available/cdattg.dataguaviare.com.co /etc/nginx/sites-enabled/
-# Certbot: sudo certbot --nginx -d cdattg.dataguaviare.com.co
+# CDATTG - Frontend (React). Copiar a /etc/nginx/sites-available/cdattg.dataguaviare.site
+# Luego: sudo ln -s /etc/nginx/sites-available/cdattg.dataguaviare.site /etc/nginx/sites-enabled/
+# Certbot: sudo certbot --nginx -d cdattg.dataguaviare.site
 
 server {
-    server_name cdattg.dataguaviare.com.co;
+    server_name cdattg.dataguaviare.site;
 
     access_log /var/log/nginx/cdattg.access.log;
     error_log  /var/log/nginx/cdattg.error.log;

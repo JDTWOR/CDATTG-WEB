@@ -16,40 +16,7 @@ import type {
   InstructorItem,
   AprendizResponse,
   PersonaResponse,
-  FichaCaracterizacionRequest,
-  FichaCaracterizacionResponse,
 } from '../types';
-
-function toDateInputString(iso?: string | null): string | undefined {
-  if (iso == null || iso === '') return undefined;
-  const s = String(iso).trim();
-  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  return undefined;
-}
-
-function normalizeDiaIds(ids?: (number | string)[] | null): number[] {
-  if (!ids?.length) return [];
-  return [...new Set(ids.map(Number).filter((n) => !Number.isNaN(n) && n > 0))];
-}
-
-function buildFichaUpdatePayload(f: FichaCaracterizacionResponse, nuevoInstructorId: number): FichaCaracterizacionRequest {
-  return {
-    programa_formacion_id: f.programa_formacion_id ?? null,
-    nombre: f.nombre || f.programa_formacion_nombre || '',
-    ficha: f.ficha,
-    tipo_formacion: f.tipo_formacion || 'FORMACION_REGULAR',
-    instructor_id: nuevoInstructorId,
-    fecha_inicio: toDateInputString(f.fecha_inicio),
-    fecha_fin: toDateInputString(f.fecha_fin),
-    sede_id: f.sede_id ?? null,
-    modalidad_formacion_id: f.modalidad_formacion_id ?? null,
-    ambiente_id: f.ambiente_id ?? null,
-    jornada_id: f.jornada_id ?? null,
-    total_horas: f.total_horas,
-    status: f.status,
-    dias_formacion_ids: normalizeDiaIds(f.dias_formacion_ids),
-  };
-}
 
 type WithDisplayName = {
   nombre?: string;
@@ -138,8 +105,8 @@ export function ModalAsignarFicha(props: Readonly<ModalAsignarFichaProps>) {
         setInstructorLiderId(v);
         return;
       }
-      const payload = buildFichaUpdatePayload(ficha, v);
-      await apiService.updateFichaCaracterizacion(fichaId, payload);
+      // Solo cambia el líder sin tocar horarios, días ni estado de la ficha.
+      await apiService.asignarInstructores(fichaId, { instructor_lider_id: v, instructores: [] });
       setInstructorLiderId(v);
       onSuccess?.();
       await load();
@@ -167,13 +134,13 @@ export function ModalAsignarFicha(props: Readonly<ModalAsignarFichaProps>) {
     let cancelled = false;
     if (isInstructores) {
       const idsAsignados = new Set((asignados as InstructorFichaResponse[]).map((i) => i.instructor_id));
-      apiService.getInstructores(1, 200, search || undefined).then((res) => {
-        if (!cancelled) setNoAsignados(res.data.filter((i) => !idsAsignados.has(i.id)));
+      apiService.getAllInstructores(search || undefined).then((res) => {
+        if (!cancelled) setNoAsignados(res.filter((i) => !idsAsignados.has(i.id)));
       });
     } else {
       const idsAprendices = new Set((asignados as AprendizResponse[]).map((a) => a.persona_id));
-      apiService.getPersonas(1, 200, search).then((res) => {
-        if (!cancelled) setNoAsignados(res.data.filter((p) => !idsAprendices.has(p.id)));
+      apiService.getAllPersonas(search).then((res) => {
+        if (!cancelled) setNoAsignados(res.filter((p) => !idsAprendices.has(p.id)));
       });
     }
     return () => { cancelled = true; };

@@ -7,5 +7,7 @@ export interface SidebarManifestItem {
   rolesRequired?: string[];
   alsoVisibleForRoles?: string[];
   alsoVisibleForPermissions?: string[];
+  /** Roles que nunca deben ver el ítem, aunque cumplan el permiso. */
+  hiddenForRoles?: string[];
   iconKey: string;
 }

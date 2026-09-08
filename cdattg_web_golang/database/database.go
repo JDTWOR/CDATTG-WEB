@@ -87,6 +87,10 @@ func Migrate() error {
 		// Personas del sistema
 		&models.Instructor{},
 		&models.Aprendiz{},
+		&models.PersonalOperativoApoyo{},
+		&models.PersonalAdministrativo{},
+		&models.Contratista{},
+		&models.PersonalRolImportLog{},
 		
 		// Competencias
 		&models.Competencia{},
@@ -157,6 +161,7 @@ func Migrate() error {
 		&models.EleccionVoto{},
 		&models.EleccionResultado{},
 		&models.RepresentanteAprendiz{},
+		&models.CarnetSolicitud{},
 	)
 	
 	if err != nil {

@@ -27,3 +27,6 @@ dist-ssr
 .env
 .env.local
 .env.production
+
+# SonarLint (cache local del IDE)
+.sonarlint/
